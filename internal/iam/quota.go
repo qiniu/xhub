@@ -24,6 +24,7 @@ type quotaNode struct {
 	RPM, TPM         *int
 	Limit            *float64
 	Spend            float64
+	PeriodStart      *time.Time
 	Children         []*quotaNode
 }
 
@@ -147,7 +148,7 @@ func quotaTreeFor(s *xorm.Session, kind, id string) (map[string]*quotaNode, erro
 		}
 	}
 	for _, o := range orgs {
-		nodes["org:"+o.ID] = &quotaNode{ID: o.ID, Kind: "org", Limit: o.MaxBudget, Spend: o.Spend, RPM: o.RPMLimit, TPM: o.TPMLimit}
+		nodes["org:"+o.ID] = &quotaNode{ID: o.ID, Kind: "org", PeriodStart: o.BudgetPeriodStart, Limit: o.MaxBudget, Spend: o.Spend, RPM: o.RPMLimit, TPM: o.TPMLimit}
 	}
 	for _, t := range teams {
 		nodes["team:"+t.ID] = &quotaNode{ID: t.ID, Kind: "team", Parent: "org:" + t.OrganizationID, Limit: t.MaxBudget, Spend: t.Spend, RPM: t.RPMLimit, TPM: t.TPMLimit}
@@ -228,8 +229,9 @@ func singleTeamMember(s *xorm.Session, userID, teamID string) error {
 
 // QuotaPath 检查调用节点及祖先的共享余额。参数 ctx/kind/id/hot 为上下文、主体与未落库消费读取器。
 // 返回消费团队、组织、耗尽层级及错误；固定孩子保留额度，仅共享孩子受父级共享池限制。
+// hot 的可选时间参数仅用于组织最近周期起点，其他节点没有该参数，保留累计消费语义。
 // 调用：会话与密钥检查；检查前补执行到期组织周期，失败拒绝准入；无法约束供应商最终计价超过最后余额的情况。
-func (db *DB) QuotaPath(ctx context.Context, kind, id string, hot func(string, string) float64) (string, string, string, error) {
+func (db *DB) QuotaPath(ctx context.Context, kind, id string, hot func(string, string, ...time.Time) float64) (string, string, string, error) {
 	if err := db.ResetOrganizationBudgets(ctx, time.Now()); err != nil {
 		return "", "", "", err
 	}
@@ -245,7 +247,7 @@ func (db *DB) QuotaPath(ctx context.Context, kind, id string, hot func(string, s
 // QuotaAndRates 为首次准入共用一次归属树读取，避免预算和分钟计划分别扫描同一组织。
 // 参数 ctx/kind/id/hot 与 QuotaPath 相同；返回计费团队、组织、耗尽层级、速率计划及读取错误。
 // 网关首次准入调用；先补执行到期组织周期，再读取预算及热消费，不占分钟容量，后续复核仍读取最新预算。
-func (db *DB) QuotaAndRates(ctx context.Context, kind, id string, hot func(string, string) float64) (string, string, string, live.RatePlan, error) {
+func (db *DB) QuotaAndRates(ctx context.Context, kind, id string, hot func(string, string, ...time.Time) float64) (string, string, string, live.RatePlan, error) {
 	if err := db.ResetOrganizationBudgets(ctx, time.Now()); err != nil {
 		return "", "", "", live.RatePlan{}, err
 	}
@@ -265,7 +267,8 @@ func (db *DB) QuotaAndRates(ctx context.Context, kind, id string, hot func(strin
 
 // quotaPath 检查已读取的归属树及热消费，参数 target 为层级前缀 ID，hot 可空。
 // 返回计费归属及耗尽层级；供 QuotaPath/QuotaAndRates 共用，不更新数据库或速率计数。
-func quotaPath(nodes map[string]*quotaNode, target string, hot func(string, string) float64) (string, string, string, error) {
+// 组织传入持久化周期起点，只计当前周期待入库费用；其他层级保持累计额度与保留额规则。
+func quotaPath(nodes map[string]*quotaNode, target string, hot func(string, string, ...time.Time) float64) (string, string, string, error) {
 	n := nodes[target]
 	if n == nil {
 		return "", "", "", ErrNotFound
@@ -277,7 +280,11 @@ func quotaPath(nodes map[string]*quotaNode, target string, hot func(string, stri
 			if node.Kind == "key" {
 				ref = node.HotID
 			}
-			node.Spend += hot(node.Kind, ref)
+			if node.Kind == "org" && node.PeriodStart != nil {
+				node.Spend += hot(node.Kind, ref, *node.PeriodStart)
+			} else {
+				node.Spend += hot(node.Kind, ref)
+			}
 		}
 	}
 	team, org, scope := "", "", ""

@@ -152,20 +152,28 @@ func New(cfg *config.Config, st *store.Store, db *iam.DB) *Server {
 	return s
 }
 
-// Run accepts connections on addr. The process entry uses it instead of handing a ServeMux to ListenAndServe.
-// 参数 addr（string）：Run使用的addr。空串表示调用方没有提供这项。
-// 返回 error（error）：失败原因，nil 表示这一步成功。
-// 调用：dataplane/execution/serve.go、live/redis.go
-// 测试：authz_test.go、catalog_reads_test.go、chains_test.go
+// Run 绑定 addr 并启动 HTTP 服务及依赖身份库的维护任务，供进程入口调用。
+// 参数 addr 为监听地址，空串按 net.Listen 的默认规则处理；返回监听或服务退出错误。
+// 监听失败不启动后台任务；服务退出取消维护，PostgreSQL-only 部署同样维护预算周期。
+// 测试：organization_maintenance_test.go 验证成功监听后的空闲组织维护与退出清理。
 func (s *Server) Run(addr string) error {
 	ln, err := net.Listen("tcp", addr)
 	if err != nil {
 		return err
 	}
+	return s.serveListener(ln)
+}
+
+// serveListener 在成功监听后启动维护任务并提供 HTTP 服务；ln 为 Run 或隔离测试创建的监听器。
+// 返回服务退出错误；退出取消预算/归档任务，IAM 存在时即启动维护，不以 Redis 可用性为条件。
+func (s *Server) serveListener(ln net.Listener) error {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
- // 监听成功后启动刷写；服务退出时取消，避免启动失败留下后台任务。
- if s.Live != nil { go s.flushLoop(ctx) }
+	// 监听成功且有身份库时启动预算维护及可选 Redis 刷写；纯 PostgreSQL 也必须重置空闲组织预算。
+	// 服务退出时取消，避免启动失败留下后台任务。
+	if s.IAM != nil {
+		go s.flushLoop(ctx)
+	}
 	go s.archiveLoop(ctx)
 	return (&http.Server{Handler: s.Handler()}).Serve(ln)
 }

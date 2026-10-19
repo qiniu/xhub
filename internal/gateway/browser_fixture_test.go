@@ -14,6 +14,7 @@ import (
 	"github.com/qiniu/go-sdk/v7/storagev2/uplog"
 	"github.com/sunqirui1987/xhub/internal/config"
 	"github.com/sunqirui1987/xhub/internal/iam"
+	"github.com/sunqirui1987/xhub/internal/live"
 	"github.com/sunqirui1987/xhub/internal/store"
 	"github.com/sunqirui1987/xhub/internal/util"
 	"io"
@@ -278,9 +279,10 @@ func TestBrowserEnterpriseFixture(t *testing.T) {
 			_ = json.NewEncoder(w).Encode(map[string]bool{"ok": true})
 
 		case "/organization/budget/due":
-			// 私有测试 schema 中只推进本场景组织的到期时刻；实际重置仍走生产事务、审计与准入。
+			// 私有测试 schema 中推进本场景组织的到期时刻，可保留旧周期积压；实际重置仍走生产事务、审计与准入。
 			var body struct {
-				ID string `json:"organization_id"`
+				ID      string `json:"organization_id"`
+				Pending bool   `json:"pending_previous"`
 			}
 			if r.Method != http.MethodPost || json.NewDecoder(r.Body).Decode(&body) != nil {
 				http.Error(w, "POST organization_id required", 400)
@@ -295,6 +297,18 @@ func TestBrowserEnterpriseFixture(t *testing.T) {
 			if n != 1 {
 				http.Error(w, "fixture organization required", 400)
 				return
+			}
+			if body.Pending && s.Live != nil {
+				var org iam.Organization
+				if _, err := db.Engine.ID(body.ID).Get(&org); err != nil || org.MaxBudget == nil {
+					http.Error(w, "fixture budget required", 400)
+					return
+				}
+				old := time.Now().UTC().Add(-time.Hour).Format(time.RFC3339Nano)
+				if err := s.Live.EnqueueSpend(live.SpendLog{RequestID: "budget-pending-" + body.ID, OrgID: body.ID, Model: "budget-period-fixture", Spend: *org.MaxBudget, SpendValid: true, Start: old, End: old}); err != nil {
+					http.Error(w, err.Error(), 500)
+					return
+				}
 			}
 			_ = json.NewEncoder(w).Encode(map[string]bool{"ok": true})
 		case "/usage/failure":

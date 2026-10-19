@@ -60,7 +60,7 @@ export function registerOrganizationManagementScenario(locale: "en" | "zh-CN") {
    await expect.poll(async()=>{const o=await (await page.request.get(GATEWAY+"/organization/info?organization_id="+orgID,{headers})).json();spend=o.spend;return spend}).toBeGreaterThan(0);
    expect((await page.request.patch(GATEWAY+"/organization/update",{headers,data:{organization_id:orgID,max_budget:spend}})).status()).toBe(200);
    expect((await call()).status()).toBe(429);
-   expect((await page.request.post(control+"/organization/budget/due",{data:{organization_id:orgID}})).status()).toBe(200);
+   expect((await page.request.post(control+"/organization/budget/due",{data:{organization_id:orgID,pending_previous:true}})).status()).toBe(200);
    expect((await call()).status()).toBe(200);
    const reset=await (await page.request.get(GATEWAY+"/organization/info?organization_id="+orgID,{headers})).json();
    expect(reset.budget_duration).toBe("7d");expect(reset.administrator_count).toBe(1);

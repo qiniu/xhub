@@ -104,3 +104,5 @@ Defines `RateScope`, the `rateAdmission` Lua program, `AdmitRates`, and `AdmitRa
 ### `redis.go`
 
 Defines `Client`, `SpendLog`, key construction, connection lifecycle, cooldown/latency/minute telemetry, unacknowledged spend reads, reliable queue operations, and TTL strings. Its scripts provide enqueue idempotency and atomic acknowledgement; private parsers may omit bad telemetry values but never skip past a corrupt reliable-queue entry.
+
+Organization admission reads `HotSpendSince(id, periodStart)` so unacknowledged previous-period charges do not occupy a renewed budget. Enqueue and acknowledgement atomically maintain a per-organization timestamp index. Queues left by an older deployment without that index use their original start times until drained; missing timestamps are counted conservatively. Other budget levels retain cumulative spend.

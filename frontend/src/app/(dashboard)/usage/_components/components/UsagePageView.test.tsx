@@ -1139,6 +1139,33 @@ describe("UsagePage", () => {
       expect(screen.getByText(translate("en", "pages.usage.endpointActivity"))).toBeInTheDocument();
     });
   });
+  /** 前置已加载用量并选中非费用标签；切换日期经历真实 hook 的加载卸载，验证返回所选标签；自动清理 DOM/mock。 */
+  it.each(["Model Activity", "Key Activity", "Endpoint Activity"])("preserves %s across range requests", async (tab) => {
+    const user = userEvent.setup();
+    renderWithProviders(<UsagePage {...defaultProps} />);
+    await user.click(await screen.findByRole("tab", { name: tab, exact: true }));
+    let resolve!: (value: typeof mockSpendData) => void;
+    mockUserDailyActivityAggregatedCall.mockImplementationOnce(() => new Promise((done) => { resolve = done; }));
+    await user.click(screen.getByTestId("pick-a-different-range"));
+    await waitFor(() => expect(screen.queryByRole("tab", { name: tab, exact: true })).not.toBeInTheDocument());
+    await act(async () => resolve(mockSpendData));
+    expect(await screen.findByRole("tab", { name: tab, exact: true })).toHaveAttribute("aria-selected", "true");
+  });
+
+  /** 前置已选 Key Activity，查询失败后重试恢复；确认错误不伪造数据且仍回到原标签，自动卸载清理。 */
+  it("preserves the usage tab through an error and retry", async () => {
+    const user = userEvent.setup();
+    renderWithProviders(<UsagePage {...defaultProps} />);
+    await user.click(await screen.findByRole("tab", { name: "Key Activity", exact: true }));
+    mockUserDailyActivityAggregatedCall.mockRejectedValueOnce(new Error("offline"));
+    mockUserDailyActivityCall.mockRejectedValueOnce(new Error("offline"));
+    await user.click(screen.getByTestId("pick-a-different-range"));
+    expect(await screen.findByRole("button", { name: "Retry usage", exact: true })).toBeVisible();
+    expect(screen.queryByRole("tab", { name: "Key Activity", exact: true })).not.toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "Retry usage", exact: true }));
+    expect(await screen.findByRole("tab", { name: "Key Activity", exact: true })).toHaveAttribute("aria-selected", "true");
+  });
+
   /** 前置两种用量源均失败；验证持续错误、无零值统计及重试成功恢复，自动清理 DOM 和 mock。 */
   it("keeps an explicit error instead of zero usage and recovers on retry", async () => {
     mockUserDailyActivityAggregatedCall.mockRejectedValue(new Error("offline"));

@@ -89,6 +89,8 @@ const UsagePage: React.FC<UsagePageProps> = ({ teams, organizations }) => {
   // For admins: null means global view (all users), a string means filter by that user
   // For non-admins: always set to their own user ID
   const [selectedUserId, setSelectedUserId] = useState<string | null>(isAdmin ? null : userID || null);
+  // 请求切换范围或失败时内容会卸载，选中标签保留在页面状态中，恢复后继续当前视图。
+  const [activeTab, setActiveTab] = useState("cost");
   const [modelViewType, setModelViewType] = useState<ModelViewType>("groups");
   const [isGlobalExportModalOpen, setIsGlobalExportModalOpen] = useState(false);
   const [selectedUsageView, setUsageView] = useState<UsageOption>("global");
@@ -421,7 +423,7 @@ const UsagePage: React.FC<UsagePageProps> = ({ teams, organizations }) => {
           {gatewayFailed && <div role="alert" className="rounded-lg border p-4 space-y-3">
             <p>{t("usageLoad.gatewayFailed")}</p><Button variant="outline" onClick={retryUsage}>{t("usageLoad.retry")}</Button>
           </div>}
-          <Tabs defaultValue="cost">
+          <Tabs value={activeTab} onValueChange={setActiveTab}>
             <div className="flex flex-wrap items-center justify-between gap-3">
               <TabsList>
                     <TabsTrigger value="cost" className="flex-none px-3">

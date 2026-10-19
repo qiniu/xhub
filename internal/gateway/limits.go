@@ -318,7 +318,7 @@ func (s *Server) keyBudgetOK(ctx context.Context, p *auth.Principal) error {
 	if err != nil {
 		return errKeyGone
 	}
-	if overBudget(org.MaxBudget, org.Spend, s.hotSpendRef("org", org.ID)) {
+	if overBudget(org.MaxBudget, org.Spend, s.hotSpendRef("org", org.ID, organizationPeriod(org))) {
 		return errBudget{scope: "Organization"}
 	}
 	// And the organization is the widest scope in the chain.
@@ -369,12 +369,16 @@ func overBudget(ceiling *float64, spent, hot float64) bool {
 
 // 读取这个主体还没刷进数据库的热花费。没有 Redis 时为 0。
 // 参数 kind（string）：分类名，用来选择限额主体、日志类型或官方端点；id（string）：热花费引用使用的主键。空串表示调用方没有指定记录。
+// 可选 since 为组织当前周期起点；其他层级或未设置周期继续使用累计花费。
 // 返回 float64（float64）：热花费引用。没有计数或类型不符时为 0。
 // 调用：仅在 limits.go 内使用
 // 测试：无直接单测
-func (s *Server) hotSpendRef(kind, id string) float64 {
+func (s *Server) hotSpendRef(kind, id string, since ...time.Time) float64 {
 	if s.Live == nil {
 		return 0
+	}
+	if kind == "org" && len(since) > 0 && !since[0].IsZero() {
+		return s.Live.HotSpendSince(id, since[0])
 	}
 	return s.Live.HotSpend(live.SpendRef(kind, id))
 }
@@ -446,4 +450,13 @@ func (s *Server) admitLocalRatePlan(plan live.RatePlan, est int, now time.Time) 
 		s.tpmHits[id] = append(s.tpmHits[id], tokHit{t: now, n: est})
 	}
 	return ""
+}
+
+// organizationPeriod 返回组织最近预算起点；参数 org 为数据库快照，未充值返回零时刻。
+// keyBudgetOK 调用，与额度树准入保持相同周期过滤，不写入存储。
+func organizationPeriod(org *iam.Organization) time.Time {
+	if org.BudgetPeriodStart != nil {
+		return *org.BudgetPeriodStart
+	}
+	return time.Time{}
 }

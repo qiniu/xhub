@@ -7,7 +7,35 @@ import (
 	"math"
 	"sync"
 	"testing"
+	"time"
 )
+
+// TestQuotaHotPeriod 验证额度树仅向组织热消费读取器传入周期起点，其他层级仍累计。
+// 参数 t 为测试上下文，无返回；正常/边界和耗尽分支使用内存节点，不写数据库，无需清理。
+func TestQuotaHotPeriod(t *testing.T) {
+	start := time.Now().UTC()
+	for _, spent := range []float64{0, 10} {
+		limit := 10.0
+		org := &quotaNode{ID: "org", Kind: "org", Limit: &limit, PeriodStart: &start}
+		user := &quotaNode{ID: "user", Kind: "user", Parent: "org:org"}
+		nodes := map[string]*quotaNode{"org:org": org, "user:user": user}
+		_, _, scope, err := quotaPath(nodes, "user:user", func(kind, id string, since ...time.Time) float64 {
+			if kind == "org" {
+				if len(since) != 1 || !since[0].Equal(start) {
+					t.Fatal("组织热消费缺少周期")
+				}
+				return spent
+			}
+			if len(since) != 0 {
+				t.Fatal("非组织不应按组织周期清空")
+			}
+			return 0
+		})
+		if err != nil || (scope == "org") != (spent == 10) {
+			t.Fatalf("周期额度判断错误: %s %v", scope, err)
+		}
+	}
+}
 
 // quotaLimit 构造测试额度指针；参数 value 为美元，返回独立指针，无副作用，供边界表使用。
 func quotaLimit(value float64) *float64 { return &value }
@@ -89,7 +117,7 @@ func TestQuotaHierarchy(t *testing.T) {
 		t.Fatalf("会话不能使用密钥保留额: %s %v", scope, err)
 	}
 	// 热消费已占用个人金额，但相同消费也减少密钥保留额，不能重复占用。
-	_, _, scope, err = db.QuotaPath(ctx, "key", k.ID, func(kind, id string) float64 {
+	_, _, scope, err = db.QuotaPath(ctx, "key", k.ID, func(kind, id string, _ ...time.Time) float64 {
 		if kind == "key" && id == k.TokenHash {
 			return 100
 		}

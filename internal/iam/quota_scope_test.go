@@ -4,6 +4,7 @@ import (
 	"errors"
 	"reflect"
 	"testing"
+	"time"
 )
 
 // TestQuotaAndRatesScope 验证请求内共用额度及速率归属；前置两个隔离组织和一个个人，验证兄弟保留及跨组织隔离。
@@ -41,7 +42,7 @@ func TestQuotaAndRatesScope(t *testing.T) {
 		t.Fatal(err)
 	}
 	hotIDs := map[string]bool{}
-	tid, oid, scope, empty, err := db.QuotaAndRates(ctx, "key", key.ID, func(kind, id string) float64 { hotIDs[kind+":"+id] = true; return 0 })
+	tid, oid, scope, empty, err := db.QuotaAndRates(ctx, "key", key.ID, func(kind, id string, _ ...time.Time) float64 { hotIDs[kind+":"+id] = true; return 0 })
 	if err != nil || tid != team.ID || oid != org.ID || scope != "org" || len(empty.Nodes) != 0 {
 		t.Fatalf("兄弟固定额度应阻止共享调用并不生成速率计划: team=%s org=%s scope=%s plan=%+v err=%v", tid, oid, scope, empty, err)
 	}
@@ -66,7 +67,7 @@ func TestQuotaAndRatesScope(t *testing.T) {
 		t.Fatal(err)
 	}
 	hotIDs = map[string]bool{}
-	tid, oid, scope, plan, err = db.QuotaAndRates(ctx, "user", personal.ID, func(kind, id string) float64 { hotIDs[kind+":"+id] = true; return 0 })
+	tid, oid, scope, plan, err = db.QuotaAndRates(ctx, "user", personal.ID, func(kind, id string, _ ...time.Time) float64 { hotIDs[kind+":"+id] = true; return 0 })
 	if err != nil || tid != "" || oid != "" || scope != "" || len(plan.Nodes) != 2 || len(hotIDs) != 2 || !hotIDs["user:"+personal.ID] || !hotIDs["key:"+personalKey.TokenHash] {
 		t.Fatalf("无团队个人必须只读取自己及个人密钥: %s %s %s %+v %+v %v", tid, oid, scope, plan, hotIDs, err)
 	}

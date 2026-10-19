@@ -129,6 +129,8 @@ const EntityUsage: React.FC<EntityUsageProps> = ({
   const t = useT();
   const { teams } = useTeams();
   const [selectedTags, setSelectedTags] = useState<string[]>([]);
+  // 请求切换范围或失败时内容会卸载，选中标签保留在页面状态中，恢复后继续当前视图。
+  const [activeTab, setActiveTab] = useState("cost");
   const [modelViewType, setModelViewType] = useState<ModelViewType>("groups");
   const [topKeysLimit, setTopKeysLimit] = useState<number>(5);
   const [topModelsLimit, setTopModelsLimit] = useState<number>(5);
@@ -664,7 +666,7 @@ const EntityUsage: React.FC<EntityUsageProps> = ({
         <p>{t("usageLoad.partial", { loaded: progress.currentPage, total: progress.totalPages })}</p>
         <Button variant="outline" onClick={retry}>{t("usageLoad.retry")}</Button>
       </div>}
-      <Tabs defaultValue={tabs[0].key}>
+      <Tabs value={activeTab} onValueChange={setActiveTab}>
         <TabsList className="mt-1">
           {tabs.map(({ key, label }) => (
             <TabsTrigger key={key} value={key} className="flex-none px-3">

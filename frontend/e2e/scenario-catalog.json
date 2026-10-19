@@ -2573,5 +2573,33 @@
     "title": "messages bridge preserves public thinking and file tool continuation",
     "kind": "implemented",
     "environment": "default offline"
+  },
+  {
+    "id": "SC-358",
+    "file": "e2e/scenarios/regression/organization-management-en.test.ts",
+    "title": "organization budgets filters and roles en",
+    "kind": "implemented",
+    "environment": "default offline"
+  },
+  {
+    "id": "SC-359",
+    "file": "e2e/scenarios/regression/organization-management-zh-CN.test.ts",
+    "title": "organization budgets filters and roles zh-CN",
+    "kind": "implemented",
+    "environment": "default offline"
+  },
+  {
+    "id": "SC-360",
+    "file": "e2e/scenarios/regression/usage-error-en.test.ts",
+    "title": "usage errors fallback partial pages and retry en",
+    "kind": "implemented",
+    "environment": "default offline"
+  },
+  {
+    "id": "SC-361",
+    "file": "e2e/scenarios/regression/usage-error-zh-CN.test.ts",
+    "title": "usage errors fallback partial pages and retry zh-CN",
+    "kind": "implemented",
+    "environment": "default offline"
   }
 ]

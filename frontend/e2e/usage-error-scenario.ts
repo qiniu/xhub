@@ -42,18 +42,21 @@ export function registerUsageErrorScenario(locale:"en"|"zh-CN"){
    await fault("aggregated");await page.reload();await expect(page.getByTestId("daily-spend-settled")).toBeVisible();
    await expect(page.getByText(tr("usageLoad.failed"),{exact:true})).toHaveCount(0);
    expect((await page.request.post(control+"/usage/seed-pages",{data:{user_id:userID}})).status()).toBe(200);
+   await page.getByRole("tab",{name:tr("pages.usage.keyActivity"),exact:true}).click();
    await fault("page2");
    await page.getByRole("button",{name:tr("Select Time Range"),exact:true}).click();
    const start=new Date(Date.now()-60*86400000).toISOString().slice(0,10);
    await page.getByLabel(tr("Start date"),{exact:true}).fill(start);
    await page.getByRole("button",{name:tr("Apply"),exact:true}).click();
    await expect(page.getByRole("alert").filter({hasText:translate(locale,"usageLoad.partial",{loaded:1,total:2})})).toBeVisible();
-   await expect(page.getByTestId("daily-spend-settled")).toBeVisible();
+   await expect(page.getByRole("tab",{name:tr("pages.usage.keyActivity"),exact:true})).toHaveAttribute("aria-selected","true");
    await expect(page.getByRole("button",{name:tr("pages.usage.exportData"),exact:true})).toBeDisabled();
    await fault("");await page.getByRole("button",{name:tr("usageLoad.retry"),exact:true}).click();
    await expect(page.getByRole("alert").filter({hasText:translate(locale,"usageLoad.partial",{loaded:1,total:2})})).toHaveCount(0);
-   await expect(page.getByTestId("daily-spend-settled")).toBeVisible();
    await expect(page.getByRole("button",{name:tr("pages.usage.exportData"),exact:true})).toBeEnabled();
+   await expect(page.getByRole("tab",{name:tr("pages.usage.keyActivity"),exact:true})).toHaveAttribute("aria-selected","true");
+   await page.getByRole("tab",{name:tr("pages.usage.cost"),exact:true}).click();
+   await expect(page.getByTestId("daily-spend-settled")).toBeVisible();
    // 成功空范围才允许展示空统计，不沿用刚才的 52 日数据。
    await page.getByRole("button",{name:tr("Select Time Range"),exact:true}).click();
    await page.getByLabel(tr("Start date"),{exact:true}).fill("2020-01-01");await page.getByLabel(tr("End date"),{exact:true}).fill("2020-01-02");
@@ -64,14 +67,19 @@ export function registerUsageErrorScenario(locale:"en"|"zh-CN"){
    await login(page,"admin",MASTER,locale);
    await expect(page.getByText(tr("nav.apiKeys"),{exact:true}).first()).toBeVisible();
    await stableGoto(page,"/usage");
-   expect((await page.request.post(control+"/usage/legacy")).status()).toBe(200);legacy=true;
    await page.getByRole("tab",{name:tr("pages.usage.team"),exact:true}).click();
+   await page.getByRole("tab",{name:tr("Key Activity"),exact:true}).click();
+   expect((await page.request.post(control+"/usage/legacy")).status()).toBe(200);legacy=true;
+   await page.getByRole("button",{name:tr("Select Time Range"),exact:true}).click();
+   await page.getByLabel(tr("Start date"),{exact:true}).fill("2025-01-01");
+   await page.getByRole("button",{name:tr("Apply"),exact:true}).click();
    await expect(page.getByText(tr("usageLoad.failed"),{exact:true})).toBeVisible();
    await expect(page.getByPlaceholder(tr("Search teams by alias..."),{exact:true})).toBeVisible();
    await expect(page.getByRole("button",{name:tr("Export Data"),exact:true})).toBeDisabled();
    expect((await page.request.post(control+"/usage/migrate")).status()).toBe(200);legacy=false;
    await page.getByRole("button",{name:tr("usageLoad.retry"),exact:true}).click();
    await expect(page.getByRole("button",{name:tr("Export Data"),exact:true})).toBeEnabled();
+   await expect(page.getByRole("tab",{name:tr("Key Activity"),exact:true})).toHaveAttribute("aria-selected","true");
    await info.attach("usage-recovery",{body:JSON.stringify({realDatabaseFailure:500,fallback:true,partialPages:[1,2],recovered:true,emptyRange:true}),contentType:"application/json"});
   }finally{
    test.setTimeout(test.info().timeout+30000);

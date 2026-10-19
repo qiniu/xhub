@@ -2,6 +2,7 @@ package live
 
 import (
 	"context"
+	"encoding/json"
 	"math"
 	"net"
 	"os/exec"
@@ -11,6 +12,89 @@ import (
 
 	"github.com/redis/go-redis/v9"
 )
+
+// TestOrganizationPendingPeriod 前置独立 Redis，验证边界时间、迟到旧费用、去重、确认与升级遗留队列。
+// 参数 t 为测试上下文，无返回值；非法时间保守按当前计入，损坏索引不得部分写入；testRedis 负责清理进程。
+func TestOrganizationPendingPeriod(t *testing.T) {
+	c := testRedis(t)
+	ctx := t.Context()
+	cutoff := time.Now().UTC().Truncate(time.Microsecond)
+	row := SpendLog{RequestID: "old", OrgID: "org", APIKey: "key", Spend: 10, SpendValid: true, Start: cutoff.Add(-time.Second).Format(time.RFC3339Nano)}
+	if err := c.EnqueueSpend(row); err != nil {
+		t.Fatal(err)
+	}
+	if got := c.HotSpendSince("org", cutoff); got != 0 {
+		t.Fatalf("旧周期费用占新额度: %v", got)
+	}
+	row.RequestID, row.Start, row.Spend = "boundary", cutoff.Format(time.RFC3339Nano), 2
+	if err := c.EnqueueSpend(row); err != nil {
+		t.Fatal(err)
+	}
+	if err := c.EnqueueSpend(row); err != nil {
+		t.Fatal(err)
+	}
+	if got := c.HotSpendSince("org", cutoff); got != 2 {
+		t.Fatalf("起点应包含且去重: %v", got)
+	}
+	row.RequestID, row.Start, row.Spend = "late-old", cutoff.Add(-time.Hour).Format(time.RFC3339Nano), 3
+	if err := c.EnqueueSpend(row); err != nil {
+		t.Fatal(err)
+	}
+	if got := c.HotSpendSince("org", cutoff); got != 2 {
+		t.Fatalf("迟到旧费用污染周期: %v", got)
+	}
+	_, raw := c.PeekLogs(10)
+	if err := c.AckFlushed(map[string]float64{"org/org": 15, "key/key": 15}, len(raw), raw[0]); err != nil {
+		t.Fatal(err)
+	}
+	if got := c.HotSpendSince("org", cutoff); got != 0 {
+		t.Fatalf("确认未释放时间索引: %v", got)
+	}
+	if n := c.rdb.ZCard(ctx, "xhub:spend:org-pending:org").Val(); n != 0 {
+		t.Fatalf("确认遗留索引: %d", n)
+	}
+	row.RequestID, row.Start, row.Spend = "indexed-missing-time", "", 1
+	if err := c.EnqueueSpend(row); err != nil {
+		t.Fatal(err)
+	}
+	if got := c.HotSpendSince("org", cutoff.Add(time.Hour)); got != 1 {
+		t.Fatalf("缺失时间不能被后续周期排除: %v", got)
+	}
+	_, raw = c.PeekLogs(10)
+	if err := c.AckFlushed(map[string]float64{"org/org": 1, "key/key": 1}, 1, raw[0]); err != nil {
+		t.Fatal(err)
+	}
+	// 直接还原升级前的队列形态，没有新索引；新旧事件混合时必须兼容，不可漏算当前费用。
+	row.RequestID, row.Start, row.Spend = "legacy-current", cutoff.Format(time.RFC3339Nano), 4
+	encoded, _ := json.Marshal(row)
+	if err := c.rdb.RPush(ctx, "xhub:spendlog", encoded).Err(); err != nil {
+		t.Fatal(err)
+	}
+	if got := c.HotSpendSince("org", cutoff); got != 4 {
+		t.Fatalf("旧队列兼容漏费: %v", got)
+	}
+	row.RequestID, row.Start, row.Spend = "missing-time", "", 1
+	if err := c.EnqueueSpend(row); err != nil {
+		t.Fatal(err)
+	}
+	if got := c.HotSpendSince("org", cutoff); got != 5 {
+		t.Fatalf("非法时间应保守计入: %v", got)
+	}
+	if got := c.HotSpendSince("other", cutoff); got != 0 {
+		t.Fatalf("跨组织污染: %v", got)
+	}
+	if err := c.rdb.Set(ctx, "xhub:spend:org-pending:broken", "bad", 0).Err(); err != nil {
+		t.Fatal(err)
+	}
+	row.RequestID, row.OrgID = "rejected", "broken"
+	before := c.rdb.LLen(ctx, "xhub:spendlog").Val()
+	if err := c.EnqueueSpend(row); err == nil {
+		t.Fatal("损坏索引未拒绝入队")
+	}
+	if c.rdb.LLen(ctx, "xhub:spendlog").Val() != before || c.rdb.HExists(ctx, "xhub:spend:requests", "rejected").Val() {
+		t.Fatal("拒绝入队却部分写入")
+	}
+}
 
 // testRedis 为热状态单元测试启动随机端口的专用 Redis；参数 t 提供断言和清理注册。
 // 返回独立客户端；缺少 Redis 二进制时跳过，连接失败时报错，结束关闭客户端并终止进程，不访问共享数据。

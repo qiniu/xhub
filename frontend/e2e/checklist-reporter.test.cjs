@@ -1,6 +1,24 @@
 const {test} = require('node:test');
 const assert = require('node:assert/strict');
 const Reporter = require('./checklist-reporter.cjs');
+/** 目的：组织与用量双语回归必须登记精确文件/标题；前置静态清单，验证四个独立场景，无文件写入或清理。 */
+test('组织与用量四个新场景全部登记且文件存在', () => {
+  const fs = require('node:fs');
+  const path = require('node:path');
+  const catalog = require('./scenario-catalog.json');
+  const {evaluateScenarios} = require('./scenario-coverage.cjs');
+  const results = [];
+  for (const [name,title] of [['organization-management','organization budgets filters and roles '],['usage-error','usage errors fallback partial pages and retry ']]) {
+    for (const locale of ['en','zh-CN']) {
+      const file = `e2e/scenarios/regression/${name}-${locale}.test.ts`;
+      assert.ok(fs.existsSync(path.join(__dirname,'..',file)), file);
+      results.push({file,title:title+locale,status:'passed'});
+    }
+  }
+  const report=evaluateScenarios(catalog,results);
+  assert.deepEqual(report.unregistered,[]);
+  assert.equal(report.passed,4);
+});
 /** 目的：全局启动失败必须可见且不暴露凭据；前置内存错误对象，验证普通/空错误及敏感值，finally 恢复输出，无外部副作用。 */
 test('启动错误可见且隐藏连接串和凭据', () => {
   const messages = [];

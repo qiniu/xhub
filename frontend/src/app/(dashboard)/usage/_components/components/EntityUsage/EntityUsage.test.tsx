@@ -1163,4 +1163,16 @@ describe("EntityUsage", () => {
     expect(screen.queryByText(/The values are unknown/)).not.toBeInTheDocument();
   });
 
+  /** 前置实体统计成功并选非费用标签，日期切换期间隐藏数据，响应恢复后保留标签；自动卸载清理 mock，无后台写入。 */
+  it.each(["Model Activity", "Key Activity", "Endpoint Activity"])("preserves entity %s across date requests", async (tab) => {
+    const { rerender } = render(<EntityUsage {...defaultProps} />);
+    fireEvent.click(await screen.findByRole("tab", { name: tab, exact: true }));
+    let resolve!: (value: typeof mockSpendData) => void;
+    mockTagDailyActivityCall.mockImplementationOnce(() => new Promise((done) => { resolve = done; }));
+    rerender(<EntityUsage {...defaultProps} dateValue={{ from: new Date("2025-02-01"), to: new Date("2025-02-28") }} />);
+    await waitFor(() => expect(screen.queryByRole("tab", { name: tab, exact: true })).not.toBeInTheDocument());
+    await act(async () => resolve(mockSpendData));
+    expect(await screen.findByRole("tab", { name: tab, exact: true })).toHaveAttribute("aria-selected", "true");
+  });
+
 });

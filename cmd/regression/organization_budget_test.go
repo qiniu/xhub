@@ -1,10 +1,74 @@
 package regression
 
 import (
+	"encoding/json"
+	"github.com/sunqirui1987/xhub/internal/live"
 	"net/url"
 	"testing"
 	"time"
 )
+
+// TestOrganizationBudgetPendingPeriod 验证 Redis 旧周期积压及重置后迟到旧账单不会阻塞新预算，当前费用仍执行 429。
+// 前置专用 Redis、隔离 PostgreSQL 和本地真实 HTTP 网关；同时覆盖升级前无索引队列、虚拟 Key 与会话入口。
+// 参数 t 为测试上下文，无返回；原始队列经生产 Flush 唯一落库，harness 和 isolatedSpendRedis 清理资源。
+func TestOrganizationBudgetPendingPeriod(t *testing.T) {
+	for _, legacy := range []bool{false, true} {
+		t.Run(map[bool]string{false: "indexed", true: "legacy"}[legacy], func(t *testing.T) {
+			rdb := isolatedSpendRedis(t)
+			h := newHarness(t, chatDeployment("budget-pending-model"))
+			admin := h.adminSession()
+			owner := h.openScope(t, admin, "pending-budget")
+			h.ok("PATCH", "/organization/update", admin, map[string]any{"organization_id": owner.orgID, "max_budget": 10, "budget_duration": "24h"})
+			old := time.Now().Add(-2 * time.Hour).UTC()
+			row := live.SpendLog{RequestID: "pending-previous", OrgID: owner.orgID, Model: "budget-pending-model", Spend: 10, SpendValid: true, Start: old.Format(time.RFC3339Nano), End: old.Add(time.Second).Format(time.RFC3339Nano)}
+			if legacy {
+				raw, _ := json.Marshal(row)
+				if err := rdb.RPush(t.Context(), "xhub:spendlog", raw).Err(); err != nil {
+					t.Fatal(err)
+				}
+				if err := rdb.Set(t.Context(), "xhub:spend:org/"+owner.orgID, 10, 0).Err(); err != nil {
+					t.Fatal(err)
+				}
+			} else if err := h.gw.Live.EnqueueSpend(row); err != nil {
+				t.Fatal(err)
+			}
+			if got := h.do("POST", "/v1/chat/completions", owner.key, chatRequest("budget-pending-model", "Check exhausted previous budget.")); got.status != 429 {
+				t.Fatalf("到期前积压应阻止调用: %s", got.describe())
+			}
+			if _, err := h.db.Engine.Exec("UPDATE organizations SET budget_reset_at=? WHERE id=?", time.Now().Add(-time.Second), owner.orgID); err != nil {
+				t.Fatal(err)
+			}
+			h.ok("POST", "/v1/chat/completions", owner.key, chatRequest("budget-pending-model", "Verify renewed virtual key budget."))
+			row.RequestID = "late-previous"
+			if err := h.gw.Live.EnqueueSpend(row); err != nil {
+				t.Fatal(err)
+			}
+			h.ok("POST", "/v1/chat/completions", owner.session, chatRequest("budget-pending-model", "Verify renewed session budget."))
+			row.RequestID, row.Start, row.End = "current-pending", time.Now().UTC().Format(time.RFC3339Nano), time.Now().UTC().Format(time.RFC3339Nano)
+			if err := h.gw.Live.EnqueueSpend(row); err != nil {
+				t.Fatal(err)
+			}
+			for _, token := range []string{owner.key, owner.session} {
+				got := h.do("POST", "/v1/chat/completions", token, chatRequest("budget-pending-model", "Verify current period limit."))
+				if got.status != 429 {
+					t.Fatalf("当前周期积压未执行限额: %s", got.describe())
+				}
+			}
+			h.flushSpend()
+			h.flushSpend()
+			org, err := h.db.GetOrg(t.Context(), owner.orgID)
+			if err != nil || org.Spend < 10 || org.Spend >= 20 {
+				t.Fatalf("入库将旧账单计入新周期: %+v %v", org, err)
+			}
+			if pending, _ := h.gw.Live.PeekLogs(100); len(pending) != 0 {
+				t.Fatal("队列确认未清空")
+			}
+			if got := h.gw.Live.HotSpendSince(owner.orgID, *org.BudgetPeriodStart); got != 0 {
+				t.Fatalf("确认后保留费用: %v", got)
+			}
+		})
+	}
+}
 
 // TestOrganizationBudgetAndFilters 验证真实组织路由、周期持久化、搜索可见性、混合越权回滚和管理员关系。
 // 前置私有数据库及本地上游；到期前拒绝、到期恢复真实推理且历史用量保留，harness 删除全部测试资源。

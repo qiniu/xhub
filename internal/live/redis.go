@@ -272,6 +272,53 @@ func (c *Client) HotSpend(id string) float64 {
 	return v
 }
 
+// HotSpendSince 读取组织当前周期内尚未确认的费用；id 为组织 ID，since 为包含在内的周期起点。
+// 预算准入调用；新队列通过组织时间索引读取，升级时混有未建索引的旧事件则从队列兼容读取。
+// 返回未落库金额；异常保守沿用全量热计数，不因损坏记录放宽额度；不消费或重写账单。
+func (c *Client) HotSpendSince(id string, since time.Time) float64 {
+	if c == nil || id == "" {
+		return 0
+	}
+	value, err := organizationPendingScript.Run(context.Background(), c.rdb,
+		[]string{"xhub:spendlog", "xhub:spend:indexed", "xhub:spend:org-pending:" + id, "xhub:spend:requests"}, since.UnixMicro()).Float64()
+	if err == nil {
+		return value
+	}
+	// 旧进程入队的记录没有时间索引。过渡期以原队列为事实源，待它们确认后自动恢复索引读取。
+	rows, readErr := c.rdb.LRange(context.Background(), "xhub:spendlog", 0, -1).Result()
+	if readErr != nil {
+		return c.HotSpend(SpendRef("org", id))
+	}
+	var total float64
+	for _, raw := range rows {
+		var row SpendLog
+		if json.Unmarshal([]byte(raw), &row) != nil {
+			return c.HotSpend(SpendRef("org", id))
+		}
+		if row.OrgID != id || !row.SpendValid {
+			continue
+		}
+		started, parseErr := time.Parse(time.RFC3339Nano, row.Start)
+		// 无时间的旧记录无法证明属于上周期，保守计入，和落库时的时间回退规则一致。
+		if parseErr != nil || !started.Before(since) {
+			total += row.Spend
+		}
+	}
+	return total
+}
+
+var organizationPendingScript = redis.NewScript(`
+-- 全局待结算索引的数量必须覆盖整个队列，才能确认没有旧进程写入的未索引账单。
+if redis.call('SCARD', KEYS[2]) ~= redis.call('LLEN', KEYS[1]) then return nil end
+local total = 0
+for _, id in ipairs(redis.call('ZRANGEBYSCORE', KEYS[3], ARGV[1], '+inf')) do
+  local cost = tonumber(redis.call('HGET', KEYS[4], id))
+  if not cost then return nil end
+  total = total + cost
+end
+return tostring(total)
+`)
+
 // SpendLog 是网关发送到 Redis 队列的单次用量载荷，消费者转换为 iam.UsageRecord 写 PostgreSQL。
 // RequestID 用于去重结算，SessionID 用于授权范围内归组，字段记录调用时事实而非刷库时配置。
 type SpendLog struct {
@@ -383,7 +430,13 @@ func (c *Client) EnqueueSpend(row SpendLog) error {
 	if err != nil {
 		return err
 	}
-	args := []any{raw, 0.0, row.RequestID}
+	started, err := time.Parse(time.RFC3339Nano, row.Start)
+	// 缺失时间无法归入旧周期，直到实际落库确认前始终保守计入，和兼容队列读取保持一致。
+	startedMicros := int64(math.MaxInt64)
+	if err == nil {
+		startedMicros = started.UnixMicro()
+	}
+	args := []any{raw, 0.0, row.RequestID, startedMicros, row.OrgID}
 	if row.SpendValid {
 		args[1] = row.Spend
 	}
@@ -411,7 +464,12 @@ local queueType = redis.call('TYPE', KEYS[1]).ok
 if queueType ~= 'none' and queueType ~= 'list' then
   return redis.error_reply('spend queue is not a list')
 end
-for i = 4, #ARGV do
+local indexType = redis.call('TYPE', 'xhub:spend:indexed').ok
+if indexType ~= 'none' and indexType ~= 'set' then return redis.error_reply('invalid pending index') end
+local orgIndex = 'xhub:spend:org-pending:' .. ARGV[5]
+local orgType = redis.call('TYPE', orgIndex).ok
+if orgType ~= 'none' and orgType ~= 'zset' then return redis.error_reply('invalid organization pending index') end
+for i = 6, #ARGV do
   if delta ~= 0 then
     local raw = redis.call('GET', 'xhub:spend:' .. ARGV[i])
     local current = raw and tonumber(raw) or 0
@@ -421,13 +479,15 @@ for i = 4, #ARGV do
     end
   end
 end
-for i = 4, #ARGV do
+for i = 6, #ARGV do
   if delta ~= 0 then
     redis.call('INCRBYFLOAT', 'xhub:spend:' .. ARGV[i], delta)
   end
 end
 redis.call('RPUSH', KEYS[1], ARGV[1])
-redis.call('HSET', KEYS[2], ARGV[3], '1')
+redis.call('HSET', KEYS[2], ARGV[3], ARGV[2])
+redis.call('SADD', 'xhub:spend:indexed', ARGV[3])
+if ARGV[5] ~= '' and delta ~= 0 then redis.call('ZADD', orgIndex, ARGV[4], ARGV[3]) end
 return 1
 `)
 
@@ -486,6 +546,15 @@ if (not head) or head ~= ARGV[2] then
   return 0
 end
 local n = tonumber(ARGV[1])
+local rows = {}
+local indexType = redis.call('TYPE', 'xhub:spend:indexed').ok
+if indexType ~= 'none' and indexType ~= 'set' then return redis.error_reply('invalid pending index') end
+for _, raw in ipairs(redis.call('LRANGE', KEYS[1], 0, n - 1)) do
+  local row = cjson.decode(raw)
+  local orgType = redis.call('TYPE', 'xhub:spend:org-pending:' .. (row.org_id or '')).ok
+  if orgType ~= 'none' and orgType ~= 'zset' then return redis.error_reply('invalid organization pending index') end
+  table.insert(rows, row)
+end
 -- Lua 错误不回滚已经执行的写入，必须在扣减前预检全部主体计数。
 for i = 3, #ARGV, 2 do
   local raw = redis.call('GET', 'xhub:spend:' .. ARGV[i])
@@ -506,6 +575,10 @@ while i <= #ARGV do
   i = i + 2
 end
 redis.call('LTRIM', KEYS[1], n, -1)
+for _, row in ipairs(rows) do
+  redis.call('SREM', 'xhub:spend:indexed', row.request_id)
+  if row.org_id and row.org_id ~= '' then redis.call('ZREM', 'xhub:spend:org-pending:' .. row.org_id, row.request_id) end
+end
 return 1
 `)
 
