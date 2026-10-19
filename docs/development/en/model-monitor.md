@@ -2,6 +2,8 @@
 
 Monitoring groups usage by provider connection and actual upstream model. Public aliases of the same upstream model on one connection are aggregated. Provider identity uses the credential connection name when available; inline addresses remove authentication and query parameters. Selectors combine authorized deployments and visible historical records.
 
+The catalog returned in `options` follows the current caller’s effective grants: a virtual key uses its organization/team/project/key intersection; a session without `team_id` reads the account’s current team and organization. An explicit team is checked by `UsageScope` before its model grants are read. Platform administrators retain the full catalog. Authorization lookup failures reject the request rather than falling back to an unrestricted catalog. Historical statistics keep their existing usage scope, so revoking a model does not erase the caller’s own usage; the interface can still offer those visible historical combinations.
+
 Billing and monitoring buckets commit in the same PostgreSQL transaction. Statistics change only after an idempotent billing insert succeeds. Task settlement subtracts the previous value and adds the settled value. Queued billing becomes visible after persistence.
 
 Fifteen-minute UTC buckets retain organization, team, project, user, key, billing ownership, provider and upstream-model dimensions. Batches merge matching buckets and apply UPSERTs in stable key order. Queries read aggregated buckets, with a window of 1–90 days and timezone offsets aligned to 15 minutes. High-cardinality dimensions increase storage and query cost; local tests are not a production load benchmark.

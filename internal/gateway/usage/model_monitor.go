@@ -1,12 +1,14 @@
 package usage
 
 import (
+	"context"
 	"net/http"
 	"sort"
 	"strconv"
 	"strings"
 	"time"
 
+	"github.com/sunqirui1987/xhub/internal/auth"
 	"github.com/sunqirui1987/xhub/internal/config"
 	"github.com/sunqirui1987/xhub/internal/iam"
 	"github.com/sunqirui1987/xhub/internal/util"
@@ -36,18 +38,12 @@ func ModelMonitor(s Host, w http.ResponseWriter, r *http.Request) {
 		util.WriteJSON(w, 503, map[string]any{"error": map[string]any{"type": "monitor_unavailable", "message": "Usage storage is unavailable"}})
 		return
 	}
-	// 配置目录独立于统计窗口；没有账单的模型仍可选择，权限读取失败必须拒绝。
-	var allowed []string
-	if !p.PlatformAdmin() && !p.IsMaster() {
-		if p.Key != nil {
-			allowed, err = db.AllowedModelsForKey(r.Context(), p.Key)
-		} else if q.TeamID != "" {
-			allowed, err = db.AllowedModelsForTeam(r.Context(), q.TeamID)
-		}
-		if err != nil {
-			s.WriteIAMError(w, r, err)
-			return
-		}
+	// 配置目录独立于统计窗口；省略团队筛选也必须按当前账号实时授权收窄。
+	// 显式团队已由 UsageScope 校验可见性；目录权限与账单统计范围分别计算，不能互相替代。
+	allowed, err := modelMonitorAllowedModels(r.Context(), db, p, q.TeamID)
+	if err != nil {
+		s.WriteIAMError(w, r, err)
+		return
 	}
 	options := modelMonitorOptions(s.ModelList(), allowed)
 	rows, err := db.ModelMonitor(r.Context(), q, tz)
@@ -69,6 +65,36 @@ func ModelMonitor(s Host, w http.ResponseWriter, r *http.Request) {
 		}
 	}
 	util.WriteJSON(w, 200, map[string]any{"options": options, "summary": summary, "models": models, "trend": trend, "start_date": q.From.Add(time.Duration(tz) * time.Minute).Format("2006-01-02"), "end_date": q.To.Add(time.Duration(tz)*time.Minute - time.Nanosecond).Format("2006-01-02")})
+}
+
+// modelMonitorAccess 复用 IAM 的模型交集查询；监控只读取授权，不创建独立权限规则。
+type modelMonitorAccess interface {
+	// AllowedModelsForKey 读取密钥完整归属链的模型交集；输入上下文与密钥，返回模型或查询错误，无写入。
+	AllowedModelsForKey(context.Context, *iam.Key) ([]string, error)
+	// AllowedModelsForTeam 读取已授权团队与组织的模型交集；输入上下文与团队 ID，返回模型或查询错误，无写入。
+	AllowedModelsForTeam(context.Context, string) ([]string, error)
+	// AllowedModelsForUser 实时读取账号所属团队及组织的模型交集；输入上下文与账号 ID，返回模型或查询错误，无写入。
+	AllowedModelsForUser(context.Context, string) ([]string, error)
+}
+
+// modelMonitorAllowedModels 为监控目录选择实时授权来源；ctx/db/p 为上下文、IAM 及已认证主体。
+// teamID 是已经过 UsageScope 校验的可选团队；平台管理员保留全局目录，Key 始终应用自身限制。
+// 返回 nil 表示授权链未限制，非 nil 空列表拒绝全部；读取失败原样返回，调用方必须拒绝响应。
+// ModelMonitor 调用；省略 teamID 的普通会话与模型发现一样查询本人当前团队及组织，不信任会话缓存。
+func modelMonitorAllowedModels(ctx context.Context, db modelMonitorAccess, p *auth.Principal, teamID string) ([]string, error) {
+	if p == nil || db == nil {
+		return nil, iam.ErrInvalid
+	}
+	if p.PlatformAdmin() || p.IsMaster() {
+		return nil, nil
+	}
+	if p.Key != nil {
+		return db.AllowedModelsForKey(ctx, p.Key)
+	}
+	if teamID != "" {
+		return db.AllowedModelsForTeam(ctx, teamID)
+	}
+	return db.AllowedModelsForUser(ctx, p.UserID)
 }
 
 // modelMonitorOption 是不含凭据的供应商实际模型组合，供页面筛选使用。

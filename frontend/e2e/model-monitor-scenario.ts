@@ -113,12 +113,17 @@ test("supplier model monitor displays real billing and switches chart and langua
     const en = (key: string) => translate("en", key);
     await expect(page.getByRole("heading", { name: en("monitor.title"), exact: true })).toBeVisible();
     await expect(page.getByLabel(en("monitor.supplier"), { exact: true })).toHaveValue(suppliers[0]);
+    // 语言切换会刷新服务端组件；先完成真实重载并等待数据加载，避免未完成的刷新覆盖日期输入。
+    await page.reload();
+    await expect(page.getByRole("button", { name: en("monitor.refresh"), exact: true })).toBeEnabled();
     await page.getByLabel(en("monitor.start"), { exact: true }).fill("2026-02-01");
     await page.getByLabel(en("monitor.end"), { exact: true }).fill("2026-01-01");
     await page.getByRole("button", { name: en("monitor.refresh"), exact: true }).click();
     await expect(page.getByRole("main").getByRole("alert")).toHaveText(en("monitor.invalidRange"));
     await page.getByRole("button", { name: en("language.zhCN"), exact: true }).click();
     await expect(page.getByRole("heading", { name: t("monitor.title"), exact: true })).toBeVisible();
+    await page.reload();
+    await expect(page.getByRole("button", { name: t("monitor.refresh"), exact: true })).toBeEnabled();
     await page.getByLabel(t("monitor.start"), { exact: true }).fill("2026-02-01");
     await page.getByLabel(t("monitor.end"), { exact: true }).fill("2026-01-01");
     await page.getByRole("button", { name: t("monitor.refresh"), exact: true }).click();

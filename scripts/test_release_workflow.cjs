@@ -9,11 +9,13 @@ const yaml = require('../frontend/node_modules/js-yaml');
 const workflow = yaml.load(readFileSync(join(__dirname, '../.github/workflows/release.yml'), 'utf8'));
 const publish = workflow.jobs.publish;
 
-/** 前置真实发布 YAML；验证升级双语闭环随发布运行且使用隔离 Redis，防止 CI 只验证新库；只读配置无需清理。 */
-test('verification runs both usage upgrade browser scenarios with isolated Redis', () => {
+/** 前置真实发布 YAML；验证升级及监控权限双语闭环随发布运行且使用隔离 Redis，防止 CI 遗漏权限回归；只读配置无需清理。 */
+test('verification runs bilingual usage upgrade and monitor permission scenarios with isolated Redis', () => {
   const browser = workflow.jobs.verify.steps.find(item => (item.run || '').startsWith('bash scripts/e2e.sh '));
   assert.ok(browser, '发布必须运行真实浏览器场景');
   for (const locale of ['en', 'zh-CN']) {
+    assert.ok(browser.run.split(/\s+/).includes(`scenarios/permissions/model-monitor-${locale}.test.ts`),
+      `发布前必须验证 ${locale} 普通用户监控权限，不能省略团队参数就泄露目录`);
     assert.ok(browser.run.split(/\s+/).includes(`scenarios/regression/usage-upgrade-${locale}.test.ts`),
       `发布缺少 ${locale} 旧库升级闭环`);
   }

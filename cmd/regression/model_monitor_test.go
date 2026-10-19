@@ -6,6 +6,7 @@ import (
 	"math"
 	"net/http"
 	"net/http/httptest"
+	"reflect"
 	"strings"
 	"testing"
 	"time"
@@ -138,5 +139,83 @@ func TestModelMonitorHTTP(t *testing.T) {
 	}
 	if r := h.do("GET", "/models/monitor", "", nil); r.status != http.StatusUnauthorized {
 		t.Fatal("匿名必须拒绝", r.describe())
+	}
+}
+
+// TestModelMonitorCatalogPermissions 验证真实会话默认目录与模型发现一致、组织收窄立即生效、同名模型按供应商隔离。
+// 前置两个隔离租户及本地上游；覆盖 Key、显式/伪造团队、空交集和统计归属，harness 回收全部 schema 与服务。
+func TestModelMonitorCatalogPermissions(t *testing.T) {
+	a, b, c := chatDeployment("monitor-grant-a"), chatDeployment("monitor-grant-b"), chatDeployment("monitor-hidden")
+	a.LiteLLMParams["model"], b.LiteLLMParams["model"] = "shared-actual", "shared-actual"
+	a.LiteLLMParams["litellm_credential_name"] = "monitor-provider-a"
+	b.LiteLLMParams["litellm_credential_name"] = "monitor-provider-b"
+	h := newHarness(t, a, b, c)
+	admin := h.adminSession()
+	for _, supplier := range []string{"monitor-provider-a", "monitor-provider-b"} {
+		h.ok("POST", "/credentials", admin, map[string]any{
+			"credential_name":   supplier,
+			"credential_info":   map[string]any{"custom_llm_provider": "openai"},
+			"credential_values": map[string]any{"api_base": h.prices.URL + "/v1", "api_key": "sk-fake"},
+		})
+	}
+	mine, other := h.provision(t, admin, "monitor-granted"), h.provision(t, admin, "monitor-foreign")
+	h.ok("PATCH", "/organization/update", admin, map[string]any{"organization_id": mine.orgID, "models": []string{a.ModelName}})
+	h.ok("PATCH", "/organization/update", admin, map[string]any{"organization_id": other.orgID, "models": []string{b.ModelName}})
+	for _, probe := range []struct{ key, alias string }{{mine.key, a.ModelName}, {other.key, b.ModelName}} {
+		h.ok("POST", "/v1/chat/completions", probe.key, map[string]any{"model": probe.alias, "messages": []any{map[string]any{"role": "user", "content": "Verify monitor authorization."}}})
+	}
+	h.flushSpend()
+	want := []any{map[string]any{"supplier": "monitor-provider-a", "model": "shared-actual"}}
+	for _, principal := range []string{mine.session, mine.key} {
+		for _, query := range []string{"", "?team_id=" + mine.teamID} {
+			body := h.ok("GET", "/models/monitor"+query, principal, nil).json()
+			if !reflect.DeepEqual(body["options"], want) {
+				t.Fatalf("省略团队参数不能泄露未授权供应商: options=%v want=%v", body["options"], want)
+			}
+			if body["summary"].(map[string]any)["requests"] != float64(1) {
+				t.Fatal("监控统计不得包含其他租户的调用", body)
+			}
+			rows := body["models"].([]any)
+			if len(rows) != 1 || rows[0].(map[string]any)["supplier"] != "monitor-provider-a" {
+				t.Fatal("同名模型的其他供应商统计泄露", rows)
+			}
+		}
+	}
+	listed := h.ok("GET", "/v1/models", mine.session, nil).json()["data"].([]any)
+	if len(listed) != 1 || listed[0].(map[string]any)["id"] != a.ModelName {
+		t.Fatal("监控目录应与会话模型发现使用相同组织上限", listed)
+	}
+	for _, query := range []string{"?team_id=" + other.teamID, "?team_id=missing-team"} {
+		response := h.do("GET", "/models/monitor"+query, mine.session, nil)
+		if response.status != http.StatusNotFound || response.json()["error"] == nil {
+			t.Fatal("伪造团队应返回明确 404，不能降级成全量目录", response.describe())
+		}
+	}
+	// 已有会话必须实时应用组织扩展，而密钥仍保留更窄的自身限制。
+	h.ok("PATCH", "/organization/update", admin, map[string]any{"organization_id": mine.orgID, "models": []string{a.ModelName, b.ModelName}})
+	h.ok("POST", "/key/update", admin, map[string]any{"key": mine.key, "models": []string{a.ModelName}})
+	if got := h.ok("GET", "/models/monitor", mine.session, nil).json()["options"].([]any); len(got) != 2 {
+		t.Fatal("已有会话没有实时读取组织模型扩展", got)
+	}
+	if got := h.ok("GET", "/models/monitor?team_id="+other.teamID, mine.key, nil).json()["options"]; !reflect.DeepEqual(got, want) {
+		t.Fatal("Key 不能通过团队提示扩大目录权限", got)
+	}
+	// 团队保留 a 而组织改成 b，交集为空，不能把空结果误当成继承全部。
+	h.ok("POST", "/team/update", admin, map[string]any{"team_id": mine.teamID, "models": []string{a.ModelName}})
+	h.ok("PATCH", "/organization/update", admin, map[string]any{"organization_id": mine.orgID, "models": []string{b.ModelName}})
+	for _, principal := range []string{mine.session, mine.key} {
+		body := h.ok("GET", "/models/monitor", principal, nil).json()
+		if got := body["options"].([]any); len(got) != 0 {
+			t.Fatal("组织/团队空交集必须返回空目录", got)
+		}
+		if body["summary"].(map[string]any)["requests"] != float64(1) {
+			t.Fatal("模型授权变更不应抹去本人历史统计", body)
+		}
+	}
+	if got := h.ok("GET", "/models/monitor", admin, nil).json()["options"].([]any); len(got) != 3 {
+		t.Fatal("平台管理员仍应看到完整目录", got)
+	}
+	if got := h.ok("GET", "/models/monitor?model=shared-actual&supplier=monitor-provider-b", mine.session, nil).json()["summary"].(map[string]any)["requests"]; got != float64(0) {
+		t.Fatal("显式选择未授权供应商不能读取其他用户统计", got)
 	}
 }
