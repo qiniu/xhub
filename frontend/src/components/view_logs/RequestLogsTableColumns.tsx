@@ -44,7 +44,7 @@ function TruncatedText({ value }: { value: string | undefined }) {
 
 /** 返回普通与错误日志共用的列定义；参数为会话点击回调，供 RequestLogsTable 渲染。
  * 密钥 Hash 仅展示日志中的标识，不查询可能已删除或无权查看的密钥；缺失值显示占位符。
- * 费用读取原始调用或会话合计，并与详情共用金额格式，不重新计费或修改记录。 */
+ * 费用读取原始调用或会话合计，并与详情共用金额格式；未定价零值保留未知，不重新计费或修改记录。 */
 export const getRequestLogsTableColumns = ({
   onSessionClick,
 }: RequestLogsTableColumnsDeps): ColumnDef<LogEntry>[] => [
@@ -189,7 +189,7 @@ export const getRequestLogsTableColumns = ({
       const spend = isMultiCallSession && log.session_total_spend != null ? log.session_total_spend : log.spend;
       const money = (
         <span>
-          {formatLogCost(spend)}
+          {formatLogCost(spend, log)}
         </span>
       );
 

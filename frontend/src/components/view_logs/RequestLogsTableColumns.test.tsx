@@ -49,6 +49,19 @@ function renderRows(rows: LogEntry[], deps = noopDeps) {
 }
 
 describe("Cost column", () => {
+  /** 前置未定价零值与真实免费/响应缓存日志；验证费用列不把未知当免费，含会话零合计和正合计边界，自动卸载清理。 */
+  it.each([
+    ["unpriced", false, undefined, "-"], ["priced", false, undefined, "$0.00"],
+    ["unpriced", "true", undefined, "$0.00"], ["unpriced", true, undefined, "$0.00"],
+    ["unpriced", false, 0, "-"], ["unpriced", false, 0.06, "$0.06"],
+  ] as const)("renders %s pricing, cache %s and session total %s as %s", (status, cacheHit, total, expected) => {
+    renderRows([logEntry({ spend: 0, cache_hit: cacheHit, metadata: { cost_breakdown: { pricing_status: status } },
+      session_total_count: total === undefined ? 1 : 2, session_total_spend: total })]);
+    const costIndex = screen.getAllByRole("columnheader").findIndex((header) => header.textContent === t("Cost"));
+    const costCell = within(screen.getAllByRole("row")[1]).getAllByRole("cell")[costIndex];
+    expect(costCell).toHaveTextContent(expected);
+    if (expected === "-") expect(costCell).not.toHaveTextContent("$0.00");
+  });
   /** 前置真实零费用日志；验证明确显示零且不生成矛盾 tooltip，自动卸载清理 DOM。 */
   it("renders an explicit zero without a contradictory tooltip", async () => {
     const user = userEvent.setup();

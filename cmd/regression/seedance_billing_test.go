@@ -96,3 +96,54 @@ func TestSeedanceSettlementUsesMeasuredBandAndDeduplicates(t *testing.T) {
 		t.Fatalf("wrong snapshot: %s", raw)
 	}
 }
+
+// TestTaskLogsPreserveUnknownAndFreePricing 验证任务零账单在列表与详情保留未定价和真实免费区别。
+// 参数 t 为测试上下文，无返回值；前置本地上游、真实网关和隔离数据库，无外部服务凭据。
+// 成功任务重复查询不得增加日志或费用，未认证查询应失败；harness 和 defer 清理 schema 与本地服务。
+func TestTaskLogsPreserveUnknownAndFreePricing(t *testing.T) {
+	for _, free := range []bool{false, true} {
+		t.Run(map[bool]string{false: "unpriced", true: "free"}[free], func(t *testing.T) {
+			up := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				writeJSON(w, map[string]any{"id": "pricing-task", "status": "succeeded", "usage": map[string]any{"completion_tokens": 100}})
+			}))
+			defer up.Close()
+			model := "volcengine/regression-unknown-price"
+			dep := seedanceDeployment(model, "ark_contents_generation")
+			dep.LiteLLMParams["api_base"] = up.URL
+			if free {
+				dep.LiteLLMParams["output_cost_per_token"] = 0.0
+			}
+			h := newHarness(t, dep)
+			admin := h.adminSession()
+			owner := h.openScope(t, admin, "task-pricing")
+			before := h.moneyOf(t, owner)
+			created := h.ok(http.MethodPost, "/api/v3/contents/generations/tasks", owner.key, map[string]any{
+				"model": model, "content": []any{map[string]any{"type": "text", "text": "Verify request pricing."}},
+			})
+			callID := created.header("x-litellm-call-id")
+			for i := 0; i < 2; i++ {
+				h.ok(http.MethodGet, "/api/v3/contents/generations/tasks/pricing-task", owner.key, nil)
+			}
+			rows := h.spendLogs(t, admin)
+			if len(rows) != 1 || numberOrZero(rows[0]["spend"]) != 0 || rows[0]["status"] != "completed" {
+				t.Fatalf("任务应仅保留一条完成的零账单: %#v", rows)
+			}
+			want := "unpriced"
+			if free {
+				want = "priced"
+			}
+			metadata, _ := rows[0]["metadata"].(map[string]any)
+			listBill, _ := metadata["cost_breakdown"].(map[string]any)
+			bill := breakdownOf(t, h, admin, callID)
+			if listBill["pricing_status"] != want || bill["pricing_status"] != want {
+				t.Fatalf("列表与详情定价状态应为 %s: list=%#v detail=%#v", want, listBill, bill)
+			}
+			if !h.moneyOf(t, owner).same(before) {
+				t.Fatal("零账单不应增加归属方支出")
+			}
+			if got := h.do(http.MethodGet, "/spend/logs/ui/"+callID, "", nil); got.status != http.StatusUnauthorized {
+				t.Fatalf("未认证日志查询应拒绝: %s", got.describe())
+			}
+		})
+	}
+}

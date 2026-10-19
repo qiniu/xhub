@@ -498,7 +498,7 @@ function BatchResultsSection({ logEntry, metadata }: { logEntry: LogEntry; metad
 }
 
 /** 展示实测指标；参数为日志和元数据，返回指标视图，由详情组件调用。
- * 金额保留 API 数值精度、不重新计费；缓存统计缺失保留未知状态，无后台写入。 */
+ * 金额保留 API 数值精度、未定价零值显示未知，不重新计费；缓存统计缺失保留未知状态，无后台写入。 */
 function MetricsSection({ logEntry, metadata }: { logEntry: LogEntry; metadata: Record<string, any> }) {
   const t = useT();
   const ttftMs = logEntry.ttft_ms;
@@ -541,7 +541,7 @@ function MetricsSection({ logEntry, metadata }: { logEntry: LogEntry; metadata: 
             {reasoningTokens !== undefined && reasoningTokens > 0 && (
               <DescriptionItem label={t("Reasoning Tokens")}>{formatNumberWithCommas(reasoningTokens)}</DescriptionItem>
             )}
-            <DescriptionItem label={t("Cost")}>{formatLogCost(logEntry.spend)}</DescriptionItem>
+            <DescriptionItem label={t("Cost")}>{formatLogCost(logEntry.spend, logEntry)}</DescriptionItem>
             <DescriptionItem label={t("requestMetrics.inbound")}>{logEntry.inbound_endpoint || "—"}</DescriptionItem>
  <DescriptionItem label={t("requestMetrics.outbound")}>{logEntry.outbound_endpoint || "—"}</DescriptionItem>
  <DescriptionItem label={t("requestMetrics.tps")}>{logEntry.tps != null ? logEntry.tps.toFixed(2) : "—"}</DescriptionItem>

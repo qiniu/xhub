@@ -110,7 +110,7 @@ function TraceEventRow({ row, isSelected, onClick }: TraceEventRowProps) {
 }
 
 /** 展示请求及会话日志抽屉；参数包括选中日志、授权令牌和关闭/选择回调，返回可导航详情。
- * 日志页调用；金额使用同一展示格式，查询遵循后台授权，不重新计费或修改历史记录。 */
+ * 日志页调用；金额使用同一展示格式，零合计含未定价请求时保持未知；查询遵循后台授权，不重新计费或修改历史记录。 */
 export function LogDetailsDrawer({
   open,
   onClose,
@@ -280,6 +280,10 @@ export function LogDetailsDrawer({
   const environment = metadata?.user_api_key_team_alias || "default";
 
   const totalSessionCost = sessionLogs.reduce((sum, row) => sum + (row.spend || 0), 0);
+  // 零合计不能证明会话免费；含未定价且非响应缓存命中的请求时，沿用该请求的未知状态。
+  const unpricedSessionLog = sessionLogs.find(
+    (row) => row.metadata?.cost_breakdown?.pricing_status === "unpriced" && String(row.cache_hit).toLowerCase() !== "true",
+  );
   const sessionStart =
     sessionLogs.length > 0 ? new Date(Math.min(...sessionLogs.map((r) => new Date(r.startTime).getTime()))) : null;
   const sessionEnd =
@@ -379,7 +383,9 @@ export function LogDetailsDrawer({
                     ) : null;
                   })}
                   <span className="mx-1.5">·</span>
-                  {isSessionMode ? formatLogCost(totalSessionCost) : formatLogCost(currentLog.spend)}
+                  {isSessionMode
+                    ? formatLogCost(totalSessionCost, unpricedSessionLog)
+                    : formatLogCost(enrichedLog.spend, enrichedLog)}
                   {isSessionMode && (
                     <>
                       <span className="mx-1.5">·</span>

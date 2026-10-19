@@ -10,3 +10,16 @@ describe("日志金额精度", () => {
     [NaN, "-"], [Infinity, "-"], [-Infinity, "-"],
   ] as const)("%s 显示为 %s", (value, expected) => expect(formatLogCost(value)).toBe(expected));
 });
+
+/** 前置 API 零值和定价/响应缓存元数据；验证未知、真实免费、兼容旧数据及无效数值，纯函数无需清理。 */
+describe("日志费用状态", () => {
+  it.each([
+    [0, "unpriced", false, "-"], [0, "unpriced", "false", "-"],
+    [0, "unpriced", true, "$0.00"], [0, "unpriced", "TRUE", "$0.00"],
+    [0, "priced", false, "$0.00"], [0, undefined, false, "$0.00"],
+    [0.01, "unpriced", false, "$0.01"], [NaN, "priced", true, "-"],
+    [undefined, "priced", true, "-"],
+  ] as const)("金额 %s、定价 %s、缓存 %s 显示 %s", (amount, pricingStatus, cacheHit, expected) => {
+    expect(formatLogCost(amount, { metadata: { cost_breakdown: { pricing_status: pricingStatus } }, cache_hit: cacheHit })).toBe(expected);
+  });
+});
