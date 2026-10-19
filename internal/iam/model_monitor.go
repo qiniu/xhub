@@ -48,7 +48,7 @@ type monitorDelta struct {
 }
 
 // accumulateMonitor 把终态记录 r 按 sign 方向加入批次 out；账单及任务结算调用。
-// 无返回值；进行中不计数，失败和缓存不产生性能样本；所有协议按首字节及总 Token 统一统计。
+// 无返回值；进行中不计数，失败和缓存不产生性能样本；TTFT 保留首字节口径，TPS 只使用有效流式请求的输出 Token。
 func accumulateMonitor(out map[monitorKey]monitorDelta, r UsageRecord, sign int64) {
 	if r.Status == "executing" || r.Status == "polling" {
 		return
@@ -67,16 +67,13 @@ func accumulateMonitor(out map[monitorKey]monitorDelta, r UsageRecord, sign int6
 		d.Latency += float64(sign) * float64(r.DurationMS)
 		d.LatencySamples += sign
 	}
-	// TTFT 统一记录首字节；TPS 使用总 Token 除以首字节之后耗时。
-	if success && !r.CacheHit && r.TTFTMs != nil && *r.TTFTMs >= 0 && r.DurationMS >= *r.TTFTMs {
-		switch r.CallType {
-		case "chat", "chat.completions", "responses", "messages", "completions", "bypass_openai_chat:create", "bypass_openai_responses:create", "bypass_anthropic_messages:create", "openai_completions:create", "anthropic_messages", "gemini", "generateContent", "streamGenerateContent", "bypass_google_genai:create", "gemini:create", "bypass_gemini:create", "google_genai:create", "gemini_generate_content:create", "vertex_generate_content:create", "vertex":
-			d.TTFT += float64(sign) * float64(*r.TTFTMs)
-			d.TTFTSamples += sign
-			if r.PromptTokens+r.CompletionTokens > 0 && r.DurationMS > *r.TTFTMs {
-				d.TPS += float64(sign) * float64(r.PromptTokens+r.CompletionTokens) * 1000 / float64(r.DurationMS-*r.TTFTMs)
-				d.TPSSamples += sign
-			}
+	// 同步首字节可用于响应延迟，但 TPS 必须排除同步读尾时间，并与请求日志共用输出公式。
+	if textTimingSample(r) {
+		d.TTFT += float64(sign) * float64(*r.TTFTMs)
+		d.TTFTSamples += sign
+		if tps := OutputTPS(r); tps != nil {
+			d.TPS += float64(sign) * *tps
+			d.TPSSamples += sign
 		}
 	}
 	out[k] = d
@@ -84,6 +81,7 @@ func accumulateMonitor(out map[monitorKey]monitorDelta, r UsageRecord, sign int6
 
 // flushMonitor 在调用方事务 s 内每桶一次 UPSERT，values 已按新事件去重合并。
 // 返回存储错误，调用方整体回滚；键排序统一锁行顺序，减少并发热点和死锁。
+// 输出 TPS 写入独立指标列，兼容旧版本继续写旧 TPS 列时不会混合统计口径。
 func flushMonitor(s *xorm.Session, values map[monitorKey]monitorDelta) error {
 	keys := make([]monitorKey, 0, len(values))
 	for k := range values {
@@ -106,7 +104,7 @@ func flushMonitor(s *xorm.Session, values map[monitorKey]monitorDelta) error {
 	for _, k := range keys {
 		d := values[k]
 		_, err := s.Exec(`INSERT INTO model_monitor_buckets
- (bucket_start,organization_id,team_id,project_id,user_id,key_id,owner_type,supplier,model,requests,failed_requests,prompt_tokens,completion_tokens,cost,tps_sum,tps_samples,ttft_sum,ttft_samples,latency_sum,latency_samples)
+ (bucket_start,organization_id,team_id,project_id,user_id,key_id,owner_type,supplier,model,requests,failed_requests,prompt_tokens,completion_tokens,cost,output_tps_sum,output_tps_samples,ttft_sum,ttft_samples,latency_sum,latency_samples)
  VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
  ON CONFLICT (bucket_start,organization_id,team_id,project_id,user_id,key_id,owner_type,supplier,model)
  DO UPDATE SET requests=model_monitor_buckets.requests+EXCLUDED.requests,
@@ -114,7 +112,7 @@ func flushMonitor(s *xorm.Session, values map[monitorKey]monitorDelta) error {
  prompt_tokens=model_monitor_buckets.prompt_tokens+EXCLUDED.prompt_tokens,
  completion_tokens=model_monitor_buckets.completion_tokens+EXCLUDED.completion_tokens,
  cost=model_monitor_buckets.cost+EXCLUDED.cost,
- tps_sum=model_monitor_buckets.tps_sum+EXCLUDED.tps_sum,tps_samples=model_monitor_buckets.tps_samples+EXCLUDED.tps_samples,
+ output_tps_sum=model_monitor_buckets.output_tps_sum+EXCLUDED.output_tps_sum,output_tps_samples=model_monitor_buckets.output_tps_samples+EXCLUDED.output_tps_samples,
  ttft_sum=model_monitor_buckets.ttft_sum+EXCLUDED.ttft_sum,ttft_samples=model_monitor_buckets.ttft_samples+EXCLUDED.ttft_samples,
  latency_sum=model_monitor_buckets.latency_sum+EXCLUDED.latency_sum,latency_samples=model_monitor_buckets.latency_samples+EXCLUDED.latency_samples`,
 			k.Bucket, k.Org, k.Team, k.Project, k.User, k.Key, k.Owner, k.Supplier, k.Model, d.Requests, d.Failed, d.Prompt, d.Completion, d.Cost, d.TPS, d.TPSSamples, d.TTFT, d.TTFTSamples, d.Latency, d.LatencySamples)
@@ -142,7 +140,7 @@ func (db *DB) ModelMonitor(ctx context.Context, q ModelMonitorQuery, tzMinutes i
 	s = q.applyLists(s)
 	// 显式 UTC 转换消除数据库会话时区对浏览器日期的影响。
 	day := "to_char((bucket_start AT TIME ZONE 'UTC') + INTERVAL '" + strconv.Itoa(tzMinutes) + " minutes', 'YYYY-MM-DD')"
-	sel := "CASE WHEN GROUPING(supplier)=1 THEN 'summary' WHEN GROUPING(" + day + ")=1 THEN 'model' ELSE 'trend' END AS kind, COALESCE(supplier,'') AS supplier, COALESCE(model,'') AS model, COALESCE(" + day + ",'') AS day, COALESCE(SUM(requests),0) AS requests, COALESCE(SUM(failed_requests),0) AS failed_requests, COALESCE(SUM(prompt_tokens),0) AS prompt_tokens, COALESCE(SUM(completion_tokens),0) AS completion_tokens, COALESCE(SUM(prompt_tokens+completion_tokens),0) AS total_tokens, COALESCE(SUM(cost),0) AS cost, SUM(tps_sum)/NULLIF(SUM(tps_samples),0) AS avg_tps, SUM(ttft_sum)/NULLIF(SUM(ttft_samples),0) AS avg_ttft_ms, SUM(latency_sum)/NULLIF(SUM(latency_samples),0) AS avg_latency_ms, COALESCE(SUM(tps_samples),0) AS tps_samples, COALESCE(SUM(ttft_samples),0) AS ttft_samples"
+	sel := "CASE WHEN GROUPING(supplier)=1 THEN 'summary' WHEN GROUPING(" + day + ")=1 THEN 'model' ELSE 'trend' END AS kind, COALESCE(supplier,'') AS supplier, COALESCE(model,'') AS model, COALESCE(" + day + ",'') AS day, COALESCE(SUM(requests),0) AS requests, COALESCE(SUM(failed_requests),0) AS failed_requests, COALESCE(SUM(prompt_tokens),0) AS prompt_tokens, COALESCE(SUM(completion_tokens),0) AS completion_tokens, COALESCE(SUM(prompt_tokens+completion_tokens),0) AS total_tokens, COALESCE(SUM(cost),0) AS cost, SUM(output_tps_sum)/NULLIF(SUM(output_tps_samples),0) AS avg_tps, SUM(ttft_sum)/NULLIF(SUM(ttft_samples),0) AS avg_ttft_ms, SUM(latency_sum)/NULLIF(SUM(latency_samples),0) AS avg_latency_ms, COALESCE(SUM(output_tps_samples),0) AS tps_samples, COALESCE(SUM(ttft_samples),0) AS ttft_samples"
 	rows := []ModelMonitorRow{}
 	err := s.Select(sel).GroupBy("GROUPING SETS ((), (supplier,model), (supplier,model," + day + "))").OrderBy("kind,supplier,model,day").Find(&rows)
 	return rows, mapErr(err)

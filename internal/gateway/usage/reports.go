@@ -236,19 +236,13 @@ func parseDayEnd(v string) time.Time {
 	return from.Add(24*time.Hour - time.Nanosecond)
 }
 
-// logTPS 按统一日志口径计算总 Token /（总耗时 − 首字节耗时）。
-// 参数 e 为授权读取的账单，返回可空速度；缓存、失败或零分母返回 nil，列表及详情共用。
+// logTPS 将授权账单投影到 IAM 共用的输出 TPS 公式；e 为账单事实，返回可空速度。
+// 日志列表与详情调用；同步、失败、缓存、非文本或无有效生成区间时返回 nil，不重新计费或修改数据。
 func logTPS(e iam.UsageEvent) *float64 {
-	switch e.Status {
-	case "", "success", "succeeded", "completed":
-	default:
-		return nil
-	}
-	if e.CacheHit || e.HTTPStatus >= 400 || e.TTFTMs == nil || *e.TTFTMs < 0 || e.DurationMS <= *e.TTFTMs || e.PromptTokens+e.CompletionTokens <= 0 {
-		return nil
-	}
-	v := float64(e.PromptTokens+e.CompletionTokens) * 1000 / float64(e.DurationMS-*e.TTFTMs)
-	return &v
+	return iam.OutputTPS(iam.UsageRecord{
+		CallType: e.CallType, Status: e.Status, HTTPStatus: e.HTTPStatus, Streamed: e.Streamed,
+		CacheHit: e.CacheHit, CompletionTokens: e.CompletionTokens, DurationMS: e.DurationMS, TTFTMs: e.TTFTMs,
+	})
 }
 
 // eventRows 将授权后的事件转换为日志列表和详情共用的数据。

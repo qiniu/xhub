@@ -316,3 +316,13 @@ ALTER TABLE usage_events ADD COLUMN IF NOT EXISTS api_base TEXT NOT NULL DEFAULT
 -- CREATE TABLE 不会更新旧表；启动时幂等补齐会话来源，避免日志与账单事务整体失败。
 -- 历史来源未知时保持空值，不根据当前路由推断，也不改写已有来源或重新结算账单。
 ALTER TABLE usage_events ADD COLUMN IF NOT EXISTS session_source TEXT NOT NULL DEFAULT '';
+
+-- 新口径独立存储，旧版本网关只写 tps_sum/tps_samples，不能污染修正后的输出速度。
+ALTER TABLE model_monitor_buckets ADD COLUMN IF NOT EXISTS output_tps_sum DOUBLE PRECISION NOT NULL DEFAULT 0;
+ALTER TABLE model_monitor_buckets ADD COLUMN IF NOT EXISTS output_tps_samples BIGINT NOT NULL DEFAULT 0;
+
+-- 指标口径升级仅记录完成状态；账单、费用与日用量保持原样，避免每次启动重复扫描历史事件。
+CREATE TABLE IF NOT EXISTS model_monitor_migrations (
+    name TEXT PRIMARY KEY,
+    applied_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);

@@ -10,6 +10,25 @@ from e2e.fake_upstream import Handler, ERROR_LOG_JSON_DIAGNOSTIC, ERROR_LOG_TEXT
 
 
 class ArkUpstreamTest(unittest.TestCase):
+    def test_monitor_tps_fixture(self):
+        """前置真实本地上游；验证 TPS 夹具流式/同步用量一致、确有分帧间隔，非法协议返回 400；tearDown 关闭服务。"""
+        import time
+        body = {"model": "monitor-tps-probe", "messages": [{"role": "user", "content": "Verify output TPS."}]}
+        result = self.request("/v1/chat/completions", body)
+        self.assertEqual(result["usage"], {"prompt_tokens": 10000, "completion_tokens": 10, "total_tokens": 10010})
+        with urlopen(Request(self.base + "/v1/chat/completions", data=json.dumps({**body, "stream": True}).encode()), timeout=2) as response:
+            first = response.readline()
+            start = time.monotonic()
+            rest = response.read()
+            self.assertGreaterEqual(time.monotonic() - start, 0.04)
+            self.assertIn(b"e2e-ok", first)
+            self.assertIn(b'"completion_tokens": 10', rest)
+            self.assertIn(b"[DONE]", rest)
+        with self.assertRaises(HTTPError) as error:
+            self.request("/v1/responses", body)
+        self.assertEqual(error.exception.code, 400)
+        error.exception.close()
+
     def test_vision_payload(self):
         """前置真实本地 HTTP 上游；图片字节正确才回答，错误图片/缺图必须失败，覆盖 JSON/SSE；tearDown 清理服务。"""
         image = {"type": "image_url", "image_url": {"url": "data:image/png;base64," + VISION_PNG}}

@@ -127,3 +127,35 @@ func TestLogPaginationQuery(t *testing.T) {
 		}
 	}
 }
+
+// TestLogTPS 使用账单投影验证日志列表/详情沿用输出公式；前置固定计时，覆盖正常流、同步、缓存和失败，无持久化清理。
+func TestLogTPS(t *testing.T) {
+	ttft := 100
+	base := iam.UsageEvent{CallType: "responses", Status: "success", HTTPStatus: 200, Streamed: true, PromptTokens: 10000, CompletionTokens: 10, DurationMS: 1100, TTFTMs: &ttft}
+	for _, tc := range []struct {
+		name   string
+		change func(*iam.UsageEvent)
+		valid  bool
+	}{
+		{"stream", func(e *iam.UsageEvent) {}, true},
+		{"sync", func(e *iam.UsageEvent) { e.Streamed = false }, false},
+		{"cache", func(e *iam.UsageEvent) { e.CacheHit = true }, false},
+		{"failed", func(e *iam.UsageEvent) { e.Status = "failed" }, false},
+		{"zero output", func(e *iam.UsageEvent) { e.CompletionTokens = 0 }, false},
+		{"invalid interval", func(e *iam.UsageEvent) { e.DurationMS = 100 }, false},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			e := base
+			tc.change(&e)
+			got := logTPS(e)
+			if (got != nil) != tc.valid || got != nil && *got != 10 {
+				t.Fatalf("日志输出 TPS 错误: %v", got)
+			}
+			row := eventRows([]iam.UsageEvent{e})[0]
+			value := row["tps"].(*float64)
+			if (value != nil) != tc.valid || value != nil && *value != 10 {
+				t.Fatal("日志列表与详情 TPS 口径不一致", row)
+			}
+		})
+	}
+}

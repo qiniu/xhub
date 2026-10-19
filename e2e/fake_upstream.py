@@ -237,6 +237,8 @@ class Handler(BaseHTTPRequestHandler):
             req = {}
         if self._ark(req) or self._fal(req):
             return
+        if self._monitor_tps(req):
+            return
         if req.get("model", "").startswith("e2e-vision-"):
             try:
                 text = vision_answer(req, self.path)
@@ -708,6 +710,36 @@ class Handler(BaseHTTPRequestHandler):
             self.connection.close()
             return True
         return False
+
+    def _monitor_tps(self, req: dict) -> bool:
+        """为 monitor-tps- 前缀的 Chat 测试型号提供长输入、短输出及可测生成区间。
+
+        参数 req 为当前请求 JSON；返回是否已处理，非测试型号返回 False。
+        同步和流式使用相同用量，流式两帧间隔 80ms；只写本地连接，不访问真实供应商，进程结束清理。
+        """
+        if not str(req.get("model", "")).startswith("monitor-tps-"):
+            return False
+        if not self.path.rstrip("/").endswith("/chat/completions"):
+            self._response(400, b'{"error":"TPS fixture expects Chat Completions"}', "application/json")
+            return True
+        usage = {"prompt_tokens": 10000, "completion_tokens": 10, "total_tokens": 10010}
+        if req.get("stream") is not True:
+            time.sleep(0.03)
+            self._json({"id": "chatcmpl-monitor", "object": "chat.completion", "choices": [{"index": 0, "message": {"role": "assistant", "content": "e2e-ok"}, "finish_reason": "stop"}], "usage": usage})
+            return True
+        first = b'data: {"id":"chatcmpl-monitor","choices":[{"index":0,"delta":{"content":"e2e-ok"}}]}\n\n'
+        last = ("data: " + json.dumps({"choices": [{"index": 0, "delta": {}, "finish_reason": "stop"}], "usage": usage}) + "\n\ndata: [DONE]\n\n").encode()
+        self.send_response(200)
+        self.send_header("Content-Type", "text/event-stream")
+        self.send_header("Content-Length", str(len(first) + len(last)))
+        self.end_headers()
+        time.sleep(0.03)
+        self.wfile.write(first)
+        self.wfile.flush()
+        time.sleep(0.08)
+        self.wfile.write(last)
+        self.wfile.flush()
+        return True
 
     def _response(self, status: int, body: bytes, content_type: str) -> None:
         """写出指定 HTTP 响应；参数为状态码、完整正文和类型，无返回值。

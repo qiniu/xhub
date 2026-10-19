@@ -37,7 +37,7 @@ export const zhCN = {
 },
  organizationConfig: {"modelScopeHint": "模型范围是组织的授权上限，团队、项目和密钥只能继承或收窄；留空允许所有代理模型。", "modelScopeReadOnly": "仅平台管理员可以修改组织模型上限。", "modelScopeInherited": "允许所有代理模型；团队、项目和密钥可以进一步收窄。"},
  session: { inferred: "推断会话", logoutFailed: "退出失败，请重试。" },
- requestMetrics: {endpoints: "端点", inbound: "入站端点", outbound: "出站端点", duration: "总时间（秒）", ttft: "TTFT（秒）", tps: "TPS（Token/秒）", definition: "TTFT 为上游首个响应字节耗时；TPS = 总 Token 数 ÷（总时间 − TTFT），流式与非流式统一计算。"},
+ requestMetrics: {endpoints: "端点", inbound: "入站端点", outbound: "出站端点", duration: "总时间（秒）", ttft: "TTFT（秒）", tps: "TPS（Token/秒）", definition: "TTFT 为上游首个响应字节耗时，不一定是首个可见 Token；TPS = 输出 Token 数 ÷（总时间 − TTFT），仅对成功、非缓存的有效流式文本请求计算；同步请求无 TPS 样本。"},
  monitor: {
   "title": "模型监控",
   "description": "按每个供应商连接与实际模型比较表现。统计随账单持久化自动更新。",
@@ -70,7 +70,7 @@ export const zhCN = {
   "completion_tokens": "输出 Token",
   "tps_samples": "TPS 样本数",
   "ttft_samples": "TTFT 样本数",
-  "measurement": "TPS 为总 Token 除以首字节之后的耗时；TTFT 为首个上游响应字节到达时间。性能均值使用成功、非缓存的有效文本请求样本，包含流式与非流式。费用与 Token 汇总包含所有已记录的终态请求。日期按浏览器时区显示。"
+  "measurement": "TPS 为输出 Token 除以首字节之后的耗时，仅使用成功、非缓存的有效流式文本请求；同步请求无 TPS 样本。TTFT 为首个上游响应字节耗时，不一定是首个可见 Token。均值按有效样本数加权；费用与 Token 汇总包含所有已记录的终态请求。日期按浏览器时区显示。"
 },
  enterprise: {
   providers: {oidc: "OpenID Connect", entra: "Microsoft Entra ID", okta: "Okta", keycloak: "Keycloak", auth0: "Auth0"},

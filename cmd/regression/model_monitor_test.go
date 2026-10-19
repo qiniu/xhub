@@ -6,73 +6,121 @@ import (
 	"math"
 	"net/http"
 	"net/http/httptest"
-	"strings"
+	"reflect"
 	"testing"
 	"time"
 )
 
-// TestModelMonitorResponsesStream 验证真实 Responses 流的首事件计时、生成速度及同步请求统一口径。
-// 参数 t 为测试上下文，无返回值；本地供应商分段刷新并延迟终态，私有 schema 和服务自动清理。
-func TestModelMonitorResponsesStream(t *testing.T) {
-	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		var body map[string]any
-		if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
-			w.WriteHeader(http.StatusBadRequest)
-			return
-		}
-		response := map[string]any{"id": "resp_monitor", "object": "response", "status": "completed", "output": []any{map[string]any{"type": "message", "role": "assistant", "content": []any{map[string]any{"type": "output_text", "text": "hello"}}}}, "usage": map[string]any{"input_tokens": 11, "output_tokens": 5}}
-		if body["stream"] != true {
-			w.Header().Set("Content-Type", "application/json")
-			w.WriteHeader(200)
-			w.(http.Flusher).Flush()
-			time.Sleep(30 * time.Millisecond)
-			writeJSON(w, response)
-			return
-		}
-		w.Header().Set("Content-Type", "text/event-stream")
-		// 延迟首事件和终态，确保测到两个独立时间点，不依赖立即写入造成的毫秒舍入。
-		time.Sleep(30 * time.Millisecond)
-		fmt.Fprint(w, "data: {\"type\":\"response.created\",\"response\":{\"id\":\"resp_monitor\"}}\n\n")
-		w.(http.Flusher).Flush()
-		fmt.Fprint(w, "data: {\"type\":\"response.output_text.delta\",\"output_index\":0,\"delta\":\"hello\"}\n\n")
-		w.(http.Flusher).Flush()
-		time.Sleep(50 * time.Millisecond)
-		raw, _ := json.Marshal(map[string]any{"type": "response.completed", "response": response})
-		fmt.Fprintf(w, "data: %s\n\n", raw)
-		w.(http.Flusher).Flush()
-	}))
-	t.Cleanup(upstream.Close)
-	dep := chatDeployment("monitor-responses")
-	dep.ModelInfo = map[string]any{"id": "monitor-responses-deployment", "transport": "bypass_openai_responses", "endpoint_types": []string{"responses"}}
-	dep.LiteLLMParams["api_base"] = upstream.URL + "/v1"
-	h := newHarness(t, dep)
-	session := h.personalBillingSession()
-	for _, stream := range []bool{true, false} {
-		r := h.ok("POST", "/v1/responses", session, map[string]any{"model": dep.ModelName, "input": "Monitor streaming probe", "stream": stream, "store": false})
-		if stream && !strings.Contains(string(r.body), "response.completed") {
-			t.Fatal("流式请求没有完成事件", r.describe())
-		}
-	}
-	h.flushSpend()
-	logs := h.ok("GET", "/spend/logs/ui", session, nil).json()
-	rows := listField(logs, "data")
-	if len(rows) != 2 {
-		t.Fatalf("日志请求数不匹配: %v", logs)
-	}
-	for _, row := range rows {
-		if row["inbound_endpoint"] != "/v1/responses" || row["outbound_endpoint"] != "/v1/responses" {
-			t.Fatalf("异步落库后的日志端点丢失: %v", row)
-		}
-	}
-	summary := h.ok("GET", "/models/monitor", session, nil).json()["summary"].(map[string]any)
-	if summary["requests"] != float64(2) || summary["total_tokens"] != float64(32) || summary["tps_samples"] != float64(2) || summary["ttft_samples"] != float64(2) {
-		t.Fatal("真实流式请求必须产生性能样本，同步请求同样产生首字节性能样本", summary)
-	}
-	if tps, ok := summary["avg_tps"].(float64); !ok || tps <= 0 {
-		t.Fatal("流式 TPS 必须为正数", summary)
-	}
-	if ttft, ok := summary["avg_ttft_ms"].(float64); !ok || ttft <= 0 {
-		t.Fatal("流式首事件耗时必须为正数", summary)
+// TestModelMonitorOutputTPS 验证三种原生协议的实际流式/同步调用、日志与监控输出 TPS 一致。
+// 前置长输入/短输出的本地上游、真实后台与私有数据库；模拟旧聚合后走生产迁移，验证历史计量不变，harness 清理资源。
+func TestModelMonitorOutputTPS(t *testing.T) {
+	for _, protocol := range []string{"chat", "responses", "messages"} {
+		t.Run(protocol, func(t *testing.T) {
+			upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				var body map[string]any
+				if json.NewDecoder(r.Body).Decode(&body) != nil {
+					w.WriteHeader(400)
+					return
+				}
+				usage := map[string]any{"prompt_tokens": 10000, "completion_tokens": 10}
+				var response any = chatAnswer("monitor", usage)
+				if protocol == "messages" {
+					response = anthropicAnswer("monitor", map[string]any{"input_tokens": 10000, "output_tokens": 10})
+				}
+				if protocol == "responses" {
+					response = map[string]any{"id": "resp_monitor", "object": "response", "status": "completed", "output": []any{map[string]any{"type": "message", "role": "assistant", "content": []any{map[string]any{"type": "output_text", "text": "hello"}}}}, "usage": map[string]any{"input_tokens": 10000, "output_tokens": 10}}
+				}
+				if body["stream"] != true {
+					time.Sleep(30 * time.Millisecond)
+					writeJSON(w, response)
+					return
+				}
+				w.Header().Set("Content-Type", "text/event-stream")
+				time.Sleep(30 * time.Millisecond)
+				switch protocol {
+				case "chat":
+					fmt.Fprint(w, "data: {\"choices\":[{\"index\":0,\"delta\":{\"content\":\"hello\"}}]}\n\n")
+				case "responses":
+					fmt.Fprint(w, "data: {\"type\":\"response.created\",\"response\":{\"id\":\"resp_monitor\"}}\n\ndata: {\"type\":\"response.output_text.delta\",\"output_index\":0,\"delta\":\"hello\"}\n\n")
+				case "messages":
+					fmt.Fprint(w, "event: message_start\ndata: {\"type\":\"message_start\",\"message\":{\"id\":\"msg_monitor\",\"type\":\"message\",\"role\":\"assistant\",\"content\":[],\"usage\":{\"input_tokens\":10000,\"output_tokens\":0}}}\n\nevent: content_block_start\ndata: {\"type\":\"content_block_start\",\"index\":0,\"content_block\":{\"type\":\"text\",\"text\":\"\"}}\n\nevent: content_block_delta\ndata: {\"type\":\"content_block_delta\",\"index\":0,\"delta\":{\"type\":\"text_delta\",\"text\":\"hello\"}}\n\n")
+				}
+				w.(http.Flusher).Flush()
+				time.Sleep(80 * time.Millisecond)
+				switch protocol {
+				case "chat":
+					fmt.Fprint(w, "data: {\"choices\":[{\"index\":0,\"delta\":{},\"finish_reason\":\"stop\"}],\"usage\":{\"prompt_tokens\":10000,\"completion_tokens\":10}}\n\ndata: [DONE]\n\n")
+				case "responses":
+					raw, _ := json.Marshal(map[string]any{"type": "response.completed", "response": response})
+					fmt.Fprintf(w, "data: %s\n\n", raw)
+				case "messages":
+					fmt.Fprint(w, "event: content_block_stop\ndata: {\"type\":\"content_block_stop\",\"index\":0}\n\nevent: message_delta\ndata: {\"type\":\"message_delta\",\"delta\":{\"stop_reason\":\"end_turn\"},\"usage\":{\"output_tokens\":10}}\n\nevent: message_stop\ndata: {\"type\":\"message_stop\"}\n\n")
+				}
+			}))
+			t.Cleanup(upstream.Close)
+			dep := chatDeployment("monitor-" + protocol)
+			transport, path := "bypass_openai_chat", "/v1/chat/completions"
+			if protocol == "responses" {
+				transport, path = "bypass_openai_responses", "/v1/responses"
+			}
+			if protocol == "messages" {
+				transport, path = "bypass_anthropic_messages", "/v1/messages"
+				dep.LiteLLMParams["custom_llm_provider"] = "anthropic"
+			}
+			dep.ModelInfo = map[string]any{"id": "monitor-" + protocol, "transport": transport, "endpoint_types": []string{protocol}}
+			dep.LiteLLMParams["api_base"] = upstream.URL + "/v1"
+			h := newHarness(t, dep)
+			session := h.personalBillingSession()
+			for _, stream := range []bool{true, false} {
+				body := map[string]any{"model": dep.ModelName, "stream": stream, "max_tokens": 16}
+				if protocol == "responses" {
+					body["input"], body["store"] = "Verify output TPS.", false
+					delete(body, "max_tokens")
+				} else {
+					body["messages"] = []any{map[string]any{"role": "user", "content": "Verify output TPS."}}
+				}
+				h.ok("POST", path, session, body)
+			}
+			h.flushSpend()
+			rows := listField(h.ok("GET", "/spend/logs/ui", session, nil).json(), "data")
+			if len(rows) != 2 {
+				t.Fatal("流式和同步调用必须各保留一条账单", rows)
+			}
+			want := 0.0
+			for _, row := range rows {
+				if row["inbound_endpoint"] != path || row["outbound_endpoint"] != path {
+					t.Fatal("日志端点错误", row)
+				}
+				if row["streamed"] == true {
+					want = 10 * 1000 / (row["request_duration_ms"].(float64) - row["ttft_ms"].(float64))
+					if tps, ok := row["tps"].(float64); !ok || math.Abs(tps-want) > 1e-9 {
+						t.Fatal("日志 TPS 混入输入 Token", row)
+					}
+				} else if row["tps"] != nil {
+					t.Fatal("同步请求不能用读尾时间伪造 TPS", row)
+				}
+			}
+			summary := h.ok("GET", "/models/monitor", session, nil).json()["summary"].(map[string]any)
+			if summary["requests"] != float64(2) || summary["total_tokens"] != float64(20020) || summary["tps_samples"] != float64(1) || math.Abs(summary["avg_tps"].(float64)-want) > 1e-9 {
+				t.Fatal("日志与聚合 TPS 口径不一致", summary)
+			}
+			// 仅作为旧版本存储夹具写入错误指标；随后实际 HTTP 必须读到生产迁移修正结果。
+			if _, err := h.db.Engine.Exec("UPDATE model_monitor_buckets SET output_tps_sum=999999,output_tps_samples=2"); err != nil {
+				t.Fatal(err)
+			}
+			if _, err := h.db.Engine.Exec("DELETE FROM model_monitor_migrations"); err != nil {
+				t.Fatal(err)
+			}
+			for range 2 {
+				if err := h.db.Migrate(t.Context()); err != nil {
+					t.Fatal(err)
+				}
+			}
+			upgraded := h.ok("GET", "/models/monitor", session, nil).json()["summary"].(map[string]any)
+			if !reflect.DeepEqual(summary, upgraded) {
+				t.Fatalf("历史升级改变计费或其他指标: before=%v after=%v", summary, upgraded)
+			}
+		})
 	}
 }
 

@@ -9,37 +9,50 @@ import (
 	"xorm.io/builder"
 )
 
-// TestMonitorContribution 在无数据库条件下验证正常流、缓存、失败及错误计时的样本筛选和可逆贡献，无清理需求。
+// TestMonitorContribution 验证正常流、同步、缓存、失败和计时边界的独立 TPS/TTFT 样本及可逆贡献，无外部清理。
 func TestMonitorContribution(t *testing.T) {
 	ttft := 100
 	base := UsageRecord{TS: time.Date(2026, 1, 1, 0, 3, 0, 0, time.UTC), Supplier: "s", UpstreamModel: "m", Status: "success", CallType: "chat", HTTPStatus: 200, PromptTokens: 20, CompletionTokens: 10, Cost: 0.2, DurationMS: 1100, TTFTMs: &ttft, Streamed: true}
 	for _, tc := range []struct {
-		name              string
-		change            func(*UsageRecord)
-		samples, requests int64
-	}{{"stream", func(r *UsageRecord) {}, 1, 1}, {"native-completions", func(r *UsageRecord) { r.CallType = "openai_completions:create" }, 1, 1}, {"sync", func(r *UsageRecord) { r.Streamed = false }, 1, 1}, {"cache", func(r *UsageRecord) { r.CacheHit = true }, 0, 1}, {"failed", func(r *UsageRecord) { r.HTTPStatus = 502 }, 0, 1}, {"negative", func(r *UsageRecord) { n := -1; r.TTFTMs = &n }, 0, 1}, {"inverted", func(r *UsageRecord) { r.DurationMS = 99 }, 0, 1}, {"polling", func(r *UsageRecord) { r.Status = "polling" }, 0, 0}, {"image", func(r *UsageRecord) { r.CallType = "image" }, 0, 1}} {
+		name                string
+		change              func(*UsageRecord)
+		tps, ttft, requests int64
+	}{
+		{"stream", func(r *UsageRecord) {}, 1, 1, 1},
+		{"native-completions", func(r *UsageRecord) { r.CallType = "openai_completions:create" }, 1, 1, 1},
+		{"sync", func(r *UsageRecord) { r.Streamed = false }, 0, 1, 1},
+		{"cache", func(r *UsageRecord) { r.CacheHit = true }, 0, 0, 1},
+		{"failed", func(r *UsageRecord) { r.HTTPStatus = 502 }, 0, 0, 1},
+		{"negative", func(r *UsageRecord) { n := -1; r.TTFTMs = &n }, 0, 0, 1},
+		{"inverted", func(r *UsageRecord) { r.DurationMS = 99 }, 0, 0, 1},
+		{"zero interval", func(r *UsageRecord) { r.DurationMS = 100 }, 0, 1, 1},
+		{"no output", func(r *UsageRecord) { r.CompletionTokens = 0 }, 0, 1, 1},
+		{"polling", func(r *UsageRecord) { r.Status = "polling" }, 0, 0, 0},
+		{"image", func(r *UsageRecord) { r.CallType = "image" }, 0, 0, 1},
+	} {
 		t.Run(tc.name, func(t *testing.T) {
 			r := base
 			tc.change(&r)
 			m := map[monitorKey]monitorDelta{}
 			accumulateMonitor(m, r, 1)
-			var d monitorDelta
-			for k, v := range m {
-				d = v
+			for k, d := range m {
 				if k.Bucket.Minute() != 0 || k.Supplier != "s" || k.Model != "m" {
 					t.Fatal("桶维度丢失", k)
 				}
-			}
-			if d.Requests != tc.requests || d.TPSSamples != tc.samples || d.TTFTSamples != tc.samples {
-				t.Fatalf("样本筛选错误: %+v", d)
-			}
-			if tc.samples == 1 && (d.TPS != 30 || d.TTFT != 100) {
-				t.Fatal("公式错误", d)
+				if d.Requests != tc.requests || d.TPSSamples != tc.tps || d.TTFTSamples != tc.ttft {
+					t.Fatalf("样本筛选错误: %+v", d)
+				}
+				if tc.tps == 1 && d.TPS != 10 {
+					t.Fatal("输入 Token 被错误计入输出 TPS", d)
+				}
+				if tc.ttft == 1 && d.TTFT != 100 {
+					t.Fatal("首字节计时被改变", d)
+				}
 			}
 			accumulateMonitor(m, r, -1)
-			for _, v := range m {
-				if v != (monitorDelta{}) {
-					t.Fatal("贡献不能抵消", v)
+			for _, d := range m {
+				if d != (monitorDelta{}) {
+					t.Fatal("贡献不能抵消", d)
 				}
 			}
 		})
@@ -101,7 +114,7 @@ func TestMonitorAtomicIdempotentBuckets(t *testing.T) {
 		t.Fatal(err)
 	}
 	for _, row := range monitorRows(t, db, builder.Eq{"user_id": "owner-a"}) {
-		if row.Requests != 2 || row.TotalTokens != 60 || row.Cost != 0.4 || row.AvgTPS == nil || *row.AvgTPS != 45 || row.TPSSamples != 2 {
+		if row.Requests != 2 || row.TotalTokens != 60 || row.Cost != 0.4 || row.AvgTPS == nil || *row.AvgTPS != 15 || row.TPSSamples != 2 {
 			t.Fatalf("预聚合、授权或平均错误: %+v", row)
 		}
 	}

@@ -86,7 +86,7 @@ jobs:
       - run: npx playwright install --with-deps chromium
         working-directory: frontend
       # 真实登录、密钥轮换、推理及旧库升级后的日志/用量/监控；使用专属 Redis 和本地上游，运行器清理资源。
-      - run: bash scripts/e2e.sh scenarios/legacy/login/sc-056.test.ts scenarios/keys/rotation-secret.test.ts scenarios/legacy/playground-workspace/sc-109.test.ts scenarios/regression/usage-upgrade-en.test.ts scenarios/regression/usage-upgrade-zh-CN.test.ts agent-native-protocol.test.ts portable-reasoning.test.ts vision-input.test.ts messages-reasoning.test.ts agent-chat-bridge.test.ts responses-item-ids.test.ts chat-encrypted-reasoning.test.ts agent-proxy-timeout.test.ts web-search-policy.test.ts
+      - run: bash scripts/e2e.sh scenarios/legacy/login/sc-056.test.ts scenarios/keys/rotation-secret.test.ts scenarios/legacy/playground-workspace/sc-109.test.ts scenarios/regression/usage-upgrade-en.test.ts scenarios/regression/usage-upgrade-zh-CN.test.ts agent-native-protocol.test.ts portable-reasoning.test.ts vision-input.test.ts messages-reasoning.test.ts agent-chat-bridge.test.ts responses-item-ids.test.ts chat-encrypted-reasoning.test.ts agent-proxy-timeout.test.ts web-search-policy.test.ts scenarios/regression/model-monitor-tps-en.test.ts scenarios/regression/model-monitor-tps-zh-CN.test.ts
         env:
           E2E_RUN_DIR: ${{ github.workspace }}/.e2e/release
           E2E_PORTABLE_CONSOLE: '1'

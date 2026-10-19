@@ -62,6 +62,7 @@ describe("model monitor view", () => {
     );
     expect(await screen.findByRole("rowheader", { name: "original-model" })).toBeVisible();
     expect(screen.getByText(locale === "en" ? "Model details (1 combinations)" : "模型明细（1 个组合）")).toBeVisible();
+    expect(screen.getByText(locale === "en" ? /TPS = output tokens/ : /TPS 为输出 Token/)).toHaveTextContent(locale === "en" ? "Synchronous requests have no TPS sample" : "同步请求无 TPS 样本");
     const start = screen.getByLabelText(locale === "en" ? "Start date" : "开始日期");
     const end = screen.getByLabelText(locale === "en" ? "End date" : "结束日期");
     fireEvent.change(start, { target: { value: "2026-02-01" } });

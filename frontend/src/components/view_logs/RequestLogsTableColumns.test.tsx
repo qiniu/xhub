@@ -356,3 +356,21 @@ it.each(["en", "zh-CN"] as const)("labels inferred sessions in %s", (locale) => 
     setActiveLocale(originalLocale);
   }
 });
+
+/** 前置两种语言和后端输出速度/无样本事实；验证日志 TPS 说明不再声称输入或同步计入，自动卸载 DOM 并恢复语言。 */
+it.each(["en", "zh-CN"] as const)("explains output-only streaming TPS in %s", (locale) => {
+  const original = getActiveLocale();
+  try {
+    setActiveLocale(locale);
+    renderRows([logEntry({ request_id: "streamed", tps: 10 }), logEntry({ request_id: "sync", tps: null })]);
+    const definition = t("requestMetrics.definition");
+    expect(definition).toContain(locale === "en" ? "output tokens" : "输出 Token");
+    expect(definition).toContain(locale === "en" ? "synchronous requests have no TPS sample" : "同步请求无 TPS 样本");
+    const index = screen.getAllByRole("columnheader").findIndex(element => element.textContent === t("requestMetrics.tps"));
+    expect(index).toBeGreaterThanOrEqual(0);
+    const rows = screen.getAllByRole("row").slice(1);
+    expect(rows.map(row => within(row).getAllByRole("cell")[index].textContent)).toEqual(["10.00", "—"]);
+  } finally {
+    setActiveLocale(original);
+  }
+});

@@ -247,6 +247,18 @@ func TestBrowserEnterpriseFixture(t *testing.T) {
 	control := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 		switch r.URL.Path {
+		case "/monitor/tps/legacy":
+			// 只在此测试程序的私有 schema 写入旧 TPS 并移除完成标记；浏览器随后通过生产 Migrate 验证修复。
+			// 不改写账单、费用、Token 或其他统计；POST 以外拒绝，运行器最终删除专属 schema。
+			if r.Method != http.MethodPost {
+				w.WriteHeader(http.StatusMethodNotAllowed)
+				return
+			}
+			if _, err := db.Engine.Context(r.Context()).Exec("UPDATE model_monitor_buckets SET output_tps_sum=999999,output_tps_samples=2; DELETE FROM model_monitor_migrations"); err != nil {
+				http.Error(w, err.Error(), http.StatusInternalServerError)
+				return
+			}
+			_ = json.NewEncoder(w).Encode(map[string]bool{"ok": true})
 		case "/usage/legacy", "/usage/migrate":
 			// 仅在已校验的 e2e_ 私有 schema 中复现旧表缺列；恢复必须走生产迁移入口。
 			// 控制端只编入测试程序，重复迁移不得重算历史费用；测试结束由运行器删库清理。

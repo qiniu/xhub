@@ -254,3 +254,12 @@ test('agent compatibility uses pinned real clients and a governed browser flow',
   assert.equal(artifact.if, 'always()');
   assert.ok(artifact.with.path.includes('.e2e/release/agent-clients/'), '必须保留实际 CLI 证据');
 });
+
+/** 前置真实发布 YAML；验证双语输出 TPS 旧指标升级随发布运行，避免只测实时公式；只读配置无需清理。 */
+test('verification includes bilingual output TPS and historical upgrade scenarios', () => {
+  const browser = workflow.jobs.verify.steps.find(item => (item.run || '').startsWith('bash scripts/e2e.sh '));
+  assert.ok(browser, '发布必须运行真实浏览器场景');
+  for (const locale of ['en', 'zh-CN']) {
+    assert.ok(browser.run.split(/\s+/).includes(`scenarios/regression/model-monitor-tps-${locale}.test.ts`), `发布缺少 ${locale} 输出 TPS 与历史升级闭环`);
+  }
+});

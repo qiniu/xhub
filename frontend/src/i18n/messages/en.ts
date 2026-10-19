@@ -36,7 +36,7 @@ export const en = {
 },
  organizationConfig: {"modelScopeHint": "Models set the organization ceiling. Teams, projects and keys can only inherit or narrow it. Leave empty to allow all proxy models.", "modelScopeReadOnly": "Only platform administrators can change the organization model ceiling.", "modelScopeInherited": "All proxy models; teams, projects and keys may narrow this range."},
  session: { inferred: "Inferred session", logoutFailed: "Unable to sign out. Please try again." },
- requestMetrics: {endpoints: "Endpoints", inbound: "Inbound", outbound: "Outbound", duration: "Total time (s)", ttft: "TTFT (s)", tps: "TPS (tokens/s)", definition: "TTFT measures the first upstream response byte. TPS = total tokens / (total time − TTFT), for streaming and synchronous requests."},
+ requestMetrics: {endpoints: "Endpoints", inbound: "Inbound", outbound: "Outbound", duration: "Total time (s)", ttft: "TTFT (s)", tps: "TPS (tokens/s)", definition: "TTFT measures the first upstream response byte, not necessarily the first visible token. TPS = output tokens / (total time − TTFT), for successful uncached streaming text only; synchronous requests have no TPS sample."},
  monitor: {
   "title": "Model Monitor",
   "description": "Compare every supplier connection and actual upstream model. Statistics update when billing is persisted.",
@@ -69,7 +69,7 @@ export const en = {
   "completion_tokens": "Output tokens",
   "tps_samples": "TPS samples",
   "ttft_samples": "TTFT samples",
-  "measurement": "TPS = total tokens / (total time − TTFT). TTFT measures the first upstream response byte. Successful uncached text requests include streaming and synchronous calls. Cost and token totals include all recorded terminal requests. Dates use your browser timezone."
+  "measurement": "TPS = output tokens / (total time − TTFT), for successful uncached streaming text only. Synchronous requests have no TPS sample. TTFT measures the first upstream response byte, not necessarily the first visible token. Averages are weighted by valid samples. Cost and token totals include all recorded terminal requests. Dates use your browser timezone."
 },
  enterprise: {
   providers: {oidc: "OpenID Connect", entra: "Microsoft Entra ID", okta: "Okta", keycloak: "Keycloak", auth0: "Auth0"},

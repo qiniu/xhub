@@ -78,11 +78,10 @@ func Open(ctx context.Context, dsn string) (*DB, error) {
 	return db, nil
 }
 
-// Migrate creates every table and constraint; idempotent on the new schema.
-// 参数 ctx（context.Context）：上下文，取消或超时时停止后续工作。
-// 返回 error（error）：失败原因，nil 表示这一步成功。
-// 调用：仅在 db.go 内使用
-// 测试：无直接单测
+// Migrate 幂等补齐表结构，并在账单事务锁内执行一次性指标口径升级。
+// 参数 ctx 为启动或显式升级上下文；返回建表、修正或提交错误，失败时调用方不得启动服务。
+// Open 与升级验收调用；不导入旧系统数据、不重算费用，重复调用不会重复修正历史 TPS。
+// 测试：usage_migration_test.go、model_monitor_migration_test.go。
 func (db *DB) Migrate(ctx context.Context) error {
 	if _, err := db.Engine.Context(ctx).Exec(schemaSQL); err != nil {
 		util.Error("iam schema apply failed: %v", err)
@@ -97,7 +96,7 @@ func (db *DB) Migrate(ctx context.Context) error {
 	if _, err := db.Engine.Context(ctx).Exec(archiveSchemaSQL); err != nil {
 		return err
 	}
-	return nil
+	return db.migrateMonitorTPS(ctx)
 }
 
 // Close releases the engine.
