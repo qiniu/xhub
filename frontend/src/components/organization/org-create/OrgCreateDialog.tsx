@@ -34,7 +34,7 @@ interface OrgCreateDialogProps {
   createOrganization?: (body: OrgCreateBody) => Promise<unknown>;
 }
 
-/** 组织创建弹窗：接收打开状态、会话及可选创建接口，返回表单；校验后提交模型上限和元数据。
+/** 组织创建弹窗：接收打开状态、会话及可选创建接口，返回表单；校验后提交固定预算周期、模型上限和元数据。
  * 管理页面调用，成功清空并关闭，失败保留用户输入，取消不写数据。 */
 export const OrgCreateDialog = ({
   open,
@@ -112,6 +112,7 @@ export const OrgCreateDialog = ({
               {({ ref, ...field }) => <Input {...field} ref={ref} type="number" step="any" min={0} />}
             </FormField>
 
+            <p className="text-sm text-muted-foreground">{t("organizationBudget.periodHint")}</p>
             <FormField control={form.control} name="budget_duration" label={t("Reset Budget")}>
               {({ id, value, onChange, "aria-invalid": ariaInvalid, "aria-describedby": ariaDescribedBy }) => (
                 <Select

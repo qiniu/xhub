@@ -15,6 +15,7 @@ import (
 	"github.com/sunqirui1987/xhub/internal/config"
 	"github.com/sunqirui1987/xhub/internal/iam"
 	"github.com/sunqirui1987/xhub/internal/store"
+	"github.com/sunqirui1987/xhub/internal/util"
 	"io"
 	"math/big"
 	"net/http"
@@ -228,16 +229,32 @@ func TestBrowserEnterpriseFixture(t *testing.T) {
 		k.client = &qclient.Client{Client: objectServer.Client()}
 		return k, nil
 	}
+	// 故障只注入隔离测试 HTTP 边界；分页主体和成功结果仍来自真实 IAM 查询。
+	var usageFault string
+	var usageFaultMu sync.Mutex
+	gatewayHandler := s.Handler()
+	fixtureHandler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		usageFaultMu.Lock()
+		fault := usageFault
+		usageFaultMu.Unlock()
+		path := strings.TrimPrefix(r.URL.Path, "/gw")
+		failed := strings.Contains(path, "/daily/activity") && ((fault == "aggregated" && strings.HasSuffix(path, "/aggregated")) || (fault == "page2" && (strings.HasSuffix(path, "/aggregated") || r.URL.Query().Get("page") == "2")) || (fault == "gateway" && path == "/gateway/daily/activity"))
+		if failed {
+			util.WriteError(w, 503, "unavailable", "isolated usage failure")
+			return
+		}
+		gatewayHandler.ServeHTTP(w, r)
+	})
 	ui, _ := url.Parse("http://127.0.0.1:" + os.Getenv("E2E_UI_PORT"))
 	proxy := httputil.NewSingleHostReverseProxy(ui)
 	consoleServer := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if strings.HasPrefix(r.URL.Path, "/gw/") {
 			r.URL.Path = strings.TrimPrefix(r.URL.Path, "/gw")
-			s.Handler().ServeHTTP(w, r)
+			fixtureHandler.ServeHTTP(w, r)
 			return
 		}
 		if strings.HasPrefix(r.URL.Path, "/auth/") {
-			s.Handler().ServeHTTP(w, r)
+			fixtureHandler.ServeHTTP(w, r)
 			return
 		}
 		proxy.ServeHTTP(w, r)
@@ -259,6 +276,67 @@ func TestBrowserEnterpriseFixture(t *testing.T) {
 				return
 			}
 			_ = json.NewEncoder(w).Encode(map[string]bool{"ok": true})
+
+		case "/organization/budget/due":
+			// 私有测试 schema 中只推进本场景组织的到期时刻；实际重置仍走生产事务、审计与准入。
+			var body struct {
+				ID string `json:"organization_id"`
+			}
+			if r.Method != http.MethodPost || json.NewDecoder(r.Body).Decode(&body) != nil {
+				http.Error(w, "POST organization_id required", 400)
+				return
+			}
+			result, err := db.Engine.Exec("UPDATE organizations SET budget_reset_at=? WHERE id=? AND name LIKE 'budget-%' AND budget_duration<>''", time.Now().Add(-time.Second), body.ID)
+			if err != nil {
+				http.Error(w, err.Error(), 500)
+				return
+			}
+			n, _ := result.RowsAffected()
+			if n != 1 {
+				http.Error(w, "fixture organization required", 400)
+				return
+			}
+			_ = json.NewEncoder(w).Encode(map[string]bool{"ok": true})
+		case "/usage/failure":
+			// 只切换本地 HTTP 故障模式，不替换任何成功响应或生产页面数据。
+			var body struct {
+				Mode string `json:"mode"`
+			}
+			if r.Method != http.MethodPost || json.NewDecoder(r.Body).Decode(&body) != nil {
+				http.Error(w, "POST mode required", 400)
+				return
+			}
+			if body.Mode != "" && body.Mode != "aggregated" && body.Mode != "page2" && body.Mode != "gateway" {
+				http.Error(w, "unsupported mode", 400)
+				return
+			}
+			usageFaultMu.Lock()
+			usageFault = body.Mode
+			usageFaultMu.Unlock()
+			_ = json.NewEncoder(w).Encode(map[string]bool{"ok": true})
+		case "/usage/seed-pages":
+			// 私有 schema 写入确定的 52 日历史账单，浏览器通过真实分页路由读取；只能用于本场景测试账号。
+			var body struct {
+				UserID string `json:"user_id"`
+			}
+			if r.Method != http.MethodPost || json.NewDecoder(r.Body).Decode(&body) != nil {
+				http.Error(w, "POST user_id required", 400)
+				return
+			}
+			user, err := db.GetUser(r.Context(), body.UserID)
+			if err != nil || user == nil || !strings.HasPrefix(user.Email, "usage-state-") {
+				http.Error(w, "fixture user required", 400)
+				return
+			}
+			var records []iam.UsageRecord
+			for i := 0; i < 52; i++ {
+				records = append(records, iam.UsageRecord{RequestID: body.UserID + fmt.Sprint("-page-", i), UserID: body.UserID, OwnerType: iam.OwnerPersonal, Model: "usage-state-history", TS: time.Now().UTC().Add(-time.Duration(i) * 24 * time.Hour), Cost: 0.01, PromptTokens: 10, CompletionTokens: 1, HTTPStatus: 200, Status: "success"})
+			}
+			if err := db.RecordUsage(r.Context(), records); err != nil {
+				http.Error(w, err.Error(), 500)
+				return
+			}
+			_ = json.NewEncoder(w).Encode(map[string]int{"records": len(records)})
 		case "/usage/legacy", "/usage/migrate":
 			// 仅在已校验的 e2e_ 私有 schema 中复现旧表缺列；恢复必须走生产迁移入口。
 			// 控制端只编入测试程序，重复迁移不得重算历史费用；测试结束由运行器删库清理。
@@ -416,7 +494,7 @@ func TestBrowserEnterpriseFixture(t *testing.T) {
 	if err = os.WriteFile(filepath.Join(dir, "enterprise-fixture.json"), metadata, 0600); err != nil {
 		t.Fatal(err)
 	}
-	server := &http.Server{Addr: "127.0.0.1:" + os.Getenv("E2E_GW_PORT"), Handler: s.Handler()}
+	server := &http.Server{Addr: "127.0.0.1:" + os.Getenv("E2E_GW_PORT"), Handler: fixtureHandler}
 	go func() {
 		if err := server.ListenAndServe(); err != nil && err != http.ErrServerClosed {
 			fmt.Fprintln(os.Stderr, err)

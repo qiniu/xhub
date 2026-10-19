@@ -228,6 +228,9 @@ it("keeps organization models read-only while allowing metadata edits", async ()
   const user = userEvent.setup();
   const { patchOrganization } = renderForm({ canEditModels: false });
   expect(screen.getByRole("button", {name: "clear-models"})).toBeDisabled();
+  for (const label of ["Max Budget (USD)", "Reset Budget", "Tokens per minute Limit (TPM)", "Requests per minute Limit (RPM)"]) {
+    expect(screen.getByLabelText(label)).toBeDisabled();
+  }
   expect(screen.getByText("Only platform administrators can change the organization model ceiling.")).toBeVisible();
   fireEvent.change(screen.getByLabelText("Metadata"), {target: {value: '{"department":"研发试点","nested":{"limit":3}}'}});
   await user.click(screen.getByRole("button", {name: "Save Changes"}));

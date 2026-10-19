@@ -106,7 +106,7 @@ func (db *DB) Migrate(ctx context.Context) error {
 // 测试：authz_test.go、builtin_providers_test.go、bypass_logic_test.go
 func (db *DB) Close() error { return db.Engine.Close() }
 
-// tx runs fn in one xorm transaction and rolls back on any error.
+// tx 在共用写事务锁下先补执行到期组织预算，再运行 fn；任一步失败回滚预算、审计和本次业务写入。
 // 参数 ctx（context.Context）：上下文，取消时停止；fn（值）：tx使用的值。
 // 返回 error（error）：失败原因，nil 表示这一步成功。
 // 调用：iam/keys.go、iam/teams.go、iam/usage.go、iam/users.go
@@ -120,6 +120,11 @@ func (db *DB) tx(ctx context.Context, fn func(*xorm.Session) error) error {
 	// 在行锁前统一串行化管理写入与结算，防止并发兄弟分配读取同一余额。
 	if _, err := s.Exec("SELECT pg_advisory_xact_lock(hashtextextended(current_schema(), 864209731))"); err != nil {
 		return err
+	}
+	// 重置与配置/账单写入共用串行事务；不能先写新周期消费再清零。
+	if err := resetOrganizationBudgets(s, time.Now()); err != nil {
+		_ = s.Rollback()
+		return mapErr(err)
 	}
 	if err := fn(s); err != nil {
 		_ = s.Rollback()

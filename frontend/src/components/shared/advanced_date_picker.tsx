@@ -74,9 +74,8 @@ const relativeTimeOptions: RelativeTimeOption[] = [
   },
 ];
 
-/**
- * Advanced Date Range Picker with dropdown, relative times, and custom inputs
- */
+/** 选择实际查询时间范围；参数为当前范围、变更回调和可选标题/样式，返回带预设及自定义日期的选择器。
+ * 用量页面等查询视图调用；输入有当前语言的无障碍名称，校验通过点击应用才通知调用方，不写后台数据。 */
 const AdvancedDatePicker: React.FC<AdvancedDatePickerProps> = ({
   value,
   onValueChange,
@@ -292,6 +291,7 @@ const AdvancedDatePicker: React.FC<AdvancedDatePickerProps> = ({
         <button
           type="button"
           data-slot="advanced-date-picker-trigger"
+          aria-label={label}
           aria-expanded={isOpen}
           className="w-[300px] px-3 py-2 text-sm text-left border border-border rounded-md bg-card cursor-pointer hover:border-ring focus:border-info focus:ring-1 focus:ring-ring"
           onClick={() => setIsOpen(!isOpen)}
@@ -373,6 +373,7 @@ const AdvancedDatePicker: React.FC<AdvancedDatePickerProps> = ({
                     <label className="text-sm text-foreground mb-1 block">{t("Start date")}</label>
                     <input
                       type="date"
+                      aria-label={t("Start date")}
                       value={startDate}
                       onChange={(e) => setStartDate(e.target.value)}
                       className={`w-65 px-3 py-2 text-sm border rounded-md cursor-pointer hover:border-ring focus:border-info focus:ring-1 focus:ring-ring ${
@@ -388,6 +389,7 @@ const AdvancedDatePicker: React.FC<AdvancedDatePickerProps> = ({
                     <label className="text-sm text-foreground mb-1 block">{t("End date")}</label>
                     <input
                       type="date"
+                      aria-label={t("End date")}
                       value={endDate}
                       onChange={(e) => setEndDate(e.target.value)}
                       className={`w-65 px-3 py-2 text-sm border rounded-md cursor-pointer hover:border-ring focus:border-info focus:ring-1 focus:ring-ring ${
@@ -423,7 +425,7 @@ const AdvancedDatePicker: React.FC<AdvancedDatePickerProps> = ({
                         {moment(tempValue.from).format(t("MMM D, YYYY [at] HH:mm:ss"))}
                       </div>
                       <div className="text-xs text-info">
-                        <span className="font-medium">To:</span>{" "}
+                        <span className="font-medium">{t("To:")}</span>{" "}
                         {moment(tempValue.to).format(t("MMM D, YYYY [at] HH:mm:ss"))}
                       </div>
                     </div>

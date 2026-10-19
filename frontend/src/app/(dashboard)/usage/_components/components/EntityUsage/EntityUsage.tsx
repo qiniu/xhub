@@ -1,3 +1,4 @@
+import { Button } from "@/components/ui/button";
 import useTeams from "@/app/(dashboard)/hooks/useTeams";
 import { BarChart, DonutChart } from "@/components/shared/charts";
 import { DataTable } from "@/components/shared/DataTable";
@@ -113,7 +114,7 @@ const ENTITY_CAPABILITIES: Partial<Record<EntityType, Capability>> = {
 /**
  * 渲染所选实体的费用、模型、密钥和接口用量，供用量页面的实体视图调用。
  * 参数为实体类型、日期范围、访问令牌、筛选列表和用户权限；返回统计面板。
- * 请求在令牌、日期和权限就绪后执行，失败由分页钩子处理；切换实体或日期会重新读取。
+ * 请求在令牌、日期和权限就绪后执行；失败显示错误及重试、部分结果标记不完整，保留筛选但禁用导出；切换实体或日期会重新读取。
  * 团队视图只读取团队统计，Agent 产品已移除，因此不发起 Agent 请求或展示其入口。
  */
 const EntityUsage: React.FC<EntityUsageProps> = ({
@@ -149,7 +150,7 @@ const EntityUsage: React.FC<EntityUsageProps> = ({
   const enabled = hasRequestWindow && canViewEntity;
 
   const {
-    data: spendDataRaw,
+    data: spendDataRaw, error, hasData, retry,
     isFetchingMore,
     progress,
     cancelled,
@@ -641,7 +642,11 @@ const EntityUsage: React.FC<EntityUsageProps> = ({
         progress={progress}
         cancel={cancel}
       />
-      <UsageExportHeader
+      {!hasData && (!canViewEntity ? <p role="alert">{t("usageLoad.denied")}</p> : error ? <div role="alert" className="rounded-lg border border-destructive p-4 space-y-3">
+        <p>{t("usageLoad.failed")}</p><Button variant="outline" onClick={retry}>{t("usageLoad.retry")}</Button>
+      </div> : <p role="status">{t("usageLoad.loading")}</p>)}
+      {canViewEntity && <UsageExportHeader
+        disableExport={!hasData || !!error || cancelled || isFetchingMore}
         dateValue={dateValue}
         entityType={entityType}
         spendData={spendData}
@@ -653,7 +658,12 @@ const EntityUsage: React.FC<EntityUsageProps> = ({
         onFiltersChange={setSelectedTags}
         filterOptions={getAllTags() || undefined}
         teams={teams || []}
-      />
+      />}
+      {hasData && <>
+      {(error || cancelled) && <div role="alert" className="rounded-lg border p-4 space-y-3">
+        <p>{t("usageLoad.partial", { loaded: progress.currentPage, total: progress.totalPages })}</p>
+        <Button variant="outline" onClick={retry}>{t("usageLoad.retry")}</Button>
+      </div>}
       <Tabs defaultValue={tabs[0].key}>
         <TabsList className="mt-1">
           {tabs.map(({ key, label }) => (
@@ -667,7 +677,7 @@ const EntityUsage: React.FC<EntityUsageProps> = ({
             {content}
           </TabsContent>
         ))}
-      </Tabs>
+      </Tabs></>}
     </div>
   );
 };

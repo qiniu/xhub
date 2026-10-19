@@ -1,5 +1,5 @@
 import { expect, type Page } from "@playwright/test";
-import { translate } from "../src/i18n/translate";
+import { translate, type Locale } from "../src/i18n/translate";
 import { requirePageSuccess } from "./assertions";
 
 export const t = (key: string) => translate("zh-CN", key);
@@ -94,17 +94,20 @@ export async function clearConsoleSession(page: Page) {
   await page.evaluate(() => sessionStorage.clear()).catch(() => undefined);
 }
 
-export async function gotoLogin(page: Page) {
+/** 打开登录页；参数为浏览器及当前界面语言，返回就绪 Promise；清理会话存储但保留语言，供多角色 E2E 使用。 */
+export async function gotoLogin(page: Page, locale: Locale = "zh-CN") {
   await stableGoto(page, "/login");
   await page.evaluate(() => sessionStorage.clear()).catch(() => undefined);
-  await expect(page.getByRole("heading", { name: t("login.title") })).toBeVisible({ timeout: 20_000 });
+  await expect(page.getByRole("heading", { name: translate(locale, "login.title") })).toBeVisible({ timeout: 20_000 });
 }
 
-export async function login(page: Page, username: string, password: string) {
+/** 用真实登录表单建立会话；参数为浏览器、账号、密码及当前语言，返回提交 Promise。
+ * 多角色/双语 E2E 调用；先清理旧认证，按当前语言定位，不修改账号、密码或界面语言。 */
+export async function login(page: Page, username: string, password: string, locale: Locale = "zh-CN") {
   await clearConsoleSession(page);
-  await gotoLogin(page);
-  await page.getByPlaceholder(t("login.usernamePlaceholder")).fill(username);
-  const passwordInput = page.getByPlaceholder(t("login.passwordPlaceholder"));
+  await gotoLogin(page, locale);
+  await page.getByPlaceholder(translate(locale, "login.usernamePlaceholder")).fill(username);
+  const passwordInput = page.getByPlaceholder(translate(locale, "login.passwordPlaceholder"));
   await passwordInput.fill(password);
   // 从密码框提交原生登录表单，避免长时间全量运行时按钮动画或重渲染打断指针点击。
   await passwordInput.press("Enter");

@@ -1,6 +1,6 @@
 import type { DateRangePickerValue } from "@/components/shared/date_picker_types";
 import { Download } from "lucide-react";
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import {
   Combobox,
@@ -35,8 +35,11 @@ interface UsageExportHeaderProps {
   customTitle?: string;
   compactLayout?: boolean;
   teams?: Team[];
+  disableExport?: boolean;
 }
 
+/** 展示实体筛选与导出入口；参数为范围、实体、用量、筛选回调及导出禁用状态，返回标题区。
+ * 用量页调用；失败/不完整时只禁用导出，保留筛选以便清除失效条件；变更为禁用时关闭旧导出，不修改后台数据。 */
 const UsageExportHeader: React.FC<UsageExportHeaderProps> = ({
   dateValue,
   entityType,
@@ -51,16 +54,19 @@ const UsageExportHeader: React.FC<UsageExportHeaderProps> = ({
   customTitle,
   compactLayout = false,
   teams = [],
+  disableExport = false,
 }) => {
   const t = useT();
   const anchor = useComboboxAnchor();
   const [isExportModalOpen, setIsExportModalOpen] = useState(false);
 
+  useEffect(() => { if (disableExport) setIsExportModalOpen(false); }, [disableExport]);
+
   const hasFilters = filterSlot != null || showFilters;
   const optionValues = filterOptions.map((option) => option.value);
   const labelOf = (value: string) => filterOptions.find((option) => option.value === value)?.label ?? value;
   const hasNoOptions = filterOptions.length === 0;
-  const emptyPlaceholder = `No ${entityType}s with usage in this range`;
+  const emptyPlaceholder = t("usageLoad.noOptions");
   // A selection carried over from a range that did have options still scopes
   // the data below, so the control has to stay usable long enough to clear it.
   const isFilterDisabled = hasNoOptions && selectedFilters.length === 0;
@@ -123,7 +129,7 @@ const UsageExportHeader: React.FC<UsageExportHeaderProps> = ({
           )}
 
           <div className="justify-self-end">
-            <Button onClick={() => setIsExportModalOpen(true)}>
+            <Button disabled={disableExport} onClick={() => setIsExportModalOpen(true)}>
               <Download />
               {t("Export Data")}
             </Button>
@@ -132,7 +138,7 @@ const UsageExportHeader: React.FC<UsageExportHeaderProps> = ({
       </div>
 
       <EntityUsageExportModal
-        isOpen={isExportModalOpen}
+        isOpen={isExportModalOpen && !disableExport}
         onClose={() => setIsExportModalOpen(false)}
         entityType={entityType}
         spendData={spendData}

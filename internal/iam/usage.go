@@ -356,7 +356,7 @@ func bumpDaily(s *xorm.Session, r UsageRecord) error {
 	return mapErr(err)
 }
 
-// addScopeSpend moves the live counters the budget check reads. It runs in the same transaction as the event, so a budget can never count a call whose event was rolled back, and a rolled-back flush cannot leave a phantom charge.
+// addScopeSpend 在账单同一事务更新准入读取的消费计数；回滚不遗留虚假扣款，晚到旧周期费用不占当前组织预算。
 // 参数 s（*xorm.Session）：当前事务里的数据库会话。调用方负责提交，这里不关闭它；r（UsageRecord）：一次调用的用量，含 token、费用、密钥和团队，准备写入用量表。
 // 返回 error（error）：失败原因，nil 表示这一步成功。
 // 调用：仅在 usage.go 内使用
@@ -374,7 +374,14 @@ func addScopeSpend(s *xorm.Session, r UsageRecord) error {
 		if t.id == "" {
 			continue
 		}
-		if _, err := s.Exec("UPDATE "+t.table+" SET spend = spend + ? WHERE id = ?", r.Cost, t.id); err != nil {
+		// 迟到或重放的旧周期事件仍写历史明细及其他层级，但不再次占组织当前周期。
+		query := "UPDATE " + t.table + " SET spend = spend + ? WHERE id = ?"
+		args := []any{r.Cost, t.id}
+		if t.table == "organizations" {
+			query += " AND (budget_period_start IS NULL OR budget_period_start <= ?)"
+			args = append(args, r.TS)
+		}
+		if _, err := s.Exec(append([]any{query}, args...)...); err != nil {
 			return mapErr(err)
 		}
 	}

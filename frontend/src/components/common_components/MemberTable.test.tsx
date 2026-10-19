@@ -213,3 +213,10 @@ describe("MemberTable actions", () => {
     expect(screen.getByText("No members found")).toBeInTheDocument();
   });
 });
+
+/** 前置只允许增加/撤销的组织管理员关系；验证没有编辑入口但仍能撤销，DOM 自动清理，无后台数据。 */
+it("hides editing when a relationship has no editable attributes", () => {
+  renderTable({onEdit:undefined});
+  expect(screen.queryByTestId("edit-member")).not.toBeInTheDocument();
+  expect(screen.getAllByTestId("delete-member")).toHaveLength(MEMBERS.length);
+});

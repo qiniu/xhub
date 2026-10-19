@@ -26,10 +26,15 @@ export const NO_RESET = "never";
 
 export const BUDGET_DURATION_OPTIONS = [
   { value: NO_RESET, /** 渲染时读取当前语言，避免初始化冻结文案；无写入副作用。 */ get label() { return t("No reset"); } },
-  { value: "24h", /** 渲染时读取当前语言，避免初始化冻结文案；无写入副作用。 */ get label() { return t("daily"); } },
-  { value: "7d", /** 渲染时读取当前语言，避免初始化冻结文案；无写入副作用。 */ get label() { return t("weekly"); } },
-  { value: "30d", /** 渲染时读取当前语言，避免初始化冻结文案；无写入副作用。 */ get label() { return t("monthly"); } },
+  { value: "24h", /** 渲染时读取当前语言，避免初始化冻结文案；无写入副作用。 */ get label() { return t("organizationBudget.every24h"); } },
+  { value: "7d", /** 渲染时读取当前语言，避免初始化冻结文案；无写入副作用。 */ get label() { return t("organizationBudget.every7d"); } },
+  { value: "30d", /** 渲染时读取当前语言，避免初始化冻结文案；无写入副作用。 */ get label() { return t("organizationBudget.every30d"); } },
 ] as const;
+
+/** 格式化组织预算周期；value 为服务端周期，返回当前语言文案，详情与选择项共用；未知值不冒充有效周期，无写入副作用。 */
+export function organizationBudgetLabel(value: string | null | undefined): string {
+  return BUDGET_DURATION_OPTIONS.find(option => option.value === (value || NO_RESET))?.label ?? t("organizationBudget.unknown");
+}
 
 /** What the legacy update route actually accepts: the schema's fields plus the id. */
 type OrgUpdateBody = OrgPatchBody & { organization_id: string };
@@ -58,18 +63,20 @@ interface OrgSettingsFormProps {
   org: Organization;
   accessToken: string;
   canEditModels?: boolean;
+  canEditLimits?: boolean;
   onCancel: () => void;
   onSaved: () => void;
   patchOrganization?: (organizationId: string, body: OrgPatchBody) => Promise<unknown>;
 }
 
 /** 组织设置表单：接收组织快照、身份及保存/取消回调，返回可编辑表单。
- * canEditModels 由平台角色决定，组织管理员只读模型上限；仅提交实际修改字段，非法输入不提交，保存失败保留输入。 */
+ * canEditModels/canEditLimits 由平台角色决定，组织管理员只读模型、预算周期与速率上限；仅提交实际修改字段，非法输入不提交，保存失败保留输入。 */
 export const OrgSettingsForm = ({
   organizationId,
   org,
   accessToken,
   canEditModels = true,
+  canEditLimits = canEditModels,
   onCancel,
   onSaved,
   patchOrganization = defaultPatchOrganization,
@@ -130,14 +137,16 @@ export const OrgSettingsForm = ({
           )}
         </FormField>
 
+        <p className="text-sm text-muted-foreground">{t(canEditLimits ? "organizationBudget.periodHint" : "organizationBudget.readOnly")}</p>
         <FormField control={form.control} name="max_budget" label={t("Max Budget (USD)")}>
-          {({ ref, ...field }) => <Input {...field} ref={ref} type="number" step="any" min={0} />}
+          {({ ref, ...field }) => <Input {...field} ref={ref} disabled={!canEditLimits} type="number" step="any" min={0} />}
         </FormField>
 
         <FormField control={form.control} name="budget_duration" label={t("Reset Budget")}>
           {({ id, value, onChange, "aria-invalid": ariaInvalid, "aria-describedby": ariaDescribedBy }) => (
             <Select
               items={BUDGET_DURATION_OPTIONS}
+              disabled={!canEditLimits}
               value={value === "" ? NO_RESET : value}
               onValueChange={(selected) => onChange(selected === NO_RESET ? "" : selected)}
             >
@@ -157,11 +166,11 @@ export const OrgSettingsForm = ({
 
         <p className="text-sm text-muted-foreground">{t("quotaGuide.rates")}</p>
         <FormField control={form.control} name="tpm_limit" label={t("Tokens per minute Limit (TPM)")}>
-          {({ ref, ...field }) => <Input {...field} ref={ref} type="number" step={1} min={0} max={2147483647} placeholder={t("quotaGuide.rateBlank")} />}
+          {({ ref, ...field }) => <Input {...field} ref={ref} disabled={!canEditLimits} type="number" step={1} min={0} max={2147483647} placeholder={t("quotaGuide.rateBlank")} />}
         </FormField>
 
         <FormField control={form.control} name="rpm_limit" label={t("Requests per minute Limit (RPM)")}>
-          {({ ref, ...field }) => <Input {...field} ref={ref} type="number" step={1} min={0} max={2147483647} placeholder={t("quotaGuide.rateBlank")} />}
+          {({ ref, ...field }) => <Input {...field} ref={ref} disabled={!canEditLimits} type="number" step={1} min={0} max={2147483647} placeholder={t("quotaGuide.rateBlank")} />}
         </FormField>
 
         <FormField control={form.control} name="metadata" label={t("Metadata")}>

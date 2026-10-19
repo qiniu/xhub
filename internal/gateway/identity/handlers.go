@@ -510,7 +510,7 @@ func UserDelete(g Gate, w http.ResponseWriter, r *http.Request) {
 
 // ---------- organizations ----------
 
-// OrgNew 为平台管理员创建组织，同时校验并保存模型上限和 JSON 元数据；非法配置不产生组织。
+// OrgNew 为平台管理员创建组织，同时校验固定预算周期、模型上限和 JSON 元数据；非法配置不产生组织。
 // 参数 g（Gate）：带当前操作者的鉴权守卫。允许时返回 nil，拒绝时返回禁止或未找到；w（http.ResponseWriter）：调用方的 HTTP 响应，状态和正文写在这里；r（*http.Request）：入站 HTTP 请求。
 // 返回：无。状态码和正文写进调用方的响应。
 // 调用：gateway/identity/mount.go
@@ -522,12 +522,20 @@ func OrgNew(g Gate, w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	body := readMap(r)
+	duration, durationErr := organizationBudgetField(body)
+	if durationErr != nil {
+		g.WriteIAMError(w, r, durationErr)
+		return
+	}
 	models, metadata, err := organizationConfigFields(body)
 	if err != nil {
 		g.WriteIAMError(w, r, err)
 		return
 	}
 	config := iam.OrgConfig{}
+	if duration != nil {
+		config.BudgetDuration = *duration
+	}
 	if models != nil {
 		config.Models = *models
 	}
@@ -568,7 +576,7 @@ func OrgNew(g Gate, w http.ResponseWriter, r *http.Request) {
 	util.WriteJSON(w, 200, orgPublic(o))
 }
 
-// OrgList lists the organizations the caller may see. A platform administrator sees every one; everybody else sees only the organizations that own one of their teams, which is what the console shows asthe team's grouping.
+// OrgList 在已授权可见组织中应用名称包含与精确 ID 组合筛选，返回组织列表；空筛选不会绕过可见性。
 // 参数 g（Gate）：带当前操作者的鉴权守卫。允许时返回 nil，拒绝时返回禁止或未找到；w（http.ResponseWriter）：调用方的 HTTP 响应，状态和正文写在这里；r（*http.Request）：入站 HTTP 请求。
 // 返回：无。状态码和正文写进调用方的响应。
 // 调用：gateway/identity/mount.go
@@ -599,6 +607,9 @@ func OrgList(g Gate, w http.ResponseWriter, r *http.Request) {
 	}
 	out := make([]map[string]any, 0, len(rows))
 	for i := range rows {
+		if !organizationMatches(rows[i], r.URL.Query().Get("org_alias"), firstQueryValue(r, "org_id", "organization_id")) {
+			continue
+		}
 		view, err := orgView(g, r, &rows[i])
 		if err != nil {
 			g.WriteIAMError(w, r, err)
@@ -657,7 +668,7 @@ func orgIDFrom(_ Gate, r *http.Request, _ *auth.Principal) string {
 	return ""
 }
 
-// OrgUpdate 保存组织部分更新；名称和元数据由组织管理员维护，额度、状态与模型上限需要平台授权。
+// OrgUpdate 保存组织部分更新；名称和元数据由组织管理员维护，额度、周期、限流、状态与模型上限需要平台授权；混合越权整体拒绝。
 // 参数 g（Gate）：带当前操作者的鉴权守卫。允许时返回 nil，拒绝时返回禁止或未找到；w（http.ResponseWriter）：调用方的 HTTP 响应，状态和正文写在这里；r（*http.Request）：入站 HTTP 请求。
 // 返回：无。状态码和正文写进调用方的响应。
 // 调用：gateway/identity/mount.go
@@ -669,6 +680,11 @@ func OrgUpdate(g Gate, w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	body := readMap(r)
+	duration, durationErr := organizationBudgetField(body)
+	if durationErr != nil {
+		g.WriteIAMError(w, r, durationErr)
+		return
+	}
 	models, metadata, err := organizationConfigFields(body)
 	if err != nil {
 		g.WriteIAMError(w, r, err)
@@ -691,7 +707,7 @@ func OrgUpdate(g Gate, w http.ResponseWriter, r *http.Request) {
 	// 预算、限流、状态和模型上限由平台管理员维护，组织管理员可修改名称与元数据。
 	action := authz.ActionOrgAdmin
 	// 组织模型范围是平台设定的授权上限，组织管理员不能通过改白名单扩权；元数据与名称仍允许组织管理员维护。
-	if _, budget := body["max_budget"]; budget || models != nil || util.OptionalRate(body, "rpm_limit") != nil || util.OptionalRate(body, "tpm_limit") != nil || stringPtr(body, "status") != nil {
+	if _, budget := body["max_budget"]; budget || duration != nil || models != nil || util.OptionalRate(body, "rpm_limit") != nil || util.OptionalRate(body, "tpm_limit") != nil || stringPtr(body, "status") != nil {
 		action = authz.ActionOrgWrite
 	}
 	if err := g.Authorize(r, p, action, authz.Object{Type: authz.ObjectOrg, ID: id}); err != nil {
@@ -703,7 +719,7 @@ func OrgUpdate(g Gate, w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	in := iam.OrgUpdate{
-		Models: models, Metadata: metadata,
+		Models: models, Metadata: metadata, BudgetDuration: duration,
 		Name:      orgNamePtr(body),
 		Status:    stringPtr(body, "status"),
 		MaxBudget: optionalFloat(body, "max_budget"),
@@ -1728,7 +1744,9 @@ func orgPublic(o *iam.Organization) map[string]any {
 		// lives on the organization; this object keeps that one field so an
 		// older screen does not crash looking it up.
 		"rpm_limit": o.RPMLimit, "tpm_limit": o.TPMLimit,
-		"litellm_budget_table": map[string]any{"max_budget": budget, "rpm_limit": o.RPMLimit, "tpm_limit": o.TPMLimit},
+		"litellm_budget_table": map[string]any{"max_budget": budget, "rpm_limit": o.RPMLimit, "tpm_limit": o.TPMLimit, "budget_duration": o.BudgetDuration, "budget_reset_at": o.BudgetResetAt},
+		"budget_duration":      o.BudgetDuration,
+		"budget_reset_at":      o.BudgetResetAt,
 		"spend":                o.Spend,
 		"models":               nonNilStrings(o.Models),
 		"members":              []any{},
@@ -1754,6 +1772,7 @@ func orgView(g Gate, r *http.Request, o *iam.Organization) (map[string]any, erro
 	if err != nil {
 		return nil, err
 	}
+	pub["administrator_count"] = len(admins)
 	members := make([]any, 0, len(admins))
 	for _, m := range admins {
 		members = append(members, map[string]any{

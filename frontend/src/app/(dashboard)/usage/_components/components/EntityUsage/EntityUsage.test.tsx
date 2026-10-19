@@ -951,7 +951,8 @@ describe("EntityUsage", () => {
       call().mockClear();
 
       render(<EntityUsage {...defaultProps} entityType={entityType} userRole="Internal User" />);
-      expect(await screen.findByText(heading)).toBeInTheDocument();
+      expect(await screen.findByText("You do not have permission to view this usage scope.")).toBeVisible();
+      expect(screen.queryByText(heading)).not.toBeInTheDocument();
       expect(call()).not.toHaveBeenCalled();
     });
 
@@ -970,7 +971,7 @@ describe("EntityUsage", () => {
           expect(call()).toHaveBeenCalled();
         });
       } else {
-        expect(await screen.findByText("Agent Spend Overview")).toBeInTheDocument();
+        expect(await screen.findByText("You do not have permission to view this usage scope.")).toBeVisible();
         expect(call()).not.toHaveBeenCalled();
       }
     });
@@ -1150,4 +1151,16 @@ describe("EntityUsage", () => {
       });
     });
   });
+  /** 前置实体查询失败；验证隐藏伪零统计及重试恢复，自动卸载和清理 mock，无后台写入。 */
+  it("shows a persistent entity usage error and retries instead of zero totals", async () => {
+    mockTagDailyActivityCall.mockRejectedValue(new Error("offline"));
+    render(<EntityUsage {...defaultProps} />);
+    expect(await screen.findByText("Usage could not be loaded. The values are unknown, not zero. Retry to load the selected range.")).toBeVisible();
+    expect(screen.queryByText("Tag Spend Overview")).not.toBeInTheDocument();
+    mockTagDailyActivityCall.mockResolvedValue(mockSpendData);
+    fireEvent.click(screen.getByRole("button",{name:"Retry usage"}));
+    expect(await screen.findByText("Tag Spend Overview")).toBeVisible();
+    expect(screen.queryByText(/The values are unknown/)).not.toBeInTheDocument();
+  });
+
 });

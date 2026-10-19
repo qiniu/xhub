@@ -1,3 +1,4 @@
+import { I18nProvider, translate } from "@/i18n";
 import { renderWithProviders, screen } from "../../../tests/test-utils";
 import userEvent from "@testing-library/user-event";
 import { vi } from "vitest";
@@ -99,7 +100,7 @@ describe("UsageExportHeader", () => {
     );
 
     expect(screen.getByText("Filter by tag")).toBeInTheDocument();
-    const input = screen.getByPlaceholderText("No tags with usage in this range");
+    const input = screen.getByPlaceholderText("No usage options in this range");
     expect(input).toBeDisabled();
     expect(screen.queryByPlaceholderText("Select tag to filter...")).not.toBeInTheDocument();
   });
@@ -120,7 +121,7 @@ describe("UsageExportHeader", () => {
       />,
     );
 
-    expect(screen.getByPlaceholderText("No tags with usage in this range")).toBeEnabled();
+    expect(screen.getByPlaceholderText("No usage options in this range")).toBeEnabled();
 
     await user.click(screen.getByRole("button", { name: "Clear Filter by tag" }));
     expect(onFiltersChange).toHaveBeenCalledWith([]);
@@ -143,4 +144,23 @@ describe("UsageExportHeader", () => {
     expect(input).toBeEnabled();
     expect(screen.queryByPlaceholderText("No tags with usage in this range")).not.toBeInTheDocument();
   });
+});
+
+/** 前置已打开的导出和仍可用的筛选；加载失败后禁用导出、关闭旧窗口且保留筛选，组件自动清理。 */
+it("keeps filters usable while disabling incomplete exports", async () => {
+  const user=userEvent.setup();
+  const {rerender}=renderWithProviders(<UsageExportHeader {...defaultProps} filterSlot={<button>Clear filter</button>} />);
+  await user.click(screen.getByRole("button",{name:"Export Data"}));
+  expect(screen.getByTestId("export-modal")).toBeVisible();
+  rerender(<UsageExportHeader {...defaultProps} disableExport filterSlot={<button>Clear filter</button>} />);
+  expect(screen.getByRole("button",{name:"Export Data"})).toBeDisabled();
+  expect(screen.getByRole("button",{name:"Clear filter"})).toBeEnabled();
+  expect(screen.queryByTestId("export-modal")).not.toBeInTheDocument();
+});
+
+/** 前置空选项和禁用导出；双语验证可访问占位符及按钮名称，组件自动卸载，无后台数据。 */
+it.each(["en", "zh-CN"] as const)("%s localizes empty filter options while export is disabled", locale => {
+  renderWithProviders(<I18nProvider initialLocale={locale}><UsageExportHeader {...defaultProps} showFilters disableExport /></I18nProvider>);
+  expect(screen.getByPlaceholderText(translate(locale,"usageLoad.noOptions"))).toBeVisible();
+  expect(screen.getByRole("button",{name:translate(locale,"Export Data")})).toBeDisabled();
 });

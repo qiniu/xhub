@@ -1,4 +1,4 @@
-import { renderHook, waitFor } from "@testing-library/react";
+import { act, renderHook, waitFor } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 import { DailyData, SpendMetrics } from "@/components/UsagePage/types";
 import { mergeDailyResults, sumMetadata, usePaginatedDailyActivity } from "./usePaginatedDailyActivity";
@@ -171,4 +171,58 @@ it("does not retain previous filter data when replacement fails", async () => {
 /** 前置跨页节省费用字段；验证每页合计且缺字段按零处理，参数无返回，仅内存数据无需清理。 */
 it("sums savings metadata across all pages", () => {
   expect(sumMetadata({ total_compression_saved_tokens: 4, total_prompt_caching_savings_spend: 0.5 }, { total_compression_saved_tokens: 3 })).toMatchObject({ total_compression_saved_tokens: 7, total_prompt_caching_savings_spend: 0.5 });
+});
+
+/** 前置聚合与第一页均失败；验证未知状态、重试清错与成功空结果，钩子卸载自动清理。 */
+it("returns an explicit failure and retries without treating failure as an empty success", async () => {
+  const fetchFn = vi.fn().mockRejectedValueOnce(new Error("offline")).mockResolvedValueOnce({ results: [], metadata: { total_api_requests: 0 } });
+  const aggregatedFetchFn = vi.fn().mockRejectedValue(new Error("unsupported"));
+  const { result } = renderHook(() => usePaginatedDailyActivity({fetchFn, aggregatedFetchFn, args:["token"], enabled:true}));
+  await waitFor(() => expect(result.current.error?.message).toBe("offline"));
+  expect(result.current.hasData).toBe(false);
+  act(() => result.current.retry());
+  expect(result.current.error).toBeNull();
+  await waitFor(() => expect(result.current.hasData).toBe(true));
+  expect(result.current.error).toBeNull();
+  expect(result.current.data.results).toEqual([]);
+});
+
+/** 前置聚合失败、分页空结果成功；验证可回退且不误报整体失败，钩子卸载清理。 */
+it("accepts a successful empty fallback after aggregate failure", async () => {
+  const fetchFn=vi.fn().mockResolvedValue({results:[],metadata:{total_api_requests:0}});
+  const aggregatedFetchFn=vi.fn().mockRejectedValue(new Error("unsupported"));
+  const {result}=renderHook(()=>usePaginatedDailyActivity({fetchFn,aggregatedFetchFn,args:[],enabled:true}));
+  await waitFor(()=>expect(result.current.hasData).toBe(true));
+  expect(result.current.error).toBeNull();expect(result.current.loading).toBe(false);
+});
+
+/** 前置三页且第三页失败；验证未刷新批次第二页不丢失、错误和完成页数明确，钩子卸载清理。 */
+it("retains every successful page when a later page fails before the render batch", async () => {
+  const fetchFn=vi.fn().mockResolvedValueOnce({results:[dayOf("2026-08-16",1)],metadata:{total_pages:3,total_spend:1}})
+    .mockResolvedValueOnce({results:[dayOf("2026-08-16",2)],metadata:{total_pages:3,total_spend:2}}).mockRejectedValueOnce(new Error("page three"));
+  const {result}=renderHook(()=>usePaginatedDailyActivity({fetchFn,args:[],enabled:true}));
+  await waitFor(()=>expect(result.current.error?.message).toBe("page three"),{timeout:3000});
+  expect(result.current.hasData).toBe(true);expect(result.current.progress).toEqual({currentPage:2,totalPages:3});
+  expect(result.current.data.metadata.total_spend).toBe(3);expect(result.current.data.results[0].metrics.spend).toBe(3);
+});
+
+/** 前置旧账号未完成、新账号成功；验证迟到旧响应不会回写新账号，钩子卸载清理。 */
+it("ignores a late response from the previous account", async () => {
+  let resolveOld!: (data:any)=>void;
+  const fetchFn=vi.fn().mockImplementationOnce(()=>new Promise(resolve=>{resolveOld=resolve})).mockResolvedValueOnce({results:[],metadata:{total_api_requests:7}});
+  const {result,rerender}=renderHook(({token})=>usePaginatedDailyActivity({fetchFn,args:[token],enabled:true}),{initialProps:{token:"old"}});
+  rerender({token:"new"});expect(result.current.hasData).toBe(false);
+  await waitFor(()=>expect(result.current.data.metadata.total_api_requests).toBe(7));
+  await act(async()=>resolveOld({results:[],metadata:{total_api_requests:999}}));
+  expect(result.current.data.metadata.total_api_requests).toBe(7);
+});
+
+/** 前置相同筛选的两种数据源；切换实体第一帧就隐藏旧总计，完成后只读新来源，钩子卸载清理。 */
+it("hides previous entity data immediately when the fetch source changes", async () => {
+  const first=vi.fn().mockResolvedValue({results:[],metadata:{total_api_requests:999}});
+  const second=vi.fn().mockResolvedValue({results:[],metadata:{total_api_requests:7}});
+  const {result,rerender}=renderHook(({fetchFn})=>usePaginatedDailyActivity({fetchFn,args:["token"],enabled:true}),{initialProps:{fetchFn:first}});
+  await waitFor(()=>expect(result.current.data.metadata.total_api_requests).toBe(999));
+  rerender({fetchFn:second});expect(result.current.hasData).toBe(false);
+  await waitFor(()=>expect(result.current.data.metadata.total_api_requests).toBe(7));
 });

@@ -265,3 +265,12 @@ test('verification includes bilingual output TPS and historical upgrade scenario
     assert.ok(browser.run.split(/\s+/).includes(`scenarios/regression/model-monitor-tps-${locale}.test.ts`), `发布缺少 ${locale} 输出 TPS 与历史升级闭环`);
   }
 });
+
+/** 前置发布 YAML；验证组织管理和用量失败恢复双语真实浏览器场景进入发布回归；只读文件，无资源清理。 */
+test('verification includes organization budgets and usage failure recovery', () => {
+  const step=workflow.jobs.verify.steps.find(item=>(item.run||'').startsWith('bash scripts/e2e.sh '));
+  assert.ok(step,'缺少发布 E2E');
+  for(const scenario of ['organization-config','organization-management','usage-error']) for(const locale of ['en','zh-CN']) {
+    assert.ok(step.run.split(/\s+/).includes(`scenarios/regression/${scenario}-${locale}.test.ts`),`缺少 ${scenario}/${locale}`);
+  }
+});

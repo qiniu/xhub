@@ -30,7 +30,7 @@ export interface MemberTableColumn {
 export interface MemberTableProps {
   members: Member[];
   canEdit: boolean;
-  onEdit: (member: Member) => void;
+  onEdit?: (member: Member) => void;
   onDelete: (member: Member) => void;
   onAddMember?: () => void;
   addLabel?: string;
@@ -78,7 +78,7 @@ const ACTIONS_COLUMN_WIDTH = 120;
 
 interface MemberColumnDeps {
   canEdit: boolean;
-  onEdit: (member: Member) => void;
+  onEdit?: (member: Member) => void;
   onDelete: (member: Member) => void;
   roleColumnTitle: string;
   roleTooltip?: string;
@@ -108,6 +108,8 @@ const extraColumnDef = (column: MemberTableColumn): ColumnDef<Member> => {
   };
 };
 
+/** 构建成员关系表列；参数为权限、可选编辑及撤销回调和扩展列，返回列定义。
+ * MemberTable 调用；没有可编辑关系属性时不生成编辑按钮，撤销仍受 canEdit 控制，不更改后台权限。 */
 const buildColumns = ({
   canEdit,
   onEdit,
@@ -178,12 +180,12 @@ const buildColumns = ({
     cell: ({ row }) =>
       canEdit ? (
         <span className="inline-flex items-center gap-2">
-          <TableIconActionButton
+          {onEdit && <TableIconActionButton
             variant="Edit"
             tooltipText={t("quotaGuide.editMember")}
             dataTestId="edit-member"
             onClick={() => onEdit(row.original)}
-          />
+          />}
           {(!showDeleteForMember || showDeleteForMember(row.original)) && (
             <TableIconActionButton
               variant="Delete"
@@ -197,6 +199,8 @@ const buildColumns = ({
   },
 ];
 
+/** 展示成员关系与搜索/排序；参数为成员、授权操作回调及扩展列，返回可访问表格。
+ * 团队/组织页面共用；组织只提供撤销回调时隐藏编辑，用户操作才触发调用方写入，组件不自行变更账号角色。 */
 export default function MemberTable({
   members,
   canEdit,

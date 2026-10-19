@@ -326,3 +326,9 @@ CREATE TABLE IF NOT EXISTS model_monitor_migrations (
     name TEXT PRIMARY KEY,
     applied_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
+
+-- 组织周期按固定 UTC 时长计算；旧组织保持不重置，不回填或改写既有账单。
+ALTER TABLE organizations ADD COLUMN IF NOT EXISTS budget_duration TEXT NOT NULL DEFAULT '';
+ALTER TABLE organizations ADD COLUMN IF NOT EXISTS budget_reset_at TIMESTAMPTZ;
+ALTER TABLE organizations ADD COLUMN IF NOT EXISTS budget_period_start TIMESTAMPTZ;
+CREATE INDEX IF NOT EXISTS organizations_budget_reset_due ON organizations(budget_reset_at) WHERE budget_duration <> '';

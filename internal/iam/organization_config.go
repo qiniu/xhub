@@ -8,10 +8,11 @@ import (
 	"xorm.io/xorm"
 )
 
-// OrgConfig 表示组织创建时的模型上限及 JSON 元数据；由后台解析并在同一事务中保存。
+// OrgConfig 表示组织创建时的固定预算周期、模型上限及 JSON 元数据；由后台校验并在同一事务中保存。
 type OrgConfig struct {
-	Models   []string
-	Metadata map[string]any
+	BudgetDuration string
+	Models         []string
+	Metadata       map[string]any
 }
 
 // NormalizeOrganizationModels 校验组织模型范围并返回去重副本，供创建、更新和 HTTP 输入校验调用。

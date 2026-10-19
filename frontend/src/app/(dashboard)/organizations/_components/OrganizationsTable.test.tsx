@@ -46,7 +46,7 @@ describe("OrganizationsTable", () => {
       "Budget (USD)",
       "Models",
       "TPM / RPM Limits",
-      "Members",
+      "Organization administrators",
     ]) {
       expect(screen.getByText(header)).toBeInTheDocument();
     }
@@ -145,7 +145,7 @@ describe("OrganizationsTable", () => {
     expect(screen.getByText("$100.00")).toBeInTheDocument();
     expect(screen.getByText("TPM: 1000")).toBeInTheDocument();
     expect(screen.getByText("RPM: 60")).toBeInTheDocument();
-    expect(screen.getByText("3 Members")).toBeInTheDocument();
+    expect(screen.getByText("3 administrators")).toBeInTheDocument();
     // Five models, three visible -> the shared ModelsCell collapses the rest.
     expect(screen.getByText("+2 more")).toBeInTheDocument();
   });

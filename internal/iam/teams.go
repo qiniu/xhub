@@ -3,6 +3,7 @@ package iam
 import (
 	"context"
 	"sort"
+	"time"
 
 	"github.com/sunqirui1987/xhub/internal/util"
 	"xorm.io/xorm"
@@ -35,7 +36,7 @@ func (db *DB) CreateOrg(ctx context.Context, by Actor, name string, maxBudget *f
 	return db.CreateOrgWithConfig(ctx, by, name, maxBudget, OrgConfig{}, rates...)
 }
 
-// CreateOrgWithConfig 在同一事务创建组织、模型上限、元数据及审计，供组织管理接口与兼容入口调用。
+// CreateOrgWithConfig 在同一事务创建组织、固定预算周期、模型上限、元数据及审计，供组织管理接口与兼容入口调用。
 // 参数 ctx/by 为上下文及操作者，name/maxBudget 为名称及额度，config 为组织设置，rates 为可选限流。
 // 返回持久化组织或字段/数据库错误；非法配置不产生组织和审计，空配置保持已有创建接口行为。
 func (db *DB) CreateOrgWithConfig(ctx context.Context, by Actor, name string, maxBudget *float64, config OrgConfig, rates ...RateLimits) (*Organization, error) {
@@ -50,6 +51,9 @@ func (db *DB) CreateOrgWithConfig(ctx context.Context, by Actor, name string, ma
 	var out *Organization
 	err = db.tx(ctx, func(s *xorm.Session) error {
 		o := Organization{ID: newID(), Name: name, Status: StatusActive, MaxBudget: maxBudget, Models: models, Metadata: metadata}
+		if err := configureOrganizationBudget(&o, config.BudgetDuration, time.Now()); err != nil {
+			return err
+		}
 		if len(rates) > 0 {
 			o.RPMLimit, o.TPMLimit = rates[0].RPMLimit, rates[0].TPMLimit
 		}
@@ -90,12 +94,15 @@ func (db *DB) OrgsByIDs(ctx context.Context, ids []string) (map[string]Organizat
 	return out, nil
 }
 
-// GetOrg loads one organization.
+// GetOrg 读取组织；先补执行到期预算，返回当前周期消费及持久配置，重置与审计同事务。
 // 参数 ctx（context.Context）：上下文，取消或超时时停止后续工作；id（string）：组织 id。空串表示没有指定组织。
 // 返回 *Organization（*Organization）：交给调用方的组织行；error（error）：失败原因。nil 表示这一步成功。
 // 调用：authz/decide.go、gateway/identity/handlers.go、gateway/limits.go
 // 测试：无直接单测
 func (db *DB) GetOrg(ctx context.Context, id string) (*Organization, error) {
+	if err := db.ResetOrganizationBudgets(ctx, time.Now()); err != nil {
+		return nil, err
+	}
 	s := db.session(ctx)
 	defer s.Close()
 	return getOrg(ctx, s, id)
@@ -114,12 +121,15 @@ func getOrg(_ context.Context, s *xorm.Session, id string) (*Organization, error
 	return &o, nil
 }
 
-// ListOrgs returns every organization, or only those that own one of the user's teams when userID is set.
+// ListOrgs 补执行到期预算后读取可见组织；userID 非空时仅返回其团队所属或其管理的组织。
 // 参数 ctx（context.Context）：上下文，取消或超时时停止后续工作；userID（string）：用户 id。空串表示没有指定用户。
 // 返回 []Organization（[]Organization）：符合条件的组织；error（error）：失败原因，nil 表示成功。
 // 调用：gateway/identity/handlers.go、gateway/usage/entity_activity.go
 // 测试：无直接单测
 func (db *DB) ListOrgs(ctx context.Context, userID string) ([]Organization, error) {
+	if err := db.ResetOrganizationBudgets(ctx, time.Now()); err != nil {
+		return nil, err
+	}
 	s := db.session(ctx)
 	defer s.Close()
 	if userID != "" {
@@ -137,20 +147,21 @@ func (db *DB) ListOrgs(ctx context.Context, userID string) ([]Organization, erro
 
 // OrgUpdate 表示组织部分更新；nil 字段保持原值，非 nil 空模型或元数据对象明确清空。
 type OrgUpdate struct {
-	Models    *[]string
-	Metadata  *map[string]any
-	RPMLimit  **int
-	TPMLimit  **int
-	Name      *string
-	Status    *string
-	MaxBudget **float64
+	BudgetDuration *string
+	Models         *[]string
+	Metadata       *map[string]any
+	RPMLimit       **int
+	TPMLimit       **int
+	Name           *string
+	Status         *string
+	MaxBudget      **float64
 	// RouteTemplateID selects a named router settings template. A non-nil pointer
 	// to an empty string clears the selection, which puts the organization back
 	// on the platform default; nil leaves the current selection alone.
 	RouteTemplateID **string
 }
 
-// UpdateOrg 在事务内保存组织部分更新并写审计；模型和元数据校验失败回滚全部字段。
+// UpdateOrg 在事务内保存组织部分更新并写审计；周期、模型和元数据校验失败回滚全部字段，周期变化不立即恢复额度。
 // 参数 ctx（context.Context）：上下文，取消时停止；by（Actor）：执行这次修改的操作者。审计日志记这个人的 id 和角色；id（string）：组织 id。空串表示没有指定组织；in（OrgUpdate）：调用方提交的OrgUpdate。字段为空表示这项不改。
 // 返回 *Organization（*Organization）：交给调用方的组织行；error（error）：失败原因。nil 表示这一步成功。
 // 调用：gateway/identity/handlers.go
@@ -161,6 +172,11 @@ func (db *DB) UpdateOrg(ctx context.Context, by Actor, id string, in OrgUpdate) 
 		cur, err := getOrg(ctx, s, id) // Get takes the primary-key lock path below
 		if err != nil {
 			return err
+		}
+		if in.BudgetDuration != nil {
+			if err := configureOrganizationBudget(cur, *in.BudgetDuration, time.Now()); err != nil {
+				return err
+			}
 		}
 		if in.Name != nil {
 			cur.Name = *in.Name
@@ -195,7 +211,7 @@ func (db *DB) UpdateOrg(ctx context.Context, by Actor, id string, in OrgUpdate) 
 		if in.RouteTemplateID != nil {
 			cur.RouteTemplateID = *in.RouteTemplateID
 		}
-		if _, err := s.ID(id).Cols("name", "status", "max_budget", "route_template_id", "rpm_limit", "tpm_limit", "models", "metadata").Update(cur); err != nil {
+		if _, err := s.ID(id).Cols("name", "status", "max_budget", "route_template_id", "rpm_limit", "tpm_limit", "models", "metadata", "budget_duration", "budget_reset_at", "budget_period_start").Update(cur); err != nil {
 			return err
 		}
 		if out, err = getOrg(ctx, s, id); err != nil {

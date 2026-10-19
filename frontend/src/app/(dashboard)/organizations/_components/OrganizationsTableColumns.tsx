@@ -81,6 +81,8 @@ export interface OrganizationsTableColumnsDeps {
   onDeleteClick: (organizationId: string) => void;
 }
 
+/** 构建组织列表列；参数为会话角色和详情/编辑/删除回调，返回列定义。
+ * 组织列表调用，人数明确统计管理员关系并随语言切换；操作只触发调用方回调，不扩大后台授权。 */
 export const getOrganizationsTableColumns = ({
   userRole,
   onOrganizationClick,
@@ -166,11 +168,11 @@ export const getOrganizationsTableColumns = ({
   },
   {
     id: "members",
-    meta: { title: t("Members") },
-    header: t("Members"),
+    meta: { title: t("Organization administrators") },
+    header: t("Organization administrators"),
     size: 100,
     enableSorting: false,
-    cell: ({ row }) => <span className="text-sm">{row.original.members?.length ?? 0} Members</span>,
+    cell: ({ row }) => <span className="text-sm">{t("organizationBudget.administratorCount", { count: row.original.members?.length ?? 0 })}</span>,
   },
   {
     id: "actions",

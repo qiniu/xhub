@@ -36,14 +36,12 @@ import { ChartLoader } from "@/components/shared/chart_loader";
 import ViewUserSpend from "@/components/view_user_spend";
 import { usePaginatedDailyActivity } from "../hooks/usePaginatedDailyActivity";
 import { keyActivityLabel } from "@/components/UsagePage/keyActivityLabel";
-import { DailyData, KeyMetricWithMetadata, MetricWithMetadata } from "@/components/UsagePage/types";
+import { KeyMetricWithMetadata, MetricWithMetadata } from "@/components/UsagePage/types";
 import { valueFormatterSpend } from "@/components/UsagePage/utils/value_formatters";
 import {
   fetchedRangeKey,
-  selectForRange,
   selectGatewayActivity,
   topGatewayRoutes,
-  type FetchedForRange,
   type FetchedGatewayActivity,
   type GatewayActivity,
 } from "./gatewayActivity";
@@ -60,21 +58,13 @@ interface UsagePageProps {
   organizations: Organization[];
 }
 
-/** 用量路由调用的页面组件；参数为可见团队及组织，返回按日期与身份隔离的统计视图；读取失败回退分页，禁止沿用旧筛选数据。 */
+/** 用量路由调用的页面组件；参数为可见团队及组织，返回按日期与身份隔离的统计视图；读取失败回退分页，全部失败显示持续错误，部分失败提示不完整；禁用未知/不完整导出，禁止沿用旧筛选或旧数据源。 */
 const UsagePage: React.FC<UsagePageProps> = ({ teams, organizations }) => {
   const t = useT();
   const { accessToken, userRole, userId: userID, premiumUser } = useAuthorized();
   // Aggregated endpoint: try first, fall back to paginated if unavailable
-  const [aggregatedData, setAggregatedData] = useState<FetchedForRange<{
-    results: DailyData[];
-    metadata: any;
-  }> | null>(null);
-  // Stamped like the data itself: the flag decides whether the paginated
-  // fallback is read, and a flag left over from the previous range would let
-  // that fallback's own leftover rows through.
-  const [aggregatedFailure, setAggregatedFailure] = useState<FetchedForRange<true> | null>(null);
-  // True until the spend request for this range finishes. False on the first paint would draw an empty chart before that request starts.
-  const [aggregatedLoading, setAggregatedLoading] = useState(true);
+  const [gatewayFailure, setGatewayFailure] = useState<string | null>(null);
+  const [gatewayAttempt, setGatewayAttempt] = useState(0);
   const [gatewayActivityData, setGatewayActivityData] = useState<FetchedGatewayActivity | null>(null);
 
   // Separate loading states for better UX
@@ -132,30 +122,7 @@ const UsagePage: React.FC<UsagePageProps> = ({ teams, organizations }) => {
   // can paint them. One source is not enough, since the tiles read the gateway
   // counts, fall through to the aggregate, and fall through again to the
   // paginated pages, so a stamp on any one of them is escaped by the next.
-  const currentAggregatedRangeKey = fetchedRangeKey(startTime, endTime, effectiveUserId);
-  const currentGatewayRangeKey = fetchedRangeKey(startTime, endTime);
-
-  // Try aggregated endpoint first, fall back to paginated on failure
-  const aggregatedFetchIdRef = useRef(0);
-  useEffect(() => {
-    if (!accessToken || !startTime || !endTime) return;
-    const fetchId = ++aggregatedFetchIdRef.current;
-    const rangeKey = currentAggregatedRangeKey;
-    setAggregatedLoading(true);
-
-    userDailyActivityAggregatedCall(accessToken, startTime, endTime, effectiveUserId)
-      .then((data) => {
-        if (aggregatedFetchIdRef.current !== fetchId) return;
-        setAggregatedData({ rangeKey, value: data });
-        setAggregatedLoading(false);
-        setIsDateChanging(false);
-      })
-      .catch(() => {
-        if (aggregatedFetchIdRef.current !== fetchId) return;
-        setAggregatedFailure({ rangeKey, value: true });
-        setAggregatedLoading(false);
-      });
-  }, [accessToken, startTime, endTime, effectiveUserId, currentAggregatedRangeKey]);
+  const currentGatewayRangeKey = JSON.stringify([accessToken, fetchedRangeKey(startTime, endTime), gatewayAttempt]);
 
   // 用户筛选后停用全局计数，保证请求数与费用、Token 使用相同的数据范围。
   const gatewayRequest = useMemo(
@@ -166,6 +133,8 @@ const UsagePage: React.FC<UsagePageProps> = ({ teams, organizations }) => {
   useEffect(() => {
     if (!isAdmin || effectiveUserId || !gatewayRequest) return;
     const fetchId = ++gatewayFetchIdRef.current;
+    setGatewayActivityData(null);
+    setGatewayFailure(null);
     gatewayDailyActivityCall(gatewayRequest.accessToken, gatewayRequest.startTime, gatewayRequest.endTime)
       .then((data) => {
         if (gatewayFetchIdRef.current !== fetchId) return;
@@ -174,38 +143,25 @@ const UsagePage: React.FC<UsagePageProps> = ({ teams, organizations }) => {
       .catch(() => {
         if (gatewayFetchIdRef.current !== fetchId) return;
         setGatewayActivityData(null);
+        setGatewayFailure(currentGatewayRangeKey);
       });
+    return () => { gatewayFetchIdRef.current++; };
   }, [isAdmin, effectiveUserId, gatewayRequest, currentGatewayRangeKey]);
 
   const gatewayActivity = selectGatewayActivity(isAdmin && !effectiveUserId, gatewayActivityData, currentGatewayRangeKey);
-  const activeAggregated = selectForRange(aggregatedData, currentAggregatedRangeKey);
-  // A failure belongs to the range it happened on. Reading it through the same
-  // rule keeps the paginated hook disabled while a new range is in flight, and
-  // disabled is what empties it, so its previous rows never reach a tile.
-  const aggregatedFailed = selectForRange(aggregatedFailure, currentAggregatedRangeKey) === true;
-
-  // Paginated fallback — only enabled when aggregated endpoint fails
+  // 聚合和分页统一管理代次、错误与部分结果，切换账号、日期和重试不能复用旧数据。
   const paginatedResult = usePaginatedDailyActivity({
-    fetchFn: userDailyActivityCall,
+    fetchFn: userDailyActivityCall, aggregatedFetchFn: userDailyActivityAggregatedCall,
     args: [accessToken, startTime, endTime, effectiveUserId],
-    enabled: aggregatedFailed && !!accessToken && !!startTime && !!endTime,
+    enabled: !!accessToken && !!startTime && !!endTime,
   });
-
-  // Derive userSpendData from whichever source is active
-  const userSpendData = useMemo(() => {
-    if (activeAggregated) return activeAggregated;
-    if (aggregatedFailed) return paginatedResult.data;
-    return { results: [] as DailyData[], metadata: {} as any };
-  }, [activeAggregated, aggregatedFailed, paginatedResult.data]);
-
-  const loading = aggregatedLoading || paginatedResult.loading;
-
-  // Clear isDateChanging when paginated data starts arriving
-  useEffect(() => {
-    if (aggregatedFailed && !paginatedResult.loading && paginatedResult.data.results.length > 0) {
-      setIsDateChanging(false);
-    }
-  }, [aggregatedFailed, paginatedResult.loading, paginatedResult.data.results.length]);
+  const userSpendData = paginatedResult.data;
+  const loading = paginatedResult.loading;
+  const incomplete = !!paginatedResult.error || paginatedResult.cancelled || paginatedResult.isFetchingMore;
+  const gatewayFailed = isAdmin && !effectiveUserId && gatewayFailure === currentGatewayRangeKey;
+  /** 重试当前用量范围；无参数及返回值，重新读取聚合/分页及管理员请求计数，不复用旧结果，无后台写入。 */
+  const retryUsage = () => { paginatedResult.retry(); setGatewayAttempt(value => value + 1); };
+  useEffect(() => { if (!loading) setIsDateChanging(false); }, [loading]);
 
   // Super responsive date change handler
   const handleDateChange = useCallback((newValue: DateRangePickerValue) => {
@@ -452,6 +408,19 @@ const UsagePage: React.FC<UsagePageProps> = ({ teams, organizations }) => {
               </div>
             </div>
           )}
+          {!paginatedResult.hasData && (paginatedResult.error ? (
+            <div role="alert" className="rounded-lg border border-destructive p-4 space-y-3">
+              <p>{t("usageLoad.failed")}</p><Button variant="outline" onClick={retryUsage}>{t("usageLoad.retry")}</Button>
+            </div>
+          ) : <p role="status">{t("usageLoad.loading")}</p>)}
+          {paginatedResult.hasData && <>
+          {(paginatedResult.error || paginatedResult.cancelled) && <div role="alert" className="rounded-lg border p-4 space-y-3">
+            <p>{t("usageLoad.partial", { loaded: paginatedResult.progress.currentPage, total: paginatedResult.progress.totalPages })}</p>
+            <Button variant="outline" onClick={retryUsage}>{t("usageLoad.retry")}</Button>
+          </div>}
+          {gatewayFailed && <div role="alert" className="rounded-lg border p-4 space-y-3">
+            <p>{t("usageLoad.gatewayFailed")}</p><Button variant="outline" onClick={retryUsage}>{t("usageLoad.retry")}</Button>
+          </div>}
           <Tabs defaultValue="cost">
             <div className="flex flex-wrap items-center justify-between gap-3">
               <TabsList>
@@ -469,7 +438,7 @@ const UsagePage: React.FC<UsagePageProps> = ({ teams, organizations }) => {
                     </TabsTrigger>
                   </TabsList>
                   <div className="flex items-center gap-2">
-                    <Button variant="outline" onClick={() => setIsGlobalExportModalOpen(true)}>
+                    <Button variant="outline" disabled={incomplete} onClick={() => setIsGlobalExportModalOpen(true)}>
                       <Download />
                       {t("pages.usage.exportData")}
                     </Button>
@@ -803,7 +772,7 @@ const UsagePage: React.FC<UsagePageProps> = ({ teams, organizations }) => {
                 <TabsContent value="endpoints" keepMounted>
                   <EndpointUsage userSpendData={userSpendData} />
                 </TabsContent>
-              </Tabs>
+              </Tabs></>}
             </>
           )}
           {/* Organization Usage Panel */}
@@ -865,11 +834,11 @@ const UsagePage: React.FC<UsagePageProps> = ({ teams, organizations }) => {
         entityType="team"
         spendData={{
           results: userSpendData.results,
-          metadata: userSpendData.metadata,
+          metadata: { total_spend: 0, total_api_requests: 0, total_successful_requests: 0, total_failed_requests: 0, total_tokens: 0, ...userSpendData.metadata },
         }}
         dateRange={dateValue}
         selectedFilters={[]}
-        customTitle="Export Usage Data"
+        customTitle={t("pages.usage.exportData")}
       />
 
     </div>

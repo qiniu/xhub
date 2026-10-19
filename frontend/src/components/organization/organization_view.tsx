@@ -21,10 +21,8 @@ import {
   Member,
   organizationMemberAddCall,
   organizationMemberDeleteCall,
-  organizationMemberUpdateCall,
 } from "../networking";
-import MemberModal from "../team/EditMembership";
-import { OrgSettingsForm } from "./org-settings/OrgSettingsForm";
+import { OrgSettingsForm, organizationBudgetLabel } from "./org-settings/OrgSettingsForm";
 import { useT } from "@/i18n";
 
 interface OrganizationInfoProps {
@@ -38,7 +36,7 @@ interface OrganizationInfoProps {
 }
 
 /** 组织详情视图：接收组织 ID、身份权限与关闭回调，返回团队、管理员和设置页。
- * 模型上限仅平台管理员可编辑，其余已授权组织字段按表单增量保存；加载失败保留页面错误，无自动写入。 */
+ * 模型、预算周期和速率上限仅平台管理员可编辑；组织关系只允许添加/撤销，已授权字段按表单增量保存；加载失败保留页面错误，无自动写入。 */
 const OrganizationInfoView: React.FC<OrganizationInfoProps> = ({
   organizationId,
   onClose,
@@ -53,8 +51,6 @@ const OrganizationInfoView: React.FC<OrganizationInfoProps> = ({
   const { data: orgData, isLoading: loading } = useOrganization(organizationId);
   const [isEditing, setIsEditing] = useState(false);
   const [isAddMemberModalVisible, setIsAddMemberModalVisible] = useState(false);
-  const [isEditMemberModalVisible, setIsEditMemberModalVisible] = useState(false);
-  const [selectedEditMember, setSelectedEditMember] = useState<Member | null>(null);
   const budgetTable = (orgData?.litellm_budget_table ?? {}) as {
     max_budget?: number | null;
     budget_duration?: string | null;
@@ -101,33 +97,12 @@ const OrganizationInfoView: React.FC<OrganizationInfoProps> = ({
     }
   };
 
-  const handleMemberUpdate = async (values: any) => {
-    try {
-      if (!accessToken) return;
-
-      const member: Member = {
-        user_email: values.user_email,
-        user_id: values.user_id,
-        role: values.role,
-      };
-
-      await organizationMemberUpdateCall(accessToken, organizationId, member);
-      toast.success(t("Organization member updated successfully"));
-      setIsEditMemberModalVisible(false);
-      queryClient.invalidateQueries({ queryKey: organizationKeys.all });
-    } catch (error) {
-      toast.fromError(t("Failed to update organization member"));
-      console.error("Error updating organization member:", error);
-    }
-  };
-
   const handleMemberDelete = async (values: any) => {
     try {
       if (!accessToken) return;
 
       await organizationMemberDeleteCall(accessToken, organizationId, values.user_id);
       toast.success(t("Organization member deleted successfully"));
-      setIsEditMemberModalVisible(false);
       queryClient.invalidateQueries({ queryKey: organizationKeys.all });
     } catch (error) {
       toast.fromError(t("Failed to delete organization member"));
@@ -278,10 +253,6 @@ const OrganizationInfoView: React.FC<OrganizationInfoProps> = ({
                 user_alias: m.user?.user_alias ?? null,
               }))}
               canEdit={canEditOrg}
-              onEdit={(member) => {
-                setSelectedEditMember(member);
-                setIsEditMemberModalVisible(true);
-              }}
               onDelete={(member) => handleMemberDelete(member)}
               onAddMember={() => setIsAddMemberModalVisible(true)}
               addLabel={t("Add organization administrator")}
@@ -292,7 +263,7 @@ const OrganizationInfoView: React.FC<OrganizationInfoProps> = ({
           </div>
         </TabsContent>
 
-        <TabsContent keepMounted={hasVisited(t("settings"))} value="settings" className="pt-4">
+        <TabsContent keepMounted={hasVisited("settings")} value="settings" className="pt-4">
           <Card className="max-h-[65vh] overflow-y-auto">
             <CardContent>
               <div className="mb-4 flex items-center justify-between">
@@ -343,7 +314,7 @@ const OrganizationInfoView: React.FC<OrganizationInfoProps> = ({
                   <div>
                     <p className="font-medium text-foreground">{t("Budget")}</p>
                     <div>{t("Budget cap: {value0}", { value0: budgetLabel })}</div>
-                    <div>{t("Reset: {value0}", { value0: budgetTable.budget_duration || t("Never") })}</div>
+                    <div>{t("Reset: {value0}", { value0: organizationBudgetLabel(budgetTable.budget_duration) })}</div>
                   </div>
                 </div>
               )}
@@ -367,19 +338,7 @@ const OrganizationInfoView: React.FC<OrganizationInfoProps> = ({
         ]}
         defaultRole="org_admin"
       />
-      <MemberModal
-        visible={isEditMemberModalVisible}
-        onCancel={() => setIsEditMemberModalVisible(false)}
-        onSubmit={handleMemberUpdate}
-        initialData={selectedEditMember}
-        mode="edit"
-        config={{
-          title: t("Edit Member"),
-          showEmail: true,
-          showUserId: true,
-          roleOptions: [{ label: t("Org Admin"), value: "org_admin" }],
-        }}
-      />
+
     </div>
   );
 };

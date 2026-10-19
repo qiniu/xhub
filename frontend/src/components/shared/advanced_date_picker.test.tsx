@@ -242,3 +242,12 @@ vi.mock("@/i18n", async (importOriginal) => {
   const original = await importOriginal<typeof import("@/i18n")>();
   return { ...original, t: (key: string, values?: Parameters<typeof original.translate>[2]) => original.translate("en", key, values) };
 });
+
+/** 前置日期选择器；验证自定义日期输入具有可访问名称，应用前不提交，自动卸载，无后台写入。 */
+it("labels both custom date inputs for keyboard and screen reader access", async () => {
+  const onValueChange=vi.fn();render(<AdvancedDatePicker value={{from:new Date("2026-08-01"),to:new Date("2026-08-02")}} onValueChange={onValueChange} />);
+  fireEvent.click(screen.getByRole("button",{name:"Select Time Range",exact:true}));
+  expect(screen.getByLabelText("Start date")).toBeVisible();expect(screen.getByLabelText("End date")).toBeVisible();
+  fireEvent.change(screen.getByLabelText("Start date"),{target:{value:"2026-07-01"}});
+  expect(onValueChange).not.toHaveBeenCalled();
+});

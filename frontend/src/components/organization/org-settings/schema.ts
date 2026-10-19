@@ -27,7 +27,7 @@ const orgSettingsShape = {
   organization_alias: z.string().min(1, { error: () => t("Please input an organization name") }),
   models: z.array(z.string()),
   max_budget: amountOrEmpty,
-  budget_duration: z.string(),
+  budget_duration: z.string().refine(value => ["", "24h", "7d", "30d"].includes(value), { error: () => t("organizationBudget.invalid") }),
   tpm_limit: wholeNumberOrEmpty,
   rpm_limit: wholeNumberOrEmpty,
   metadata: z.string().refine((value) => isBlank(value) || isJsonObject(value), { error: () => t("Metadata must be a valid JSON object") }),

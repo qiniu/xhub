@@ -11,3 +11,9 @@ describe("organization rate allocations", () => {
     });
   }
 });
+
+/** 前置真实组织表单 schema；验证支持的固定周期、取消及非法周期，纯函数无需清理。 */
+it.each(["", "24h", "7d", "30d", "monthly", "1d", "wrong"])("validates budget period %s", (budget_duration) => {
+  const result = orgSettingsSchema.safeParse({ organization_alias:"period",models:[],max_budget:"",budget_duration,tpm_limit:"",rpm_limit:"",metadata:"",route_template_id:"" });
+  expect(result.success).toBe(["", "24h", "7d", "30d"].includes(budget_duration));
+});

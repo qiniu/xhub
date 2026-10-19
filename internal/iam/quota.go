@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"math"
+	"time"
 
 	"xorm.io/xorm"
 
@@ -227,8 +228,11 @@ func singleTeamMember(s *xorm.Session, userID, teamID string) error {
 
 // QuotaPath 检查调用节点及祖先的共享余额。参数 ctx/kind/id/hot 为上下文、主体与未落库消费读取器。
 // 返回消费团队、组织、耗尽层级及错误；固定孩子保留额度，仅共享孩子受父级共享池限制。
-// 调用：会话与密钥检查；调用前检查无法约束供应商最终计价超过最后余额的情况。
+// 调用：会话与密钥检查；检查前补执行到期组织周期，失败拒绝准入；无法约束供应商最终计价超过最后余额的情况。
 func (db *DB) QuotaPath(ctx context.Context, kind, id string, hot func(string, string) float64) (string, string, string, error) {
+	if err := db.ResetOrganizationBudgets(ctx, time.Now()); err != nil {
+		return "", "", "", err
+	}
 	s := db.session(ctx)
 	defer s.Close()
 	nodes, err := quotaTreeFor(s, kind, id)
@@ -240,8 +244,11 @@ func (db *DB) QuotaPath(ctx context.Context, kind, id string, hot func(string, s
 
 // QuotaAndRates 为首次准入共用一次归属树读取，避免预算和分钟计划分别扫描同一组织。
 // 参数 ctx/kind/id/hot 与 QuotaPath 相同；返回计费团队、组织、耗尽层级、速率计划及读取错误。
-// 网关首次准入调用；只读数据库及热消费，不占分钟容量，后续权限复核仍读取最新预算。
+// 网关首次准入调用；先补执行到期组织周期，再读取预算及热消费，不占分钟容量，后续复核仍读取最新预算。
 func (db *DB) QuotaAndRates(ctx context.Context, kind, id string, hot func(string, string) float64) (string, string, string, live.RatePlan, error) {
+	if err := db.ResetOrganizationBudgets(ctx, time.Now()); err != nil {
+		return "", "", "", live.RatePlan{}, err
+	}
 	s := db.session(ctx)
 	defer s.Close()
 	nodes, err := quotaTreeFor(s, kind, id)

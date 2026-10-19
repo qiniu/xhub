@@ -415,13 +415,13 @@ describe("UsagePage", () => {
         }),
     );
     renderWithProviders(<UsagePage {...defaultProps} />);
-    expect((await screen.findAllByText("Loading chart data...")).length).toBeGreaterThan(0);
+    expect(await screen.findByText("Loading usage…")).toBeVisible();
     expect(screen.queryByTestId("daily-spend-settled")).not.toBeInTheDocument();
     await act(async () => {
       resolveActivity(mockSpendData);
     });
     expect(await screen.findByTestId("daily-spend-settled")).toBeInTheDocument();
-    expect(screen.queryByText("Loading chart data...")).not.toBeInTheDocument();
+    expect(screen.queryByText("Loading usage…")).not.toBeInTheDocument();
   });
 
   it("should render and fetch usage data on mount", async () => {
@@ -1139,4 +1139,18 @@ describe("UsagePage", () => {
       expect(screen.getByText(translate("en", "pages.usage.endpointActivity"))).toBeInTheDocument();
     });
   });
+  /** 前置两种用量源均失败；验证持续错误、无零值统计及重试成功恢复，自动清理 DOM 和 mock。 */
+  it("keeps an explicit error instead of zero usage and recovers on retry", async () => {
+    mockUserDailyActivityAggregatedCall.mockRejectedValue(new Error("offline"));
+    mockUserDailyActivityCall.mockRejectedValue(new Error("offline"));
+    renderWithProviders(<UsagePage {...defaultProps} />);
+    expect(await screen.findByText("Usage could not be loaded. The values are unknown, not zero. Retry to load the selected range.")).toBeVisible();
+    expect(screen.queryByTestId("daily-spend-settled")).not.toBeInTheDocument();
+    expect(screen.queryByText("Total Requests")).not.toBeInTheDocument();
+    mockUserDailyActivityAggregatedCall.mockResolvedValue(mockSpendData);
+    fireEvent.click(screen.getByRole("button", {name:"Retry usage"}));
+    expect(await screen.findByTestId("daily-spend-settled")).toBeVisible();
+    expect(screen.queryByText(/The values are unknown/)).not.toBeInTheDocument();
+  });
+
 });

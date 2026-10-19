@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   BreakdownMetrics,
   DailyData,
@@ -67,6 +67,9 @@ interface UsePaginatedDailyActivityReturn {
   progress: PaginationProgress;
   cancelled: boolean;
   cancel: () => void;
+  error: Error | null;
+  hasData: boolean;
+  retry: () => void;
 }
 
 const EMPTY_DATA: DailyActivityResponse = {
@@ -183,7 +186,7 @@ export function mergeDailyResults(existing: readonly DailyData[], incoming: read
 
 /**
  * 用量页使用的自动分页钩子；参数为读取函数、参数、启用状态和可选聚合函数，返回当前请求数据及进度。
- * 失败保留当前请求已完成页面并记录错误；切换筛选隐藏旧值，取消和卸载停止后续更新，无写入副作用。
+ * 失败保留当前请求已完成页面并返回错误、是否已成功读取和重试入口；切换筛选或重试立即隐藏旧值，取消和卸载停止后续更新，无写入副作用。
  * Hook that auto-paginates daily activity endpoints, updating state in batches
  * so charts render progressively. Cancels on unmount, param changes, or
  * manual cancel().
@@ -199,9 +202,14 @@ export function usePaginatedDailyActivity({
   enabled,
   aggregatedFetchFn,
 }: UsePaginatedDailyActivityParams): UsePaginatedDailyActivityReturn {
+  const [attempt, setAttempt] = useState(0);
+  const argsKey = JSON.stringify([args, attempt]);
+  // 同一账号/日期切换实体也要换身份；仅比较 JSON 参数会在第一帧短暂显示另一数据源的结果。
+  const requestIdentity = useMemo(() => ({ argsKey, fetchFn, aggregatedFetchFn }), [argsKey, fetchFn, aggregatedFetchFn]);
+  const [failure, setFailure] = useState<{ key: typeof requestIdentity; error: Error } | null>(null);
   const [data, setData] = useState<DailyActivityResponse>(EMPTY_DATA);
   // 结果与请求参数绑定，在切换筛选的第一帧就隐藏旧值；读取失败也不会退回旧账户数据。
-  const [dataKey, setDataKey] = useState<string | null>(null);
+  const [dataKey, setDataKey] = useState<typeof requestIdentity | null>(null);
   const [loading, setLoading] = useState(false);
   const [isFetchingMore, setIsFetchingMore] = useState(false);
   const [progress, setProgress] = useState<PaginationProgress>({
@@ -220,7 +228,8 @@ export function usePaginatedDailyActivity({
   argsRef.current = args;
 
   // Stable serialised key so the effect only re-runs when the arg *values* change.
-  const argsKey = JSON.stringify(args);
+  /** 重试当前筛选；无参数返回值，以新代次隐藏旧结果并使旧响应失效，不修改后台数据。 */
+  const retry = useCallback(() => setAttempt(value => value + 1), []);
 
   const cancel = useCallback(() => {
     cancelledRef.current = true;
@@ -243,6 +252,7 @@ export function usePaginatedDailyActivity({
     }
 
     const currentFetchId = ++fetchIdRef.current;
+    setFailure(null);
     setDataKey(null);
     setData(EMPTY_DATA);
     cancelledRef.current = false;
@@ -259,6 +269,8 @@ export function usePaginatedDailyActivity({
         }, ms);
       });
 
+    /** 读取当前筛选全部页面；无参数，异步返回 void；聚合失败回退分页，保留成功页并单独报告错误。
+     * effect 调用，代次检查阻止取消/旧账号请求回写；不修改后台数据。 */
     const run = async () => {
       const currentArgs = argsRef.current;
       setLoading(true);
@@ -270,7 +282,7 @@ export function usePaginatedDailyActivity({
           const aggregated = await aggregatedFetchFn(...currentArgs);
           if (isStale()) return;
           setData(aggregated);
-          setDataKey(argsKey);
+          setDataKey(requestIdentity);
           setProgress({ currentPage: 1, totalPages: 1 });
           setLoading(false);
           return;
@@ -279,6 +291,9 @@ export function usePaginatedDailyActivity({
         }
       }
 
+      let accumulatedResults: DailyData[] = [];
+      let accumulatedMetadata: Record<string, any> = {};
+      let loadedPages = 0;
       try {
         // Inject page=1 as the 4th argument.
         const argsWithPage = [...currentArgs.slice(0, 3), 1, ...currentArgs.slice(3)];
@@ -286,8 +301,9 @@ export function usePaginatedDailyActivity({
 
         if (isStale()) return;
 
+        loadedPages = 1;
         setData(firstPage);
-        setDataKey(argsKey);
+        setDataKey(requestIdentity);
 
         const totalPages = firstPage.metadata?.total_pages || 1;
 
@@ -302,8 +318,8 @@ export function usePaginatedDailyActivity({
         setLoading(false);
         setIsFetchingMore(true);
 
-        let accumulatedResults = mergeDailyResults([], firstPage.results);
-        let accumulatedMetadata = { ...firstPage.metadata };
+        accumulatedResults = mergeDailyResults([], firstPage.results);
+        accumulatedMetadata = { ...firstPage.metadata };
 
         for (let page = 2; page <= totalPages; page++) {
           if (isStale()) return;
@@ -318,6 +334,7 @@ export function usePaginatedDailyActivity({
 
           if (isStale()) return;
 
+          loadedPages = page;
           accumulatedResults = mergeDailyResults(accumulatedResults, pageData.results);
           accumulatedMetadata = sumMetadata(accumulatedMetadata, pageData.metadata);
           accumulatedMetadata.total_pages = totalPages;
@@ -342,7 +359,12 @@ export function usePaginatedDailyActivity({
         setIsFetchingMore(false);
       } catch (error) {
         if (!isStale()) {
-          console.error("Error fetching daily activity:", error);
+          // 部分页失败也提交已经完成的未刷新批次，明确返回错误，不能伪装成完整结果。
+          if (loadedPages > 0) {
+            setData({ results: accumulatedResults, metadata: accumulatedMetadata });
+            setProgress({ currentPage: loadedPages, totalPages: accumulatedMetadata.total_pages || loadedPages });
+          }
+          setFailure({ key: requestIdentity, error: error instanceof Error ? error : new Error("Daily activity unavailable") });
           setLoading(false);
           setIsFetchingMore(false);
         }
@@ -360,7 +382,11 @@ export function usePaginatedDailyActivity({
     };
     // argsKey is a stable JSON string so the effect only re-fires when arg values change.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [enabled, fetchFn, aggregatedFetchFn, argsKey]);
+  }, [enabled, fetchFn, aggregatedFetchFn, argsKey, requestIdentity]);
 
-  return { data: enabled && dataKey === argsKey ? data : EMPTY_DATA, loading, isFetchingMore, progress, cancelled, cancel };
+  const hasData = enabled && dataKey === requestIdentity;
+  const error = enabled && failure?.key === requestIdentity ? failure.error : null;
+  return { data: hasData ? data : EMPTY_DATA, loading: enabled && !hasData && !error ? true : loading,
+    isFetchingMore: hasData && isFetchingMore, progress: hasData ? progress : { currentPage: 0, totalPages: 0 },
+    cancelled: hasData && cancelled, cancel, error, hasData, retry };
 }
