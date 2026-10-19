@@ -51,7 +51,15 @@ function editorSchema() {
       route_template_id: true,
       auto_rotate: true,
     })
-    .extend({ duration, rotation_interval: z.custom<string | undefined>() })
+    .extend({
+      duration,
+      rotation_interval: z.custom<string | undefined>(),
+      max_budget: z
+        .custom<number | string | null | undefined>()
+        .refine((value) => value == null || value === "" || (Number.isFinite(Number(value)) && Number(value) >= 0), {
+          error: () => t("keyEditor.invalidBudget"),
+        }),
+    })
     .superRefine((value, context) => {
       if (value.auto_rotate && !/^[1-9][0-9]*[smhd]$/.test(value.rotation_interval ?? "")) {
         context.addIssue({ code: "custom", path: ["duration"], message: t("keyEditor.invalidDuration") });
@@ -102,8 +110,6 @@ export function KeyEditView({
   }, [keyData, form]);
   useEffect(() => {
     let cancelled = false;
-    setAvailableModels([]);
-    setModelsError(false);
     /** 读取团队或个人模型；无参数/返回，卸载后不写状态，失败保留既有选择供用户继续编辑。 */
     async function loadModels() {
       if (!accessToken || !userID || !userRole) return;
@@ -112,9 +118,15 @@ export function KeyEditView({
           keyData.team_id && team
             ? [...(team.models ?? []), ...(await fetchTeamModels(userID, userRole, accessToken, team.team_id))]
             : (await modelAvailableCall(accessToken, userID, userRole)).data.map((model: { id: string }) => model.id);
-        if (!cancelled) setAvailableModels(excludeProxyWideSentinel([...new Set<string>(models)]));
+        if (!cancelled) {
+          setAvailableModels(excludeProxyWideSentinel([...new Set<string>(models)]));
+          setModelsError(false);
+        }
       } catch {
-        if (!cancelled) setModelsError(true);
+        if (!cancelled) {
+          setAvailableModels([]);
+          setModelsError(true);
+        }
       }
     }
     void loadModels();
@@ -135,16 +147,23 @@ export function KeyEditView({
         rpm_limit: values.rpm_limit,
         tpm_limit: values.tpm_limit,
         route_template_id: values.route_template_id,
-        auto_rotate: values.auto_rotate,
       };
       if (values.allowed_routes !== (keyData.allowed_routes ?? []).join(","))
         payload.allowed_routes = parseAllowedRoutes(values.allowed_routes);
       if (values.duration?.trim()) payload.duration = values.duration.trim();
-      if (values.auto_rotate) payload.rotation_interval = values.rotation_interval;
       await onSubmit(payload);
     } finally {
       setSaving(false);
     }
+  }
+
+  /** 将可见类型写入表单；输入类型值，返回无，管理类型清除模型，供类型选择控件调用。 */
+  function changeKeyType(type: string) {
+    let allowedRoutes = "";
+    if (type === "llm_api") allowedRoutes = "llm_api_routes";
+    else if (type === "management") allowedRoutes = "management_routes";
+    form.setValue("allowed_routes", allowedRoutes);
+    if (type === "management") form.setValue("models", []);
   }
 
   const modelOptions = [
@@ -157,7 +176,11 @@ export function KeyEditView({
   ];
 
   return (
-    <form noValidate className="flex h-full min-h-0 flex-col overflow-hidden rounded-xl border bg-background" onSubmit={form.handleSubmit(save)}>
+    <form
+      noValidate
+      className="flex h-full min-h-0 flex-col overflow-hidden rounded-xl border bg-background"
+      onSubmit={form.handleSubmit(save)}
+    >
       <div
         role="region"
         aria-label={t("Key Settings")}
@@ -186,15 +209,11 @@ export function KeyEditView({
                     value={modelsDisabled ? [] : (value ?? [])}
                     disabled={modelsDisabled}
                     placeholder={t("Select models")}
-                    onValueChange={(next) =>
-                      onChange(
-                        next.includes("all-team-models")
-                          ? ["all-team-models"]
-                          : next.includes("all-proxy-models")
-                            ? ["all-proxy-models"]
-                            : next,
-                      )
-                    }
+                    onValueChange={(next) => {
+                      if (next.includes("all-team-models")) onChange(["all-team-models"]);
+                      else if (next.includes("all-proxy-models")) onChange(["all-proxy-models"]);
+                      else onChange(next);
+                    }}
                   />
                 )}
               </FormField>
@@ -204,18 +223,7 @@ export function KeyEditView({
                 </p>
               )}
               <FormField control={form.control} name="allowed_routes" label={t("Key Type")}>
-                {({ id, onChange }) => (
-                  <KeyTypeSelect
-                    id={id}
-                    value={keyTypeFromRoutes(routes)}
-                    onChange={(type) => {
-                      onChange(
-                        type === "llm_api" ? "llm_api_routes" : type === "management" ? "management_routes" : "",
-                      );
-                      if (type === "management") form.setValue("models", []);
-                    }}
-                  />
-                )}
+                {({ id }) => <KeyTypeSelect id={id} value={keyTypeFromRoutes(routes)} onChange={changeKeyType} />}
               </FormField>
             </section>
             <section className="space-y-5 border-t pt-6">
@@ -223,7 +231,14 @@ export function KeyEditView({
               <p className="text-sm text-muted-foreground">{t("keyEditor.budgetHint")}</p>
               <div className="grid gap-5 sm:grid-cols-3">
                 <FormField control={form.control} name="max_budget" label={t("Max Budget (USD)")}>
-                  {({ ref: _ref, ...field }) => <NumericalInput {...field} value={field.value ?? ""} min={0} />}
+                  {({ ref: _ref, ...field }) => (
+                    <NumericalInput
+                      {...field}
+                      value={field.value ?? ""}
+                      min={0}
+                      placeholder={t("keyEditor.budgetPlaceholder")}
+                    />
+                  )}
                 </FormField>
                 {(["rpm_limit", "tpm_limit"] as const).map((name) => (
                   <FormField
@@ -272,7 +287,8 @@ export function KeyEditView({
                       id={id}
                       value={value ?? ""}
                       onChange={onChange}
-                      autoRotationEnabled={!!form.watch("auto_rotate")}
+                      rotationSupported={false}
+                      autoRotationEnabled={false}
                       onAutoRotationChange={(enabled) => form.setValue("auto_rotate", enabled)}
                       rotationInterval={form.watch("rotation_interval") ?? "30d"}
                       onRotationIntervalChange={(interval) => form.setValue("rotation_interval", interval)}

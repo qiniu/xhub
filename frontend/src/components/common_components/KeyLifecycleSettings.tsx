@@ -14,6 +14,8 @@ const PREDEFINED_INTERVALS = ["7d", "30d", "90d", "180d", "365d"] as const;
 interface KeyLifecycleSettingsProps {
   value?: string;
   onChange?: (value: string) => void;
+  /** 宿主是否实现自动轮换；不支持时禁用并解释原因，默认兼容已有调用方。 */
+  rotationSupported?: boolean;
   autoRotationEnabled: boolean;
   onAutoRotationChange: (enabled: boolean) => void;
   rotationInterval: string;
@@ -35,10 +37,11 @@ const hintIcon = (hint: string): React.ReactNode => (
   </Tooltip>
 );
 
-/** 渲染共享的密钥生命周期控件；参数及回调控制期限、永不过期与轮换，返回表单片段；编辑留空保留期限，启用轮换显示间隔。 */
+/** 渲染共享的密钥生命周期控件；参数及回调控制期限、永不过期与轮换，返回表单片段；编辑留空保留期限，宿主支持且启用轮换时显示间隔，否则禁用并说明原因。 */
 const KeyLifecycleSettings: React.FC<KeyLifecycleSettingsProps> = ({
   value,
   onChange,
+  rotationSupported = true,
   autoRotationEnabled,
   onAutoRotationChange,
   rotationInterval,
@@ -55,12 +58,12 @@ const KeyLifecycleSettings: React.FC<KeyLifecycleSettingsProps> = ({
   const [customInterval, setCustomInterval] = useState(isCustomInterval ? rotationInterval : "");
 
   /** 根据当前语言格式化间隔；输入协议值，返回可见标签，未知自定义值原样保留。 */
-  const intervalLabel = (interval: string) =>
-    interval === "custom"
-      ? t("keyEditor.custom")
-      : PREDEFINED_INTERVALS.includes(interval as never)
-        ? t("keyEditor.days", { count: Number(interval.slice(0, -1)) })
-        : interval;
+  const intervalLabel = (interval: string) => {
+    if (interval === "custom") return t("keyEditor.custom");
+    if (PREDEFINED_INTERVALS.includes(interval as never))
+      return t("keyEditor.days", { count: Number(interval.slice(0, -1)) });
+    return interval;
+  };
 
   const durationId = id ?? "key-lifecycle-duration";
 
@@ -98,7 +101,7 @@ const KeyLifecycleSettings: React.FC<KeyLifecycleSettingsProps> = ({
           <div className="space-y-2">
             <div className="flex items-center space-x-1 text-sm font-medium text-foreground">
               <label htmlFor={durationId}>{t("keyEditor.expire")}</label>
-              {hintIcon(t("keyEditor.expiryHint"))}
+              {hintIcon(t(isCreateMode ? "keyEditor.createExpiryHint" : "keyEditor.expiryHint"))}
               {!isCreateMode && onNeverExpireChange && (
                 <span className="ml-2 flex items-center gap-2 text-sm font-normal text-muted-foreground">
                   <Checkbox
@@ -136,12 +139,14 @@ const KeyLifecycleSettings: React.FC<KeyLifecycleSettingsProps> = ({
               </label>
               <Switch
                 aria-label={t("keyEditor.enableRotation")}
-                checked={autoRotationEnabled}
+                disabled={!rotationSupported}
+                aria-describedby={!rotationSupported ? `${durationId}-rotation-unavailable` : undefined}
+                checked={rotationSupported && autoRotationEnabled}
                 onCheckedChange={onAutoRotationChange}
               />
             </div>
 
-            {autoRotationEnabled && (
+            {rotationSupported && autoRotationEnabled && (
               <div className="space-y-2">
                 <label className="flex items-center space-x-1 text-sm font-medium text-foreground">
                   <span>{t("keyEditor.interval")}</span>
@@ -191,7 +196,12 @@ const KeyLifecycleSettings: React.FC<KeyLifecycleSettingsProps> = ({
             )}
           </div>
 
-          {autoRotationEnabled && (
+          {!rotationSupported && (
+            <p id={`${durationId}-rotation-unavailable`} className="text-sm text-muted-foreground">
+              {t("keyEditor.rotationUnavailable")}
+            </p>
+          )}
+          {rotationSupported && autoRotationEnabled && (
             <div className="rounded-md bg-info/10 p-3 text-sm text-info">{t("keyEditor.rotationNotice")}</div>
           )}
         </div>

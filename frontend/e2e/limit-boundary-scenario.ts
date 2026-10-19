@@ -35,7 +35,7 @@ export function registerLimitBoundary(layer: "organization" | "team" | "user" | 
       await stableGoto(page, path);
       if (layer === "user") {
         await page.getByRole("button", { name: t("pages.users.editUser"), exact: true }).click();
-      } else {
+      } else if (layer !== "key") {
         await page.getByRole("tab", { name: t("Settings"), exact: true }).click();
         await page.getByRole("button", { name: t("Edit Settings"), exact: true }).click();
       }

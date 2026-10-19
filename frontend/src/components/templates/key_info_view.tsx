@@ -98,17 +98,14 @@ export default function KeyInfoView({
       "tpm_limit",
       "route_template_id",
       "duration",
-      "auto_rotate",
-      "rotation_interval",
     ];
     const payload: Record<string, unknown> = { key: currentKeyData.token_id || currentKeyData.token };
     for (const field of fields) {
-      if (field in values)
-        payload[field] = ["max_budget", "rpm_limit", "tpm_limit"].includes(field)
-          ? values[field] === "" || values[field] == null
-            ? null
-            : Number(values[field])
-          : values[field];
+      if (!(field in values)) continue;
+      const value = values[field];
+      if (["max_budget", "rpm_limit", "tpm_limit"].includes(field)) {
+        payload[field] = value === "" || value == null ? null : Number(value);
+      } else payload[field] = value;
     }
     try {
       const updated = await keyUpdateCall(accessToken, payload);
@@ -263,7 +260,7 @@ export default function KeyInfoView({
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end">
                 <DropdownMenuItem onClick={() => setIsRegenerateModalOpen(true)} disabled={!premiumUser}>
-                  {t("Regenerate Key")}
+                  {t("keyEditor.regenerate")}
                 </DropdownMenuItem>
                 {canBlockKey && (
                   <DropdownMenuItem onClick={() => setIsBlockModalOpen(true)}>

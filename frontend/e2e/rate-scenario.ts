@@ -135,7 +135,10 @@ test("层级限流 " + scenario, async ({ page }) => {
     // API Key 创建页面支持 RPM/TPM，中文/英文说明完整切换。
     await stableGoto(page, "/api-keys");
     await page.getByRole("button", { name: "English", exact: true }).click();
-    await expect(page.getByRole("complementary", { name: "How quota allocation works" })).toContainText("RPM");
+    const guide = page.getByRole("complementary", { name: "How quota allocation works" });
+    await expect(guide.locator("details")).not.toHaveAttribute("open");
+    await guide.locator("summary").click();
+    await expect(guide).toContainText("RPM");
     await page.getByRole("button", { name: "中文", exact: true }).click();
     await expect(page.getByRole("complementary", { name: t("quotaGuide.title") })).toContainText("TPM");
     }
@@ -156,8 +159,7 @@ test("层级限流 " + scenario, async ({ page }) => {
       expect(zero.status()).toBe(429);
       // 编辑页面清空 RPM 恢复共享；保存接口和真实推理同时验证，删除释放预留容量。
       await stableGoto(page, "/api-keys?key=" + own.token_id);
-      await page.getByRole("tab", { name: t("Settings"), exact: true }).click();
-      await page.getByRole("button", { name: t("Edit Settings"), exact: true }).click();
+      // 精简密钥详情直接编辑，不再经过设置页签和二级编辑按钮。
       await page.getByLabel(t("RPM Limit"), { exact: true }).fill("");
       await page.getByLabel(t("TPM Limit"), { exact: true }).fill("64");
       saved = page.waitForResponse(r => r.url().endsWith("/key/update") && r.request().method() === "POST");

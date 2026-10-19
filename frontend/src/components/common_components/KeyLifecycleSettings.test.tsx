@@ -4,6 +4,7 @@ import userEvent, { PointerEventsCheckLevel } from "@testing-library/user-event"
 import { describe, expect, it, vi, beforeEach } from "vitest";
 import { chooseSelectOption, fireEvent, renderWithProviders, screen, waitFor } from "../../../tests/test-utils";
 import KeyLifecycleSettings from "./KeyLifecycleSettings";
+import { translate } from "@/i18n";
 
 const CREATE_PLACEHOLDER = "e.g., 30d or leave empty to never expire";
 const EDIT_PLACEHOLDER = "e.g., 30d";
@@ -58,6 +59,27 @@ describe("KeyLifecycleSettings", () => {
     vi.clearAllMocks();
   });
 
+  /** 未支持自动轮换时明确降级；已启用值也不显示间隔，点击禁用开关不写入，DOM 自动清理。 */
+  it("disables unsupported rotation without calling the change handler", async () => {
+    const onChange = vi.fn();
+    renderWithProviders(
+      <KeyLifecycleSettings
+        rotationSupported={false}
+        autoRotationEnabled={true}
+        onAutoRotationChange={onChange}
+        rotationInterval="30d"
+        onRotationIntervalChange={vi.fn()}
+      />,
+    );
+    const control = screen.getByRole("switch", { name: "Enable Auto-Rotation" });
+    expect(control).toHaveAttribute("aria-disabled", "true");
+    expect(control).not.toBeChecked();
+    expect(control).toHaveAccessibleDescription(translate("en", "keyEditor.rotationUnavailable"));
+    expect(screen.queryByRole("combobox", { name: "Rotation Interval" })).not.toBeInTheDocument();
+    await userEvent.click(control);
+    expect(onChange).not.toHaveBeenCalled();
+  });
+
   it("renders the expiry and auto-rotation sections", () => {
     renderWithProviders(<Harness />);
     expect(screen.getByText("Key Expiry Settings")).toBeInTheDocument();
@@ -71,9 +93,11 @@ describe("KeyLifecycleSettings", () => {
     expect(screen.getByRole("checkbox", { name: "Never Expire" })).toBeInTheDocument();
   });
 
+  /** 创建时空期限表示永不过期；校验专用提示名称，无副作用且 DOM 自动清理。 */
   it("uses the create-mode placeholder in create mode", () => {
     renderWithProviders(<Harness isCreateMode={true} />);
     expect(screen.getByPlaceholderText(CREATE_PLACEHOLDER)).toBeInTheDocument();
+    expect(screen.getByLabelText(translate("en", "keyEditor.createExpiryHint"))).toBeInTheDocument();
   });
 
   it("uses the edit-mode placeholder in edit mode", () => {

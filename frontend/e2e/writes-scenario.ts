@@ -7,7 +7,6 @@ import { expect, test, type Page } from "@playwright/test";
 
 import { loginAdmin, sessionBearer, stableGoto, t, uiPath, watchGateway } from "./helpers";
 
-
 /** 从真实登录 cookie 读取会话；page 为浏览器，返回 bearer，供旧场景操作自建资源，缺凭据时失败。 */
 async function sessionFrom(page: Page): Promise<string> {
   const cookies = await page.context().cookies();
@@ -17,40 +16,58 @@ async function sessionFrom(page: Page): Promise<string> {
 /** 注册密钥单项生命周期；kind 指定编辑、封禁、解封或删除，title 为报告名称，返回无。
  * 前置页面创建专属个人密钥；独立验证页面、持久化和真实推理，拒绝核对 401 契约与无上游调用；finally 删除并回读 404。 */
 export function registerKeyWrite(kind: "edit" | "block" | "unblock" | "delete", title: string) {
-  test(title, async ({page}) => {
+  test(title, async ({ page }) => {
     const guard = watchGateway(page);
     await loginAdmin(page);
-    const headers = {Authorization: "Bearer " + await sessionBearer(page)};
+    const headers = { Authorization: "Bearer " + (await sessionBearer(page)) };
     const alias = "e2e-key-" + kind + "-" + Date.now();
-    await page.getByTestId("create-key-button").click(); await chooseKeyTeam(page);
+    await page.getByTestId("create-key-button").click();
+    await chooseKeyTeam(page);
     await page.getByLabel(t("Key Name")).fill(alias);
-    const pending = page.waitForResponse(r => new URL(r.url()).pathname === "/key/generate" && r.request().method() === "POST");
-    await page.getByRole("button", {name:t("pages.apiKeys.createSubmit"), exact:true}).click();
-    const created = await pending; expect(created.status(), await created.text()).toBe(200);
+    const pending = page.waitForResponse(
+      (r) => new URL(r.url()).pathname === "/key/generate" && r.request().method() === "POST",
+    );
+    await page.getByRole("button", { name: t("pages.apiKeys.createSubmit"), exact: true }).click();
+    const created = await pending;
+    expect(created.status(), await created.text()).toBe(200);
     const key = await created.json();
     /** 调用真实推理；返回 HTTP 响应，凭据来自页面，测试账单由私有 schema 回收。 */
-    const invoke = () => page.request.post(GATEWAY + "/v1/chat/completions", {
-      headers: {Authorization: "Bearer " + key.key},
-      data: {model:"gpt-4o-mini", messages:[{role:"user", content:"Verify key " + kind}]},
-    });
+    const invoke = () =>
+      page.request.post(GATEWAY + "/v1/chat/completions", {
+        headers: { Authorization: "Bearer " + key.key },
+        data: { model: "gpt-4o-mini", messages: [{ role: "user", content: "Verify key " + kind }] },
+      });
     /** 回读当前密钥；返回 info，读失败立即失败，无写入副作用。 */
     const info = async () => {
-      const response = await page.request.get(GATEWAY + "/key/info?key=" + key.token_id, {headers});
-      expect(response.status()).toBe(200); return (await response.json()).info;
+      const response = await page.request.get(GATEWAY + "/key/info?key=" + key.token_id, { headers });
+      expect(response.status()).toBe(200);
+      return (await response.json()).info;
     };
     /** 验证拒绝不转发；无参数/返回，要求明确 401 契约与上游计数不变。 */
     const rejected = async () => {
-      const before = await page.request.get(UPSTREAM + "/e2e/request-count"); expect(before.status()).toBe(200);
-      const denied = await invoke(); requireAuthorizationError(denied.status(), await denied.json(), 401, kind === "delete" ? undefined : "key_blocked");
-      const after = await page.request.get(UPSTREAM + "/e2e/request-count"); expect(after.status()).toBe(200);
+      const before = await page.request.get(UPSTREAM + "/e2e/request-count");
+      expect(before.status()).toBe(200);
+      const denied = await invoke();
+      requireAuthorizationError(
+        denied.status(),
+        await denied.json(),
+        401,
+        kind === "delete" ? undefined : "key_blocked",
+      );
+      const after = await page.request.get(UPSTREAM + "/e2e/request-count");
+      expect(after.status()).toBe(200);
       expect(await after.json()).toEqual(await before.json());
     };
     let deleted = false;
     try {
       await page.keyboard.press("Escape");
       if (kind === "unblock") {
-        const block = await page.request.post(GATEWAY + "/key/block", {headers, data:{key:key.token_id}});
-        expect(block.status(), await block.text()).toBe(200); await rejected();
+        const block = await page.request.post(GATEWAY + "/key/block", {
+          headers,
+          data: { key: key.token_id },
+        });
+        expect(block.status(), await block.text()).toBe(200);
+        await rejected();
       } else expect((await invoke()).status()).toBe(200);
       await stableGoto(page, "/api-keys?key=" + key.token_id);
       if (kind === "edit") {
@@ -66,66 +83,148 @@ export function registerKeyWrite(kind: "edit" | "block" | "unblock" | "delete", 
         // 布局约束由浏览器实测：全宽、可滚动、操作栏与内容区互不遮挡。
         const bounds = await scroll.boundingBox();
         expect(bounds!.width).toBeGreaterThan(1000);
-        expect(await scroll.evaluate(node => node.scrollHeight > node.clientHeight)).toBe(true);
-        expect(await scroll.evaluate(node => getComputedStyle(node).overflowY)).toBe("scroll");
+        expect(await scroll.evaluate((node) => node.scrollHeight > node.clientHeight)).toBe(true);
+        expect(await scroll.evaluate((node) => getComputedStyle(node).overflowY)).toBe("scroll");
         const footerBounds = await actions.boundingBox();
         expect(bounds!.y + bounds!.height).toBeLessThanOrEqual(footerBounds!.y + 1);
         expect(Math.abs(bounds!.x - footerBounds!.x)).toBeLessThan(2);
         expect(Math.abs(bounds!.width - footerBounds!.width)).toBeLessThan(2);
         // 窄屏保持同一面板且无横向溢出，保存按钮在视口内。
         await page.setViewportSize({ width: 720, height: 640 });
-        expect(await scroll.evaluate(node => node.scrollWidth <= node.clientWidth)).toBe(true);
+        expect(await scroll.evaluate((node) => node.scrollWidth <= node.clientWidth)).toBe(true);
         await expect(actions.getByRole("button", { name: t("Save Changes"), exact: true })).toBeInViewport();
         await page.setViewportSize({ width: 1440, height: 700 });
-        await scroll.hover(); await page.mouse.wheel(0, 1800);
-        await expect.poll(() => scroll.evaluate(node => node.scrollTop)).toBeGreaterThan(0);
-        await expect(page.getByRole("switch", { name: t("keyEditor.enableRotation"), exact: true })).toBeInViewport();
+        await scroll.hover();
+        await page.mouse.wheel(0, 1800);
+        await expect.poll(() => scroll.evaluate((node) => node.scrollTop)).toBeGreaterThan(0);
+        await expect(
+          page.getByRole("switch", { name: t("keyEditor.enableRotation"), exact: true }),
+        ).toBeInViewport();
         await expect(actions.getByRole("button", { name: t("Save Changes"), exact: true })).toBeInViewport();
+        await test
+          .info()
+          .attach("key-editor-unified-panel", { body: await page.screenshot(), contentType: "image/png" });
         // 切换真实语言后保留用户输入，覆盖中英文标签。
         await page.getByRole("button", { name: "English", exact: true }).click();
         await expect(page.getByLabel("Key Alias", { exact: true })).toHaveValue(alias);
-        await expect(page.getByRole("switch", { name: "Enable Auto-Rotation", exact: true })).toBeVisible();
+        await expect(page.getByRole("switch", { name: "Enable Auto-Rotation", exact: true })).toBeDisabled();
+        await expect(page.getByLabel("Max Budget (USD)", { exact: true })).toHaveAttribute("placeholder", "Share your remaining quota");
         await page.getByRole("button", { name: "中文", exact: true }).click();
+        await expect(page.getByText(t("keyEditor.rotationUnavailable"), { exact: true })).toBeVisible();
+        await expect(page.getByLabel(t("Max Budget (USD)"), { exact: true })).toHaveAttribute("placeholder", t("keyEditor.budgetPlaceholder"));
         await page.getByLabel(t("Max Budget (USD)"), { exact: true }).fill("10");
         await page.getByLabel(t("RPM Limit"), { exact: true }).fill("100");
         await page.getByLabel(t("TPM Limit"), { exact: true }).fill("100000");
         await page.getByLabel(t("keyEditor.expire"), { exact: true }).fill("30d");
-        await page.getByRole("textbox", {name:t("Key Alias"), exact:true}).fill(alias + "-renamed");
-        const saved = page.waitForResponse(r => new URL(r.url()).pathname === "/key/update" && r.request().method() === "POST");
-        await page.getByRole("button", {name:t("Save Changes"), exact:true}).last().click(); expect((await saved).status()).toBe(200);
+        await page.getByRole("textbox", { name: t("Key Alias"), exact: true }).fill(alias + "-renamed");
+        const saved = page.waitForResponse(
+          (r) => new URL(r.url()).pathname === "/key/update" && r.request().method() === "POST",
+        );
+        await page
+          .getByRole("button", { name: t("Save Changes"), exact: true })
+          .last()
+          .click();
+        expect((await saved).status()).toBe(200);
         const stored = await info();
-        expect(stored).toMatchObject({ key_alias: alias + "-renamed", max_budget: 10, rpm_limit: 100, tpm_limit: 100000 });
+        expect(stored).toMatchObject({
+          key_alias: alias + "-renamed",
+          max_budget: 10,
+          rpm_limit: 100,
+          tpm_limit: 100000,
+        });
         expect(stored.expires).toBeTruthy();
-        await page.reload(); await expect(page.getByRole("heading").filter({has:page.getByText(alias + "-renamed", {exact:true})})).toBeVisible();
+        await page.reload();
+        await expect(
+          page.getByRole("heading").filter({ has: page.getByText(alias + "-renamed", { exact: true }) }),
+        ).toBeVisible();
+        expect((await invoke()).status()).toBe(200);
+        /** 通过可见操作栏再次保存，等待真实接口完成；调用前设置字段，返回无，测试末尾统一删除密钥。 */
+        const saveAgain = async () => {
+          const response = page.waitForResponse(
+            (r) => new URL(r.url()).pathname === "/key/update" && r.request().method() === "POST",
+          );
+          await actions.getByRole("button", { name: t("Save Changes"), exact: true }).click();
+          const result = await response;
+          expect(result.status(), await result.text()).toBe(200);
+        };
+        await expect(page.getByLabel(t("RPM Limit"), { exact: true })).toHaveValue("100");
+        await expect(page.getByLabel(t("keyEditor.expire"), { exact: true })).toHaveValue("");
+        // 零是禁止调用，必须在真实网关拦截且不进入上游。
+        await page.getByLabel(t("RPM Limit"), { exact: true }).fill("0");
+        await saveAgain();
+        expect(await info()).toMatchObject({
+          rpm_limit: 0,
+          expires: stored.expires,
+          models: stored.models,
+          user_id: stored.user_id,
+        });
+        const before = await page.request.get(UPSTREAM + "/e2e/request-count");
+        expect(before.status()).toBe(200);
+        const denied = await invoke();
+        expect(denied.status(), await denied.text()).toBe(429);
+        expect((await denied.json()).error.message).toContain("rpm_limit");
+        const after = await page.request.get(UPSTREAM + "/e2e/request-count");
+        expect(after.status()).toBe(200);
+        expect(await after.json()).toEqual(await before.json());
+        // 留空恢复共享；空到期不改期限，模型及归属等未修改字段保持原样。
+        await page.getByLabel(t("RPM Limit"), { exact: true }).fill("");
+        await page.getByLabel(t("TPM Limit"), { exact: true }).fill("");
+        await page.getByLabel(t("Max Budget (USD)"), { exact: true }).fill("");
+        await saveAgain();
+        expect(await info()).toMatchObject({
+          rpm_limit: null,
+          tpm_limit: null,
+          max_budget: null,
+          expires: stored.expires,
+          models: stored.models,
+          user_id: stored.user_id,
+        });
         expect((await invoke()).status()).toBe(200);
       } else {
         const action = kind === "block" ? "Block" : kind === "unblock" ? "Unblock" : "Delete";
-        await page.getByRole("button", {name:t("More key actions"), exact:true}).click();
-        await page.getByRole("menuitem", {name:t(action + " Key"), exact:true}).click();
-        if (kind === "delete") await page.getByPlaceholder(alias, {exact:true}).fill(alias);
-        const saved = page.waitForResponse(r => new URL(r.url()).pathname === "/key/" + kind && r.request().method() === "POST");
-        await page.getByRole("button", {name:kind === "delete" ? t("common.delete") : t(action), exact:true}).click();
+        await page.getByRole("button", { name: t("More key actions"), exact: true }).click();
+        await page.getByRole("menuitem", { name: t(action + " Key"), exact: true }).click();
+        if (kind === "delete") await page.getByPlaceholder(alias, { exact: true }).fill(alias);
+        const saved = page.waitForResponse(
+          (r) => new URL(r.url()).pathname === "/key/" + kind && r.request().method() === "POST",
+        );
+        await page
+          .getByRole("button", { name: kind === "delete" ? t("common.delete") : t(action), exact: true })
+          .click();
         expect((await saved).status()).toBe(200);
         if (kind === "delete") {
-          deleted = true; await expect(page.getByText(alias, {exact:true})).toHaveCount(0);
-          expect((await page.request.get(GATEWAY + "/key/info?key=" + key.token_id, {headers})).status()).toBe(404); await rejected();
+          deleted = true;
+          await expect(page.getByText(alias, { exact: true })).toHaveCount(0);
+          expect(
+            (await page.request.get(GATEWAY + "/key/info?key=" + key.token_id, { headers })).status(),
+          ).toBe(404);
+          await rejected();
         } else {
           expect((await info()).blocked).toBe(kind === "block");
           // 当前详情仅在封禁时显示徽标；解封后检查徽标消失及可再次封禁的操作。
-          if (kind === "block") await expect(page.getByText(t("Blocked"), {exact:true}).first()).toBeVisible();
+          if (kind === "block")
+            await expect(page.getByText(t("Blocked"), { exact: true }).first()).toBeVisible();
           else {
-            await expect(page.getByText(t("Blocked"), {exact:true})).toHaveCount(0);
-            await page.getByRole("button", {name:t("More key actions"), exact:true}).click();
-            await expect(page.getByRole("menuitem", {name:t("Block Key"), exact:true})).toBeVisible();
+            await expect(page.getByText(t("Blocked"), { exact: true })).toHaveCount(0);
+            await page.getByRole("button", { name: t("More key actions"), exact: true }).click();
+            await expect(page.getByRole("menuitem", { name: t("Block Key"), exact: true })).toBeVisible();
             await page.keyboard.press("Escape");
           }
-          if (kind === "block") await rejected(); else expect((await invoke()).status()).toBe(200);
+          if (kind === "block") await rejected();
+          else expect((await invoke()).status()).toBe(200);
         }
       }
       guard.assertOk();
     } finally {
-      if (!deleted) expect((await page.request.post(GATEWAY + "/key/delete", {headers, data:{keys:[key.token_id]}})).status()).toBe(200);
-      expect((await page.request.get(GATEWAY + "/key/info?key=" + key.token_id, {headers})).status()).toBe(404);
+      if (!deleted)
+        expect(
+          (
+            await page.request.post(GATEWAY + "/key/delete", { headers, data: { keys: [key.token_id] } })
+          ).status(),
+        ).toBe(200);
+      expect((await page.request.get(GATEWAY + "/key/info?key=" + key.token_id, { headers })).status()).toBe(
+        404,
+      );
     }
   });
 }

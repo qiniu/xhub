@@ -39,7 +39,7 @@ export function registerBudgetBoundary(layer: "organization" | "team" | "persona
         await page.getByRole("button", { name: t("pages.users.editUser"), exact: true }).click();
       } else if (layer === "project") {
         await page.getByRole("button", { name: t("Edit Project"), exact: true }).click();
-      } else {
+      } else if (layer !== "key") {
         await page.getByRole("tab", { name: t("Settings"), exact: true }).click();
         await page.getByRole("button", { name: t("Edit Settings"), exact: true }).click();
       }

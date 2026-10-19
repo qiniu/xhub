@@ -83,7 +83,6 @@ describe("simplified key editor", () => {
       token: "hash-1",
       key_alias: "updated 用户",
       models: ["gpt-4"],
-      auto_rotate: false,
     });
     for (const field of [
       "metadata",
@@ -121,17 +120,24 @@ describe("simplified key editor", () => {
     expect(await screen.findByText("Must be a non-negative whole number")).toBeVisible();
     expect(onSubmit).not.toHaveBeenCalled();
   });
-  /** 生命周期正常保存；输入到期并开启轮换，确认只提交明确指定期限及默认轮换间隔，清理 DOM。 */
-  it("saves expiry and auto rotation", async () => {
+  /** 金额失败输入不发出保存；负数显示对应字段错误，允许零及小数的边界由精度测试覆盖，清理 DOM。 */
+  it("rejects a negative budget", async () => {
+    const { onSubmit } = setup();
+    fireEvent.change(screen.getByLabelText("Max Budget (USD)"), { target: { value: "-0.01" } });
+    await userEvent.click(screen.getByRole("button", { name: "Save Changes" }));
+    expect(await screen.findByText(translate("en", "keyEditor.invalidBudget"))).toBeVisible();
+    expect(onSubmit).not.toHaveBeenCalled();
+  });
+  /** 生命周期能力边界；只保存指定期限，后台未实现的自动轮换禁用且不随请求发送，清理 DOM。 */
+  it("saves expiry and explains unavailable automatic rotation", async () => {
     const { onSubmit } = setup();
     fireEvent.change(screen.getByLabelText("Expire Key"), { target: { value: "30d" } });
-    await userEvent.click(screen.getByRole("switch", { name: "Enable Auto-Rotation" }));
+    expect(screen.getByRole("switch", { name: "Enable Auto-Rotation" })).toHaveAttribute("aria-disabled", "true");
+    expect(screen.getByText(translate("en", "keyEditor.rotationUnavailable"))).toBeVisible();
     await userEvent.click(screen.getByRole("button", { name: "Save Changes" }));
-    await waitFor(() =>
-      expect(onSubmit).toHaveBeenCalledWith(
-        expect.objectContaining({ duration: "30d", auto_rotate: true, rotation_interval: "30d" }),
-      ),
-    );
+    await waitFor(() => expect(onSubmit).toHaveBeenCalledWith(expect.objectContaining({ duration: "30d" })));
+    expect(onSubmit.mock.calls[0][0]).not.toHaveProperty("auto_rotate");
+    expect(onSubmit.mock.calls[0][0]).not.toHaveProperty("rotation_interval");
   });
   /** 非法期限失败路径；空期限之外的非法格式阻止请求并提示，清理 DOM。 */
   it.each(["0d", "-1h", "tomorrow"])("rejects expiry %s", async (value) => {
@@ -160,7 +166,7 @@ describe("simplified key editor", () => {
     await userEvent.click(screen.getByRole("button", { name: "Cancel" }));
     expect(onCancel).toHaveBeenCalledOnce();
   });
-  /** 语言切换覆盖标签、动态天数和非法提示，原始别名不被翻译，清理 DOM 与存储。 */
+  /** 语言切换覆盖标签、共享额度提示、未支持状态和非法提示，原始别名不被翻译，清理 DOM 与存储。 */
   it("switches all editor copy without changing user input", async () => {
     renderWithProviders(
       <I18nProvider initialLocale="en">
@@ -175,11 +181,17 @@ describe("simplified key editor", () => {
         />
       </I18nProvider>,
     );
-    await userEvent.click(screen.getByRole("switch", { name: "Enable Auto-Rotation" }));
-    expect(screen.getByRole("combobox", { name: "Rotation Interval" })).toHaveTextContent("30 days");
+    expect(screen.getByLabelText("Max Budget (USD)")).toHaveAttribute(
+      "placeholder",
+      translate("en", "keyEditor.budgetPlaceholder"),
+    );
     await userEvent.click(screen.getByRole("button", { name: "中文" }));
     expect(screen.getByLabelText(translate("zh-CN", "Key Alias"))).toHaveValue("用户原始 alias");
-    expect(screen.getByRole("combobox", { name: "轮换间隔" })).toHaveTextContent("30 天");
+    expect(screen.getByLabelText(translate("zh-CN", "Max Budget (USD)"))).toHaveAttribute(
+      "placeholder",
+      translate("zh-CN", "keyEditor.budgetPlaceholder"),
+    );
+    expect(screen.getByText(translate("zh-CN", "keyEditor.rotationUnavailable"))).toBeVisible();
     expect(screen.queryByText("Key Lifecycle")).not.toBeInTheDocument();
     fireEvent.change(screen.getByLabelText("密钥有效期"), { target: { value: "0d" } });
     await userEvent.click(screen.getByRole("button", { name: translate("zh-CN", "Save Changes") }));
