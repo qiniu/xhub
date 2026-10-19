@@ -246,7 +246,8 @@ func logTPS(e iam.UsageEvent) *float64 {
 }
 
 // eventRows 将授权后的事件转换为日志列表和详情共用的数据。
-// 参数 events 为用量事件；返回非 nil 切片，附带端点、首字节耗时和 TPS，无持久化副作用。
+// 参数 events 为用量事件；返回非 nil 切片，附带端点、首字节耗时、TPS 和请求推理强度，无持久化副作用。
+// 未记录的强度保持空值，不根据提示词、当前模型配置或返回的推理 Token 数猜测。
 func eventRows(events []iam.UsageEvent) []map[string]any {
 	out := make([]map[string]any, 0, len(events))
 	for _, e := range events {
@@ -281,6 +282,7 @@ func eventRows(events []iam.UsageEvent) []map[string]any {
 			"model":               e.Model,
 			"model_id":            e.Model,
 			"call_type":           e.CallType,
+			"reasoning_effort":    e.ReasoningEffort,
 			"spend":               e.Cost,
 			"total_tokens":        total,
 			"prompt_tokens":       e.PromptTokens,

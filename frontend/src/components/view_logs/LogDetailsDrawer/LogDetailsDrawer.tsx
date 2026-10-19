@@ -15,7 +15,7 @@ import { useKeyboardNavigation } from "./useKeyboardNavigation";
 import { LogDetailContent, GuardrailJumpLink } from "./LogDetailContent";
 import { sessionSpendLogsCall } from "../../networking";
 import { useQuery } from "@tanstack/react-query";
-import { getSpendString } from "@/utils/dataUtils";
+import { formatLogCost } from "../formatLogCost";
 import { normalizeGuardrailEntries, sortSessionLogs, SessionLogSortMode } from "./utils";
 import { DRAWER_WIDTH } from "./constants";
 import { useLogDetails } from "@/app/(dashboard)/hooks/logDetails/useLogDetails";
@@ -65,6 +65,8 @@ function TraceEventIcon({ callType, isAutoRouted }: { callType: string; isAutoRo
   return <Sparkles size={12} className={TRACE_EVENT_ICON_CLASS} />;
 }
 
+/** 展示会话中的单次请求；参数为日志、选中态和选择回调，返回可访问按钮。
+ * 抽屉侧栏调用；金额沿用原始请求精度，不改写日志，点击仅触发调用方回调。 */
 function TraceEventRow({ row, isSelected, onClick }: TraceEventRowProps) {
   const t = useT();
   const isAutoRouted = useIsAutoRoutedModelGroup(row.model_group);
@@ -93,7 +95,7 @@ function TraceEventRow({ row, isSelected, onClick }: TraceEventRowProps) {
         {row.spend ? (
           <>
             <span>·</span>
-            <span>{getSpendString(row.spend)}</span>
+            <span>{formatLogCost(row.spend)}</span>
           </>
         ) : null}
         {row.total_tokens ? (
@@ -107,17 +109,8 @@ function TraceEventRow({ row, isSelected, onClick }: TraceEventRowProps) {
   );
 }
 
-/**
- * 日志详情抽屉：接收当前日志和导航回调，按需读取后台正文并合并错误字段和元数据；
- * 返回单请求或会话详情，兼容 error/failure 状态且保留供应商完整诊断信息。
- * Features:
- * - Request ID prominently displayed with copy functionality
- * - Keyboard navigation (J/K for next/prev, Escape to close)
- * - Formatted and JSON view toggle for request/response
- * - 会话侧栏统计整段响应缓存，详情另行展示提示词缓存及未上报状态
- * - Error alerts for failed requests
- * - Collapsible sections for guardrails, vector store, metadata
- */
+/** 展示请求及会话日志抽屉；参数包括选中日志、授权令牌和关闭/选择回调，返回可导航详情。
+ * 日志页调用；金额使用同一展示格式，查询遵循后台授权，不重新计费或修改历史记录。 */
 export function LogDetailsDrawer({
   open,
   onClose,
@@ -386,7 +379,7 @@ export function LogDetailsDrawer({
                     ) : null;
                   })}
                   <span className="mx-1.5">·</span>
-                  {isSessionMode ? getSpendString(totalSessionCost) : getSpendString(currentLog.spend || 0)}
+                  {isSessionMode ? formatLogCost(totalSessionCost) : formatLogCost(currentLog.spend)}
                   {isSessionMode && (
                     <>
                       <span className="mx-1.5">·</span>

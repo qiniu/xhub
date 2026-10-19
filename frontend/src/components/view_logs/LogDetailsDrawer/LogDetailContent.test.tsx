@@ -102,3 +102,17 @@ it.each(["zh-CN","en"] as const)("%s displays the web search downgrade reason", 
   rerender(<I18nProvider initialLocale={locale}><LogDetailContent logEntry={logEntry()} /></I18nProvider>);
   expect(screen.queryByRole("status")).not.toBeInTheDocument();
 });
+
+/** 前置已采集或历史缺省的推理强度；双语验证原值、协议参数和未知提示，费用保持原始精度，渲染后自动卸载。 */
+it.each(["en", "zh-CN"] as const)("%s 请求详情展示明确推理强度及未知历史", (locale) => {
+  const { rerender } = render(<I18nProvider initialLocale={locale}><LogDetailContent logEntry={logEntry({reasoning_effort:"high",spend:0.00308641})} /></I18nProvider>);
+  const label = locale === "en" ? "Reasoning effort" : "推理强度";
+  expect(screen.getByText(label)).toBeVisible();
+  expect(screen.getByText("high (reasoning_effort=high)")).toBeVisible();
+  expect(screen.getAllByText("$0.00308641").length).toBeGreaterThan(0);
+  rerender(<I18nProvider initialLocale={locale}><LogDetailContent logEntry={logEntry({reasoning_effort:"none"})} /></I18nProvider>);
+  expect(screen.getByText("none (reasoning_effort=none)")).toBeVisible();
+  rerender(<I18nProvider initialLocale={locale}><LogDetailContent logEntry={logEntry()} /></I18nProvider>);
+  expect(screen.getByText(locale === "en" ? "Not recorded" : "未记录")).toBeVisible();
+  expect(screen.queryByText("high (reasoning_effort=high)")).not.toBeInTheDocument();
+});

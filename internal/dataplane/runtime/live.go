@@ -144,7 +144,7 @@ func Flush(h Runtime) {
 // queuedUsageRecord 将一条 Redis 日志转成完整数据库用量快照。
 // 参数 row 为队列记录；返回 iam.UsageRecord；Flush 的批量转换调用，无网络或存储副作用。
 // 解析纳秒时间戳，非法起止时间各自回退到当前时间；SpendValid 为 false 时费用保留零。
-// 会话来源、端点、供应商、流标志、原始上游诊断及价格快照直接继承，不能根据正文保存开关猜测或丢弃。
+// 推理强度、会话来源、端点、供应商、流标志、原始上游诊断及价格快照直接继承，不能根据正文保存开关猜测或丢弃。
 // 只做字段映射，不重新测量 token、重新定价或推断旧记录缺失的归属。
 func queuedUsageRecord(row live.SpendLog) iam.UsageRecord {
 	start, err := time.Parse(time.RFC3339Nano, row.Start)
@@ -174,7 +174,7 @@ func queuedUsageRecord(row live.SpendLog) iam.UsageRecord {
 		Provider: row.Provider, CachedTokens: row.CachedTokens,
 		// 会话来源必须随队列快照落库；仅保留 SessionID 会让异步账单丢失 explicit/parent 归属。
 		SessionID: row.SessionID, SessionSource: row.SessionSource, CacheKey: row.CacheKey, Guardrail: row.Guardrail,
-		PriceSnapshot: row.PriceSnapshot, Label: row.Label,
+		PriceSnapshot: row.PriceSnapshot, Label: row.Label, ReasoningEffort: row.ReasoningEffort,
 	}
 }
 

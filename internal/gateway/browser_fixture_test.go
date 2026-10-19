@@ -268,7 +268,7 @@ func TestBrowserEnterpriseFixture(t *testing.T) {
 			}
 			var err error
 			if r.URL.Path == "/usage/legacy" {
-				_, err = db.Engine.Context(r.Context()).Exec("ALTER TABLE usage_events DROP COLUMN session_source")
+				_, err = db.Engine.Context(r.Context()).Exec("ALTER TABLE usage_events DROP COLUMN session_source, DROP COLUMN reasoning_effort")
 			} else {
 				err = db.Migrate(r.Context())
 			}

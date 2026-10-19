@@ -163,7 +163,7 @@ describe("LogDetailContent", () => {
     );
 
     expect(screen.getByText("Metrics")).toBeInTheDocument();
-    expect(screen.getAllByText("$0.00200000").length).toBeGreaterThanOrEqual(1);
+    expect(screen.getAllByText("$0.002").length).toBeGreaterThanOrEqual(1);
   });
 
   it("shows reasoning tokens in Metrics when the usage breakout carries them", () => {

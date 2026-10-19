@@ -275,6 +275,8 @@ func (c *Client) HotSpend(id string) float64 {
 // SpendLog 是网关发送到 Redis 队列的单次用量载荷，消费者转换为 iam.UsageRecord 写 PostgreSQL。
 // RequestID 用于去重结算，SessionID 用于授权范围内归组，字段记录调用时事实而非刷库时配置。
 type SpendLog struct {
+	// 客户端明确指定的推理强度快照；独立于提示词保存，空值表示未指定或历史未记录，不推断厂商默认值。
+	ReasoningEffort string `json:"reasoning_effort,omitempty"`
 	// 客户端实际请求路径，不含查询串；由执行器记录，独立于提示词存储。
 	InboundEndpoint string `json:"inbound_endpoint"`
 	// 实际发送的上游路径，由传输层观察；未发送时为空。

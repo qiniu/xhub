@@ -49,24 +49,22 @@ function renderRows(rows: LogEntry[], deps = noopDeps) {
 }
 
 describe("Cost column", () => {
-  it("renders '-' for zero spend with no tooltip, so hovering never shows a contradictory $0", async () => {
+  /** 前置真实零费用日志；验证明确显示零且不生成矛盾 tooltip，自动卸载清理 DOM。 */
+  it("renders an explicit zero without a contradictory tooltip", async () => {
     const user = userEvent.setup();
     renderRows([logEntry({ request_id: "req-zero", spend: 0 })]);
-
-    for (const dash of screen.getAllByText("-")) {
-      await user.hover(dash);
-    }
-    expect(screen.queryByText("$0")).not.toBeInTheDocument();
+    await user.hover(screen.getByText("$0.00"));
+    expect(screen.queryByRole("tooltip")).not.toBeInTheDocument();
   });
 
-  it("shows the full-precision raw value in the tooltip for a real spend", async () => {
-    const user = userEvent.setup();
+  /** 前置小额日志；验证无需悬浮即可读到完整金额，旧六位截断值不再展示，自动卸载清理。 */
+  it("shows the full-precision raw value without requiring hover", () => {
     renderRows([logEntry({ request_id: "req-spend", spend: 0.00012345678 })]);
-
-    await user.hover(screen.getByText("$0.000123"));
-    expect(await screen.findByText("$0.00012345678")).toBeInTheDocument();
+    expect(screen.getByText("$0.00012345678")).toBeVisible();
+    expect(screen.queryByText("$0.000123")).not.toBeInTheDocument();
   });
 
+  /** 前置多轮会话合计；验证展示合计而非代表请求金额，自动卸载清理。 */
   it("shows the summed session total, not the representative call's spend, for a multi-round session", () => {
     renderRows([
       logEntry({
@@ -78,8 +76,8 @@ describe("Cost column", () => {
       }),
     ]);
 
-    expect(screen.getByText("$0.060000")).toBeInTheDocument();
-    expect(screen.queryByText("$0.010000")).not.toBeInTheDocument();
+    expect(screen.getByText("$0.06")).toBeInTheDocument();
+    expect(screen.queryByText("$0.01")).not.toBeInTheDocument();
     expect(screen.getByText("session total")).toBeInTheDocument();
   });
 });

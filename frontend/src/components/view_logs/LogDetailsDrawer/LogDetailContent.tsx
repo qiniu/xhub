@@ -11,6 +11,7 @@ import { UiLoadingSpinner } from "@/components/ui/ui-loading-spinner";
 import { LogEntry } from "../columns";
 import { fullErrorDetails, isRequestFailure } from "../logErrors";
 import { formatNumberWithCommas } from "@/utils/dataUtils";
+import { formatLogCost } from "../formatLogCost";
 import { PROMPT_CACHE_CREATION_TOOLTIP, PROMPT_CACHE_READ_TOOLTIP } from "@/utils/promptCacheUsage";
 import GuardrailViewer from "../GuardrailViewer/GuardrailViewer";
 import EvalViewer from "../EvalViewer/EvalViewer";
@@ -64,6 +65,7 @@ export interface LogDetailContentProps {
  * 返回请求、响应、费用和护栏视图。失败请求始终展示完整诊断正文，
  * 真实响应优先于旧版错误摘要；加载详情时不显示缺失捕获提示。
  * 上游响应默认折叠，用户通过标题按钮展开；切换请求时重置折叠状态，复制始终保留完整诊断。
+ * 推理强度只展示明确快照，缺省为未知；金额格式化不修改计费或用户内容。
  */
 export function LogDetailContent({ logEntry, isLoadingDetails = false, accessToken }: LogDetailContentProps) {
   const t = useT();
@@ -190,6 +192,13 @@ export function LogDetailContent({ logEntry, isLoadingDetails = false, accessTok
               <DescriptionItem label={t("Model")}>{logEntry.model}</DescriptionItem>
               <DescriptionItem label={t("Credential Name")}>{logEntry.credential_name || "-"}</DescriptionItem>
               <DescriptionItem label={t("Call Type")}>{logEntry.call_type}</DescriptionItem>
+              <DescriptionItem label={t("logs.reasoningEffort")}>
+                <span title={t("logs.reasoningEffortHint")}>
+                  {logEntry.reasoning_effort
+                    ? `${logEntry.reasoning_effort} (reasoning_effort=${logEntry.reasoning_effort})`
+                    : t("logs.reasoningEffortUnknown")}
+                </span>
+              </DescriptionItem>
               <DescriptionItem label={t("Model ID")}>
                 <TruncatedValue value={logEntry.model_id} />
               </DescriptionItem>
@@ -488,7 +497,8 @@ function BatchResultsSection({ logEntry, metadata }: { logEntry: LogEntry; metad
   );
 }
 
-/** 展示实测指标；参数为日志和元数据，返回指标视图。由详情组件调用，缓存统计缺失保留未知状态。 */
+/** 展示实测指标；参数为日志和元数据，返回指标视图，由详情组件调用。
+ * 金额保留 API 数值精度、不重新计费；缓存统计缺失保留未知状态，无后台写入。 */
 function MetricsSection({ logEntry, metadata }: { logEntry: LogEntry; metadata: Record<string, any> }) {
   const t = useT();
   const ttftMs = logEntry.ttft_ms;
@@ -531,7 +541,7 @@ function MetricsSection({ logEntry, metadata }: { logEntry: LogEntry; metadata: 
             {reasoningTokens !== undefined && reasoningTokens > 0 && (
               <DescriptionItem label={t("Reasoning Tokens")}>{formatNumberWithCommas(reasoningTokens)}</DescriptionItem>
             )}
-            <DescriptionItem label={t("Cost")}>${formatNumberWithCommas(logEntry.spend || 0, 8)}</DescriptionItem>
+            <DescriptionItem label={t("Cost")}>{formatLogCost(logEntry.spend)}</DescriptionItem>
             <DescriptionItem label={t("requestMetrics.inbound")}>{logEntry.inbound_endpoint || "—"}</DescriptionItem>
  <DescriptionItem label={t("requestMetrics.outbound")}>{logEntry.outbound_endpoint || "—"}</DescriptionItem>
  <DescriptionItem label={t("requestMetrics.tps")}>{logEntry.tps != null ? logEntry.tps.toFixed(2) : "—"}</DescriptionItem>

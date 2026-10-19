@@ -326,3 +326,6 @@ CREATE TABLE IF NOT EXISTS model_monitor_migrations (
     name TEXT PRIMARY KEY,
     applied_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
+
+-- 推理强度独立于请求正文保存；旧库补列后保持未知，不从当前模型配置伪造历史设置。
+ALTER TABLE usage_events ADD COLUMN IF NOT EXISTS reasoning_effort TEXT NOT NULL DEFAULT '';

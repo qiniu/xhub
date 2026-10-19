@@ -1,13 +1,14 @@
 "use client";
 
+import { formatLogCost } from "./formatLogCost";
+
 import { requestLogStatus } from "./taskStatus";
 
 import type { ColumnDef } from "@tanstack/react-table";
 import { isRequestFailure } from "./logErrors";
 
 import { DataTableSortHeader } from "@/components/shared/DataTable";
-import { CellTooltip, DateCell, IdCell, MoneyCell, StatusBadge } from "@/components/shared/table_cells";
-import { getSpendString } from "@/utils/dataUtils";
+import { CellTooltip, DateCell, IdCell, StatusBadge } from "@/components/shared/table_cells";
 
 import { getProviderLogoAndName } from "../provider_info_helpers";
 import { getBatchIdFromRequestId, getBatchRequestCounts, isBatchCallType } from "./batchLogUtils";
@@ -42,7 +43,8 @@ function TruncatedText({ value }: { value: string | undefined }) {
 }
 
 /** 返回普通与错误日志共用的列定义；参数为会话点击回调，供 RequestLogsTable 渲染。
- * 密钥 Hash 仅展示日志中的标识，不查询可能已删除或无权查看的密钥；缺失值显示占位符。 */
+ * 密钥 Hash 仅展示日志中的标识，不查询可能已删除或无权查看的密钥；缺失值显示占位符。
+ * 费用读取原始调用或会话合计，并与详情共用金额格式，不重新计费或修改记录。 */
 export const getRequestLogsTableColumns = ({
   onSessionClick,
 }: RequestLogsTableColumnsDeps): ColumnDef<LogEntry>[] => [
@@ -187,7 +189,7 @@ export const getRequestLogsTableColumns = ({
       const spend = isMultiCallSession && log.session_total_spend != null ? log.session_total_spend : log.spend;
       const money = (
         <span>
-          <MoneyCell value={spend} decimals={6} />
+          {formatLogCost(spend)}
         </span>
       );
 
@@ -197,7 +199,7 @@ export const getRequestLogsTableColumns = ({
           {isMultiCallSession && <span className="text-[10px] text-muted-foreground">{t("session total")}</span>}
           {mcpCount > 0 && mcpSpend > 0 && (
             <span className="text-[10px] text-warning">
-              {t("incl. {value0} from {mcpCount} MCP", { value0: (getSpendString(mcpSpend)), mcpCount })}</span>
+              {t("incl. {value0} from {mcpCount} MCP", { value0: (formatLogCost(mcpSpend)), mcpCount })}</span>
           )}
         </div>
       );
