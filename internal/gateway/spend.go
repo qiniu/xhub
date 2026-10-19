@@ -184,7 +184,7 @@ func (s *Server) recordSpend(w http.ResponseWriter, p *auth.Principal, callID, a
 		keyID = p.KeyID
 	}
 	row := live.SpendLog{
-		Label: ex.label, InboundEndpoint: ex.inbound, OutboundEndpoint: outbound,
+		Label: ex.label, InboundEndpoint: ex.inbound, OutboundEndpoint: outbound, ReasoningEffort: ex.reasoningEffort,
 		RequestID: callID, CallType: callType, Model: alias, APIKey: hash,
 		KeyID:  keyID,
 		Prompt: pt, Completion: ct, Spend: spend, SpendValid: true,
@@ -360,7 +360,7 @@ func usageFromSpend(row live.SpendLog, spend float64, messages, response, proxy 
 		KeyHash: row.KeyHash, KeyAlias: row.KeyAlias, TeamAlias: row.TeamAlias,
 		Provider: row.Provider, CachedTokens: row.CachedTokens,
 		SessionID: row.SessionID, SessionSource: row.SessionSource, CacheKey: row.CacheKey, Guardrail: row.Guardrail,
-		PriceSnapshot: row.PriceSnapshot, Label: row.Label,
+		PriceSnapshot: row.PriceSnapshot, Label: row.Label, ReasoningEffort: row.ReasoningEffort,
 	}
 }
 
@@ -378,6 +378,8 @@ func deref(s *string) string {
 
 // promptExchange is the request and response saved on one spend log. Empty strings mean prompt storage was off.
 type promptExchange struct {
+	// 只保存请求明确指定的推理强度，不受提示词保存开关控制。
+	reasoningEffort string
 	// 入站路径独立于正文保存开关。
 	label    string
 	inbound  string
@@ -413,11 +415,11 @@ func (s *Server) promptsEnabled() bool {
 	}
 }
 
-// rememberExchange 暂存本次调用的路径、备注和正文，供 recordSpend 关联日志。
-// 参数 callID（string）：这一次调用的 id，用来把请求、响应和用量记在同一行；r（*http.Request）：入站 HTTP 请求，用来读路径、头和正文；reqBody（[]byte）：remember交换要读的原始字节；respBody（[]byte）：remember交换要读的原始字节。
+// rememberExchange 暂存本次调用的路径、备注、明确推理强度和正文，供 recordSpend 关联日志。
+// 参数 callID 为日志关联标识，r 为入站请求，reqBody 和 respBody 分别为原始请求和响应字节。
 // 返回：无。请求与成功响应受提示词开关控制；失败候选响应始终暂存到 RecordSpend 判定状态。
 // 调用：gateway/wire.go
-// 边界：非法编码或过长备注忽略；路径和备注不受正文保存开关影响。
+// 边界：非法编码或过长备注忽略；路径、备注和有长度限制的推理强度不受正文保存开关影响，不修改请求内容。
 func (s *Server) rememberExchange(callID string, r *http.Request, reqBody, respBody []byte) {
 	if s == nil || callID == "" {
 		return
@@ -432,6 +434,8 @@ func (s *Server) rememberExchange(callID string, r *http.Request, reqBody, respB
 			}
 		}
 	}
+	// 只提取协议元数据；即使不保留正文，也能排查本次请求的强度设置。
+	ex.reasoningEffort = requestlog.ReasoningEffort(ex.inbound, reqBody)
 	if s.promptsEnabled() {
 		ex.messages, ex.response, ex.proxy = requestlog.Encode(r, reqBody, respBody)
 	}

@@ -1,4 +1,5 @@
 import React, { useState } from "react";
+import { formatLogCost as formatCost } from "./formatLogCost";
 import { ChevronDown, ChevronRight } from "lucide-react";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { measureLabel, rateLabel, rateText } from "@/lib/rateDisplay";
@@ -61,26 +62,13 @@ interface CostBreakdownViewerProps {
   cacheCreationTokens?: number;
 }
 
-const formatCost = (cost: number | undefined): string => {
-  if (cost === undefined || cost === null) return "-";
-  return `$${cost.toFixed(2)}`;
-};
+/** 格式化费用公式中的完整 Token 数；参数 tokens 为数量，返回英文数字分组，不翻译协议单位，无副作用。 */
+const formatTokens = (tokens: number): string => tokens.toLocaleString("en-US");
 
-const formatTokens = (tokens: number): string => {
-  if (Math.abs(tokens) >= 1000) {
-    const wan = tokens / 10000;
-    const digits = Math.abs(wan) >= 100 ? 0 : Math.abs(wan) >= 10 ? 1 : 2;
-    return `${wan.toFixed(digits)}万`;
-  }
-  return tokens.toLocaleString("en-US");
-};
-
-const formatMillionRate = (rate: number): string => `$${(rate * 1_000_000).toFixed(2)}/1M`;
-
-/** 用途：格式化日志中的令牌数量与调用时单价；参数为数量、双语单位键和单令牌价格；缺失数量或价格返回 null；仅用于费用明细展示，无副作用。 */
-const rateLine = (tokens: number | undefined, unitKey: string, rate: number | undefined): string | null => {
+/** 用途：格式化日志中的令牌数量与调用时单价；参数为数量、带 count 插值的双语数量键和单令牌价格；缺失数量或价格返回 null；仅用于费用明细展示，无副作用。 */
+const rateLine = (tokens: number | undefined, countKey: string, rate: number | undefined): string | null => {
   if (tokens === undefined || rate === undefined || rate === null) return null;
-  return `${formatTokens(tokens)} ${t(unitKey)} × ${formatMillionRate(rate)}`;
+  return `${t(countKey, { count: formatTokens(tokens) })} × ${rateText(rate, "token")}`;
 };
 
 const formatPercent = (percent: number | undefined): string => {
@@ -88,6 +76,8 @@ const formatPercent = (percent: number | undefined): string => {
   return `${(percent * 100).toFixed(2)}%`;
 };
 
+/** 展示本次调用的原始费用快照；参数为费用、Token 和缓存事实，返回可展开明细。
+ * 日志详情调用；未定价保留未知状态，缓存命中显示真实零费用，不重新计费或更新后台数据。 */
 export const CostBreakdownViewer: React.FC<CostBreakdownViewerProps> = ({
   costBreakdown,
   totalSpend,
@@ -149,10 +139,10 @@ export const CostBreakdownViewer: React.FC<CostBreakdownViewerProps> = ({
     inputCost !== undefined || outputCost !== undefined ? (inputCost ?? 0) + (outputCost ?? 0) : undefined;
   const originalCost = isCached ? 0 : (costBreakdown?.original_cost ?? pricedOriginal);
   const totalCost = isUnpriced ? undefined : isCached ? 0 : (costBreakdown?.total_cost ?? totalSpend);
-  const inputRateLine = isCached ? null : rateLine(promptTokens, "prompt tokens", costBreakdown?.input_cost_per_token);
+  const inputRateLine = isCached ? null : rateLine(promptTokens, "logs.promptTokenCount", costBreakdown?.input_cost_per_token);
   const outputRateLine = isCached
     ? null
-    : rateLine(completionTokens, "completion tokens", costBreakdown?.output_cost_per_token);
+    : rateLine(completionTokens, "logs.completionTokenCount", costBreakdown?.output_cost_per_token);
 
   return (
     <div className="bg-card rounded-lg shadow-sm w-full max-w-full overflow-hidden mb-6">
@@ -219,7 +209,7 @@ export const CostBreakdownViewer: React.FC<CostBreakdownViewerProps> = ({
                           {formatCost(rawCost)}
                           {rawInputTokens !== undefined && rawInputTokens !== null && (
                             <span className="text-muted-foreground font-normal ml-1">
-                              ({rawInputTokens.toLocaleString()} tokens)
+                              ({rawInputTokens.toLocaleString()} {t("tokens")})
                             </span>
                           )}
                         </span>
@@ -231,7 +221,7 @@ export const CostBreakdownViewer: React.FC<CostBreakdownViewerProps> = ({
                             {formatCost(isCached ? 0 : costBreakdown?.cache_read_cost)}
                             {(cacheReadTokens ?? 0) > 0 && (
                               <span className="text-muted-foreground font-normal ml-1">
-                                ({(cacheReadTokens ?? 0).toLocaleString()} tokens)
+                                ({(cacheReadTokens ?? 0).toLocaleString()} {t("tokens")})
                               </span>
                             )}
                           </span>
@@ -244,7 +234,7 @@ export const CostBreakdownViewer: React.FC<CostBreakdownViewerProps> = ({
                             {formatCost(isCached ? 0 : costBreakdown?.cache_creation_cost)}
                             {(cacheCreationTokens ?? 0) > 0 && (
                               <span className="text-muted-foreground font-normal ml-1">
-                                ({(cacheCreationTokens ?? 0).toLocaleString()} tokens)
+                                ({(cacheCreationTokens ?? 0).toLocaleString()} {t("tokens")})
                               </span>
                             )}
                           </span>

@@ -13,3 +13,9 @@ TTFT records the first upstream response byte/data segment, which can contain me
 Startup upgrades rebuild output TPS once from retained usage events in a transaction shared with billing writes. New output-TPS columns keep the corrected metric separate from legacy writers. Only performance sums/sample counts are rebuilt; historical billing, request counts, tokens and other measurements are retained. Buckets whose original events have been purged keep their totals but show no TPS sample. A completion marker makes repeated startup idempotent; a failed rebuild rolls back and fails startup.
 
 The bilingual Recharts interface displays at most eight chart series while retaining all combinations in the detail table. Deploy matching console, gateway and database structures. Missing interface structures produce a retryable error.
+
+## Request log amounts and reasoning effort
+
+Log tables, session views, metrics and cost breakdowns share a USD formatter that preserves the numeric precision supplied by the API. Small nonzero costs do not round to `$0.00`; real zero remains `$0.00`, and missing values remain unknown. This only changes presentation, not pricing or billing.
+
+The log `reasoning_effort` field records an explicitly requested Chat `reasoning_effort`, Responses `reasoning.effort`, or Messages `output_config.effort`. It is persisted independently of prompt storage. Missing settings and pre-upgrade records remain unknown; model defaults, thinking budgets and actual provider behavior are not inferred. Startup adds the column idempotently without replaying bills.

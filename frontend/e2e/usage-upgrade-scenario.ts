@@ -23,7 +23,7 @@ export function registerUsageUpgradeScenario(locale: "en" | "zh-CN") {
     const call = async (source: string) => {
       const response = await page.request.post(GATEWAY + "/v1/chat/completions", {
         headers: { Authorization: "Bearer " + key, "X-Session-Id": source },
-        data: { model, messages: [{ role: "user", content: "Verify usage migration recovery." }] },
+        data: { model, reasoning_effort: "high", messages: [{ role: "user", content: "Verify usage migration recovery." }] },
       });
       expect(response.status(), await response.text()).toBe(200);
       expect((await response.json()).choices[0].message.content).toBe("e2e-ok");
@@ -43,6 +43,7 @@ export function registerUsageUpgradeScenario(locale: "en" | "zh-CN") {
       expect(minted.status(), await minted.text()).toBe(200); key = (await minted.json()).key;
       const historical = await call(model + "-historical");
       expect(historical.session_source).toBe("explicit");
+      expect(historical.reasoning_effort).toBe("high");
       expect((await page.request.get(control + "/usage/legacy")).status()).toBe(405);
       expect((await page.request.post(control + "/usage/legacy")).status()).toBe(200); legacy = true;
       expect((await page.request.get(GATEWAY + "/spend/logs/ui/" + calls[0], { headers })).status()).toBe(500);
@@ -50,9 +51,10 @@ export function registerUsageUpgradeScenario(locale: "en" | "zh-CN") {
       const preserved = await page.request.get(GATEWAY + "/spend/logs/ui/" + calls[0], { headers });
       expect(preserved.status()).toBe(200);
       expect(historical.spend).toBeCloseTo(0.12, 8);
-      expect(await preserved.json()).toMatchObject({ request_id: calls[0], session_source: "", spend: historical.spend });
+      expect(await preserved.json()).toMatchObject({ request_id: calls[0], session_source: "", reasoning_effort: "", spend: historical.spend });
       const current = await call(model + "-current");
       expect(current.session_source).toBe("explicit");
+      expect(current.reasoning_effort).toBe("high");
       for (let index = 0; index < 2; index++) expect((await page.request.post(control + "/usage/migrate")).status()).toBe(200);
       const monitor = await page.request.get(GATEWAY + "/models/monitor?model=" + model, { headers });
       expect(monitor.status()).toBe(200);

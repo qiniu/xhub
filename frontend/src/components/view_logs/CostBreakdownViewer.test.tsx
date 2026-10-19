@@ -20,6 +20,7 @@ it("preserves the LLM acronym in the Chinese cost breakdown", async () => {
   expect(screen.queryByText(/法学硕士/)).not.toBeInTheDocument();
 });
 
+/** 展开当前费用面板；无参数及返回值，供组件交互断言调用，测试自动卸载清理。 */
 async function expandCostBreakdown() {
   const user = userEvent.setup();
   await user.click(screen.getByText("Cost Breakdown"));
@@ -113,9 +114,9 @@ describe("CostBreakdownViewer", () => {
     );
 
     await expandCostBreakdown();
-    expect(screen.getByText(/0.69万 prompt tokens × \$4.00\/1M/)).toBeInTheDocument();
-    expect(screen.getByText(/9 completion tokens × \$20.00\/1M/)).toBeInTheDocument();
-    expect(screen.getAllByText("$0.03").length).toBeGreaterThan(0);
+    expect(screen.getByText(/6,889 prompt tokens × \$4 \/1M/)).toBeInTheDocument();
+    expect(screen.getByText(/9 completion tokens × \$20 \/1M/)).toBeInTheDocument();
+    expect(screen.getAllByText("$0.027736").length).toBeGreaterThan(0);
     expect(screen.getByText("Original LLM Cost:")).toBeInTheDocument();
     expect(screen.getByText("Final Calculated Cost:")).toBeInTheDocument();
   });
@@ -453,4 +454,26 @@ describe("CostBreakdownViewer", () => {
     expect(document.body.textContent).not.toMatch(/\$-\d/);
     expect(document.body.textContent).toContain("$0.00");
   });
+});
+
+/** 前置真实费用快照；双语验证总计、缓存/输出分项和实际费率费用完整显示，小额不变零；测试自动卸载清理。 */
+it.each(["en", "zh-CN"] as const)("%s 完整显示小额费用并区分未知与零", async (locale) => {
+  const { rerender } = renderWithProviders(<I18nProvider initialLocale={locale}><CostBreakdownViewer
+    costBreakdown={{ input_cost: 0.0025, cache_read_cost: 0.00000001, output_cost: 0.00058641,
+      original_cost: 0.00308641, total_cost: 0.00308641, output_cost_per_token: 0.00000058641,
+      applied: [{measure:"token",side:"cache_read",quantity:1,usd:0.00000001,cost:0.00000001},
+        {measure:"token",side:"output",quantity:1000,usd:0.00000058641,cost:0.00058641}] }}
+    totalSpend={0.00308641} promptTokens={10000} completionTokens={1000} cacheReadTokens={1}
+  /></I18nProvider>);
+  const label = locale === "en" ? "Cost Breakdown" : "费用明细";
+  expect(screen.getByText("$0.00308641")).toBeVisible();
+  await userEvent.click(screen.getByText(label));
+  expect(screen.getAllByText(/\$0.58641 \/1M/).length).toBeGreaterThanOrEqual(2);
+  expect(screen.getByText(locale === "en" ? "(1,000 completion tokens × $0.58641 /1M)" : "(1,000 个输出 Token × $0.58641 /1M)")).toBeVisible();
+  if (locale === "zh-CN") expect(screen.queryByText(/completion tokens/)).not.toBeInTheDocument();
+  expect(screen.getAllByText("$0.00000001").length).toBeGreaterThanOrEqual(2);
+  expect(screen.getAllByText("$0.00058641").length).toBeGreaterThanOrEqual(2);
+  expect(screen.queryByText("$0.00")).not.toBeInTheDocument();
+  rerender(<I18nProvider initialLocale={locale}><CostBreakdownViewer costBreakdown={{input_cost:0,output_cost:0,total_cost:0}} totalSpend={0} /></I18nProvider>);
+  expect(screen.getAllByText("$0.00").length).toBeGreaterThan(0);
 });

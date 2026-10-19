@@ -274,3 +274,13 @@ test('verification includes organization budgets and usage failure recovery', ()
     assert.ok(step.run.split(/\s+/).includes(`scenarios/regression/${scenario}-${locale}.test.ts`),`缺少 ${scenario}/${locale}`);
   }
 });
+
+/** 前置真实发布 YAML；验证双语日志精度/推理强度闭环进入发布检查，避免只测组件；只读配置无需清理。 */
+test('verification includes bilingual log cost and reasoning effort browser scenarios', () => {
+  const browser = workflow.jobs.verify.steps.find(item => (item.run || '').startsWith('bash scripts/e2e.sh '));
+  assert.ok(browser, '发布缺少浏览器验证步骤');
+  for (const locale of ['en', 'zh-CN']) {
+    assert.ok(browser.run.split(/\s+/).includes(`scenarios/regression/log-cost-reasoning-${locale}.test.ts`),
+      `发布缺少 ${locale} 日志金额与推理强度闭环`);
+  }
+});

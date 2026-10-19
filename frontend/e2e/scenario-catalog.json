@@ -2601,5 +2601,19 @@
     "title": "usage errors fallback partial pages and retry zh-CN",
     "kind": "implemented",
     "environment": "default offline"
+  },
+  {
+    "id": "SC-362",
+    "file": "e2e/scenarios/regression/log-cost-reasoning-en.test.ts",
+    "title": "log costs and reasoning effort en",
+    "kind": "implemented",
+    "environment": "default offline"
+  },
+  {
+    "id": "SC-363",
+    "file": "e2e/scenarios/regression/log-cost-reasoning-zh-CN.test.ts",
+    "title": "log costs and reasoning effort zh-CN",
+    "kind": "implemented",
+    "environment": "default offline"
   }
 ]

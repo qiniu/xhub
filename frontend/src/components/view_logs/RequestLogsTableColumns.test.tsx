@@ -49,24 +49,35 @@ function renderRows(rows: LogEntry[], deps = noopDeps) {
 }
 
 describe("Cost column", () => {
-  it("renders '-' for zero spend with no tooltip, so hovering never shows a contradictory $0", async () => {
+  /** 前置未定价零值与真实免费/响应缓存日志；验证费用列不把未知当免费，含会话零合计和正合计边界，自动卸载清理。 */
+  it.each([
+    ["unpriced", false, undefined, "-"], ["priced", false, undefined, "$0.00"],
+    ["unpriced", "true", undefined, "$0.00"], ["unpriced", true, undefined, "$0.00"],
+    ["unpriced", false, 0, "-"], ["unpriced", false, 0.06, "$0.06"],
+  ] as const)("renders %s pricing, cache %s and session total %s as %s", (status, cacheHit, total, expected) => {
+    renderRows([logEntry({ spend: 0, cache_hit: cacheHit, metadata: { cost_breakdown: { pricing_status: status } },
+      session_total_count: total === undefined ? 1 : 2, session_total_spend: total })]);
+    const costIndex = screen.getAllByRole("columnheader").findIndex((header) => header.textContent === t("Cost"));
+    const costCell = within(screen.getAllByRole("row")[1]).getAllByRole("cell")[costIndex];
+    expect(costCell).toHaveTextContent(expected);
+    if (expected === "-") expect(costCell).not.toHaveTextContent("$0.00");
+  });
+  /** 前置真实零费用日志；验证明确显示零且不生成矛盾 tooltip，自动卸载清理 DOM。 */
+  it("renders an explicit zero without a contradictory tooltip", async () => {
     const user = userEvent.setup();
     renderRows([logEntry({ request_id: "req-zero", spend: 0 })]);
-
-    for (const dash of screen.getAllByText("-")) {
-      await user.hover(dash);
-    }
-    expect(screen.queryByText("$0")).not.toBeInTheDocument();
+    await user.hover(screen.getByText("$0.00"));
+    expect(screen.queryByRole("tooltip")).not.toBeInTheDocument();
   });
 
-  it("shows the full-precision raw value in the tooltip for a real spend", async () => {
-    const user = userEvent.setup();
+  /** 前置小额日志；验证无需悬浮即可读到完整金额，旧六位截断值不再展示，自动卸载清理。 */
+  it("shows the full-precision raw value without requiring hover", () => {
     renderRows([logEntry({ request_id: "req-spend", spend: 0.00012345678 })]);
-
-    await user.hover(screen.getByText("$0.000123"));
-    expect(await screen.findByText("$0.00012345678")).toBeInTheDocument();
+    expect(screen.getByText("$0.00012345678")).toBeVisible();
+    expect(screen.queryByText("$0.000123")).not.toBeInTheDocument();
   });
 
+  /** 前置多轮会话合计；验证展示合计而非代表请求金额，自动卸载清理。 */
   it("shows the summed session total, not the representative call's spend, for a multi-round session", () => {
     renderRows([
       logEntry({
@@ -78,8 +89,8 @@ describe("Cost column", () => {
       }),
     ]);
 
-    expect(screen.getByText("$0.060000")).toBeInTheDocument();
-    expect(screen.queryByText("$0.010000")).not.toBeInTheDocument();
+    expect(screen.getByText("$0.06")).toBeInTheDocument();
+    expect(screen.queryByText("$0.01")).not.toBeInTheDocument();
     expect(screen.getByText("session total")).toBeInTheDocument();
   });
 });

@@ -332,3 +332,6 @@ ALTER TABLE organizations ADD COLUMN IF NOT EXISTS budget_duration TEXT NOT NULL
 ALTER TABLE organizations ADD COLUMN IF NOT EXISTS budget_reset_at TIMESTAMPTZ;
 ALTER TABLE organizations ADD COLUMN IF NOT EXISTS budget_period_start TIMESTAMPTZ;
 CREATE INDEX IF NOT EXISTS organizations_budget_reset_due ON organizations(budget_reset_at) WHERE budget_duration <> '';
+
+-- 推理强度独立于请求正文保存；旧库补列后保持未知，不从当前模型配置伪造历史设置。
+ALTER TABLE usage_events ADD COLUMN IF NOT EXISTS reasoning_effort TEXT NOT NULL DEFAULT '';

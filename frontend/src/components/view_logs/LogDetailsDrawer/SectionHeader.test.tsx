@@ -1,15 +1,17 @@
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
+import { I18nProvider } from "@/i18n";
 import { SectionHeader } from "./SectionHeader";
 
 describe("SectionHeader", () => {
+  /** 前置输入摘要；验证完整数量、费用和轮次，组件自动卸载，无后台数据。 */
   it("renders the input label with token, cost and turn metrics", () => {
     render(<SectionHeader type="input" tokens={1234} cost={0.000123} turnCount={3} onCopy={vi.fn()} />);
 
     expect(screen.getByText("Input")).toBeInTheDocument();
-    expect(screen.getByText("Tokens: 0.12万")).toBeInTheDocument();
-    expect(screen.getByText("Cost: $0.00")).toBeInTheDocument();
+    expect(screen.getByText("Tokens: 1,234")).toBeInTheDocument();
+    expect(screen.getByText("Cost: $0.000123")).toBeInTheDocument();
     expect(screen.getByText("Turns: 3")).toBeInTheDocument();
   });
 
@@ -79,4 +81,14 @@ describe("SectionHeader", () => {
 
     expect(onCopy).not.toHaveBeenCalled();
   });
+});
+
+/** 前置输入摘要的小额费用与完整 Token；双语验证所有动态标签和未知费用，自动卸载清理，无后台写入。 */
+it.each(["en","zh-CN"] as const)("%s 输入输出摘要不截断小额费用",(locale)=>{
+  const {rerender}=render(<I18nProvider initialLocale={locale}><SectionHeader type="input" tokens={10000} cost={0.00308641} turnCount={2} onCopy={vi.fn()} /></I18nProvider>);
+  expect(screen.getByText(locale==="en"?"Tokens: 10,000":"Token 数：10,000")).toBeVisible();
+  expect(screen.getByText(locale==="en"?"Cost: $0.00308641":"费用：$0.00308641")).toBeVisible();
+  expect(screen.getByText(locale==="en"?"Turns: 2":"轮次：2")).toBeVisible();
+  rerender(<I18nProvider initialLocale={locale}><SectionHeader type="output" onCopy={vi.fn()} /></I18nProvider>);
+  expect(screen.queryByText(/\$0\.00308641/)).not.toBeInTheDocument();
 });

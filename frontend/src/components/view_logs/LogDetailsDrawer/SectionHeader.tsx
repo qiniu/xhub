@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { cn } from "@/lib/cva.config";
 import { useT } from "@/i18n";
+import { formatLogCost } from "../formatLogCost";
 
 interface SectionHeaderProps {
   type: "input" | "output";
@@ -20,15 +21,13 @@ interface SectionHeaderProps {
 
 const SUMMARY_CLASSES = "flex flex-1 items-center gap-4";
 
+/** 格式化输入/输出摘要的完整 Token 数；参数 tokens 为数量，返回分组数字，组件展示调用，无状态副作用。 */
 function formatHeaderTokens(tokens: number): string {
-  if (Math.abs(tokens) >= 1000) {
-    const wan = tokens / 10000;
-    const digits = Math.abs(wan) >= 10 ? 1 : 2;
-    return `${wan.toFixed(digits)}万`;
-  }
   return tokens.toLocaleString("en-US");
 }
 
+/** 展示日志输入/输出摘要及复制/折叠操作；参数为类型、Token、费用和回调，返回可访问标题组件。
+ * 日志详情调用；金额仅格式化既有事实，不修改计费，折叠与复制仅通过传入回调通知调用方。 */
 export function SectionHeader({
   type,
   tokens,
@@ -58,15 +57,15 @@ export function SectionHeader({
       </div>
 
       {tokens !== undefined && tokens > 0 && (
-        <span className="text-xs text-muted-foreground">Tokens: {formatHeaderTokens(tokens)}</span>
+        <span className="text-xs text-muted-foreground">{t("logs.tokenCount", { count: formatHeaderTokens(tokens) })}</span>
       )}
 
       {cost !== undefined && cost > 0 && (
-        <span className="text-xs text-muted-foreground">Cost: ${cost.toFixed(2)}</span>
+        <span className="text-xs text-muted-foreground">{t("logs.costValue", { cost: formatLogCost(cost) })}</span>
       )}
 
       {turnCount !== undefined && turnCount > 0 && (
-        <span className="text-xs text-muted-foreground">Turns: {turnCount}</span>
+        <span className="text-xs text-muted-foreground">{t("logs.turnCount", { count: turnCount })}</span>
       )}
     </>
   );

@@ -117,6 +117,14 @@ it("merges complete lazy-loaded error diagnostics", async () => {
 });
 
 describe("LogDetailsDrawer session sidebar sorting", () => {
+  /** 前置含未定价零账单的会话，验证合计不冒充免费；响应缓存零值仍为真实零，自动卸载且查询客户端仅存内存。 */
+  it.each([false, true])("preserves session pricing state with cache hit %s", async (cached) => {
+    renderSessionDrawer([makeLog({ model: "unknown-price", spend: 0, cache_hit: cached,
+      metadata: { cost_breakdown: { pricing_status: "unpriced" } } })]);
+    await screen.findByText("unknown-price");
+    if (cached) expect(screen.getByText(/\$0\.00/)).toBeVisible();
+    else expect(screen.queryByText(/\$0\.00/)).not.toBeInTheDocument();
+  });
   /** 前置四条会话日志含提示词缓存，验证侧栏明确统计响应缓存且不混算；渲染由测试框架自动清理。 */
   it("labels response cache separately from provider prompt cache", async () => {
     renderSessionDrawer(sessionLogs.map(log => ({ ...log, metadata: { cached_tokens: 4 } })));

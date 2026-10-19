@@ -4,6 +4,7 @@ import { describe, expect, it } from "vitest";
 import type { LogEntry } from "../columns";
 import { LogDetailContent } from "./LogDetailContent";
 import { I18nProvider } from "@/i18n";
+import { translate } from "@/i18n/translate";
 
 /**
  * 为上游响应折叠组件测试构造最小日志；参数为覆盖字段，返回独立 LogEntry。
@@ -20,6 +21,16 @@ function logEntry(overrides: Partial<LogEntry> = {}): LogEntry {
 }
 
 describe("上游响应折叠", () => {
+  /** 前置后台未定价或真实免费零值，验证中英文指标与费用明细语义一致；纯组件渲染，自动卸载清理。 */
+  it.each(["zh-CN", "en"] as const)("%s 指标区分未知费用和真实免费", (locale) => {
+    const sample = logEntry({ spend: 0, cache_hit: false, metadata: { cost_breakdown: { pricing_status: "unpriced", total_cost: 0 } } });
+    const { rerender } = render(<I18nProvider initialLocale={locale}><LogDetailContent logEntry={sample} /></I18nProvider>);
+    const costLabel = locale === "en" ? "Cost" : "费用";
+    expect(screen.getByText(costLabel, { exact: true }).parentElement).toHaveTextContent("-");
+    expect(screen.getByText(translate(locale, "Pricing unavailable"))).toBeVisible();
+    rerender(<I18nProvider initialLocale={locale}><LogDetailContent logEntry={{ ...sample, cache_hit: true }} /></I18nProvider>);
+    expect(screen.getByText(costLabel, { exact: true }).parentElement).toHaveTextContent("$0.00");
+  });
   /** 前置日志凭证与协议不同；验证中英文标签及原始凭证名称，空凭证不误用协议；自动卸载清理。 */
   it.each(["zh-CN", "en"] as const)("%s 请求详情显示凭证名称", (locale) => {
     const { rerender } = render(<I18nProvider initialLocale={locale}><LogDetailContent logEntry={logEntry({
@@ -101,4 +112,18 @@ it.each(["zh-CN","en"] as const)("%s displays the web search downgrade reason", 
   expect(screen.getByRole("status")).toHaveTextContent(locale==="en"?"This request did not use web search":"本次请求未使用联网搜索");
   rerender(<I18nProvider initialLocale={locale}><LogDetailContent logEntry={logEntry()} /></I18nProvider>);
   expect(screen.queryByRole("status")).not.toBeInTheDocument();
+});
+
+/** 前置已采集或历史缺省的推理强度；双语验证原值、协议参数和未知提示，费用保持原始精度，渲染后自动卸载。 */
+it.each(["en", "zh-CN"] as const)("%s 请求详情展示明确推理强度及未知历史", (locale) => {
+  const { rerender } = render(<I18nProvider initialLocale={locale}><LogDetailContent logEntry={logEntry({reasoning_effort:"high",spend:0.00308641})} /></I18nProvider>);
+  const label = locale === "en" ? "Reasoning effort" : "推理强度";
+  expect(screen.getByText(label)).toBeVisible();
+  expect(screen.getByText("high (reasoning_effort=high)")).toBeVisible();
+  expect(screen.getAllByText("$0.00308641").length).toBeGreaterThan(0);
+  rerender(<I18nProvider initialLocale={locale}><LogDetailContent logEntry={logEntry({reasoning_effort:"none"})} /></I18nProvider>);
+  expect(screen.getByText("none (reasoning_effort=none)")).toBeVisible();
+  rerender(<I18nProvider initialLocale={locale}><LogDetailContent logEntry={logEntry()} /></I18nProvider>);
+  expect(screen.getByText(locale === "en" ? "Not recorded" : "未记录")).toBeVisible();
+  expect(screen.queryByText("high (reasoning_effort=high)")).not.toBeInTheDocument();
 });

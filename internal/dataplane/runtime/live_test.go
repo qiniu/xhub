@@ -9,16 +9,16 @@ import (
 	"github.com/sunqirui1987/xhub/internal/live"
 )
 
-// TestQueuedUsageRecordSessionAttribution 验证异步账单保留请求别名、实际供应商和会话识别来源。
+// TestQueuedUsageRecordSessionAttribution 验证异步账单保留请求别名、实际供应商、推理强度和会话识别来源。
 // 参数 t 为测试上下文；前置纯内存成功、失败、缓存命中及旧载荷，验证完整快照与缺失字段不被推断。
 // 返回无；不连接外部服务、不创建持久数据，无需清理。
 func TestQueuedUsageRecordSessionAttribution(t *testing.T) {
 	for _, source := range []string{"explicit", "parent", "cache_key", "prompt", "generated", ""} {
 		for _, status := range []string{"success", "error"} {
 			t.Run(source+"/"+status, func(t *testing.T) {
-				row := live.SpendLog{Label: "Affinity | 并发赢家", Model: "requested-group", APIBase: "https://supplier-b.example/v1", Supplier: "supplier-b", UpstreamModel: "actual-model", SessionID: "session", SessionSource: source, Status: status, CacheHit: true, Start: "2026-10-12T00:00:00Z", End: "2026-10-12T00:00:01Z"}
+				row := live.SpendLog{ReasoningEffort: "high", Label: "Affinity | 并发赢家", Model: "requested-group", APIBase: "https://supplier-b.example/v1", Supplier: "supplier-b", UpstreamModel: "actual-model", SessionID: "session", SessionSource: source, Status: status, CacheHit: true, Start: "2026-10-12T00:00:00Z", End: "2026-10-12T00:00:01Z"}
 				got := queuedUsageRecord(row)
-				if got.Label != row.Label || got.Model != row.Model || got.APIBase != row.APIBase || got.Supplier != row.Supplier || got.UpstreamModel != row.UpstreamModel || got.SessionID != row.SessionID || got.SessionSource != source || got.Status != status || !got.CacheHit {
+				if got.ReasoningEffort != row.ReasoningEffort || got.Label != row.Label || got.Model != row.Model || got.APIBase != row.APIBase || got.Supplier != row.Supplier || got.UpstreamModel != row.UpstreamModel || got.SessionID != row.SessionID || got.SessionSource != source || got.Status != status || !got.CacheHit {
 					t.Fatalf("异步落库改变请求或执行归属：%+v", got)
 				}
 			})
@@ -26,7 +26,7 @@ func TestQueuedUsageRecordSessionAttribution(t *testing.T) {
 	}
 	before := time.Now()
 	got := queuedUsageRecord(live.SpendLog{Start: "invalid", End: "invalid", Spend: 99})
-	if got.SessionSource != "" || got.SessionID != "" || got.APIBase != "" || got.Supplier != "" || got.UpstreamModel != "" || got.TS.Before(before) || got.EndedAt.Before(before) || got.Cost != 0 {
+	if got.ReasoningEffort != "" || got.SessionSource != "" || got.SessionID != "" || got.APIBase != "" || got.Supplier != "" || got.UpstreamModel != "" || got.TS.Before(before) || got.EndedAt.Before(before) || got.Cost != 0 {
 		t.Fatalf("旧载荷或非法时间不得伪造会话与计费事实：%+v", got)
 	}
 }

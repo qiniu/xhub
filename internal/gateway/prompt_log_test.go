@@ -125,3 +125,36 @@ func TestRequestLabelIndependentOfPrompts(t *testing.T) {
 		}
 	}
 }
+
+// TestReasoningEffortIndependentOfPrompts 验证关闭提示词仍保留请求推理强度、失败候选与同步/队列转换。
+// 前置内存 Server；覆盖开启/关闭、缺省和非法值，JSON 往返模拟 Redis 载体；takeExchange 清理全部临时状态。
+func TestReasoningEffortIndependentOfPrompts(t *testing.T) {
+	for _, enabled := range []bool{false, true} {
+		for _, effort := range []string{"high", "none", ""} {
+			s := &Server{Cfg: &config.Config{}}
+			s.Cfg.GeneralSettings.StorePromptsInSpendLogs = enabled
+			req := httptest.NewRequest("POST", "/v1/chat/completions", nil)
+			raw, _ := json.Marshal(map[string]any{"reasoning_effort": effort, "messages": []any{map[string]any{"role": "user", "content": "Private input remains unchanged."}}})
+			s.rememberExchange("reasoning", req, raw, []byte("upstream error"))
+			ex := s.takeExchange("reasoning")
+			if ex.reasoningEffort != effort || ex.rawResponse != "upstream error" {
+				t.Fatalf("元数据或失败候选丢失: %+v", ex)
+			}
+			if !enabled && (ex.messages != "" || ex.response != "" || ex.proxy != "") {
+				t.Fatal("关闭提示词保存后仍持久化了正文")
+			}
+			if len(s.exchanges) != 0 {
+				t.Fatal("临时日志状态没有清理")
+			}
+			encoded, _ := json.Marshal(live.SpendLog{ReasoningEffort: ex.reasoningEffort})
+			var queued live.SpendLog
+			if err := json.Unmarshal(encoded, &queued); err != nil {
+				t.Fatal(err)
+			}
+			row := usageFromSpend(queued, 0, "", "", "", time.Now(), time.Now())
+			if row.ReasoningEffort != effort {
+				t.Fatalf("同步或队列日志载体丢失推理强度: %+v", row)
+			}
+		}
+	}
+}

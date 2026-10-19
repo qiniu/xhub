@@ -33,6 +33,8 @@ export type LogEntry = {
   credential_name?: string;
   /** 客户端提供的通用备注，可关联验收步骤，不代表测试结果。 */
   label?: string;
+  /** 客户端明确指定的推理强度；旧记录或未指定时为空，不推断模型默认值。 */
+  reasoning_effort?: string;
   metadata?: Record<string, any>;
   cache_hit: string | boolean;
   cache_key?: string;

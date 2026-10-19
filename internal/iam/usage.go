@@ -16,6 +16,8 @@ var logTraceOnceUsage sync.Once
 // UsageEvent 是 usage_events 中一条推理用量和调用日志事实，由刷库链写入、授权查询读取。
 // 身份与供应商字段是调用时快照，成员离队或配置删除不改变历史费用；SessionID 只用于归组。
 type UsageEvent struct {
+	// 客户端明确指定的推理强度快照；独立于提示词保存，空值表示未指定或历史未记录，不推断厂商默认值。
+	ReasoningEffort string `xorm:"reasoning_effort" json:"reasoning_effort"`
 	// 客户端实际请求路径，不含查询串；由执行器记录，独立于提示词存储。
 	InboundEndpoint string `xorm:"inbound_endpoint" json:"inbound_endpoint"`
 	// 实际发送的上游路径，由传输层观察；未发送时为空。
@@ -152,6 +154,8 @@ func (UsageDaily) TableName() string { return "usage_daily" }
 // UsageRecord 是等待持久化的一次调用，由网关或 Redis 消费者交给 RecordUsage。
 // 身份采用鉴权时快照，刷库不重新解析层级关系；正文、费用和会话来源分别保留各自记录规则。
 type UsageRecord struct {
+	// 客户端明确指定的推理强度快照；独立于提示词保存，空值表示未指定或历史未记录，不推断厂商默认值。
+	ReasoningEffort string
 	// 客户端实际请求路径，不含查询串；由执行器记录，独立于提示词存储。
 	InboundEndpoint string
 	// 实际发送的上游路径，由传输层观察；未发送时为空。
@@ -289,12 +293,10 @@ func (db *DB) RecordUsage(ctx context.Context, records []UsageRecord) error {
 	})
 }
 
-// insertEvent stores one usage event and reports whether it was new. It never raises a unique violation: a replayed batch, and a second gateway process flushing the same Redis entry, both hit ON CONFLIC
-// T DO NOTHING and report "not new". Raising instead would abort the surrounding transaction on PostgreSQL, which would fail the whole batch over one duplicate.
-// 参数 s（*xorm.Session）：当前事务里的数据库会话。调用方负责提交，这里不关闭它；r（UsageRecord）：一次调用的用量，含 token、费用、密钥和团队，准备写入用量表。
-// 返回 bool（bool）：这次写入是新的用量事件时返回真。冲突插入被忽略时返回假，同时不报唯一约束错误；error（error）：失败原因。nil 表示这一步成功。
-// 调用：仅在 usage.go 内使用
-// 测试：无直接单测
+// insertEvent 插入一条带归属、计量和明确推理强度的不可变账单事实。
+// 参数 s 为调用方事务，r 为完整调用快照；返回是否新增及数据库错误，重复 request_id 返回 false、nil。
+// RecordUsage 的事务路径调用；ON CONFLICT 防止重放中断整批并导致重复计费，正文由独立日志写入。
+// 推理强度只保存采集值，空值保持未知；失败由上层事务回滚，费用和现存记录均不在此重算。
 func insertEvent(s *xorm.Session, r UsageRecord) (bool, error) {
 	var ended any
 	if !r.EndedAt.IsZero() {
@@ -304,14 +306,14 @@ func insertEvent(s *xorm.Session, r UsageRecord) (bool, error) {
         (request_id, ts, key_id, owner_type, user_id, team_id, project_id, organization_id,
 		 model, call_type, status, http_status, prompt_tokens, completion_tokens, cost, duration_ms,
          ended_at, ttft_ms, cache_hit, key_hash, key_alias, team_alias, provider,
-         cached_tokens, session_id, session_source, cache_key, guardrail, price_snapshot, supplier, upstream_model, streamed, inbound_endpoint, outbound_endpoint, label, api_base)
-		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+         cached_tokens, session_id, session_source, cache_key, guardrail, price_snapshot, supplier, upstream_model, streamed, inbound_endpoint, outbound_endpoint, label, api_base, reasoning_effort)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         ON CONFLICT (request_id) DO NOTHING`,
 		r.RequestID, stamp(r.TS), r.KeyID, ownerType(r), r.UserID, r.TeamID, r.ProjectID,
 		r.OrganizationID, r.Model, r.CallType, status(r), r.HTTPStatus,
 		r.PromptTokens, r.CompletionTokens, r.Cost, r.DurationMS,
 		ended, r.TTFTMs, r.CacheHit, r.KeyHash, r.KeyAlias, r.TeamAlias, r.Provider,
-		r.CachedTokens, r.SessionID, r.SessionSource, r.CacheKey, r.Guardrail, r.PriceSnapshot, r.Supplier, r.UpstreamModel, r.Streamed, r.InboundEndpoint, r.OutboundEndpoint, r.Label, r.APIBase)
+		r.CachedTokens, r.SessionID, r.SessionSource, r.CacheKey, r.Guardrail, r.PriceSnapshot, r.Supplier, r.UpstreamModel, r.Streamed, r.InboundEndpoint, r.OutboundEndpoint, r.Label, r.APIBase, r.ReasoningEffort)
 	if err != nil {
 		return false, mapErr(err)
 	}
