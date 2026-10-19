@@ -1,6 +1,6 @@
 version: 2
-# 普通升级每周集中处理，小版本和补丁分组；主版本仍独立审核。
-# 安全修复独立分组且不等待周计划，不配置自动合并或忽略漏洞。
+# 暂停普通版本升级 PR，只保留安全修复；0 仅限制普通升级，不关闭安全更新。
+# schedule 为必填字段；安全修复不等待周计划，小版本分组，主版本独立审核。
 updates:
   - package-ecosystem: npm
     directory: /frontend
@@ -9,11 +9,8 @@ updates:
       day: monday
       time: "09:00"
       timezone: Asia/Shanghai
-    open-pull-requests-limit: 3
+    open-pull-requests-limit: 0
     groups:
-      frontend-minor-patch:
-        patterns: ["*"]
-        update-types: [minor, patch]
       frontend-security:
         applies-to: security-updates
         patterns: ["*"]
@@ -25,11 +22,8 @@ updates:
       day: monday
       time: "09:00"
       timezone: Asia/Shanghai
-    open-pull-requests-limit: 3
+    open-pull-requests-limit: 0
     groups:
-      website-minor-patch:
-        patterns: ["*"]
-        update-types: [minor, patch]
       website-security:
         applies-to: security-updates
         patterns: ["*"]
@@ -41,11 +35,8 @@ updates:
       day: monday
       time: "09:00"
       timezone: Asia/Shanghai
-    open-pull-requests-limit: 3
+    open-pull-requests-limit: 0
     groups:
-      go-minor-patch:
-        patterns: ["*"]
-        update-types: [minor, patch]
       go-security:
         applies-to: security-updates
         patterns: ["*"]
