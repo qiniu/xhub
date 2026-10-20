@@ -251,7 +251,7 @@ func enterpriseSAMLMetadata(raw, issuer string, now time.Time, allowHTTP bool) (
 				}
 				cert, err := x509.ParseCertificate(der)
 				// IdP 证书是可信元数据固定的验签公钥，不是 TLS PKI；部分 IdP 长期保留过期自签名证书。
-				// 配置/导出允许保留该材料；登录仍由默认验签库检查证书日历、签名和断言时效，绝不绕过到期错误。
+				// 配置/导出允许保留该材料；默认登录严格检查证书日历。显式联调例外仅放宽固定证书 NotAfter，签名和断言时效始终校验。
 				if err != nil || (cert.KeyUsage != 0 && cert.KeyUsage&x509.KeyUsageDigitalSignature == 0) {
 					return fail()
 				}
