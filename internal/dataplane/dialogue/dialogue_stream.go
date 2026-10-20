@@ -792,6 +792,10 @@ func (s *dialogueStream) consume(protocol string, data string) error {
 			if d["stop_reason"] == "max_tokens" {
 				s.stop = "length"
 			}
+			// Messages 的自然结束和停止序列都对应 Chat stop；不能把供应商枚举泄露给 OpenAI 客户端。
+			if d["stop_reason"] == "end_turn" || d["stop_reason"] == "stop_sequence" {
+				s.stop = "stop"
+			}
 		case "message_stop":
 			if s.stop == "" {
 				return fmt.Errorf("upstream stream ended without stop_reason")

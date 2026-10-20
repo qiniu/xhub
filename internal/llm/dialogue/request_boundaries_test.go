@@ -157,7 +157,7 @@ func TestRequestEncodingBoundaries(t *testing.T) {
 		{"bad_messages_args", "anthropic-messages", Dialogue{Turns: []Turn{{Role: "assistant", Calls: []Turn{{Arguments: "broken"}}}}}},
 		{"orphan_google", "gemini", Dialogue{Turns: []Turn{{Role: "tool", ID: "missing"}}}},
 		{"bad_google_args", "gemini", Dialogue{Turns: []Turn{{Role: "assistant", Calls: []Turn{{Arguments: "null"}}}}}},
-		{"strict_messages", "anthropic-messages", Dialogue{Tools: []map[string]any{{"strict": false}}}},
+		{"strict_messages", "anthropic-messages", Dialogue{Tools: []map[string]any{{"strict": true}}}},
 		{"strict_google", "gemini", Dialogue{Tools: []map[string]any{{"strict": false}}}},
 	} {
 		t.Run(tc.name, func(t *testing.T) {

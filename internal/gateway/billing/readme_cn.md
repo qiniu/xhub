@@ -70,3 +70,16 @@ cost.go: DeploymentFinder → CallCost → deploymentCost
 仓库根目录执行：go test ./internal/gateway/billing -count=1
 
 真实 HTTP/持久化契约放 cmd/regression；浏览器 → 网关 → 本地上游流程放 frontend/e2e。测试清理私有 schema 与临时夹具；离线测试不假设有付费供应商凭据。
+
+## Claude 原生请求与自动缓存
+
+Messages 的 `context_management` 仅允许空 `edits` 或严格的
+`clear_thinking_20251015 / keep=all` 无操作配置，不改变额度上界；真正清理或未知字段仍拒绝。
+
+请求未声明缓存 TTL 时，严格计划冻结可达价格档的 5m/1h 写入价，按最高费用预占，
+再由 `BudgetPlan.Charge` 使用原始 usage 分桶和实际上下文档精确结算。
+显式 TTL 不一致、未知期限、缺少多期限计量或总数矛盾均不释放占用。
+旧 uncertain 的快照没有新费率，不能用新计划或最新目录自动重算、退款。
+
+覆盖：`TestStrictBudgetAutomaticCacheTTL*`、`TestHardBudgetAutomaticCacheTTL`、
+`TestClaudeKeepAllBudgetAndStop`，以及双语 `claude-client-compat-` 浏览器场景。

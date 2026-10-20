@@ -236,7 +236,9 @@ func TestStrictBudgetRejectsUnpricedFeatures(t *testing.T) {
 		{name: "unknown extension", change: func(b map[string]any) { b["unknown_billable_extension"] = true }},
 		{name: "predicted output", change: func(b map[string]any) { b["prediction"] = map[string]any{"type": "content", "content": "hello"} }},
 		{name: "audio output", change: func(b map[string]any) { b["modalities"] = []string{"audio"} }},
-		{name: "context compaction", change: func(b map[string]any) { b["context_management"] = map[string]any{"edits": []any{}} }},
+		{name: "context compaction", change: func(b map[string]any) {
+			b["context_management"] = map[string]any{"edits": []any{map[string]any{"type": "compact_20260112"}}}
+		}},
 		{name: "remote history", protocol: "openai-responses", change: func(b map[string]any) { b["previous_response_id"] = "resp_remote" }},
 		{name: "hosted search", change: func(b map[string]any) { b["tools"] = []any{map[string]any{"type": "web_search"}} }},
 		{name: "server tool search", protocol: "openai-responses", change: func(b map[string]any) {

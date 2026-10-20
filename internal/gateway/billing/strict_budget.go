@@ -40,21 +40,23 @@ type BudgetPlan struct {
 }
 
 // budgetPriceSnapshot 是无需重新查询可变目录的定价契约；金额和所有费率都只包含值，不引用部署配置。
+// 未声明TTL时CacheWrite保存最大预占价，CacheWriteByTTL保存实际结算价；不能用最大值代替实测分桶。
 type budgetPriceSnapshot struct {
-	InputBound         int               `json:"input_bound"`
-	OutputCap          int               `json:"output_cap"`
-	Amount             float64           `json:"reserved_amount"`
-	Protocol           string            `json:"protocol"`
-	Window             string            `json:"window"`
-	Model              string            `json:"model"`
-	StartedAt          time.Time         `json:"started_at"`
-	Input              catalog.Rate      `json:"input_rate"`
-	Output             catalog.Rate      `json:"output_rate"`
-	CacheRead          *catalog.Rate     `json:"cache_read_rate,omitempty"`
-	CacheWrite         *catalog.Rate     `json:"cache_write_rate,omitempty"`
-	Tiers              []budgetPriceTier `json:"tiers,omitempty"`
-	IntervalSemantics  string            `json:"interval_semantics,omitempty"`
-	CapSemanticsSource string            `json:"cap_semantics_source,omitempty"`
+	InputBound         int                     `json:"input_bound"`
+	OutputCap          int                     `json:"output_cap"`
+	Amount             float64                 `json:"reserved_amount"`
+	Protocol           string                  `json:"protocol"`
+	Window             string                  `json:"window"`
+	Model              string                  `json:"model"`
+	StartedAt          time.Time               `json:"started_at"`
+	Input              catalog.Rate            `json:"input_rate"`
+	Output             catalog.Rate            `json:"output_rate"`
+	CacheRead          *catalog.Rate           `json:"cache_read_rate,omitempty"`
+	CacheWrite         *catalog.Rate           `json:"cache_write_rate,omitempty"`
+	CacheWriteByTTL    map[string]catalog.Rate `json:"cache_write_rates_by_ttl,omitempty"`
+	Tiers              []budgetPriceTier       `json:"tiers,omitempty"`
+	IntervalSemantics  string                  `json:"interval_semantics,omitempty"`
+	CapSemanticsSource string                  `json:"cap_semantics_source,omitempty"`
 }
 
 // budgetFailure 构造不包含输入正文的分类错误；参数为固定代码和原因，返回错误，严格计划和结算共用。
@@ -106,6 +108,7 @@ func StrictBudgetPlan(dep config.ModelEntry, finalBody []byte, protocol string, 
 		snapshot.IntervalSemantics = "shared_boundaries_require_equal_rates"
 		// 原始目录不声明开闭边界；预占覆盖所有可达档，最终共享边界只有费率一致才可结算。
 		snapshot.Input, snapshot.Output, snapshot.CacheRead, snapshot.CacheWrite = budgetTierMaximum(tiers)
+		snapshot.CacheWriteByTTL = budgetMaximumCacheTTL(tiers)
 	} else {
 		rates, err := budgetRates(dep, row)
 		if err != nil {
@@ -116,6 +119,7 @@ func StrictBudgetPlan(dep config.ModelEntry, finalBody []byte, protocol string, 
 			return fail(err)
 		}
 		snapshot.Input, snapshot.Output, snapshot.CacheRead, snapshot.CacheWrite = prices.Input, prices.Output, prices.CacheRead, prices.CacheWrite
+		snapshot.CacheWriteByTTL = prices.CacheWriteByTTL
 	}
 	maxInput := snapshot.Input.USD
 	if snapshot.CacheRead != nil {
@@ -140,16 +144,30 @@ func StrictBudgetPlan(dep config.ModelEntry, finalBody []byte, protocol string, 
 	return BudgetPlan{InputBound: input, OutputCap: cap, Amount: snapshot.Amount, Defaulted: defaulted, PriceSnapshot: string(rawSnapshot), frozen: &snapshot}, encoded, nil
 }
 
-// Charge 用冻结费率核对并计算本次已完成的实测账单；参数为归一化Usage，返回可直接结算的分项或违约错误。
+// Charge 用冻结费率核对并计算本次已完成的实测账单；参数为归一化Usage及可选原始usage，返回分项或违约错误。
+// 未声明TTL而冻结多个缓存期限时必须提供原始分桶，不能把预占最高价冒充实际费用；单期限旧调用保持兼容。
 // 调用方须先用 NormalizeDialogueUsage 标记缺失实测量，再转为 catalog.Usage；本结构的零值无法表达字段缺失。
 // 错误时不得退款或改用当前目录补算；本函数不执行扣费、不更改占用。上游超过声明上界也不能穿透硬预算。
-func (p BudgetPlan) Charge(u catalog.Usage) (catalog.Charge, error) {
+func (p BudgetPlan) Charge(u catalog.Usage, rawUsage ...map[string]any) (catalog.Charge, error) {
 	s := p.frozen
 	fail := func(message string) (catalog.Charge, error) {
 		return catalog.Charge{}, budgetFailure("invalid_usage", message)
 	}
 	if s == nil {
 		return fail("strict budget plan is uninitialized")
+	}
+	if len(rawUsage) > 0 {
+		if err := ValidateStrictBudgetUsage(rawUsage[0], p); err != nil {
+			return fail(err.Error())
+		}
+		for _, key := range []string{"cache_creation_input_tokens", "cache_write_tokens"} {
+			if value, exists := rawUsage[0][key]; exists {
+				n, ok := budgetUsageInteger(value)
+				if !ok || n != u.CacheWriteTokens {
+					return fail("measured cache creation total contradicts normalized usage")
+				}
+			}
+		}
 	}
 	if len(s.Tiers) > 0 {
 		if int64(u.PromptTokens)+int64(u.CacheWriteTokens) > int64(s.InputBound) {
@@ -162,6 +180,7 @@ func (p BudgetPlan) Charge(u catalog.Usage) (catalog.Charge, error) {
 		// 临时副本仅替换本次实际档位，绝不修改持久快照或让目录热更新穿透冻结契约。
 		selected := *s
 		selected.Input, selected.Output, selected.CacheRead, selected.CacheWrite = prices.Input, prices.Output, prices.CacheRead, prices.CacheWrite
+		selected.CacheWriteByTTL = prices.CacheWriteByTTL
 		s = &selected
 	}
 	if u.PricingBlocked != "" {
@@ -191,7 +210,9 @@ func (p BudgetPlan) Charge(u catalog.Usage) (catalog.Charge, error) {
 		budgetAddCharge(&c, *s.CacheRead, cached)
 	}
 	if u.CacheWriteTokens > 0 {
-		budgetAddCharge(&c, *s.CacheWrite, u.CacheWriteTokens)
+		if err := budgetAddCacheCharges(&c, s, u.CacheWriteTokens, rawUsage); err != nil {
+			return fail(err.Error())
+		}
 	}
 	c.Total = c.Input + c.Output + c.Cache
 	if math.IsNaN(c.Total) || math.IsInf(c.Total, 0) || c.Total > s.Amount {
@@ -202,7 +223,7 @@ func (p BudgetPlan) Charge(u catalog.Usage) (catalog.Charge, error) {
 
 // ValidateStrictBudgetUsage 在目录归一化之前验证原始实测数值，防止小数、字符串和缺失事实被转成较小整数。
 // 参数为原始usage及可选冻结计划，返回违约错误；budgetCharge应传计划以校验缓存TTL，随后调用Normalize和Charge。
-// 本函数只读输入；零值是合法实测，缺少必要输入/输出量、混合TTL和未预留的多模态/服务器工具计量均拒绝。
+// 本函数只读输入；零值是合法实测，缺少必要总量或未冻结的计量维度拒绝；无TTL声明的混合桶需完整冻结价格。
 func ValidateStrictBudgetUsage(raw map[string]any, plans ...BudgetPlan) error {
 	fail := func(message string) error { return budgetFailure("invalid_usage", message) }
 	if raw == nil || raw["pricing_blocked"] != nil && raw["pricing_blocked"] != "" {
@@ -243,46 +264,17 @@ func ValidateStrictBudgetUsage(raw map[string]any, plans ...BudgetPlan) error {
 			}
 		}
 	}
-	if value := raw["cache_creation"]; value != nil {
-		details, ok := value.(map[string]any)
-		if !ok {
-			return fail("measured cache creation details must be an object")
+	five, hour, present, err := budgetCacheCreationCounts(raw)
+	if err != nil {
+		return err
+	}
+	if present && five+hour > 0 {
+		var plan *budgetPriceSnapshot
+		if len(plans) > 0 {
+			plan = plans[0].frozen
 		}
-		five, hour := 0, 0
-		for key, value := range details {
-			n, ok := budgetUsageInteger(value)
-			if !ok {
-				return fail("measured cache creation counts must be nonnegative integers")
-			}
-			switch key {
-			case "ephemeral_5m_input_tokens":
-				five = n
-			case "ephemeral_1h_input_tokens":
-				hour = n
-			default:
-				if n != 0 {
-					return fail("measured cache creation TTL is unsupported")
-				}
-			}
-		}
-		if five > 0 && hour > 0 {
-			return fail("mixed cache creation TTLs require separate prices")
-		}
-		if five+hour > 0 {
-			var plan *budgetPriceSnapshot
-			if len(plans) > 0 {
-				plan = plans[0].frozen
-			}
-			if plan == nil || plan.CacheWrite == nil || hour > 0 && plan.CacheWrite.Variant != "1h" || five > 0 && plan.CacheWrite.Variant == "1h" {
-				return fail("measured cache creation TTL differs from the reserved price")
-			}
-			total, ok := budgetUsageInteger(raw["cache_creation_input_tokens"])
-			if !ok {
-				total, ok = budgetUsageInteger(raw["cache_write_tokens"])
-			}
-			if !ok || total != five+hour {
-				return fail("measured cache creation details contradict the total")
-			}
+		if err := budgetValidateCacheTTL(plan, five, hour); err != nil {
+			return err
 		}
 	}
 	return nil
@@ -603,6 +595,14 @@ func budgetRequest(body map[string]any, protocol string) (string, error) {
 		keys[key] = true
 	}
 	for key, value := range body {
+		// Claude Code 的 keep=all 不执行清理，也不改变计费维度；结构须与桥接层使用同一严格校验。
+		// 只放行 Messages 的无操作配置，不能把真实压缩或未知编辑当作免费能力。
+		if key == "context_management" && value != nil && protocol == "anthropic-messages" {
+			if err := llmdialogue.ValidateKeepAllContextManagement(value); err != nil {
+				return "", budgetFailure("unsupported_budget", "strict budget requires keep-all context_management")
+			}
+			continue
+		}
 		if !keys[key] && value != nil {
 			return "", budgetFailure("unsupported_budget", "strict budget does not support request field "+key)
 		}

@@ -8,7 +8,7 @@ import (
 )
 
 // TestChatReasoningItemsRoundTrip 验证有/无摘要和密文的 Responses 输出可投影为 Chat 并恢复工具续轮。
-// 参数 t 为上下文；纯内存对象验证原厂 ID、原文、工具及用量保留、无输入修改、无重复摘要，且其他上游拒绝重放；无需清理。
+// 参数 t 为上下文；纯内存验证密文原厂 ID、公开摘要迁移、工具及用量保留和无重复摘要；无需外部清理。
 func TestChatReasoningItemsRoundTrip(t *testing.T) {
 	for _, summary := range []bool{false, true} {
 		for _, cipher := range []bool{false, true} {
@@ -52,16 +52,34 @@ func TestChatReasoningItemsRoundTrip(t *testing.T) {
 					t.Fatal(err)
 				}
 				items := dialogueList(out["input"])
-				if got := dialogueMap(items[1]); got["id"] != "rs_original" || (cipher && got["encrypted_content"] != "opaque-cipher") {
+				if got := dialogueMap(items[1]); cipher && (got["id"] != "rs_original" || got["encrypted_content"] != "opaque-cipher") {
 					t.Fatalf("Chat 续轮未恢复原始推理: %v", out)
 				}
 				encoded, _ = json.Marshal(out)
-				if strings.Count(string(encoded), `"type":"reasoning"`) != 1 || !strings.Contains(string(encoded), "文件原文") || !strings.Contains(string(encoded), "call_1") {
+				wantReasoning := 0
+				if summary || cipher {
+					wantReasoning = 1
+				}
+				if strings.Count(string(encoded), `"type":"reasoning"`) != wantReasoning || !strings.Contains(string(encoded), "文件原文") || !strings.Contains(string(encoded), "call_1") {
 					t.Fatalf("续轮重复推理或丢失工具: %s", encoded)
 				}
-				for _, target := range []string{"openai-chat", "anthropic-messages", "gemini"} {
-					if _, err := EncodeDialogue(d, target, "other"); err == nil {
-						t.Fatalf("Responses 扩展被发往 %s", target)
+				for _, target := range []string{"openai-chat", "anthropic-messages"} {
+					converted, err := EncodeDialogue(d, target, "other")
+					if cipher {
+						if err == nil {
+							t.Fatalf("不支持的推理扩展被发往 %s", target)
+						}
+					} else if err != nil {
+						t.Fatalf("公开摘要未能迁移到 %s: %v", target, err)
+					} else if target != "openai-chat" {
+						raw, _ := json.Marshal(converted)
+						wantSummary := 0
+						if summary {
+							wantSummary = 1
+						}
+						if strings.Count(string(raw), "Plan") != wantSummary {
+							t.Fatalf("迁移公开摘要重复或丢失: %s", raw)
+						}
 					}
 				}
 				after, _ := json.Marshal(result.Native)

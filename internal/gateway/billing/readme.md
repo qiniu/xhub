@@ -70,3 +70,19 @@ Adjacent tests: cost_test.go
 From repository root: go test ./internal/gateway/billing -count=1
 
 Real HTTP/persistence contracts belong in cmd/regression; browser → gateway → local upstream flows belong in frontend/e2e. Private schemas and temporary fixtures are cleaned up. Offline tests do not assume paid vendor credentials.
+## Native Claude requests and automatic caching
+
+Messages accepts `context_management` only for empty `edits` or strictly validated
+`clear_thinking_20251015 / keep=all` no-op edits. These do not change the budget
+bound; real clearing and unknown fields remain unsupported.
+
+When a request declares no cache TTL, the strict plan freezes available 5m/1h
+write rates in each reachable price tier and reserves the highest cost.
+`BudgetPlan.Charge` uses the original usage buckets and the measured context tier
+for exact settlement. Explicit TTL mismatches, unknown TTLs, missing buckets for
+multiple prices, and contradictory counts retain the reservation.
+Existing uncertain snapshots lack the new rates and must not be automatically
+recalculated or refunded using a new plan or the latest catalog.
+
+Coverage: `TestStrictBudgetAutomaticCacheTTL*`, `TestHardBudgetAutomaticCacheTTL`,
+`TestClaudeKeepAllBudgetAndStop`, and both `claude-client-compat-` browser locales.

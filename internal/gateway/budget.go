@@ -223,7 +223,7 @@ func (s *Server) budgetCharge(callID string, rawUsage map[string]any, status int
 		err = errors.New("upstream billing outcome is uncertain")
 	} else {
 		if err = billing.ValidateStrictBudgetUsage(rawUsage, attempt.Plan); err == nil {
-			charge, err = attempt.Plan.Charge(catalog.NormalizeUsage(llmdialogue.NormalizeDialogueUsage(rawUsage)))
+			charge, err = attempt.Plan.Charge(catalog.NormalizeUsage(llmdialogue.NormalizeDialogueUsage(rawUsage)), rawUsage)
 		}
 	}
 	if err != nil {

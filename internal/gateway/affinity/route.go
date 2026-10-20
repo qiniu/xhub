@@ -312,15 +312,13 @@ func requiresNativeOwnership(body map[string]any) bool {
 			return true
 		}
 	}
-	// LiteLLM 式 Chat 扩展和 Messages 封装属于原 Responses 上游；复用固定连接证明，不能按普通文本回退。
+	// Chat 扩展只有严格验证后的公开摘要可以迁移；密文、签名或非法结构仍要求原连接证明。
 	messages, _ := body["messages"].([]any)
 	for _, value := range messages {
 		message, _ := value.(map[string]any)
-		if value := message["reasoning_items"]; value != nil {
-			items, ok := value.([]any)
-			if !ok || len(items) > 0 {
-				return true
-			}
+		role, _ := message["role"].(string)
+		if llmdialogue.ChatReasoningRequiresNativeOwnership(message["reasoning_items"], role) {
+			return true
 		}
 		blocks, _ := message["content"].([]any)
 		for _, value := range blocks {

@@ -282,7 +282,8 @@ func stripCacheHints(value any) any {
 
 // bridgeOptions 将已知扩展参数映射到目标协议，参数为带原文的对话、目标协议及已编码的共享正文。
 // EncodeDialogue 调用，返回映射后正文或明确的能力错误；只做参数转换，不发送请求。
-// 参照 LiteLLM Responses/Chat 桥接中的 reasoning_effort 与 response_format 映射；不支持的字段拒绝而非 drop_params。
+// 参照 LiteLLM Responses/Chat 的 reasoning_effort 与 response_format 映射；Messages 只接收已验证的语义映射。
+// 不支持的生成能力明确拒绝；缓存路由等非内容提示仅按下面记录的规则规范化。
 func bridgeOptions(d Dialogue, target string, out map[string]any) (map[string]any, error) {
 	core := map[string]bool{}
 	for _, k := range []string{"model", "stream", "stream_options", "tools", "tool_choice", "max_tokens", "max_completion_tokens", "max_output_tokens", "temperature", "top_p", "messages", "input", "instructions", "system"} {
@@ -303,6 +304,9 @@ func bridgeOptions(d Dialogue, target string, out map[string]any) (map[string]an
 			r := dialogueMap(value)
 			for k, v := range r {
 				if k == "context" {
+					if target != "openai-chat" && v != nil {
+						return nil, fmt.Errorf("reasoning.context requires native Responses or Chat")
+					}
 					// Chat 的公开推理已在 EncodeDialogue 按 active/all turns 范围投影，不能将该 Responses 字段直接发给上游。
 					continue
 				}
@@ -317,16 +321,41 @@ func bridgeOptions(d Dialogue, target string, out map[string]any) (map[string]an
 					return nil, fmt.Errorf("reasoning.%s requires native Responses", k)
 				}
 			}
-			if target != "openai-chat" {
+			if target == "anthropic-messages" {
+				if err := bridgeMessagesReasoning(r["effort"], out); err != nil {
+					return nil, err
+				}
+			} else if target == "openai-chat" {
+				out["reasoning_effort"] = r["effort"]
+			} else {
 				return nil, fmt.Errorf("reasoning requires native Responses or Chat")
 			}
-			out["reasoning_effort"] = r["effort"]
 		case "reasoning_effort":
+			if target == "anthropic-messages" {
+				if err := bridgeMessagesReasoning(value, out); err != nil {
+					return nil, err
+				}
+				continue
+			}
 			if target != "openai-responses" {
 				return nil, fmt.Errorf("reasoning_effort requires OpenAI protocol")
 			}
 			out["reasoning"] = map[string]any{"effort": value}
 		case "text":
+			if target == "anthropic-messages" {
+				// 纯文本是 Messages 的默认输出；结构化格式和 verbosity 没有已认证的等价映射。
+				t := dialogueMap(value)
+				if err := dialogueFields(t, "format"); err != nil {
+					return nil, err
+				}
+				if format, exists := t["format"]; exists {
+					f := dialogueMap(format)
+					if len(f) != 1 || f["type"] != "text" {
+						return nil, fmt.Errorf("text.format requires native Responses or Chat")
+					}
+				}
+				continue
+			}
 			if target != "openai-chat" {
 				return nil, fmt.Errorf("text options require native Responses or Chat")
 			}
@@ -395,27 +424,51 @@ func bridgeOptions(d Dialogue, target string, out map[string]any) (map[string]an
 				out[key] = value
 			}
 			// Anthropic metadata.user_id 是客户端归属提示，身份始终由虚拟密钥决定，不转换成网关用户。
-		case "parallel_tool_calls", "prompt_cache_key", "prompt_cache_retention", "service_tier", "safety_identifier", "user":
+		case "parallel_tool_calls":
+			if target == "anthropic-messages" {
+				parallel, ok := value.(bool)
+				if !ok {
+					return nil, fmt.Errorf("parallel_tool_calls must be boolean")
+				}
+				if len(dialogueList(out["tools"])) > 0 {
+					choice := dialogueMap(out["tool_choice"])
+					if choice == nil {
+						choice = map[string]any{"type": "auto"}
+						out["tool_choice"] = choice
+					}
+					// none 已禁止全部工具，不附加该类型不支持的并行开关。
+					if choice["type"] != "none" {
+						choice["disable_parallel_tool_use"] = !parallel
+					}
+				}
+				continue
+			}
+			if target != "openai-chat" && target != "openai-responses" {
+				return nil, fmt.Errorf("parallel_tool_calls requires OpenAI protocol")
+			}
+			out[key] = value
+		case "prompt_cache_key":
+			if target == "anthropic-messages" {
+				if _, ok := value.(string); !ok {
+					return nil, fmt.Errorf("prompt_cache_key must be a string")
+				}
+				// OpenAI 的缓存路由提示不属于对话内容或鉴权；Messages 没有同义字段。
+				// 不擅自启用有额外缓存写入费用的 cache_control，也不承诺缓存命中或保留期。
+				continue
+			}
+			if target != "openai-chat" && target != "openai-responses" {
+				return nil, fmt.Errorf("prompt_cache_key requires OpenAI protocol")
+			}
+			out[key] = value
+		case "prompt_cache_retention", "service_tier", "safety_identifier", "user":
 			if target != "openai-chat" && target != "openai-responses" {
 				return nil, fmt.Errorf("%s requires OpenAI protocol", key)
 			}
 			out[key] = value
 		case "context_management":
-			// keep=all 是 Claude Code 明确要求保留全部推理，不触发清理，等价于网关默认保留历史。
-			config := dialogueMap(value)
-			if edits, ok := config["edits"]; ok {
-				if _, valid := edits.([]any); !valid {
-					return nil, fmt.Errorf("context_management.edits must be an array")
-				}
-			}
-			if err := dialogueFields(config, "edits"); err != nil {
+			// 与额度预占共用严格校验；仅 keep=all 无清理动作可跨协议等价保留。
+			if err := ValidateKeepAllContextManagement(value); err != nil {
 				return nil, err
-			}
-			for _, value := range dialogueList(config["edits"]) {
-				edit := dialogueMap(value)
-				if edit["type"] != "clear_thinking_20251015" || edit["keep"] != "all" || len(edit) != 2 {
-					return nil, fmt.Errorf("context_management edits require native Messages")
-				}
 			}
 		case "thinking", "output_config":
 			if d.Source != "anthropic-messages" || (target != "openai-responses" && target != "openai-chat") {
@@ -459,6 +512,20 @@ func bridgeOptions(d Dialogue, target string, out map[string]any) (map[string]an
 		}
 	}
 	return out, nil
+}
+
+// bridgeMessagesReasoning 供 bridgeOptions 映射显式关闭推理的 OpenAI 请求。
+// 参数为 reasoning effort 与目标正文；none 输出原生 disabled，无指定值保留上游默认。
+// 返回能力错误时不修改正文；非零推理需要尚未实现的签名响应与回放链，必须在发送前拒绝。
+func bridgeMessagesReasoning(effort any, out map[string]any) error {
+	if effort == nil {
+		return nil
+	}
+	if effort != "none" {
+		return fmt.Errorf("reasoning effort requires native Messages: signed thinking response and replay are not supported by this bridge")
+	}
+	out["thinking"] = map[string]any{"type": "disabled"}
+	return nil
 }
 
 // ParseDialogueResult 保留上游原生结果，同时提取文本/函数/用量供日志、计费和可表达的跨协议结果使用。

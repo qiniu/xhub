@@ -12,10 +12,11 @@ import (
 
 // budgetTierPrices 保存一个上下文档位在请求开始时刻的完整文字费率；所有值已归一为每Token美元。
 type budgetTierPrices struct {
-	Input      catalog.Rate  `json:"input_rate"`
-	Output     catalog.Rate  `json:"output_rate"`
-	CacheRead  *catalog.Rate `json:"cache_read_rate,omitempty"`
-	CacheWrite *catalog.Rate `json:"cache_write_rate,omitempty"`
+	Input           catalog.Rate            `json:"input_rate"`
+	Output          catalog.Rate            `json:"output_rate"`
+	CacheRead       *catalog.Rate           `json:"cache_read_rate,omitempty"`
+	CacheWrite      *catalog.Rate           `json:"cache_write_rate,omitempty"`
+	CacheWriteByTTL map[string]catalog.Rate `json:"cache_write_rates_by_ttl,omitempty"`
 }
 
 // budgetPriceTier 原样保留目录输入/输出区间；来源未声明开闭，共享边界不能猜测采用较高或较低档。
@@ -43,6 +44,22 @@ func budgetSelectPrices(rates []catalog.Rate, window, ttl string) (budgetTierPri
 		p.CacheRead = &r
 	} else if r, found := budgetRate(rates, "cache_read", "", window); found {
 		p.CacheRead = &r
+	}
+	if ttl == "" {
+		// 上游可能自行选择缓存期限；未声明时冻结每种已知价格，预占只取最大值，结算必须读取实测分桶。
+		for _, variant := range []string{"", "1h"} {
+			if r, found := budgetRate(rates, "cache_write", variant, window); found {
+				if p.CacheWriteByTTL == nil {
+					p.CacheWriteByTTL = map[string]catalog.Rate{}
+				}
+				p.CacheWriteByTTL[variant] = r
+				if p.CacheWrite == nil || r.USD > p.CacheWrite.USD {
+					cp := r
+					p.CacheWrite = &cp
+				}
+			}
+		}
+		return p, nil
 	}
 	variant := ""
 	if ttl == "1h" {
@@ -335,6 +352,15 @@ func budgetSamePrices(a, b budgetTierPrices) bool {
 			return a == nil && b == nil
 		}
 		return a.USD == b.USD && a.Variant == b.Variant
+	}
+	if len(a.CacheWriteByTTL) != len(b.CacheWriteByTTL) {
+		return false
+	}
+	for ttl, rate := range a.CacheWriteByTTL {
+		other, exists := b.CacheWriteByTTL[ttl]
+		if !exists || rate.USD != other.USD || rate.Variant != other.Variant {
+			return false
+		}
 	}
 	return a.Input.USD == b.Input.USD && a.Output.USD == b.Output.USD && equal(a.CacheRead, b.CacheRead) && equal(a.CacheWrite, b.CacheWrite)
 }

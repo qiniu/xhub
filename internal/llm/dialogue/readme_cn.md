@@ -65,3 +65,16 @@ model 定义统一表示，request/response 编解码，validation 校验字段�
 ## 覆盖率检查
 
 运行 scripts/core-codec-coverage.sh（使用 bash），注册表和对话编解码各自必须达到 95% 语句覆盖率。测试失败、缺少报告或低于下限都会返回失败。覆盖率来自各包自身的单元测试，不混入后台回归或浏览器测试。
+
+## Codex 到原生 Messages 的参数边界
+
+本次只放行有明确对应关系的参数，不能将此项表述为 Codex 默认推理模式已完整可用：
+
+- `strict:false` 转为普通 Messages 工具，schema 保持不变；`strict:true` 仍拒绝。
+- `parallel_tool_calls` 转为 `tool_choice.disable_parallel_tool_use` 的反值，保持指定工具和强制工具选择。没有工具或选择 `none` 时无需附加并行开关。映射依据：[Anthropic 并行工具文档](https://platform.claude.com/docs/en/agents-and-tools/tool-use/parallel-tool-use)。
+- `text.format.type=text` 是默认文本输出，可规范化；结构化输出和 `verbosity` 仍拒绝。
+- `prompt_cache_key` 只接受字符串，跨协议不转发这个 OpenAI 缓存路由提示，不保证缓存命中，也不自动开启可能增加缓存写入费用的 `cache_control`。`prompt_cache_retention` 没有等价承诺，仍拒绝。
+- `reasoning.effort=none`（或 Chat 的 `reasoning_effort=none`）转为 `thinking.type=disabled`。可选摘要和 `include=reasoning.encrypted_content` 不会制造不存在的推理或密文。
+- `low` 等非零推理努力仍在调用前拒绝。当前原生 Anthropic 签名 thinking 的跨协议响应、流和工具续轮尚未形成完整可重放链，不能直接启用 adaptive 再等付费响应到达后断流，也不能伪造签名或把低推理偷偷改为关闭。
+
+同协议请求完整保留原始字段。本目录单测覆盖参数映射、边界和发送前拒绝；真实 Codex 默认模式仍需后续签名推理端到端工作，显式 `none` 的测试不得充当默认模式验收。

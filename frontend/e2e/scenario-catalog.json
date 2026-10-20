@@ -2825,5 +2825,19 @@
     "title": "budgeted hosted search preserves tools and settles zh-CN",
     "kind": "implemented",
     "environment": "default offline; verified local search budget contract"
+  },
+  {
+    "id": "SC-435",
+    "file": "e2e/scenarios/regression/claude-client-compat-en.test.ts",
+    "title": "Claude keep-all, public history and Chat terminal en",
+    "kind": "implemented",
+    "environment": "default offline; native Messages contract and finite budget"
+  },
+  {
+    "id": "SC-436",
+    "file": "e2e/scenarios/regression/claude-client-compat-zh-CN.test.ts",
+    "title": "Claude keep-all, public history and Chat terminal zh-CN",
+    "kind": "implemented",
+    "environment": "default offline; native Messages contract and finite budget"
   }
 ]

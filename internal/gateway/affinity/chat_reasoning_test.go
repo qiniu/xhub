@@ -43,3 +43,37 @@ func TestChatReasoningOwnedSession(t *testing.T) {
 		t.Fatal("非法 Chat 扩展不能作为普通请求回退")
 	}
 }
+
+// TestChatPublicReasoningAllowsModelSwitch 验证完整公开摘要工具历史切换模型时不要求旧连接，密文和非法摘要保持拒绝。
+// 参数 t 为上下文；内存路由先记录 Grok 成功归属，再切换 Claude，覆盖无密文、密文及嵌套未知字段；无持久化清理。
+func TestChatPublicReasoningAllowsModelSwitch(t *testing.T) {
+	s := &State{}
+	p := &auth.Principal{UserID: "alice"}
+	r := httptest.NewRequest("POST", "/v1/chat/completions", nil)
+	r.Header.Set("X-Session-Id", "model-switch")
+	firstBody := map[string]any{"messages": []any{map[string]any{"role": "user", "content": "Read"}}}
+	first := s.PlanRoute(r, "grok", firstBody, p)
+	first.Target = dpcontract.RouteTarget{DeploymentID: "grok-dep", ConnectionID: "grok-account", Model: "grok", Pool: "grok"}
+	s.CommitRoute(first, "grok-dep", "resp")
+	for _, tc := range []struct {
+		name    string
+		item    map[string]any
+		allowed bool
+	}{
+		{"public", map[string]any{"type": "reasoning", "id": "rs", "summary": []any{map[string]any{"type": "summary_text", "text": "Public plan"}}}, true},
+		{"cipher", map[string]any{"type": "reasoning", "id": "rs", "encrypted_content": "cipher"}, false},
+		{"unknown-nested", map[string]any{"type": "reasoning", "id": "rs", "summary": []any{map[string]any{"type": "summary_text", "text": "Plan", "signature": "sig"}}}, false},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			body := map[string]any{"messages": []any{map[string]any{"role": "assistant", "content": "", "reasoning_items": []any{tc.item}}}}
+			got := s.PlanRoute(r, "claude", body, p)
+			if tc.allowed {
+				if got.Err != nil || got.Required {
+					t.Fatalf("公开摘要切换被旧连接拦截: %+v", got)
+				}
+			} else if got.Err == nil {
+				t.Fatalf("密文或非法扩展绕过归属: %+v", got)
+			}
+		})
+	}
+}

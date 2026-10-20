@@ -1,6 +1,9 @@
 package dialogue
 
-import "fmt"
+import (
+	"fmt"
+	"strings"
+)
 
 // ChatReasoningItems 将已解析 Responses 的推理投影为 LiteLLM 风格的 Chat reasoning_items 扩展。
 // 参数 result 为上游结果，返回独立的推理数组或字段错误；同步编码和流式终态共用，不修改原结果。
@@ -36,8 +39,9 @@ func ChatReasoningItems(result DialogueResult) ([]any, error) {
 }
 
 // chatReasoningReplay 解析 Chat assistant 上回传的 reasoning_items，供共享解析器恢复 Responses 历史。
-// 参数 value 为可选扩展、role 为消息角色，返回独立原生 Turn 或格式错误；空扩展不影响普通 Chat。
-// 仅保留协议允许的字段，不解密、不拼接正文；原生 Turn 会阻止发送给 Chat/Anthropic 等其他上游，连接归属另由路由层验证。
+// 参数 value 为可选扩展、role 为消息角色，返回独立公开/原生 Turn 或格式错误；空扩展不影响普通 Chat。
+// 经严格验证的公开摘要转为可迁移推理；含 encrypted_content 字段的项即使为空也保留原生约束。
+// 不解密、不拼接正文；原生 Turn 阻止跨协议发送，连接归属另由路由层验证。
 func chatReasoningReplay(value any, role string) ([]Turn, error) {
 	if value == nil {
 		return nil, nil
@@ -58,8 +62,15 @@ func chatReasoningReplay(value any, role string) ([]Turn, error) {
 		if item["type"] != "reasoning" || dialogueString(item["id"]) == "" {
 			return nil, fmt.Errorf("reasoning_items requires reasoning type and ID")
 		}
-		if _, err := MessagesReasoningBlock(item); err != nil {
+		text, opaque, err := chatReasoningSummary(item)
+		if err != nil {
 			return nil, err
+		}
+		if !opaque {
+			// 公开摘要没有可跨供应商复用的原厂 ID；只保留文本语义，编码器按目标协议重建。
+			// 即使摘要为空也返回占位推理轮，让调用方取消重复的 reasoning_content 投影。
+			turns = append(turns, Turn{Role: "reasoning", Reasoning: text})
+			continue
 		}
 		copy, err := cloneObject(item)
 		if err != nil {
@@ -70,4 +81,46 @@ func chatReasoningReplay(value any, role string) ([]Turn, error) {
 		turns = append(turns, Turn{Role: "reasoning", NativeProtocol: "openai-responses", Native: copy})
 	}
 	return turns, nil
+}
+
+// ChatReasoningRequiresNativeOwnership 供路由层判断 Chat 推理扩展能否跨连接迁移。
+// 参数为客户端字段及消息角色，返回是否须验证原连接；只有完整通过解析且不含原生项才返回 false。
+// 非法嵌套字段、未知签名和任何密文字段均不能通过普通选路绕过验证；纯内存解析，不修改输入。
+func ChatReasoningRequiresNativeOwnership(value any, role string) bool {
+	turns, err := chatReasoningReplay(value, role)
+	if err != nil {
+		return true
+	}
+	for _, turn := range turns {
+		if turn.Native != nil {
+			return true
+		}
+	}
+	return false
+}
+
+// chatReasoningSummary 严格读取单个已校验顶层字段的 Chat reasoning 项，供重放及路由分类共用。
+// 返回公开摘要文本、是否存在密文字段及格式错误；未知嵌套字段不允许伪装成可迁移摘要。
+// 无副作用；生命周期状态只接受 Responses 定义的字符串，空或 null 密文字段仍保留原生限制。
+func chatReasoningSummary(item map[string]any) (string, bool, error) {
+	if status, exists := item["status"]; exists {
+		switch status {
+		case "in_progress", "completed", "incomplete":
+		default:
+			return "", false, fmt.Errorf("invalid reasoning status")
+		}
+	}
+	_, opaque := item["encrypted_content"]
+	if _, err := MessagesReasoningBlock(item); err != nil {
+		return "", opaque, err
+	}
+	var parts []string
+	for _, value := range dialogueList(item["summary"]) {
+		part := dialogueMap(value)
+		if err := dialogueFields(part, "type", "text"); err != nil {
+			return "", opaque, err
+		}
+		parts = append(parts, part["text"].(string))
+	}
+	return strings.Join(parts, "\n\n"), opaque, nil
 }

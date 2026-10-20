@@ -551,9 +551,11 @@ func EncodeDialogue(d Dialogue, protocol, model string) (map[string]any, error) 
 				cp["type"] = "function"
 				tools = append(tools, cp)
 			case "anthropic-messages":
-				if cp["strict"] != nil {
+				// strict=false 明确关闭约束，等价于 Messages 的普通工具；strict=true 仍需独立的能力验证。
+				if strict, exists := cp["strict"]; exists && strict != false {
 					return nil, fmt.Errorf("strict tools cannot be expressed by Messages")
 				}
+				delete(cp, "strict")
 				cp["input_schema"] = cp["parameters"]
 				delete(cp, "parameters")
 				tools = append(tools, cp)

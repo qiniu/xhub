@@ -14,8 +14,10 @@ from http.server import BaseHTTPRequestHandler, HTTPServer
 
 if __package__:
     from .stream_terminal_fixture import serve_stream_terminal
+    from .claude_client_fixture import serve_claude_client
 else:
     from stream_terminal_fixture import serve_stream_terminal
+    from claude_client_fixture import serve_claude_client
 try:
     from e2e.agent_history_fixture import handle_agent_history
 except ModuleNotFoundError:
@@ -273,6 +275,8 @@ class Handler(BaseHTTPRequestHandler):
             return
         model = req.get("model") or "gpt-4o-mini"
         if serve_stream_terminal(self, req):
+            return
+        if serve_claude_client(self, req):
             return
         # 专属搜索软预算夹具：必须真实收到搜索且没有额外次数上限，返回完整token用量，不能靠删除搜索工具通过。
         if str(model).startswith("budget-search-browser-"):
