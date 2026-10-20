@@ -247,8 +247,8 @@ func TestStrictBudgetRejectsUnpricedFeatures(t *testing.T) {
 		{name: "malformed tools", code: "invalid_request", change: func(b map[string]any) { b["tools"] = map[string]any{} }},
 		{name: "malformed tool entry", code: "invalid_request", change: func(b map[string]any) { b["tools"] = []any{3} }},
 		{name: "unnamed anthropic tool", code: "invalid_request", change: func(b map[string]any) { b["tools"] = []any{map[string]any{}} }},
-		{name: "image content", change: func(b map[string]any) {
-			b["messages"] = []any{map[string]any{"role": "user", "content": []any{map[string]any{"type": "image_url", "image_url": map[string]any{"url": "https://example.invalid/test.png"}}}}}
+		{name: "assistant image content", change: func(b map[string]any) {
+			b["messages"] = []any{map[string]any{"role": "assistant", "content": []any{map[string]any{"type": "image_url", "image_url": map[string]any{"url": "https://example.invalid/test.png"}}}}}
 		}},
 		{name: "top message audio", change: func(b map[string]any) {
 			b["messages"] = []any{map[string]any{"role": "assistant", "content": "", "audio": map[string]any{"id": "audio_test"}}}
@@ -256,7 +256,7 @@ func TestStrictBudgetRejectsUnpricedFeatures(t *testing.T) {
 		{name: "PDF content", protocol: "anthropic-messages", change: func(b map[string]any) {
 			b["messages"] = []any{map[string]any{"role": "user", "content": []any{map[string]any{"type": "document"}}}}
 		}},
-		{name: "tool result image", protocol: "anthropic-messages", change: func(b map[string]any) {
+		{name: "tool result image", code: "invalid_request", protocol: "anthropic-messages", change: func(b map[string]any) {
 			b["messages"] = []any{map[string]any{"role": "user", "content": []any{map[string]any{"type": "tool_result", "content": []any{map[string]any{"type": "image"}}}}}}
 		}},
 		{name: "server caller", protocol: "anthropic-messages", change: func(b map[string]any) {

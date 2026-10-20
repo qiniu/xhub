@@ -15,19 +15,19 @@ import (
 // visionRequest 构造含文字前后缀的真实客户请求；参数为协议、模型和流标记，返回对象，无外部数据或副作用。
 func visionRequest(protocol, model string, stream bool) map[string]any {
 	image := map[string]any{"type": "image_url", "image_url": map[string]any{"url": "data:image/png;base64,AQID"}}
-	key, text := "messages", "text"
+	key, text, capField := "messages", "text", "max_tokens"
 	if protocol == "openai-responses" {
-		key, text = "input", "input_text"
+		key, text, capField = "input", "input_text", "max_output_tokens"
 		image = map[string]any{"type": "input_image", "image_url": "data:image/png;base64,AQID"}
 	}
 	if protocol == "anthropic-messages" {
 		image = map[string]any{"type": "image", "source": map[string]any{"type": "base64", "media_type": "image/png", "data": "AQID"}}
 	}
-	return map[string]any{"model": model, "stream": stream, "max_tokens": 128, key: []any{map[string]any{"role": "user", "content": []any{map[string]any{"type": text, "text": "Before"}, image, map[string]any{"type": text, "text": "After"}}}}}
+	return map[string]any{"model": model, "stream": stream, capField: 128, key: []any{map[string]any{"role": "user", "content": []any{map[string]any{"type": text, "text": "Before"}, image, map[string]any{"type": text, "text": "After"}}}}}
 }
 
-// TestVisionInputProtocolMatrix 验证三种客户/上游协议的 JSON/SSE 图片完整性、失败契约、护栏和实测账单归属。
-// 前置真实网关、独立 PostgreSQL schema 和个人 Key，本地上游独立校验图片字节/MIME/顺序；Cleanup 关闭服务并删除 schema。
+// TestVisionInputProtocolMatrix 验证三种客户/上游协议在硬额度下的 JSON/SSE 图片完整性、失败契约、护栏和实测账单归属。
+// 前置真实网关、独立 PostgreSQL schema 和有限额个人 Key，本地上游独立校验图片字节/MIME/顺序；Cleanup 关闭服务并删除 schema。
 func TestVisionInputProtocolMatrix(t *testing.T) {
 	protocols := []string{"openai-chat", "openai-responses", "anthropic-messages"}
 	transports := []string{"bypass_openai_chat", "bypass_openai_responses", "bypass_anthropic_messages"}
@@ -95,12 +95,19 @@ func TestVisionInputProtocolMatrix(t *testing.T) {
 				}
 			}))
 			t.Cleanup(upstream.Close)
-			dep := chatDeployment("vision-model")
+			dep := hardBudgetDeployment("vision-model")
 			dep.LiteLLMParams["api_base"] = upstream.URL + "/v1"
-			dep.ModelInfo = map[string]any{"transport": transports[index], "endpoint_types": []string{"chat", "responses", "messages"}, "pricing_source": "manual"}
+			dep.ModelInfo["transport"] = transports[index]
+			dep.ModelInfo["endpoint_types"] = []string{"chat", "responses", "messages"}
 			h := newHarness(t, dep)
 			admin := h.adminSession()
 			owner := h.openScope(t, admin, "vision-owner")
+			// 允许图片不等于放宽硬额度：整窗余额不足仍须在任何供应商请求之前拒绝。
+			h.setKeyBudget(t, admin, owner.key, 0.000001)
+			if r := h.do("POST", "/v1/messages", owner.key, visionRequest("anthropic-messages", dep.ModelName, false)); r.status != 429 || calls.Load() != 0 {
+				t.Fatalf("图片请求绕过余额限制: %s", r.describe())
+			}
+			h.setKeyBudget(t, admin, owner.key, 1)
 			for _, source := range protocols {
 				for _, stream := range []bool{false, true} {
 					body := visionRequest(source, dep.ModelName, stream)
@@ -109,14 +116,22 @@ func TestVisionInputProtocolMatrix(t *testing.T) {
 					if response.status != 200 || !strings.Contains(response.text(), "matrix-ok") {
 						t.Fatalf("%s -> %s stream=%v 识图协议失败: %s", source, target, stream, response.describe())
 					}
+					if response.header("X-XHub-Budget-Input-Bound") != "1024" {
+						t.Fatalf("图片请求未经过硬额度整窗预占: %s", response.describe())
+					}
 					h.flushSpend()
+					holds, err := h.db.PendingKeyBudget(t.Context(), owner.keyID)
+					if err != nil || len(holds) != 0 {
+						t.Fatalf("图片调用结算后仍有预占: %+v %v", holds, err)
+					}
 					bill := h.ok("GET", "/spend/logs/ui/"+response.header("x-litellm-call-id"), admin, nil).json()
-					if bill["status"] != "success" || bill["api_key"] != owner.keyID {
+					if bill["status"] != "success" || bill["api_key"] != owner.keyID || bill["spend"] != float64(0.000032) {
 						t.Fatalf("图片请求日志/账单归属错误: %v", bill)
 					}
 				}
 			}
 			before := calls.Load()
+
 			if r := h.do("POST", "/v1/responses", "", visionRequest("openai-responses", dep.ModelName, false)); r.status != 401 {
 				t.Fatal("图片请求绕过鉴权")
 			}

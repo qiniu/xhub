@@ -31,12 +31,36 @@ func NormalizeDialogueUsage(u map[string]any) map[string]any {
 	out := MergeDialogueUsage(nil, u)
 	for source, target := range map[string]string{"input_tokens": "prompt_tokens", "output_tokens": "completion_tokens", "input_tokens_details": "prompt_tokens_details", "output_tokens_details": "completion_tokens_details"} {
 		if value, exists := u[source]; exists {
-			out[target] = value
+			if value == nil && (source == "input_tokens_details" || source == "output_tokens_details") {
+				// null是未报告，不得覆盖另一别名已经观测到的图片/缓存计量。
+				delete(out, source)
+				continue
+			}
+			if (source == "input_tokens_details" || source == "output_tokens_details") && dialogueMap(value) != nil {
+				// 两种别名可能各带一部分明细；先前Merge已标记冲突，合并不能丢失图片或缓存事实。
+				fields := map[string]any{}
+				for key, v := range dialogueMap(out[target]) {
+					fields[key] = v
+				}
+				for key, v := range dialogueMap(value) {
+					if v != nil {
+						fields[key] = v
+					}
+				}
+				out[target] = fields
+			} else {
+				out[target] = value
+			}
 		}
 		delete(out, source)
 	}
 	if value, exists := u["cache_read_input_tokens"]; exists {
-		out["prompt_tokens_details"] = map[string]any{"cached_tokens": value}
+		fields := map[string]any{}
+		for key, v := range dialogueMap(out["prompt_tokens_details"]) {
+			fields[key] = v
+		}
+		fields["cached_tokens"] = value
+		out["prompt_tokens_details"] = fields
 	}
 	input, hasInput := dialogueNumber(out["prompt_tokens"])
 	output, hasOutput := dialogueNumber(out["completion_tokens"])

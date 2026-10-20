@@ -3,6 +3,7 @@ package dialogue
 import (
 	"encoding/json"
 	"reflect"
+	"strings"
 	"testing"
 
 	"github.com/sunqirui1987/xhub/internal/catalog"
@@ -164,16 +165,15 @@ func TestDialogueGoogleCacheUsage(t *testing.T) {
 	}
 }
 
-// setCacheUsageAlias 为测试构建平级/嵌套缓存计数；参数是测试私有对象、固定路径和值，无返回或外部副作用。
+// setCacheUsageAlias构建平级或嵌套缓存/模态计数；参数为私有对象、已知路径和值，无返回，无外部副作用。
 func setCacheUsageAlias(usage map[string]any, path string, value int) {
-	for _, parent := range []string{"prompt_tokens_details", "input_tokens_details"} {
-		if path == parent+".cached_tokens" {
-			if usage[parent] == nil {
-				usage[parent] = map[string]any{}
-			}
-			usage[parent].(map[string]any)["cached_tokens"] = value
-			return
+	parent, child, nested := strings.Cut(path, ".")
+	if nested {
+		if usage[parent] == nil {
+			usage[parent] = map[string]any{}
 		}
+		usage[parent].(map[string]any)[child] = value
+		return
 	}
 	usage[path] = value
 }

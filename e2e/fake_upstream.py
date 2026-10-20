@@ -44,12 +44,14 @@ VISION_PNG = "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAIAAACQd1PeAAAADElEQVR4nGNg+M8AAA
 def vision_answer(req: dict, path: str) -> str:
     """校验真实图片是否按目标协议完整抵达；参数为请求和上游路径，返回仅由图片决定的标记。
 
-    前置浏览器上传的绿色 PNG，验证协议、MIME、Base64 字节与可读提示，缺图或错误内容抛 ValueError；不下载远程地址或保存文件。
+    前置浏览器上传的绿色 PNG，验证协议、MIME、Base64 字节及原生工具关联，缺图或错误内容抛 ValueError；不下载远程地址或保存文件。
     """
     messages = req.get("input" if path.endswith("/responses") else "messages", [])
     images = []
+    tool_calls = set()
     for message in messages:
-        for part in message.get("content", []) if isinstance(message.get("content"), list) else []:
+        parts = list(message.get("content", [])) if isinstance(message.get("content"), list) else []
+        for part in parts:
             kind = part.get("type")
             if kind == "input_image" and path.endswith("/responses"):
                 images.append(part.get("image_url"))
@@ -60,6 +62,14 @@ def vision_answer(req: dict, path: str) -> str:
                 if source.get("type") != "base64" or source.get("media_type") != "image/png":
                     raise ValueError("invalid vision MIME or source")
                 images.append("data:image/png;base64," + source.get("data", ""))
+            elif kind == "tool_use" and path.endswith("/messages") and message.get("role") == "assistant":
+                if not part.get("id") or part.get("name") != "read_image":
+                    raise ValueError("invalid image tool call")
+                tool_calls.add(part["id"])
+            elif kind == "tool_result" and path.endswith("/messages") and message.get("role") == "user":
+                if part.get("tool_use_id") not in tool_calls or not isinstance(part.get("content"), list):
+                    raise ValueError("invalid image tool result")
+                parts.extend(part["content"])
             elif kind not in ("text", "input_text", "output_text"):
                 raise ValueError("wrong image protocol")
     if images != ["data:image/png;base64," + VISION_PNG]:
@@ -257,6 +267,11 @@ class Handler(BaseHTTPRequestHandler):
         if req.get("model", "").startswith("e2e-vision-"):
             try:
                 text = vision_answer(req, self.path)
+                # 有限额度浏览器专用模型必须实际收到协议cap；仅凭客户端响应头不能证明出站约束已写入。
+                if req["model"].startswith("e2e-vision-budget-"):
+                    cap_field = "max_output_tokens" if self.path.endswith("/responses") else "max_tokens"
+                    if type(req.get(cap_field)) is not int or not 1 <= req[cap_field] <= 8192:
+                        raise ValueError("budgeted vision output cap missing")
             except (ValueError, TypeError, AttributeError):
                 self._response(400, b'{"error":{"message":"image payload invalid"}}', "application/json")
                 return
@@ -265,6 +280,19 @@ class Handler(BaseHTTPRequestHandler):
                 payload = {"id": "chatcmpl_vision", "choices": [{"message": {"role": "assistant", "content": text}, "finish_reason": "stop"}], "usage": usage}
                 if req.get("stream"):
                     self._sse([{"id": "chatcmpl_vision", "choices": [{"index": 0, "delta": {"content": text}, "finish_reason": "stop"}], "usage": usage}, "[DONE]"])
+                else:
+                    self._json(payload)
+            elif self.path.endswith("/messages"):
+                payload = {"id": "msg_vision", "type": "message", "role": "assistant", "model": req["model"], "content": [{"type": "text", "text": text}], "stop_reason": "end_turn", "stop_sequence": None, "usage": {"input_tokens": 8, "output_tokens": 2}}
+                if req.get("stream"):
+                    self._sse([
+                        {"type": "message_start", "message": {**payload, "content": [], "stop_reason": None, "usage": {"input_tokens": 8, "output_tokens": 0}}},
+                        {"type": "content_block_start", "index": 0, "content_block": {"type": "text", "text": ""}},
+                        {"type": "content_block_delta", "index": 0, "delta": {"type": "text_delta", "text": text}},
+                        {"type": "content_block_stop", "index": 0},
+                        {"type": "message_delta", "delta": {"stop_reason": "end_turn", "stop_sequence": None}, "usage": {"output_tokens": 2}},
+                        {"type": "message_stop"},
+                    ])
                 else:
                     self._json(payload)
             else:

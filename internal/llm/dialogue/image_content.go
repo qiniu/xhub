@@ -247,3 +247,22 @@ func encodeImageContent(content []ContentPart, protocol string) ([]any, error) {
 	}
 	return out, nil
 }
+
+// ValidateBudgetInputImage复用三协议图片解析供严格预算准入；参数为实际图片块和出站协议，返回格式错误。
+// 缓存提示由预算层另行校验；此处只检查图片本身，不访问URL、不修改正文，拒绝服务器文件引用。
+func ValidateBudgetInputImage(block map[string]any, protocol string) error {
+	copy := make(map[string]any, len(block))
+	for key, value := range block {
+		if key != "cache_control" {
+			copy[key] = value
+		}
+	}
+	part, err := parseImagePart(copy, protocol, "user")
+	if err != nil {
+		return err
+	}
+	if part.FileID != "" {
+		return fmt.Errorf("strict budget requires explicit image data or URL")
+	}
+	return nil
+}

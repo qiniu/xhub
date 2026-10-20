@@ -301,7 +301,29 @@ func NormalizeUsage(usage map[string]any) Usage {
 	out.PricingBlocked, _ = usage["pricing_blocked"].(string)
 	out.InputSeconds = firstFloatField(usage, "input_seconds")
 	out.InputImages = firstIntField(usage, "input_image_count")
-	if details, ok := usage["input_tokens_details"].(map[string]any); ok {
+	// 对话归一化采用prompt别名；两种协议明细均须保留，不能把图片分桶退化成文字通价。
+	details, _ := usage["input_tokens_details"].(map[string]any)
+	alternate, _ := usage["prompt_tokens_details"].(map[string]any)
+	if details == nil {
+		details = alternate
+	} else if alternate != nil {
+		merged := make(map[string]any, len(details)+len(alternate))
+		for key, value := range alternate {
+			merged[key] = value
+		}
+		for key, value := range details {
+			if value != nil {
+				merged[key] = value
+			}
+		}
+		for _, key := range []string{"text_tokens", "image_tokens"} {
+			if details[key] != nil && alternate[key] != nil && intField(details, key) != intField(alternate, key) && out.PricingBlocked == "" {
+				out.PricingBlocked = "input_token_details_conflict"
+			}
+		}
+		details = merged
+	}
+	if details != nil {
 		_, hasText := details["text_tokens"]
 		_, hasImage := details["image_tokens"]
 		out.InputTokenDetails = hasText || hasImage

@@ -43,22 +43,24 @@ type BudgetPlan struct {
 // 新计划的CacheWrite保存最大预占价，CacheWriteByTTL保存全部已知期限的实际结算价；不能用最大值代替实测分桶。
 type budgetPriceSnapshot struct {
 	// Supplier冻结本次实际连接标识供人工核对；历史缺失保持未知，不能套用最后一个重试的供应商。
-	Supplier           string                  `json:"supplier,omitempty"`
-	InputBound         int                     `json:"input_bound"`
-	OutputCap          int                     `json:"output_cap"`
-	Amount             float64                 `json:"reserved_amount"`
-	Protocol           string                  `json:"protocol"`
-	Window             string                  `json:"window"`
-	Model              string                  `json:"model"`
-	StartedAt          time.Time               `json:"started_at"`
-	Input              catalog.Rate            `json:"input_rate"`
-	Output             catalog.Rate            `json:"output_rate"`
-	CacheRead          *catalog.Rate           `json:"cache_read_rate,omitempty"`
-	CacheWrite         *catalog.Rate           `json:"cache_write_rate,omitempty"`
-	CacheWriteByTTL    map[string]catalog.Rate `json:"cache_write_rates_by_ttl,omitempty"`
-	Tiers              []budgetPriceTier       `json:"tiers,omitempty"`
-	IntervalSemantics  string                  `json:"interval_semantics,omitempty"`
-	CapSemanticsSource string                  `json:"cap_semantics_source,omitempty"`
+	// InputImagesIncluded冻结图片输入仅占用总输入token的契约；旧快照缺失为false，不能事后放宽。
+	InputImagesIncluded bool                    `json:"input_images_included,omitempty"`
+	Supplier            string                  `json:"supplier,omitempty"`
+	InputBound          int                     `json:"input_bound"`
+	OutputCap           int                     `json:"output_cap"`
+	Amount              float64                 `json:"reserved_amount"`
+	Protocol            string                  `json:"protocol"`
+	Window              string                  `json:"window"`
+	Model               string                  `json:"model"`
+	StartedAt           time.Time               `json:"started_at"`
+	Input               catalog.Rate            `json:"input_rate"`
+	Output              catalog.Rate            `json:"output_rate"`
+	CacheRead           *catalog.Rate           `json:"cache_read_rate,omitempty"`
+	CacheWrite          *catalog.Rate           `json:"cache_write_rate,omitempty"`
+	CacheWriteByTTL     map[string]catalog.Rate `json:"cache_write_rates_by_ttl,omitempty"`
+	Tiers               []budgetPriceTier       `json:"tiers,omitempty"`
+	IntervalSemantics   string                  `json:"interval_semantics,omitempty"`
+	CapSemanticsSource  string                  `json:"cap_semantics_source,omitempty"`
 }
 
 // budgetFailure 构造不包含输入正文的分类错误；参数为固定代码和原因，返回错误，严格计划和结算共用。
@@ -66,7 +68,7 @@ func budgetFailure(code, message string) error { return &BudgetPlanError{Code: c
 
 // StrictBudgetPlan 校验最终JSON、设置真实输出cap并冻结单次尝试的费用上界。
 // 参数必须是已恢复历史、经护栏和协议转换后的实际部署/正文/协议与原请求开始时间；返回计划、新正文或分类错误。
-// 只支持有可信输入窗口和完整文字费率的单次文字生成；多模态、服务器工具、未知定价条件和远程历史引用拒绝。
+// 支持可信输入整窗覆盖的文字及统一token价图片输入；独立图片计费、生成、服务器工具及远程历史引用拒绝。
 // Chat 的cap字段须由可信 supported_parameters 声明，不从模型名称猜测；不修改传入部署或字节，不访问供应商。
 func StrictBudgetPlan(dep config.ModelEntry, finalBody []byte, protocol string, started time.Time) (BudgetPlan, []byte, error) {
 	fail := func(err error) (BudgetPlan, []byte, error) { return BudgetPlan{}, nil, err }
@@ -83,7 +85,8 @@ func StrictBudgetPlan(dep config.ModelEntry, finalBody []byte, protocol string, 
 	if protocol != "openai-chat" && protocol != "openai-responses" && protocol != "anthropic-messages" {
 		return fail(budgetFailure("unsupported_budget", "strict budget requires a supported text dialogue protocol"))
 	}
-	cacheTTL, err := budgetRequest(body, protocol)
+	hasImages := false
+	cacheTTL, err := budgetRequest(body, protocol, &hasImages)
 	if err != nil {
 		return fail(err)
 	}
@@ -98,9 +101,21 @@ func StrictBudgetPlan(dep config.ModelEntry, finalBody []byte, protocol string, 
 	}
 	window := catalog.WindowAt(started)
 	supplier, _ := dep.MonitorIdentity()
-	snapshot := budgetPriceSnapshot{Supplier: supplier, InputBound: input, OutputCap: cap, Protocol: protocol, Window: window, Model: dep.ParamString("model", ""), StartedAt: started}
+	snapshot := budgetPriceSnapshot{InputImagesIncluded: hasImages, Supplier: supplier, InputBound: input, OutputCap: cap, Protocol: protocol, Window: window, Model: dep.ParamString("model", ""), StartedAt: started}
 	if protocol == "openai-chat" && body["max_tokens"] != nil && budgetTrustedLegacyCap(dep) {
 		snapshot.CapSemanticsSource = strings.TrimSpace(dep.ModelInfo["max_tokens_semantics_source"].(string))
+	}
+	// 即使采用分档表，也不能忽略同一可信价格源声明的独立图片输入收费。
+	if hasImages {
+		rates, err := budgetRates(dep, row)
+		if err != nil {
+			return fail(err)
+		}
+		for _, rate := range rates {
+			if rate.Side == "input" && rate.Measure != "token" {
+				return fail(budgetFailure("unsupported_budget", "strict budget image input requires token-only input prices"))
+			}
+		}
 	}
 	tiers, tiered, err := budgetTiers(dep, row, input, cap, window, cacheTTL)
 	if err != nil {
@@ -192,10 +207,10 @@ func (p BudgetPlan) Charge(u catalog.Usage, rawUsage ...map[string]any) (catalog
 	if u.PromptTokens < 0 || u.PromptTokens > s.InputBound || u.CompletionTokens < 0 || u.CompletionTokens > s.OutputCap || u.CachedTokens < 0 || u.CachedTokens > u.PromptTokens || u.CacheWriteTokens < 0 || u.CacheWriteTokens > s.InputBound {
 		return fail("measured token usage exceeds the reserved bounds")
 	}
-	if u.InputImageTokens != 0 || u.InputImages != 0 || u.Images != 0 || u.InputSeconds != 0 || u.Seconds != 0 || u.Searches != 0 || u.ImageVariant != "" || u.OutputVariant != "" || (u.PricingModel != "" && u.PricingModel != s.Model) {
+	if u.InputImageTokens != 0 && !s.InputImagesIncluded || u.InputImages != 0 || u.Images != 0 || u.InputSeconds != 0 || u.Seconds != 0 || u.Searches != 0 || u.ImageVariant != "" || u.OutputVariant != "" || (u.PricingModel != "" && u.PricingModel != s.Model) {
 		return fail("measured usage contains an unreserved pricing dimension")
 	}
-	if u.InputTextTokens < 0 || u.InputTextTokens > u.PromptTokens {
+	if u.InputTextTokens < 0 || u.InputImageTokens < 0 || int64(u.InputTextTokens)+int64(u.InputImageTokens) > int64(u.PromptTokens) {
 		return fail("measured input token details contradict the total")
 	}
 	if u.CacheWriteTokens > 0 && s.CacheWrite == nil {
@@ -253,8 +268,24 @@ func ValidateStrictBudgetUsage(raw map[string]any, plans ...BudgetPlan) error {
 		}
 		counts[group[0]] = first
 	}
-	if err := budgetUsageDimensions(raw); err != nil {
+	allowImages := len(plans) > 0 && plans[0].frozen != nil && plans[0].frozen.InputImagesIncluded
+	if err := budgetUsageDimensions(raw, "", allowImages); err != nil {
 		return err
+	}
+	// 图片与文字分桶属于总输入的子集；别名可能各提供半份明细，须合并后检查，不能靠缓存加总掩盖矛盾。
+	textDetails, imageDetails := 0, 0
+	for _, key := range []string{"input_tokens_details", "prompt_tokens_details"} {
+		if details, ok := raw[key].(map[string]any); ok {
+			if details["text_tokens"] != nil {
+				textDetails, _ = budgetUsageInteger(details["text_tokens"])
+			}
+			if details["image_tokens"] != nil {
+				imageDetails, _ = budgetUsageInteger(details["image_tokens"])
+			}
+		}
+	}
+	if int64(textDetails)+int64(imageDetails) > int64(counts["prompt_tokens"]) {
+		return fail("measured input token details exceed the input total")
 	}
 	// 推理属于输出总量的子集，不能把明显遗漏隐藏推理的上游账单当成完整事实。
 	for _, key := range []string{"completion_tokens_details", "output_tokens_details"} {
@@ -298,18 +329,27 @@ func budgetUsageInteger(value any) (int, bool) {
 }
 
 // budgetUsageDimensions 递归检查usage计数，防止可选明细在目录转换时静默丢失；参数为用量树，返回不可计价错误。
-// 只遍历小型计量对象，不读取请求正文；未知多模态和服务器工具非零计量不能套用文字价格。
-func budgetUsageDimensions(values map[string]any) error {
+// path标记当前明细位置，allowImages仅来自冻结计划；只允许输入明细中的image_tokens作为总输入子集。
+// 不读取正文；输出图片、未知位置图片计量、音视频与服务器工具继续拒绝。
+func budgetUsageDimensions(values map[string]any, path string, allowImages bool) error {
 	for key, value := range values {
 		if value == nil {
 			continue
+		}
+		independentImage := key == "input_image_count" || key == "images" || key == "image_count" || key == "num_images" || key == "output_images"
+		if independentImage {
+			n, ok := budgetUsageInteger(value)
+			if !ok || n != 0 {
+				return budgetFailure("invalid_usage", "measured usage contains an unreserved image count")
+			}
 		}
 		if strings.HasSuffix(key, "_tokens") || key == "cached_tokens" || key == "searches" || key == "search_count" || key == "web_search_requests" || key == "web_fetch_requests" {
 			n, ok := budgetUsageInteger(value)
 			if !ok {
 				return budgetFailure("invalid_usage", "measured usage counts must be nonnegative integers")
 			}
-			if n > 0 && (strings.Contains(key, "audio") || strings.Contains(key, "image") || strings.Contains(key, "search") || strings.Contains(key, "fetch")) {
+			imageSubset := allowImages && key == "image_tokens" && (path == "input_tokens_details" || path == "prompt_tokens_details")
+			if n > 0 && !imageSubset && (strings.Contains(key, "audio") || strings.Contains(key, "image") || strings.Contains(key, "search") || strings.Contains(key, "fetch")) {
 				return budgetFailure("invalid_usage", "measured usage contains an unreserved pricing dimension")
 			}
 		}
@@ -319,7 +359,11 @@ func budgetUsageDimensions(values map[string]any) error {
 			}
 		}
 		if nested, ok := value.(map[string]any); ok {
-			if err := budgetUsageDimensions(nested); err != nil {
+			child := key
+			if path != "" {
+				child = path + "." + key
+			}
+			if err := budgetUsageDimensions(nested, child, allowImages); err != nil {
 				return err
 			}
 		}
@@ -594,8 +638,9 @@ func budgetRate(rates []catalog.Rate, side, variant, window string) (catalog.Rat
 	return catalog.Rate{}, false
 }
 
-// budgetRequest 验证文字生成收费维度并识别缓存TTL；参数为最终私有JSON和协议，返回单一TTL或拒绝原因，不修改内容。
-func budgetRequest(body map[string]any, protocol string) (string, error) {
+// budgetRequest验证收费维度和缓存TTL；参数为最终JSON、协议及图片标记指针，返回TTL或拒绝原因。
+// 只更新本次图片事实，不修改请求；实际计价能力在冻结费率后核对。
+func budgetRequest(body map[string]any, protocol string, hasImages *bool) (string, error) {
 	allowed := strings.Fields("model stream stream_options messages input instructions system tools functions function_call tool_choice parallel_tool_calls max_tokens max_completion_tokens max_output_tokens temperature top_p frequency_penalty presence_penalty logit_bias logprobs top_logprobs seed stop user metadata reasoning reasoning_effort text response_format include store service_tier prompt_cache_key prompt_cache_retention thinking output_config n safety_identifier client_metadata verbosity cache_control")
 	keys := map[string]bool{}
 	for _, key := range allowed {
@@ -638,7 +683,7 @@ func budgetRequest(body map[string]any, protocol string) (string, error) {
 		}
 	}
 	if value := body["system"]; value != nil {
-		if err := budgetContent(value, &ttl); err != nil {
+		if err := budgetContent(value, &ttl, protocol, "system", hasImages); err != nil {
 			return "", err
 		}
 	}
@@ -676,7 +721,7 @@ func budgetRequest(body map[string]any, protocol string) (string, error) {
 					return "", budgetFailure("unsupported_budget", "strict budget does not support dialogue field "+key)
 				}
 			}
-			if err := budgetContent(item["content"], &ttl); err != nil {
+			if err := budgetContent(item["content"], &ttl, protocol, budgetRole(item), hasImages); err != nil {
 				return "", err
 			}
 		case "web_search_call":
@@ -685,7 +730,7 @@ func budgetRequest(body map[string]any, protocol string) (string, error) {
 			}
 		case "reasoning", "function_call", "custom_tool_call":
 		case "function_call_output", "custom_tool_call_output":
-			if err := budgetContent(item["output"], &ttl); err != nil {
+			if err := budgetContent(item["output"], &ttl, protocol, "tool", hasImages); err != nil {
 				return "", err
 			}
 		case "additional_tools", "tool_search_output":
@@ -732,8 +777,9 @@ func budgetCacheHint(item map[string]any, ttl *string) error {
 	return nil
 }
 
-// budgetContent 只接受文字、原生推理和客户端工具结果；参数为内容与TTL累积值，返回多模态/远程资源拒绝，无外部读取。
-func budgetContent(value any, ttl *string) error {
+// budgetContent校验文字、推理、客户端工具结果和用户图片；参数含实际协议、角色及图片事实累积值。
+// 图片只允许用户输入或Messages用户工具结果；复用协议图片格式校验，不下载URL、不放行生成/文件引用。
+func budgetContent(value any, ttl *string, protocol, role string, hasImages *bool) error {
 	if value == nil {
 		return nil
 	}
@@ -761,8 +807,19 @@ func budgetContent(value any, ttl *string) error {
 					return budgetFailure("unsupported_budget", "strict budget requires direct client tools")
 				}
 			}
+		case "image", "image_url", "input_image":
+			if role != "user" {
+				return budgetFailure("unsupported_budget", "strict budget image input requires user content")
+			}
+			if err := llmdialogue.ValidateBudgetInputImage(part, protocol); err != nil {
+				return budgetFailure("invalid_request", "invalid image input for strict budget")
+			}
+			*hasImages = true
 		case "tool_result":
-			if err := budgetContent(part["content"], ttl); err != nil {
+			if protocol != "anthropic-messages" || role != "user" {
+				return budgetFailure("unsupported_budget", "strict budget requires user client tool results")
+			}
+			if err := budgetContent(part["content"], ttl, protocol, role, hasImages); err != nil {
 				return err
 			}
 		default:
@@ -819,4 +876,14 @@ func budgetTrustedLegacyCap(dep config.ModelEntry) bool {
 	declared, ok := dep.ModelInfo["max_tokens_includes_reasoning"].(bool)
 	source, sourceOK := dep.ModelInfo["max_tokens_semantics_source"].(string)
 	return ok && declared && sourceOK && strings.TrimSpace(source) != ""
+}
+
+// budgetRole读取历史项角色；Responses省略role的message默认为用户输入，其余已由协议层校验。
+// 参数为最终历史项，返回角色；无外部读取或正文修改，仅用于限制图片输入位置。
+func budgetRole(item map[string]any) string {
+	role, _ := item["role"].(string)
+	if role == "" {
+		return "user"
+	}
+	return role
 }

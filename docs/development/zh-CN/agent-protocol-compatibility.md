@@ -136,7 +136,8 @@ PNG/JPEG/GIF/WebP 的 MIME 和 Base64 字节。图片单独输入也不会因文
 OpenAI `detail` 的 `auto/low/high/original` 在 Responses ↔ Chat 之间保持原值。
 Messages 没有等价精度字段，桥接显式 `low/high/original` 会报能力错误；默认或 `auto` 可以转换。
 Responses 的 `file_id` 仅在原生 Responses 保留，不下载文件，也不将供应商私有引用假装成 URL。
-本轮不支持工具结果里的图片、音视频、PDF、Google 视觉桥接或图片生成；这些能力继续明确拒绝。
+原生 Messages 支持用户 `tool_result` 中的图片及图文混合结果（例如 Claude Code Read），保留调用 ID、顺序和错误标记；无法等价转换的工具图片跨协议桥接明确拒绝。音视频、PDF、Google 视觉桥接或图片生成仍不属于本轮支持范围。
+有限额度 Key 的用户图片及原生工具图片按可信整窗、统一输入 token 价格预占和结算；独立图片收费仍拒绝，详见[硬额度](hard-budgets.md)。
 
 网关不会为图片 URL 发起下载、重定向或读取本机文件；仅转发 HTTP(S) URL 或校验过的 Base64 data URL。
 文本护栏仍处理图片旁的文字，图片不转换成伪文本；计费使用上游实测 token。

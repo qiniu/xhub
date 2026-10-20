@@ -142,6 +142,53 @@ class ArkUpstreamTest(unittest.TestCase):
         with self.assertRaises(ValueError):
             vision_answer(messages, "/v1/messages")
 
+    def test_budgeted_vision_messages_and_tool_result(self):
+        """前置本地HTTP原生Messages；核对用户/工具图片的JSON与完整SSE、cap上下界及错误关联/MIME拒绝，tearDown清理服务。"""
+        image = {"type": "image", "source": {"type": "base64", "media_type": "image/png", "data": VISION_PNG}}
+        user_image = [{"role": "user", "content": [{"type": "text", "text": "Describe this image."}, image]}]
+        tool_image = [
+            {"role": "user", "content": "Read and describe the image."},
+            {"role": "assistant", "content": [{"type": "tool_use", "id": "tool_image", "name": "read_image", "input": {}}]},
+            {"role": "user", "content": [{"type": "tool_result", "tool_use_id": "tool_image", "content": [{"type": "text", "text": "Image bytes:"}, image]}]},
+        ]
+        for messages, cap in ((user_image, 2), (tool_image, 8192)):
+            body = {"model": "e2e-vision-budget-messages", "max_tokens": cap, "messages": messages}
+            with self.subTest(tool_result=messages is tool_image):
+                reply = self.request("/v1/messages", body)
+                self.assertEqual(reply["content"], [{"type": "text", "text": "green-pixel"}])
+                self.assertEqual(reply["usage"], {"input_tokens": 8, "output_tokens": 2})
+                self.assertEqual(reply["stop_reason"], "end_turn")
+                with urlopen(Request(self.base + "/v1/messages", data=json.dumps({**body, "stream": True}).encode()), timeout=2) as response:
+                    frames = [json.loads(line[6:]) for line in response.read().decode().splitlines() if line.startswith("data: {")]
+                self.assertEqual([frame["type"] for frame in frames], ["message_start", "content_block_start", "content_block_delta", "content_block_stop", "message_delta", "message_stop"])
+                self.assertEqual(frames[0]["message"]["usage"], {"input_tokens": 8, "output_tokens": 0})
+                self.assertEqual(frames[-2]["usage"], {"output_tokens": 2})
+        bad_tool = json.loads(json.dumps(tool_image))
+        bad_tool[-1]["content"][0]["tool_use_id"] = "not_called"
+        bad_mime = json.loads(json.dumps(tool_image))
+        bad_mime[-1]["content"][0]["content"][1]["source"]["media_type"] = "image/jpeg"
+        invalid = [{"max_tokens": cap, "messages": user_image} for cap in (None, 0, 8193, True)]
+        invalid.extend([{"max_tokens": 64, "messages": messages} for messages in (bad_tool, bad_mime, [])])
+        for fields in invalid:
+            with self.subTest(invalid=fields), self.assertRaises(HTTPError) as error:
+                self.request("/v1/messages", {"model": "e2e-vision-budget-messages", **fields})
+            self.assertEqual(error.exception.code, 400)
+            error.exception.close()
+
+    def test_budgeted_vision_requires_protocol_cap(self):
+        """前置Chat/Responses图片夹具；验证各协议实际输出cap到达，缺失或错字段拒绝，tearDown回收本地HTTP服务。"""
+        for path, field, body in (
+            ("/v1/chat/completions", "max_tokens", {"messages": [{"role": "user", "content": [{"type": "image_url", "image_url": {"url": "data:image/png;base64," + VISION_PNG}}]}]}),
+            ("/v1/responses", "max_output_tokens", {"input": [{"role": "user", "content": [{"type": "input_image", "image_url": "data:image/png;base64," + VISION_PNG}]}]}),
+        ):
+            body["model"] = "e2e-vision-budget-cap"
+            self.request(path, {**body, field: 64})
+            for fields in ({}, {"max_completion_tokens": 64}):
+                with self.subTest(path=path, fields=fields), self.assertRaises(HTTPError) as error:
+                    self.request(path, {**body, **fields})
+                self.assertEqual(error.exception.code, 400)
+                error.exception.close()
+
     def test_item_id_model_switch_fixture(self):
         """目的：验证 Chat源/严格原生目标夹具的成功、错误ID、协议及鉴权；前置本机服务，tearDown关闭，无真实凭据。"""
         source = self.request("/v1/chat/completions", {"model": "e2e-item-id-chat", "messages": []})

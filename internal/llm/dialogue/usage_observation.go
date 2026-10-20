@@ -10,6 +10,8 @@ import (
 var dialogueUsageAliases = [][]string{
 	{"prompt_tokens", "input_tokens"},
 	{"completion_tokens", "output_tokens"},
+	{"prompt_tokens_details.text_tokens", "input_tokens_details.text_tokens"},
+	{"prompt_tokens_details.image_tokens", "input_tokens_details.image_tokens"},
 	{"cache_creation_input_tokens", "cache_write_tokens"},
 	{"cache_read_input_tokens", "cache_read_tokens", "cached_tokens", "prompt_tokens_details.cached_tokens", "input_tokens_details.cached_tokens"},
 }
@@ -45,6 +47,25 @@ func MergeDialogueUsage(previous, incoming map[string]any) map[string]any {
 		}
 	}
 	for key, value := range incoming {
+		if strings.HasSuffix(key, "_tokens_details") {
+			if value == nil {
+				continue
+			}
+			if fields, ok := value.(map[string]any); ok {
+				// 流帧常只更新缓存或推理明细；保留其它已观察模态，避免下一帧把图片证据抹掉。
+				merged := map[string]any{}
+				for name, n := range dialogueMap(previous[key]) {
+					merged[name] = n
+				}
+				for name, n := range fields {
+					if n != nil {
+						merged[name] = n
+					}
+				}
+				previous[key] = merged
+				continue
+			}
+		}
 		previous[key] = value
 	}
 	if blocked != "" {
@@ -79,6 +100,11 @@ func DialogueUsageProblem(usage map[string]any) string {
 	for key, value := range usage {
 		if value == nil {
 			continue
+		}
+		if strings.HasSuffix(key, "_tokens_details") {
+			if _, ok := value.(map[string]any); !ok {
+				return "upstream_usage_invalid"
+			}
 		}
 		if strings.HasSuffix(key, "_tokens") {
 			n, ok := dialogueNumber(value)

@@ -146,7 +146,8 @@ remote URL access and recognition quality remain provider-specific.
 Responses ↔ Chat retains `detail` values `auto/low/high/original`. Messages cannot express
 explicit `low/high/original`, so those bridges fail explicitly; default/`auto` can bridge.
 Responses `file_id` stays native-only. No private file is fetched or converted into an invented URL.
-Images in tool results, audio/video, PDF, Google vision bridges and image generation remain unsupported.
+Native Messages accepts images and mixed text/image content in user `tool_result` blocks (such as Claude Code Read), preserving call IDs, order and error flags. Cross-protocol tool-image bridges are explicitly rejected because they cannot preserve this content equivalently. Audio/video, PDF, Google vision bridges and image generation remain outside this scope.
+Limited-budget keys reserve and settle user images and native tool images using the trusted full input window and uniform input-token prices; separate image fees remain unsupported. See [hard budgets](hard-budgets.md).
 XHub never downloads remote image URLs or follows image redirects and does not read local files.
 Text guardrails still process adjacent text; image pixels are not OCR-scanned by text guardrails.
 Billing uses measured upstream usage. Tests cover nine protocol routes in JSON/SSE, input/auth errors,
