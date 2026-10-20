@@ -3,6 +3,7 @@ package iam
 import (
 	"errors"
 	"fmt"
+	"math"
 	"sync"
 	"testing"
 	"time"
@@ -265,5 +266,48 @@ func TestBudgetReservationOrganizationPeriod(t *testing.T) {
 	}
 	if err = db.ReleaseBudget(ctx, next.RequestID); err != nil {
 		t.Fatal(err)
+	}
+}
+
+// TestSoftBudgetBalance 验证仅检查余额同时尊重预占/uncertain/热费用且不修改历史记录；私有PG夹具创建身份后自动清理。
+func TestSoftBudgetBalance(t *testing.T) {
+	db := testDB(t)
+	ctx := t.Context()
+	user, err := db.CreateUser(ctx, Actor{}, UserInput{Email: "soft-check@example.com", Password: "password123", MaxBudget: quotaLimit(1)})
+	if err != nil {
+		t.Fatal(err)
+	}
+	key, _, err := db.CreateKey(ctx, Actor{}, KeyInput{UserID: user.ID, OwnerType: OwnerPersonal, MaxBudget: quotaLimit(1)})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err = db.CheckSoftBudgetBalance(ctx, "key", key.ID, nil); err != nil {
+		t.Fatal(err)
+	}
+	if err = db.CheckSoftBudgetBalance(ctx, "key", key.ID, func(string, string, ...time.Time) float64 { return 1 }); !errors.Is(err, ErrBudgetUnavailable) {
+		t.Fatalf("热费用未计入 %v", err)
+	}
+	if err = db.CheckSoftBudgetBalance(ctx, "key", key.ID, func(string, string, ...time.Time) float64 { return math.NaN() }); !errors.Is(err, ErrQuotaUnavailable) {
+		t.Fatalf("热费用不可读取时必须拒绝: %v", err)
+	}
+	if _, err = db.ReserveBudget(ctx, "old-hold", "key", key.ID, 1); err != nil {
+		t.Fatal(err)
+	}
+	for _, state := range []string{"reserved", "uncertain"} {
+		if state == "uncertain" {
+			if err = db.SetBudgetReservationState(ctx, "old-hold", state, "keep unchanged"); err != nil {
+				t.Fatal(err)
+			}
+		}
+		if err = db.CheckSoftBudgetBalance(ctx, "key", key.ID, nil); !errors.Is(err, ErrBudgetUnavailable) {
+			t.Fatalf("未计入%s占用: %v", state, err)
+		}
+		holds, err := db.PendingKeyBudget(ctx, key.ID)
+		if err != nil || len(holds) != 1 || holds[0].State != state || holds[0].Amount != 1 {
+			t.Fatalf("历史占用被改写 %+v %v", holds, err)
+		}
+	}
+	if err = db.CheckSoftBudgetBalance(ctx, "key", "missing", nil); err == nil {
+		t.Fatal("未知身份不得放行")
 	}
 }

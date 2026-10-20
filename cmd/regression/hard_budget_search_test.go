@@ -12,76 +12,53 @@ import (
 	"time"
 
 	"github.com/sunqirui1987/xhub/internal/config"
-	"github.com/sunqirui1987/xhub/internal/gateway/billing"
 )
 
-// budgetSearchDeployment 返回本地受信搜索部署；参数为夹具地址，供后台回归使用，不连接外部供应商。
-func budgetSearchDeployment(base string) config.ModelEntry {
-	dep := hardBudgetDeployment("search-budget")
+// searchTokenDeployment 创建无搜索认证配置的本地部署；参数为上游地址，返回完整token价格，不访问外部供应商。
+func searchTokenDeployment(base string) config.ModelEntry {
+	dep := hardBudgetDeployment("search-token-only")
 	dep.LiteLLMParams["api_base"] = base
-	dep.LiteLLMParams["search_context_cost_per_query"] = .01
+	dep.LiteLLMParams["search_context_cost_per_query"] = 1.0 // 故意有工具价格，证明软预算不会额外收费。
 	dep.ModelInfo["transport"] = "bypass_openai_responses"
 	dep.ModelInfo["endpoint_types"] = []string{"responses", "bypass:openai-responses"}
-	dep.ModelInfo["web_search_budget_profile"] = "openai_responses_search_actions"
-	dep.ModelInfo["web_search_budget_source"] = "Local fixture enforces response caps and reports cumulative input and search actions."
-	dep.ModelInfo["web_search_budget_input_tokens"] = 2048
-	dep.ModelInfo["web_search_budget_max_calls"] = 2
 	return dep
 }
 
-// budgetSearchItem 构造已完成的公开搜索历史；参数为唯一标识和动作，返回独立对象，无搜索副作用。
-func budgetSearchItem(id, action string) map[string]any {
+// searchTokenItem 构造可继续原生对话的公开搜索项；参数为ID与动作，返回完整已完成对象，不实际联网。
+func searchTokenItem(id, action string) map[string]any {
 	return map[string]any{"id": id, "type": "web_search_call", "status": "completed", "action": map[string]any{"type": action}}
 }
 
-// budgetSearchDocument 根据场景生成上游终态；参数控制搜索数量或矛盾用量，返回完整响应，供同步与流夹具共用。
-func budgetSearchDocument(mode string) map[string]any {
-	output := []any{map[string]any{"id": "msg_search", "type": "message", "role": "assistant", "status": "completed", "content": []any{map[string]any{"type": "output_text", "text": "SEARCH_OK", "annotations": []any{}}}}}
-	if mode != "zero" && mode != "history" {
-		output = append(output, budgetSearchItem("ws_search", "search"))
-	}
-	if mode == "open-page" || mode == "over-calls" {
-		output = append(output, budgetSearchItem("ws_open", "open_page"))
-	}
-	usage := map[string]any{"input_tokens": 8, "output_tokens": 4}
-	if mode == "conflict" {
-		usage["searches"] = 0
-	}
-	return map[string]any{"id": "resp_search", "object": "response", "status": "completed", "output": output, "usage": usage}
-}
-
-// budgetSearchRequest 构造普通文本带可选搜索的实际请求；参数为场景和流模式，返回正文，历史场景不再执行旧搜索。
-func budgetSearchRequest(mode string, stream bool) map[string]any {
-	body := map[string]any{"model": "search-budget", "input": "Reply briefly using search only if needed.", "tools": []any{map[string]any{"type": "web_search"}}, "max_output_tokens": 32, "stream": stream}
-	if mode == "open-page" {
-		body["max_tool_calls"] = 2
-	}
-	if mode == "history" {
-		body["input"] = []any{budgetSearchItem("ws_previous", "search"), map[string]any{"role": "user", "content": "Continue using the existing result."}}
-	}
-	return body
-}
-
-// TestHardBudgetSearchSettlement 验证标准及旁路 JSON/SSE 的搜索、零搜索、打开网页与公开历史续轮真实结算。
-// 前置本地 HTTP 和私有 PostgreSQL；断言出站 cap、实测账单及占用清零，harness 与 httptest 自动回收资源。
-func TestHardBudgetSearchSettlement(t *testing.T) {
+// TestSearchTokenOnlySettlement 验证标准/旁路同步流及modern/preview搜索不被硬预占阻断，完整实测token落账，工具费用排除。
+// 前置独立PG和本地上游；含正常多工具与超过请求cap的供应商实际输出，结束自动清理schema/服务器，不调用付费模型。
+func TestSearchTokenOnlySettlement(t *testing.T) {
 	t.Setenv("XHUB_REGRESSION_REDIS_URL", "")
 	for _, path := range []string{"/v1/responses", "/bypass/openai/v1/responses"} {
 		for _, stream := range []bool{false, true} {
-			for _, mode := range []string{"search", "zero", "open-page", "history"} {
+			for _, mode := range []string{"modern", "preview", "zero", "over-cap", "history"} {
 				t.Run(fmt.Sprintf("%s/stream=%v/%s", path, stream, mode), func(t *testing.T) {
 					var calls atomic.Int32
 					received := make(chan map[string]any, 1)
-					terminal, _ := json.Marshal(budgetSearchDocument(mode))
+					output := []any{map[string]any{"id": "msg_test", "type": "message", "role": "assistant", "status": "completed", "content": []any{map[string]any{"type": "output_text", "text": "SEARCH_OK", "annotations": []any{}}}}}
+					searches := 0
+					if mode != "zero" && mode != "history" {
+						output = append(output, searchTokenItem("ws_1", "search"), searchTokenItem("ws_2", "open_page"))
+						searches = 2
+					}
+					ct := 4
+					if mode == "over-cap" {
+						ct = 9000
+					}
+					terminal, _ := json.Marshal(map[string]any{"id": "resp_test", "object": "response", "status": "completed", "output": output, "usage": map[string]any{"input_tokens": 8, "output_tokens": ct, "searches": searches, "web_search_calls": searches, "num_server_side_tools_used": searches, "server_side_tool_usage_details": map[string]any{"web_search_calls": searches}, "context_details": map[string]any{"fixture": true}}})
 					raw := string(terminal)
 					if stream {
 						raw = "event: response.completed\ndata: {\"type\":\"response.completed\",\"response\":" + raw + "}\n\n"
 					}
 					up := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 						calls.Add(1)
-						var body map[string]any
-						json.NewDecoder(r.Body).Decode(&body)
-						received <- body
+						var request map[string]any
+						json.NewDecoder(r.Body).Decode(&request)
+						received <- request
 						w.Header().Set("Content-Type", "application/json")
 						if stream {
 							w.Header().Set("Content-Type", "text/event-stream")
@@ -89,18 +66,39 @@ func TestHardBudgetSearchSettlement(t *testing.T) {
 						io.WriteString(w, raw)
 					}))
 					t.Cleanup(up.Close)
-					dep := budgetSearchDeployment(up.URL)
+					dep := searchTokenDeployment(up.URL)
 					h := newHarness(t, dep)
 					admin := h.adminSession()
 					owner := h.openScope(t, admin, dep.ModelName)
-					body := budgetSearchRequest(mode, stream)
-					encoded, _ := json.Marshal(body)
-					plan, _, err := billing.StrictBudgetPlan(dep, encoded, "openai-responses", time.Now())
-					if err != nil {
-						t.Fatal(err)
+					// 余额足以准入但远小于旧整窗预占；真实token消费可能超过剩余余额，明确属于软预算。
+					h.setKeyBudget(t, admin, owner.key, .000001)
+					kind := "web_search"
+					if mode == "preview" {
+						kind = "web_search_preview"
 					}
-					h.setKeyBudget(t, admin, owner.key, plan.Amount)
+					body := map[string]any{"model": dep.ModelName, "input": "Reply briefly using search only if needed.", "tools": []any{map[string]any{"type": kind}}, "stream": stream}
+					if mode == "over-cap" {
+						body["max_output_tokens"] = 32
+						body["max_tool_calls"] = 1
+					}
+					if mode == "history" {
+						body["input"] = []any{searchTokenItem("ws_previous", "search"), map[string]any{"role": "user", "content": "Continue the existing result."}}
+					}
 					got := h.ok("POST", path, owner.key, body)
+					sent := <-received
+					if mode == "over-cap" {
+						if sent["max_output_tokens"] != float64(32) || sent["max_tool_calls"] != float64(1) {
+							t.Fatal("客户端明确cap被改写")
+						}
+					} else if sent["max_output_tokens"] != nil || sent["max_tool_calls"] != nil {
+						t.Fatalf("搜索请求被注入内部cap %+v", sent)
+					}
+					if got.header("X-XHub-Budget-State") != "token_only" || got.header("X-XHub-Budget-Guarantee") != "soft" || got.header("X-XHub-Tool-Costs") != "excluded" {
+						t.Fatal("客户端未获知token-only软预算")
+					}
+					if got.header("X-XHub-Budget-Reservation-Id") != "" {
+						t.Fatal("搜索不应创建硬预占")
+					}
 					holds, err := h.db.PendingKeyBudget(t.Context(), owner.keyID)
 					if err != nil {
 						t.Fatal(err)
@@ -109,32 +107,27 @@ func TestHardBudgetSearchSettlement(t *testing.T) {
 					if err != nil {
 						t.Fatal(err)
 					}
-					want := 8*testInputRate + 4*testOutputRate
-					if mode == "search" || mode == "open-page" {
-						want += .01
-					}
+					want := 8*testInputRate + float64(ct)*testOutputRate
 					if len(holds) != 0 || !nearlyEqual(key.Spend, want) {
-						t.Fatalf("搜索账单不正确 mode=%s holds=%+v spend=%g want=%g body=%s", mode, holds, key.Spend, want, got.text())
+						t.Fatalf("token-only账单或占用错误 spend=%g want=%g holds=%+v", key.Spend, want, holds)
 					}
-					if calls.Load() != 1 {
-						t.Fatalf("搜索不应重复外发 calls=%d", calls.Load())
+					log := h.ok("GET", "/spend/logs/ui/"+got.header("X-Litellm-Call-Id"), admin, nil).text()
+					if !strings.Contains(log, "tokens_only") || !strings.Contains(log, "excluded") {
+						t.Fatalf("日志未记录费用范围 %s", log)
 					}
-					sent := <-received
-					maxCalls := float64(1)
-					if mode == "open-page" {
-						maxCalls = 2
-					}
-					if sent["max_tool_calls"] != maxCalls || sent["max_output_tokens"] != float64(32) {
-						t.Fatalf("搜索实际出站缺少预算上限: %+v", sent)
+					if searches > 0 && (!strings.Contains(got.text(), "web_search_calls") || !strings.Contains(log, "web_search_calls")) {
+						t.Fatal("搜索原始usage在响应或日志中丢失")
 					}
 					if !strings.Contains(got.text(), "SEARCH_OK") {
-						t.Fatalf("客户端丢失搜索结果: %s", got.text())
-					}
-					if (mode == "search" || mode == "open-page") && !strings.Contains(got.text(), "web_search_call") {
-						t.Fatalf("客户端丢失公开搜索调用，无法续轮: %s", got.text())
+						t.Fatal("客户端未获得文本")
 					}
 					if strings.Contains(path, "/bypass/") && got.text() != raw {
-						t.Fatal("原生旁路改写了搜索响应")
+						t.Fatal("原生搜索响应被改写")
+					}
+					body["input"] = "Try another request after the budget is exhausted."
+					denied := h.do("POST", path, owner.key, body)
+					if denied.status != 429 || calls.Load() != 1 {
+						t.Fatalf("已耗尽余额仍放行 status=%d calls=%d", denied.status, calls.Load())
 					}
 				})
 			}
@@ -142,100 +135,134 @@ func TestHardBudgetSearchSettlement(t *testing.T) {
 	}
 }
 
-// TestHardBudgetSearchUncertain 验证超次数和搜索计数矛盾不退款，后续请求耗尽预算时不再外发。
-// 前置私有 PostgreSQL、本地同步或流上游；真实两种路由均应保留 uncertain 占用，结束清理服务与 schema。
-func TestHardBudgetSearchUncertain(t *testing.T) {
+// TestSearchTokenOnlyRejectOtherTools 验证仅搜索例外不扩大到image/code/server-tool-search；真实准入拒绝且零上游，无遗留占用。
+// 前置独立PG/本地计数上游，退出自动回收所有测试资源。
+func TestSearchTokenOnlyRejectOtherTools(t *testing.T) {
 	t.Setenv("XHUB_REGRESSION_REDIS_URL", "")
-	for _, path := range []string{"/v1/responses", "/bypass/openai/v1/responses"} {
-		for _, stream := range []bool{false, true} {
-			for _, mode := range []string{"over-calls", "conflict"} {
-				t.Run(fmt.Sprintf("%s/stream=%v/%s", path, stream, mode), func(t *testing.T) {
-					var calls atomic.Int32
-					terminal, _ := json.Marshal(budgetSearchDocument(mode))
-					raw := string(terminal)
-					if stream {
-						raw = "event: response.completed\ndata: {\"type\":\"response.completed\",\"response\":" + raw + "}\n\n"
-					}
-					up := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-						calls.Add(1)
-						io.Copy(io.Discard, r.Body)
-						w.Header().Set("Content-Type", "application/json")
-						if stream {
-							w.Header().Set("Content-Type", "text/event-stream")
-						}
-						io.WriteString(w, raw)
-					}))
-					t.Cleanup(up.Close)
-					dep := budgetSearchDeployment(up.URL)
-					h := newHarness(t, dep)
-					admin := h.adminSession()
-					owner := h.openScope(t, admin, dep.ModelName)
-					body := budgetSearchRequest(mode, stream)
-					encoded, _ := json.Marshal(body)
-					plan, _, err := billing.StrictBudgetPlan(dep, encoded, "openai-responses", time.Now())
-					if err != nil {
-						t.Fatal(err)
-					}
-					h.setKeyBudget(t, admin, owner.key, plan.Amount)
-					h.do("POST", path, owner.key, body)
-					holds, err := h.db.PendingKeyBudget(t.Context(), owner.keyID)
-					if err != nil {
-						t.Fatal(err)
-					}
-					key, err := h.db.GetKey(t.Context(), owner.keyID)
-					if err != nil {
-						t.Fatal(err)
-					}
-					if len(holds) != 1 || holds[0].State != "uncertain" || !nearlyEqual(holds[0].Amount, plan.Amount) || key.Spend != 0 {
-						t.Fatalf("搜索异常被错误结算或退款 holds=%+v spend=%g", holds, key.Spend)
-					}
-					body["input"] = "Try another request after uncertain search billing."
-					refused := h.do("POST", path, owner.key, body)
-					if refused.status != 429 || calls.Load() != 1 {
-						t.Fatalf("未知占用允许继续外发 status=%d calls=%d", refused.status, calls.Load())
-					}
-				})
+	for _, kind := range []string{"image_generation", "code_interpreter", "tool_search"} {
+		t.Run(kind, func(t *testing.T) {
+			var calls atomic.Int32
+			up := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) { calls.Add(1); w.WriteHeader(500) }))
+			t.Cleanup(up.Close)
+			dep := searchTokenDeployment(up.URL)
+			h := newHarness(t, dep)
+			admin := h.adminSession()
+			owner := h.openScope(t, admin, dep.ModelName)
+			h.setKeyBudget(t, admin, owner.key, 1)
+			got := h.do("POST", "/bypass/openai/v1/responses", owner.key, map[string]any{"model": dep.ModelName, "input": "Hello", "tools": []any{map[string]any{"type": "web_search"}, map[string]any{"type": kind}}})
+			if got.status != 400 || calls.Load() != 0 {
+				t.Fatalf("其他收费工具错误放行 status=%d calls=%d", got.status, calls.Load())
 			}
-		}
+		})
 	}
 }
 
-// TestHardBudgetSearchRejectBeforeUpstream 验证余额不足和未声明契约在真实路由拒绝且不调用供应商。
-// 前置私有数据库和计数 HTTP 夹具；断言错误类别、零调用与零占用，测试自动清理独立账号/schema。
-func TestHardBudgetSearchRejectBeforeUpstream(t *testing.T) {
+// TestSearchTokenOnlyAdmission 验证搜索软预算仍受过期、撤销、模型权限、余额及既有硬预占约束。
+// 前置独立schema中的测试身份；直接制造过期/旧uncertain状态后通过真实HTTP验证零上游，历史占用不改动，harness清理。
+func TestSearchTokenOnlyAdmission(t *testing.T) {
 	t.Setenv("XHUB_REGRESSION_REDIS_URL", "")
-	for _, mode := range []string{"insufficient", "unconfigured"} {
+	for _, mode := range []string{"expired", "revoked", "model-denied", "exhausted", "reserved", "uncertain", "project-hold"} {
 		t.Run(mode, func(t *testing.T) {
 			var calls atomic.Int32
 			up := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) { calls.Add(1); w.WriteHeader(500) }))
 			t.Cleanup(up.Close)
-			dep := budgetSearchDeployment(up.URL)
-			if mode == "unconfigured" {
-				delete(dep.ModelInfo, "web_search_budget_profile")
-			}
-			h := newHarness(t, dep)
+			dep := searchTokenDeployment(up.URL)
+			other := searchTokenDeployment(up.URL)
+			other.ModelName = "search-other"
+			other.LiteLLMParams["model"] = "search-other"
+			h := newHarness(t, dep, other)
 			admin := h.adminSession()
 			owner := h.openScope(t, admin, dep.ModelName)
-			budget := .000001
-			if mode == "unconfigured" {
-				budget = 1
+			h.setKeyBudget(t, admin, owner.key, 1)
+			model := dep.ModelName
+			expected := 401
+			switch mode {
+			case "expired":
+				if _, err := h.db.Engine.Exec("UPDATE api_keys SET expires_at = ? WHERE id = ?", time.Now().Add(-time.Hour), owner.keyID); err != nil {
+					t.Fatal(err)
+				}
+			case "revoked":
+				h.ok("POST", "/key/delete", admin, map[string]any{"keys": []string{owner.keyID}})
+			case "model-denied":
+				h.ok("POST", "/key/update", admin, map[string]any{"key": owner.keyID, "models": []string{dep.ModelName}})
+				model = other.ModelName
+			case "exhausted":
+				h.setKeyBudget(t, admin, owner.key, 0)
+				expected = 429
+			case "project-hold":
+				h.setKeyBudget(t, admin, owner.key, 2)
+				h.setProjectBudget(t, admin, owner.projectID, 1)
+				if _, err := h.db.ReserveBudget(t.Context(), "preexisting-project-hold", "key", owner.keyID, 1); err != nil {
+					t.Fatal(err)
+				}
+				expected = 429
+			case "reserved", "uncertain":
+				if _, err := h.db.ReserveBudget(t.Context(), "preexisting-hold", "key", owner.keyID, 1); err != nil {
+					t.Fatal(err)
+				}
+				if mode == "uncertain" {
+					if err := h.db.SetBudgetReservationState(t.Context(), "preexisting-hold", "uncertain", "Historical fixture must remain unchanged"); err != nil {
+						t.Fatal(err)
+					}
+				}
+				expected = 429
 			}
-			h.setKeyBudget(t, admin, owner.key, budget)
-			got := h.do("POST", "/v1/responses", owner.key, budgetSearchRequest("search", false))
-			want := 429
-			if mode == "unconfigured" {
-				want = 400
+			got := h.do("POST", "/v1/responses", owner.key, map[string]any{"model": model, "input": "Search for Go.", "tools": []any{map[string]any{"type": "web_search"}}})
+			if got.status != expected || calls.Load() != 0 {
+				t.Fatalf("搜索绕过准入 mode=%s status=%d calls=%d body=%s", mode, got.status, calls.Load(), got.text())
 			}
-			if got.status != want || calls.Load() != 0 {
-				t.Fatalf("应在上游前拒绝 mode=%s status=%d calls=%d body=%s", mode, got.status, calls.Load(), got.text())
-			}
-			if mode == "unconfigured" && !strings.Contains(got.text(), "unsupported_budget") {
-				t.Fatalf("未声明搜索契约没有明确预算错误: %s", got.text())
-			}
-			holds, err := h.db.PendingKeyBudget(t.Context(), owner.keyID)
-			if err != nil || len(holds) != 0 {
-				t.Fatalf("拒绝请求不应留下占用 holds=%+v err=%v", holds, err)
+			if mode == "reserved" || mode == "uncertain" {
+				holds, err := h.db.PendingKeyBudget(t.Context(), owner.keyID)
+				if err != nil || len(holds) != 1 || holds[0].State != mode || holds[0].Amount != 1 {
+					t.Fatalf("既有占用被修改 %+v err=%v", holds, err)
+				}
 			}
 		})
+	}
+}
+
+// TestSearchTokenOnlyUnknownUsage 验证缺失或冲突token用量不能伪报免费，也不产生新硬预算占用。
+// 标准和旁路同步/流走真实后台，本地上游返回不完整账单；独立数据库及服务器由harness清理。
+func TestSearchTokenOnlyUnknownUsage(t *testing.T) {
+	t.Setenv("XHUB_REGRESSION_REDIS_URL", "")
+	for _, path := range []string{"/v1/responses", "/bypass/openai/v1/responses"} {
+		for _, stream := range []bool{false, true} {
+			for _, mode := range []string{"missing", "conflict"} {
+				t.Run(fmt.Sprintf("%s/%v/%s", path, stream, mode), func(t *testing.T) {
+					usage := map[string]any{"input_tokens": 8}
+					if mode == "conflict" {
+						usage["output_tokens"] = 4
+						usage["prompt_tokens"] = 9
+					}
+					terminal, _ := json.Marshal(map[string]any{"id": "resp_unknown", "status": "completed", "output": []any{}, "usage": usage})
+					raw := string(terminal)
+					if stream {
+						raw = "event: response.completed\ndata: {\"type\":\"response.completed\",\"response\":" + raw + "}\n\n"
+					}
+					up := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+						w.Header().Set("Content-Type", "application/json")
+						if stream {
+							w.Header().Set("Content-Type", "text/event-stream")
+						}
+						io.WriteString(w, raw)
+					}))
+					t.Cleanup(up.Close)
+					dep := searchTokenDeployment(up.URL)
+					h := newHarness(t, dep)
+					admin := h.adminSession()
+					owner := h.openScope(t, admin, dep.ModelName)
+					h.setKeyBudget(t, admin, owner.key, 1)
+					got := h.ok("POST", path, owner.key, map[string]any{"model": dep.ModelName, "input": "Search for Go.", "stream": stream, "tools": []any{map[string]any{"type": "web_search"}}})
+					log := h.ok("GET", "/spend/logs/ui/"+got.header("X-Litellm-Call-Id"), admin, nil).text()
+					if !strings.Contains(log, "unpriced") {
+						t.Fatalf("缺失/冲突token被伪装已定价 %s", log)
+					}
+					holds, err := h.db.PendingKeyBudget(t.Context(), owner.keyID)
+					if err != nil || len(holds) != 0 {
+						t.Fatalf("软预算不应新增hold %+v %v", holds, err)
+					}
+				})
+			}
+		}
 	}
 }

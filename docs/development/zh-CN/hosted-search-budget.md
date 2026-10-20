@@ -1,32 +1,20 @@
-# 硬额度下的 Responses 联网搜索
+# 联网搜索：仅 token 计费
 
-硬额度不能把 `web_search` 声明一律视为免费，也不应把支持搜索的请求一律拒绝。XHub 支持显式配置的 `openai_responses_search_actions` 计费契约：保留搜索声明，在实际出站设置 `max_tool_calls`，按完整响应中的收费搜索动作结算。
+原生 Responses 请求声明 `web_search`、`web_search_2025_08_26`、`web_search_preview` 或 `web_search_preview_2025_03_11` 时，采用**仅 token 计费的软额度**。无需供应商搜索认证配置或搜索单价；身份鉴权、模型权限和已有余额准入仍生效。
 
-仅适用于原生 Responses 的现代 `web_search`。部署管理员须确认实际供应商（包括转售渠道）的以下保证：整个 response 的输出总量遵守 `max_output_tokens`；内置工具总次数遵守 `max_tool_calls`；累计计费输入包含搜索内容且存在可信总上界；按成功 `search` 动作收费，`open_page` 和 `find_in_page` 不另外收搜索费。不能仅凭一次成功调用或模型名称推定这些保证。
+网关保留搜索工具及客户端传入的上限，不额外注入 `max_tool_calls` / `max_output_tokens`，不移除搜索，不为该请求创建硬额度预占。按上游完整实测的输入、输出及缓存 token 使用部署原有 token 价格结算；输出含上游报告的推理 token。即使上游报告搜索次数或部署配置了搜索单价，也不额外收取工具费。原始 usage 和搜索结果保留在响应及日志中。
 
-模型配置示例（数值仅展示格式，不能直接用作真实供应商认证）：
+单次请求可能超过开始时的剩余额度；并发搜索请求**不保证硬额度**。实际 token 消费影响之后的余额准入。用量缺失或矛盾时标记未定价，不猜测费用。上游搜索输出超过客户端上限时，按实际报告 token 收费，不新增 uncertain 预占。
 
-```json
-{
-  "litellm_params": {"search_context_cost_per_query": 0.01},
-  "model_info": {
-    "web_search_support": "supported",
-    "web_search_budget_profile": "openai_responses_search_actions",
-    "web_search_budget_source": "Supplier contract URL and revision covering limits, cumulative input and search pricing",
-    "web_search_budget_max_calls": 1,
-    "web_search_budget_input_tokens": 262144
-  }
-}
-```
+响应头明确说明策略：
 
-仍需原有完整文字价格和模型输入/输出上限。`web_search_budget_input_tokens` 是所有内部轮次的累计计费输入上限，必须不小于模型输入窗；不是单窗大小，也不能用“窗口×工具次数”未经认证地推算。搜索暂不支持阶梯 token 价格、preview 搜索、其他 hosted tools。每次请求默认最多 1 次内置工具调用，可显式设置 1–16，且不能超过部署认证值。返回 `X-XHub-Max-Tool-Calls`、原有输出 cap 和预算预占响应头。
+- `X-XHub-Budget-State: token_only`
+- `X-XHub-Billing-Scope: tokens_only`
+- `X-XHub-Budget-Guarantee: soft`
+- `X-XHub-Tool-Costs: excluded`
 
-结算只读取完整终态，不累加重复流事件。总工具次数与收费搜索次数分开：搜索动作中的多个查询不重复计费，公开搜索历史也不在下一轮再次收费。未使用搜索时不收搜索费。缺失、矛盾、重复 ID、未知动作或超上限用量会保留原预占等待核对，不退款后继续假装成功结算。
+用量价格快照的 `budget` 同步记录计费范围与额度保证。流式响应在生成前返回这些策略头。工具计量保留作上游证据，不参与收费。合法公开搜索历史可以在原生 Responses 中续轮；跨协议转换搜索历史仍不支持。
 
-`web_search_fallback=drop_optional` 仍是目标协议不支持搜索时的显式降级策略，不是搜索预算开关；本修复不通过静默删除搜索或关闭硬额度放行。
+本例外不放开图片生成、代码执行和服务端工具发现等其他 hosted tools。无搜索请求仍采用原有硬额度预占；历史 uncertain 记录不会被释放或修改。
 
-2026-10-20 的有限实测：七牛 GPT 的一次现代搜索成功且遵守本次两个 cap；这不构成完整累计输入/计费契约认证。Fenno Grok 返回的工具次数和输出量均超过请求 cap，因此不能为该连接启用此契约。未自动修改任何生产部署配置。
-
-参考：[Responses 参数](https://developers.openai.com/api/reference/python/resources/responses/methods/create)、[搜索动作与费用](https://developers.openai.com/api/docs/guides/tools-web-search)、[xAI 工具用量](https://docs.x.ai/developers/tools/tool-usage-details)。xAI 的计费分类和轮次上限不能直接套用 OpenAI 搜索契约。
-
-添加手工搜索价会切换至手工价格来源，因此必须同时配置完整输入/输出 token 单价及适用的缓存价格；不能只补搜索价再默认沿用目录的 token 价格。
+后台 regression 使用本地 HTTP 上游及独立 PostgreSQL schema；中英文浏览器测试创建模型和有限额 Key，并在结束后清理。这些测试验证网关策略，不保证上游搜索可用性、质量或遵守客户端限制。

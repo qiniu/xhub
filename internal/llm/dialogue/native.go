@@ -573,9 +573,6 @@ func ParseDialogueResult(protocol string, raw []byte) (DialogueResult, error) {
 			}
 		}
 	}
-	if protocol == "openai-responses" {
-		r.Usage = ResponsesSearchUsage(native, r.Usage)
-	}
 	r.Source, r.Native, r.BridgeError = protocol, native, bridgeError
 	return r, nil
 }

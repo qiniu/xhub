@@ -22,6 +22,7 @@ var _ dpcontract.BudgetHost = (*Server)(nil)
 
 // budgetAttempt 保存活跃请求最新尝试；金额及身份已在 PostgreSQL，内存只存本次冻结费率和清理事实。
 type budgetAttempt struct {
+	TokenOnly            bool // 搜索只按实际 token 结算，不创建硬额度预占。
 	Hold                 *iam.BudgetReservation
 	Plan                 billing.BudgetPlan
 	Submitted, Finalized bool
@@ -50,11 +51,47 @@ func (s *Server) initializeBudgetQueue(ctx context.Context) error {
 	return nil
 }
 
-// PrepareBudgetAttempt 为每次实际出站冻结上限、费率并在数据库中原子预占五层和项目额度。
+// PrepareBudgetAttempt 为实际出站选择搜索软预算或冻结上限费率并原子预占五层及项目额度。
 // 参数是执行器已完成协议转换的最终正文及真实部署；返回实际出站正文、是否继续；失败已经写明 400/429/503。
-// 有限额才要求可信上界；未支持能力明确拒绝。重试单独预占，旧尝试已提交但未知费用时保留。
+// 搜索采用仅token软预算，其余有限额请求要求可信上界。硬预算重试单独预占，旧未知费用保持原有占用。
 func (s *Server) PrepareBudgetAttempt(w http.ResponseWriter, r *http.Request, p *auth.Principal, callID string, dep config.ModelEntry, protocol string, body []byte, start time.Time) ([]byte, bool) {
 	s.finishBudgetCall(callID)
+	// 重试可能切换部署或降级搜索；每次尝试先清除全部预算头，失败不能继承旧策略。
+	for _, name := range []string{"X-XHub-Budget-State", "X-XHub-Billing-Scope", "X-XHub-Budget-Guarantee", "X-XHub-Tool-Costs", "X-XHub-Max-Output-Tokens", "X-XHub-Max-Tool-Calls", "X-XHub-Budget-Input-Bound", "X-XHub-Budget-Reserved", "X-XHub-Budget-Reservation-Id"} {
+		w.Header().Del(name)
+	}
+	search, searchErr := billing.SearchTokenOnlyRequest(protocol, body)
+	if searchErr != nil {
+		util.WriteTypedError(w, r.URL.Path, 400, "unsupported_budget", searchErr.Error())
+		return nil, false
+	}
+	if search {
+		kind, id := "user", p.UserID
+		if p.Key != nil {
+			kind, id = "key", p.KeyID
+		}
+		if err := s.IAM.CheckSoftBudgetBalance(r.Context(), kind, id, s.hotSpendRef); err != nil {
+			if errors.Is(err, iam.ErrBudgetUnavailable) {
+				util.WriteTypedError(w, r.URL.Path, 429, "budget_exceeded", "available budget has been exhausted")
+			} else {
+				budgetRefusal(w, r.URL.Path, iam.ErrQuotaUnavailable)
+			}
+			return nil, false
+		}
+		// 身份、模型授权与余额准入已由执行入口检查。搜索内部计费轮次无法可靠预占，明确使用软预算。
+		s.mu.Lock()
+		if s.budgetCalls == nil {
+			s.budgetCalls = map[string]*budgetAttempt{}
+		}
+		s.budgetCalls[callID] = &budgetAttempt{TokenOnly: true}
+		s.mu.Unlock()
+		w.Header().Set("X-XHub-Budget-State", "token_only")
+		w.Header().Set("X-XHub-Billing-Scope", "tokens_only")
+		w.Header().Set("X-XHub-Budget-Guarantee", "soft")
+		w.Header().Set("X-XHub-Tool-Costs", "excluded")
+		util.Info("search token-only billing call_id=%q tool_costs=excluded budget_guarantee=soft", callID)
+		return body, true
+	}
 	kind, id := "user", p.UserID
 	if p.Key != nil {
 		kind, id = "key", p.KeyID
@@ -106,9 +143,6 @@ func (s *Server) PrepareBudgetAttempt(w http.ResponseWriter, r *http.Request, p 
 	}
 	s.budgetCalls[callID] = &budgetAttempt{Hold: hold, Plan: plan}
 	s.mu.Unlock()
-	if plan.SearchCalls > 0 {
-		w.Header().Set("X-XHub-Max-Tool-Calls", strconv.Itoa(plan.SearchCalls))
-	}
 	w.Header().Set("X-XHub-Max-Output-Tokens", strconv.Itoa(plan.OutputCap))
 	w.Header().Set("X-XHub-Budget-Input-Bound", strconv.Itoa(plan.InputBound))
 	w.Header().Set("X-XHub-Budget-Reserved", catalog.Format(plan.Amount))
@@ -124,7 +158,7 @@ func (s *Server) MarkBudgetAttemptSubmitted(w http.ResponseWriter, r *http.Reque
 	s.mu.Lock()
 	attempt := s.budgetCalls[callID]
 	s.mu.Unlock()
-	if attempt == nil {
+	if attempt == nil || attempt.TokenOnly {
 		return true
 	}
 	if r.Context().Err() != nil {
@@ -152,7 +186,7 @@ func (s *Server) finishBudgetCall(callID string) {
 	attempt := s.budgetCalls[callID]
 	delete(s.budgetCalls, callID)
 	s.mu.Unlock()
-	if attempt == nil || attempt.Finalized || s.IAM == nil {
+	if attempt == nil || attempt.TokenOnly || attempt.Finalized || s.IAM == nil {
 		return
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
@@ -179,7 +213,7 @@ func (s *Server) budgetCharge(callID string, rawUsage map[string]any, status int
 	s.mu.Lock()
 	attempt := s.budgetCalls[callID]
 	s.mu.Unlock()
-	if attempt == nil {
+	if attempt == nil || attempt.TokenOnly {
 		return catalog.Charge{}, false, false, "", nil
 	}
 	metadata := map[string]any{"reservation_id": attempt.Hold.RequestID, "reserved": attempt.Plan.Amount, "input_bound": attempt.Plan.InputBound, "output_cap": attempt.Plan.OutputCap, "state": "uncertain"}
@@ -189,12 +223,7 @@ func (s *Server) budgetCharge(callID string, rawUsage map[string]any, status int
 		err = errors.New("upstream billing outcome is uncertain")
 	} else {
 		if err = billing.ValidateStrictBudgetUsage(rawUsage, attempt.Plan); err == nil {
-			measured := catalog.NormalizeUsage(llmdialogue.NormalizeDialogueUsage(rawUsage))
-			if attempt.Plan.SearchCalls > 0 {
-				// 搜索按已验证终态的search动作计费；不改变供应商原始usage或无契约通道的计量语义。
-				measured.Searches = catalog.NormalizeUsage(map[string]any{"searches": rawUsage["xhub_web_search_searches"]}).Searches
-			}
-			charge, err = attempt.Plan.Charge(measured)
+			charge, err = attempt.Plan.Charge(catalog.NormalizeUsage(llmdialogue.NormalizeDialogueUsage(rawUsage)))
 		}
 	}
 	if err != nil {
@@ -231,4 +260,12 @@ func budgetPriceSnapshot(snapshot string, budget map[string]any) string {
 	fields["budget"] = budget
 	raw, _ := json.Marshal(fields)
 	return string(raw)
+}
+
+// searchTokenOnlyBudget 读取当前尝试的搜索软预算标志；参数为请求ID，返回是否仅计 token，供结算使用，受互斥锁保护。
+func (s *Server) searchTokenOnlyBudget(callID string) bool {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	attempt := s.budgetCalls[callID]
+	return attempt != nil && attempt.TokenOnly
 }

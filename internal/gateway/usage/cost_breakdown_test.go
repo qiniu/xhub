@@ -294,3 +294,19 @@ func TestEventRowLabel(t *testing.T) {
 		}
 	}
 }
+
+// TestEventRowsBudgetScope 验证日志详情保留仅token软预算事实；历史空/损坏快照不猜策略，纯转换无需清理。
+func TestEventRowsBudgetScope(t *testing.T) {
+	for _, raw := range []string{`{"budget":{"state":"token_only","billing_scope":"tokens_only","tool_costs":"excluded","guarantee":"soft"}}`, ``, `invalid`} {
+		rows := eventRows([]iam.UsageEvent{{PriceSnapshot: raw}})
+		meta := rows[0]["metadata"].(map[string]any)
+		if raw != "" && raw != "invalid" {
+			budget, ok := meta["budget"].(map[string]any)
+			if !ok || budget["billing_scope"] != "tokens_only" || budget["tool_costs"] != "excluded" {
+				t.Fatalf("日志缺少计费范围: %+v", meta)
+			}
+		} else if meta["budget"] != nil {
+			t.Fatal("缺少快照时不得猜测预算策略")
+		}
+	}
+}

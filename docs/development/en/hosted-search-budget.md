@@ -1,32 +1,20 @@
-# Responses web search with hard budgets
+# Hosted web search: token-only billing
 
-XHub can retain modern `web_search` declarations under the explicitly configured `openai_responses_search_actions` budget contract. It sets an upstream `max_tool_calls`, reserves search and token costs, and settles measured search actions from the final response.
+Native Responses requests declaring `web_search`, `web_search_2025_08_26`, `web_search_preview`, or `web_search_preview_2025_03_11` use **token-only soft budgets**. No supplier certification profile or search price is required. Existing authentication, model access restrictions and available-balance admission remain active.
 
-Enable this only for a verified native Responses deployment. The actual supplier, including any reseller, must guarantee response-wide `max_output_tokens`, a total built-in call limit, a cumulative billed-input bound including search content, and pricing per successful `search` action (not separate charges for `open_page` or `find_in_page`). A model name or one successful request does not establish these guarantees.
+The gateway preserves the search tools and caller-provided limits. It does not add `max_tool_calls` or `max_output_tokens`, remove search, or create a hard-budget reservation for these requests. Complete measured input/output tokens, including reported reasoning and cache tokens, use the deployment's normal token pricing. Search/tool charges are excluded even when upstream reports them or the deployment has a search price. Raw upstream usage and search results remain in responses and logs.
 
-Example structure; these illustrative values are not supplier certification:
+A request can spend more than the balance remaining when it started; concurrent search requests do **not** have a hard spending guarantee. Completed token charges count toward subsequent admission. Missing or contradictory token usage remains unpriced rather than being estimated. Search output exceeding a caller limit is charged using actual reported tokens and does not create a new uncertain reservation.
 
-```json
-{
-  "litellm_params": {"search_context_cost_per_query": 0.01},
-  "model_info": {
-    "web_search_support": "supported",
-    "web_search_budget_profile": "openai_responses_search_actions",
-    "web_search_budget_source": "Supplier contract URL and revision covering limits, cumulative input and search pricing",
-    "web_search_budget_max_calls": 1,
-    "web_search_budget_input_tokens": 262144
-  }
-}
-```
+Observable response headers:
 
-Complete token prices and model limits remain required. The input bound covers cumulative billed input over all internal turns, must cover the model input window, and must not be guessed by multiplying the window by call count. Tiered token rates, preview search and other hosted tools are not supported by this contract. The default request cap is one call; explicit caps must be integers from 1 through 16 and cannot exceed the verified deployment cap. `X-XHub-Max-Tool-Calls` accompanies the existing output and reservation headers.
+- `X-XHub-Budget-State: token_only`
+- `X-XHub-Billing-Scope: tokens_only`
+- `X-XHub-Budget-Guarantee: soft`
+- `X-XHub-Tool-Costs: excluded`
 
-Settlement distinguishes total tool calls from charged search actions. Multiple queries in one action and previous search history do not produce duplicate search charges. Unused search costs zero. Missing facts, conflicting counts, duplicate IDs, unknown actions or exceeded bounds preserve the reservation for reconciliation. Streaming intermediate events are not accumulated as extra calls.
+The usage price snapshot stores the same scope and guarantee under `budget`. Streaming clients receive the policy headers before generation. Tool usage is retained as upstream evidence, not charged. Supported public search history can be continued through native Responses; cross-protocol conversion of search history remains unsupported.
 
-`web_search_fallback=drop_optional` remains an explicit downgrade for transports without search support; it does not enable search budgeting. This change neither silently removes search nor disables hard budgets.
+Other hosted tools, including image generation, code interpreter and server-side tool search, are not enabled by this exception. Ordinary requests without search retain strict budget reservation behavior. Existing uncertain reservations are not released or modified.
 
-Limited tests on 2026-10-20 found one Qiniu GPT search respected the requested caps; that does not certify its cumulative input or pricing contract. Fenno Grok exceeded both requested tool-call and output caps, so this contract must not be enabled there. No production deployment was automatically changed.
-
-References: [Responses parameters](https://developers.openai.com/api/reference/python/resources/responses/methods/create), [search actions](https://developers.openai.com/api/docs/guides/tools-web-search), [xAI tool usage](https://docs.x.ai/developers/tools/tool-usage-details). xAI billing categories and turn limits are not equivalent to this OpenAI contract.
-
-Adding a manual search price selects manual pricing: configure complete input/output token rates and applicable cache rates together, rather than assuming catalog token prices will remain active.
+Regression uses local HTTP suppliers and a private PostgreSQL schema; browser tests create and clean up a model and limited key in both supported UI languages. These prove gateway policy, not upstream search availability, quality or compliance with client-provided limits.

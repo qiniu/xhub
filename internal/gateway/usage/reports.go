@@ -247,7 +247,7 @@ func logTPS(e iam.UsageEvent) *float64 {
 
 // eventRows 将授权后的事件转换为日志列表和详情共用的数据。
 // 参数 events 为用量事件；返回非 nil 切片，附带端点、首字节耗时、TPS 和请求推理强度，无持久化副作用。
-// 未记录的强度保持空值，不根据提示词、当前模型配置或返回的推理 Token 数猜测。
+// 未记录的强度保持空值，不根据提示词、当前模型配置或返回的推理 Token 数猜测；预算策略直接读取历史快照。
 func eventRows(events []iam.UsageEvent) []map[string]any {
 	out := make([]map[string]any, 0, len(events))
 	for _, e := range events {
@@ -265,6 +265,14 @@ func eventRows(events []iam.UsageEvent) []map[string]any {
 			"user_api_key_team_alias": e.TeamAlias,
 			"user_api_key":            e.KeyHash,
 			"user_api_key_alias":      e.KeyAlias,
+		}
+		// 计费快照中的预算范围与保证属于本次调用事实；向详情API公开，避免仅token账单被误认为含工具费用。
+		var snapshot map[string]json.RawMessage
+		if json.Unmarshal([]byte(e.PriceSnapshot), &snapshot) == nil {
+			var budget map[string]any
+			if json.Unmarshal(snapshot["budget"], &budget) == nil && budget != nil {
+				meta["budget"] = budget
+			}
 		}
 		if e.CachedTokens != nil {
 			meta["cached_tokens"] = *e.CachedTokens

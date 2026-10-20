@@ -11,8 +11,8 @@ from e2e.fake_upstream import Handler, ERROR_LOG_JSON_DIAGNOSTIC, ERROR_LOG_TEXT
 
 class ArkUpstreamTest(unittest.TestCase):
     def test_hard_budget_search(self):
-        """本地HTTP验证真实搜索声明和cap，返回完整同步/流计费快照；非法cap拒绝，tearDown回收服务。"""
-        body = {"model": "budget-search-browser-unit", "input": "Search for Go.", "tools": [{"type": "web_search"}], "max_tool_calls": 1}
+        """本地HTTP验证搜索声明不被注入cap，返回完整同步/流计费快照；注入cap拒绝，tearDown回收服务。"""
+        body = {"model": "budget-search-browser-unit", "input": "Search for Go.", "tools": [{"type": "web_search"}]}
         result = self.request("/v1/responses", body)
         self.assertEqual(result["output"][0]["action"]["type"], "search")
         with urlopen(Request(self.base + "/v1/responses", data=json.dumps({**body, "stream": True}).encode()), timeout=2) as response:

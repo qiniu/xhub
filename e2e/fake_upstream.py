@@ -274,10 +274,10 @@ class Handler(BaseHTTPRequestHandler):
         model = req.get("model") or "gpt-4o-mini"
         if serve_stream_terminal(self, req):
             return
-        # 专属搜索预算夹具：必须真实收到搜索及次数上限，返回可独立计价的终态，不能靠网关删除工具蒙混通过。
+        # 专属搜索软预算夹具：必须真实收到搜索且没有额外次数上限，返回完整token用量，不能靠删除搜索工具通过。
         if str(model).startswith("budget-search-browser-"):
-            if not self.path.endswith("/responses") or req.get("max_tool_calls") != 1 or not any(t.get("type") == "web_search" for t in req.get("tools", [])):
-                self.send_error(400, "search fixture requires Responses, search and cap 1")
+            if not self.path.endswith("/responses") or "max_tool_calls" in req or not any(t.get("type") == "web_search" for t in req.get("tools", [])):
+                self.send_error(400, "search fixture requires Responses, search and no injected tool cap")
                 return
             result = {"id": "resp_budget_search", "object": "response", "status": "completed", "output": [{"id": "ws_budget_search", "type": "web_search_call", "status": "completed", "action": {"type": "search", "queries": ["Go programming language"]}}, {"id": "msg_budget_search", "type": "message", "role": "assistant", "content": [{"type": "output_text", "text": "e2e-budget-search"}]}], "usage": {"input_tokens": 8, "output_tokens": 2}}
             if req.get("stream"):

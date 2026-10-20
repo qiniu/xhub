@@ -29,7 +29,6 @@ import (
 	"github.com/sunqirui1987/xhub/internal/gateway/requestlog"
 	"github.com/sunqirui1987/xhub/internal/iam"
 	"github.com/sunqirui1987/xhub/internal/live"
-	llmdialogue "github.com/sunqirui1987/xhub/internal/llm/dialogue"
 	"github.com/sunqirui1987/xhub/internal/util"
 )
 
@@ -97,6 +96,10 @@ func (s *Server) recordSpend(w http.ResponseWriter, p *auth.Principal, callID, a
 		usage = map[string]any{}
 	}
 	billed := catalog.NormalizeUsage(usage)
+	searchTokenOnly := s.searchTokenOnlyBudget(callID)
+	if searchTokenOnly {
+		billed = billing.SearchTokenUsage(usage)
+	}
 	pt, ct := billed.PromptTokens, billed.CompletionTokens
 	// The start instant decides the billing window. A window-priced model costs
 	// twice as much inside its peak hours, so this is the difference between
@@ -116,6 +119,9 @@ func (s *Server) recordSpend(w http.ResponseWriter, p *auth.Principal, callID, a
 	}
 	budgetID := ""
 	var budgetMetadata map[string]any
+	if searchTokenOnly {
+		budgetMetadata = map[string]any{"state": "token_only", "billing_scope": "tokens_only", "tool_costs": "excluded", "guarantee": "soft"}
+	}
 	if frozen, active, valid, id, metadata := s.budgetCharge(callID, usage, status, cacheHit); active {
 		charge, okc = frozen, valid
 		total, in, out = charge.Total, charge.Input, charge.Output
@@ -204,6 +210,15 @@ func (s *Server) recordSpend(w http.ResponseWriter, p *auth.Principal, callID, a
 	if p != nil {
 		keyID = p.KeyID
 	}
+	priceSnapshot := catalog.SnapshotUsage(charge, billed, okc)
+	if searchTokenOnly {
+		pricingStatus := "unpriced"
+		if okc {
+			pricingStatus = "priced"
+		}
+		rawSnapshot, _ := json.Marshal(catalog.PriceSnapshot{Window: charge.Window, Applied: charge.Applied, PricingStatus: pricingStatus, Usage: &billed})
+		priceSnapshot = string(rawSnapshot)
+	}
 	row := live.SpendLog{
 		Label: ex.label, InboundEndpoint: ex.inbound, OutboundEndpoint: outbound, ReasoningEffort: ex.reasoningEffort,
 		RequestID: callID, CallType: callType, Model: alias, APIKey: hash,
@@ -217,7 +232,7 @@ func (s *Server) recordSpend(w http.ResponseWriter, p *auth.Principal, callID, a
 		Streamed:         note.Streamed, TTFTMs: note.TTFTMs, Provider: note.Provider, CacheKey: note.CacheKey,
 		SessionID: note.SessionID, SessionSource: note.SessionSource, CachedTokens: cachedColumn(usage),
 		Guardrail:           guardrail,
-		PriceSnapshot:       budgetPriceSnapshot(catalog.SnapshotUsage(charge, billed, okc), budgetMetadata),
+		PriceSnapshot:       budgetPriceSnapshot(priceSnapshot, budgetMetadata),
 		BudgetReservationID: budgetID,
 	}
 	// 快照保存连接名称而非仅协议名；同协议的多家供应商不会合并。
@@ -575,10 +590,6 @@ func (s *Server) writeChatJSON(w http.ResponseWriter, p *auth.Principal, callID,
 		// Providers that do return usage are normalized below.
 		if usage == nil {
 			usage = map[string]any{}
-		}
-		// 同步 Responses 与原生流使用同一完整终态搜索计量，内部标记不写回客户端正文。
-		if op == "responses" {
-			usage = llmdialogue.ResponsesSearchUsage(parsed, usage)
 		}
 		s.recordSpend(w, p, callID, alias, op, usage, start, false, status, depID)
 		respBody, _ = json.Marshal(parsed)

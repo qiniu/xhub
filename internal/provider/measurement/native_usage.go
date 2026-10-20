@@ -32,9 +32,6 @@ func NativeUsage(protocol string) func(map[string]any, map[string]any) map[strin
 		source, _ := doc["usage"].(map[string]any)
 		// 先保留原始计数冲突；原生透传不会经过统一流的 observeUsage。
 		out := llmdialogue.MergeDialogueUsage(nil, source)
-		if protocol == "openai-responses" {
-			out = llmdialogue.ResponsesSearchUsage(doc, out)
-		}
 		if protocol == "openai-responses" && (doc["status"] == "completed" || doc["status"] == "incomplete") {
 			// Responses 终态必须自带完整计数，不能拿前面的部分用量补齐退款依据。
 			// 保留原始字段供硬额度核价；只复制独立终态归一化得到的阻断原因。
