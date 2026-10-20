@@ -168,6 +168,13 @@ func EncodeDialogueResult(r DialogueResult, protocol, model string) ([]byte, err
 	if r.BridgeError != "" {
 		return nil, fmt.Errorf("unsupported response bridge: %s", r.BridgeError)
 	}
+	if r.Refused {
+		// 仅有明确拒绝说明、没有部分输出时可无损映射。未知协议不能把拒绝悄悄输出为空答案。
+		if (protocol != "openai-chat" && protocol != "openai-responses") || strings.TrimSpace(r.Refusal) == "" || r.Text != "" || r.Reasoning != "" || len(r.Calls) > 0 {
+			return nil, fmt.Errorf("unsupported response bridge: Messages refusal requires explicit explanation and no partial output")
+		}
+		r.Stop = "stop"
+	}
 	if r.Source == "openai-responses" && protocol != "anthropic-messages" && protocol != "openai-chat" {
 		for _, value := range dialogueList(r.Native["output"]) {
 			item := dialogueMap(value)
@@ -187,6 +194,9 @@ func EncodeDialogueResult(r DialogueResult, protocol, model string) ([]byte, err
 	switch protocol {
 	case "openai-chat":
 		msg := map[string]any{"role": "assistant", "content": r.Text}
+		if r.Refused {
+			msg["content"], msg["refusal"] = nil, r.Refusal
+		}
 		items, err := ChatReasoningItems(r)
 		if err != nil {
 			return nil, err
@@ -207,6 +217,9 @@ func EncodeDialogueResult(r DialogueResult, protocol, model string) ([]byte, err
 		out = map[string]any{"id": r.ID, "object": "chat.completion", "model": model, "choices": []any{map[string]any{"index": 0, "message": msg, "finish_reason": r.Stop}}, "usage": u}
 	case "openai-responses":
 		items := []any{}
+		if r.Refused {
+			items = append(items, map[string]any{"id": ResponseItemID("msg", r.ID), "type": "message", "role": "assistant", "status": "completed", "content": []any{map[string]any{"type": "refusal", "refusal": r.Refusal}}})
+		}
 		if r.Reasoning != "" {
 			items = append(items, map[string]any{"id": ResponseItemID("rs", r.ID), "type": "reasoning", "summary": []any{map[string]any{"type": "summary_text", "text": r.Reasoning}}})
 		}

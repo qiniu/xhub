@@ -76,9 +76,12 @@ cost.go: DeploymentFinder → CallCost → deploymentCost
 Messages 的 `context_management` 仅允许空 `edits` 或严格的
 `clear_thinking_20251015 / keep=all` 无操作配置，不改变额度上界；真正清理或未知字段仍拒绝。
 
-请求未声明缓存 TTL 时，严格计划冻结可达价格档的 5m/1h 写入价，按最高费用预占，
+每个新严格计划均冻结可达价格档的全部已知 5m/1h 写入价，按最高费用预占，
 再由 `BudgetPlan.Charge` 使用原始 usage 分桶和实际上下文档精确结算。
-显式 TTL 不一致、未知期限、缺少多期限计量或总数矛盾均不释放占用。
+客户端显式声明 5m 或 1h 仅描述自己的缓存块；透明上游可能另加不同期限的系统前缀缓存。
+只要实际分桶均有预占时冻结的价格，就可精确结算，不因期限与请求不同而保留占用。
+未知期限、实际档缺价、缺少多期限计量或总数矛盾仍不释放占用；不以当前目录补算。
+旧单期限快照继续执行原有期限限制，不补入新费率。
 旧 uncertain 的快照没有新费率，不能用新计划或最新目录自动重算、退款。
 
 覆盖：`TestStrictBudgetAutomaticCacheTTL*`、`TestHardBudgetAutomaticCacheTTL`、

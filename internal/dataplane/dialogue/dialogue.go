@@ -194,6 +194,11 @@ func ResponseHistory(d llmdialogue.Dialogue, body map[string]any, result llmdial
 		turns = turns[1:]
 	}
 	history := append([]llmdialogue.Turn(nil), turns...)
+	if result.Refused && result.Refusal != "" {
+		// 本轮响应已经显式标记 refusal；续轮仅将上游公开说明作为助手历史文本，
+		// 避免用户换正常问题仍被 Native 协议归属锁死，也不能让拒绝历史退化为空消息。
+		return append(history, llmdialogue.Turn{Role: "assistant", Text: result.Refusal})
+	}
 	return append(history, llmdialogue.Turn{Role: "assistant", Text: result.Text, Calls: result.Calls, Reasoning: result.Reasoning})
 }
 

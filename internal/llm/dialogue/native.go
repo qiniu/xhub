@@ -154,20 +154,12 @@ func ParseDialogue(protocol string, body map[string]any) (Dialogue, error) {
 				delete(cp, key)
 			}
 		}
-		if cp["refusal"] != nil {
-			bridgeError = "refusal history"
-			delete(cp, "refusal")
+		refusalBridgeError, err := projectRefusalHistory(protocol, cp)
+		if err != nil {
+			return Dialogue{}, err
 		}
-		if parts, ok := cp["content"].([]any); ok {
-			content := []any{}
-			for _, part := range parts {
-				if dialogueMap(part)["type"] == "refusal" {
-					bridgeError = "refusal history"
-				} else {
-					content = append(content, part)
-				}
-			}
-			cp["content"] = content
+		if refusalBridgeError != "" {
+			bridgeError = refusalBridgeError
 		}
 		cp["content"] = stripCacheHints(cp["content"])
 		if protocol == "anthropic-messages" {
@@ -511,17 +503,21 @@ func bridgeOptions(d Dialogue, target string, out map[string]any) (map[string]an
 			return nil, fmt.Errorf("%s requires native %s", key, d.Source)
 		}
 	}
+	if target == "anthropic-messages" && out["thinking"] == nil {
+		// 未声明推理的跨协议请求只承诺文字和工具语义。显式关闭上游可能自动开启的签名
+		// thinking，避免上游付费执行之后才因响应不能跨协议回放而失败；同协议不经过此处。
+		if err := bridgeMessagesReasoning(nil, out); err != nil {
+			return nil, err
+		}
+	}
 	return out, nil
 }
 
-// bridgeMessagesReasoning 供 bridgeOptions 映射显式关闭推理的 OpenAI 请求。
-// 参数为 reasoning effort 与目标正文；none 输出原生 disabled，无指定值保留上游默认。
+// bridgeMessagesReasoning 供 bridgeOptions 将未请求推理或显式关闭推理的 OpenAI 请求编码至 Messages。
+// 参数为 reasoning effort 与目标正文；缺省和 none 均输出原生 disabled，不依赖供应商的隐式默认。
 // 返回能力错误时不修改正文；非零推理需要尚未实现的签名响应与回放链，必须在发送前拒绝。
 func bridgeMessagesReasoning(effort any, out map[string]any) error {
-	if effort == nil {
-		return nil
-	}
-	if effort != "none" {
+	if effort != nil && effort != "none" {
 		return fmt.Errorf("reasoning effort requires native Messages: signed thinking response and replay are not supported by this bridge")
 	}
 	out["thinking"] = map[string]any{"type": "disabled"}
@@ -630,6 +626,19 @@ func ParseDialogueResult(protocol string, raw []byte) (DialogueResult, error) {
 		}
 	} else if protocol == "anthropic-messages" {
 		r.Reasoning = messagesReasoning
+		if native["stop_reason"] == "refusal" {
+			r.Refused = true
+			r.Refusal, err = MessagesRefusalExplanation(native["stop_details"])
+			if err != nil {
+				return DialogueResult{}, err
+			}
+			// 拒绝前已经生成的内容不构成完整答案，也不能继续作为可执行工具交给另一协议。
+			// 原生调用仍保留全部原文，由支持该 stop_reason 的客户端处理部分输出。
+			if len(dialogueList(native["content"])) > 0 {
+				bridgeError = "partial output before Messages refusal requires native Messages"
+			}
+			r.Stop = "stop"
+		}
 	} else {
 		for _, part := range dialogueList(native["output"]) {
 			item := dialogueMap(part)

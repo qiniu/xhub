@@ -76,11 +76,16 @@ Messages accepts `context_management` only for empty `edits` or strictly validat
 `clear_thinking_20251015 / keep=all` no-op edits. These do not change the budget
 bound; real clearing and unknown fields remain unsupported.
 
-When a request declares no cache TTL, the strict plan freezes available 5m/1h
-write rates in each reachable price tier and reserves the highest cost.
+Every new strict plan freezes all known 5m/1h write rates in each reachable
+price tier and reserves the highest cost.
 `BudgetPlan.Charge` uses the original usage buckets and the measured context tier
-for exact settlement. Explicit TTL mismatches, unknown TTLs, missing buckets for
-multiple prices, and contradictory counts retain the reservation.
+for exact settlement. A client-declared 5m or 1h TTL describes its own cache
+blocks; a transparent upstream can add system-prefix caching with another TTL.
+Actual buckets can settle when their prices were frozen at reservation time,
+even when their TTL differs from the client hint. Unknown TTLs, missing prices
+in the actual tier, missing buckets for multiple prices, and contradictory
+counts still retain the reservation; the current catalog is never a fallback.
+Historical single-TTL snapshots keep their original restrictions and gain no new rates.
 Existing uncertain snapshots lack the new rates and must not be automatically
 recalculated or refunded using a new plan or the latest catalog.
 

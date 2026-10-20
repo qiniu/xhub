@@ -10,22 +10,26 @@ import (
 	"testing"
 )
 
-// TestHardBudgetAutomaticCacheTTL 验证真实有限额Key在无缓存声明时按上游实测5m/1h分桶结算。
-// 前置隔离PG与本地Messages供应商，覆盖三协议JSON/SSE、精确扣费、预占释放、非法计量保留和显式TTL冲突。
+// TestHardBudgetAutomaticCacheTTL 验证真实有限额Key在无声明或显式TTL时按上游实测5m/1h分桶结算。
+// 前置隔离PG与本地Messages供应商，覆盖三协议JSON/SSE、精确扣费、预占释放、非法计量保留和显式TTL下的透明上游缓存。
 // 所有正文为合成英文，harness清理schema、用户、Key，httptest服务由Cleanup关闭，不访问付费上游。
 func TestHardBudgetAutomaticCacheTTL(t *testing.T) {
 	t.Setenv("XHUB_REGRESSION_REDIS_URL", "")
 	for _, tc := range []struct {
-		name, protocol    string
-		five, hour        int
-		missing, explicit bool
+		name, protocol string
+		five, hour     int
+		missing        bool
+		ttl            string
 	}{
-		{"hour", "messages", 0, 5, false, false},
-		{"mixed", "messages", 2, 3, false, false},
-		{"mixed_chat", "chat", 2, 3, false, false},
-		{"mixed_responses", "responses", 2, 3, false, false},
-		{"missing_buckets", "messages", 2, 3, true, false},
-		{"explicit_mismatch", "messages", 0, 5, false, true},
+		{"hour", "messages", 0, 5, false, ""},
+		{"mixed", "messages", 2, 3, false, ""},
+		{"mixed_chat", "chat", 2, 3, false, ""},
+		{"mixed_responses", "responses", 2, 3, false, ""},
+		{"missing_buckets", "messages", 2, 3, true, ""},
+		{"explicit_five_hour", "messages", 0, 5, false, "5m"},
+		{"explicit_five_mixed", "messages", 2, 3, false, "5m"},
+		{"explicit_hour_mixed", "messages", 2, 3, false, "1h"},
+		{"explicit_missing_buckets", "messages", 2, 3, true, "5m"},
 	} {
 		for _, stream := range []bool{false, true} {
 			t.Run(fmt.Sprintf("%s/stream=%v", tc.name, stream), func(t *testing.T) {
@@ -38,8 +42,14 @@ func TestHardBudgetAutomaticCacheTTL(t *testing.T) {
 					if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
 						t.Error(err)
 					}
-					if !tc.explicit && body["cache_control"] != nil {
+					if tc.ttl == "" && body["cache_control"] != nil {
 						t.Error("网关擅自改写缓存期限")
+					}
+					if tc.ttl != "" {
+						hint, ok := body["cache_control"].(map[string]any)
+						if !ok || hint["ttl"] != tc.ttl {
+							t.Error("网关改变了客户端缓存提示")
+						}
 					}
 					if stream {
 						w.Header().Set("Content-Type", "text/event-stream")
@@ -79,8 +89,8 @@ func TestHardBudgetAutomaticCacheTTL(t *testing.T) {
 					body["input"] = "Verify automatic cache billing."
 					body["max_output_tokens"] = 64
 				}
-				if tc.explicit {
-					body["cache_control"] = map[string]any{"type": "ephemeral", "ttl": "5m"}
+				if tc.ttl != "" {
+					body["cache_control"] = map[string]any{"type": "ephemeral", "ttl": tc.ttl}
 				}
 				got := h.ok(http.MethodPost, path, owner.key, body)
 				if !strings.Contains(got.text(), "TERMINAL_OK") {
@@ -94,7 +104,7 @@ func TestHardBudgetAutomaticCacheTTL(t *testing.T) {
 				if err != nil {
 					t.Fatal(err)
 				}
-				if tc.missing || tc.explicit {
+				if tc.missing {
 					if len(holds) != 1 || holds[0].State != "uncertain" || key.Spend != 0 {
 						t.Fatalf("缓存不确定事实被错误结算: holds=%+v spend=%g", holds, key.Spend)
 					}

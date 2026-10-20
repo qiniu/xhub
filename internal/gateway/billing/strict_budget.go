@@ -40,7 +40,7 @@ type BudgetPlan struct {
 }
 
 // budgetPriceSnapshot 是无需重新查询可变目录的定价契约；金额和所有费率都只包含值，不引用部署配置。
-// 未声明TTL时CacheWrite保存最大预占价，CacheWriteByTTL保存实际结算价；不能用最大值代替实测分桶。
+// 新计划的CacheWrite保存最大预占价，CacheWriteByTTL保存全部已知期限的实际结算价；不能用最大值代替实测分桶。
 type budgetPriceSnapshot struct {
 	InputBound         int                     `json:"input_bound"`
 	OutputCap          int                     `json:"output_cap"`
@@ -145,7 +145,7 @@ func StrictBudgetPlan(dep config.ModelEntry, finalBody []byte, protocol string, 
 }
 
 // Charge 用冻结费率核对并计算本次已完成的实测账单；参数为归一化Usage及可选原始usage，返回分项或违约错误。
-// 未声明TTL而冻结多个缓存期限时必须提供原始分桶，不能把预占最高价冒充实际费用；单期限旧调用保持兼容。
+// 冻结多个缓存期限时必须提供原始分桶，不能把预占最高价冒充实际费用；单期限旧调用保持兼容。
 // 调用方须先用 NormalizeDialogueUsage 标记缺失实测量，再转为 catalog.Usage；本结构的零值无法表达字段缺失。
 // 错误时不得退款或改用当前目录补算；本函数不执行扣费、不更改占用。上游超过声明上界也不能穿透硬预算。
 func (p BudgetPlan) Charge(u catalog.Usage, rawUsage ...map[string]any) (catalog.Charge, error) {
@@ -223,7 +223,7 @@ func (p BudgetPlan) Charge(u catalog.Usage, rawUsage ...map[string]any) (catalog
 
 // ValidateStrictBudgetUsage 在目录归一化之前验证原始实测数值，防止小数、字符串和缺失事实被转成较小整数。
 // 参数为原始usage及可选冻结计划，返回违约错误；budgetCharge应传计划以校验缓存TTL，随后调用Normalize和Charge。
-// 本函数只读输入；零值是合法实测，缺少必要总量或未冻结的计量维度拒绝；无TTL声明的混合桶需完整冻结价格。
+// 本函数只读输入；零值是合法实测，缺少必要总量或未冻结的计量维度拒绝；混合桶需完整冻结价格。
 func ValidateStrictBudgetUsage(raw map[string]any, plans ...BudgetPlan) error {
 	fail := func(message string) error { return budgetFailure("invalid_usage", message) }
 	if raw == nil || raw["pricing_blocked"] != nil && raw["pricing_blocked"] != "" {

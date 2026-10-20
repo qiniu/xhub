@@ -74,7 +74,17 @@ model 定义统一表示，request/response 编解码，validation 校验字段�
 - `parallel_tool_calls` 转为 `tool_choice.disable_parallel_tool_use` 的反值，保持指定工具和强制工具选择。没有工具或选择 `none` 时无需附加并行开关。映射依据：[Anthropic 并行工具文档](https://platform.claude.com/docs/en/agents-and-tools/tool-use/parallel-tool-use)。
 - `text.format.type=text` 是默认文本输出，可规范化；结构化输出和 `verbosity` 仍拒绝。
 - `prompt_cache_key` 只接受字符串，跨协议不转发这个 OpenAI 缓存路由提示，不保证缓存命中，也不自动开启可能增加缓存写入费用的 `cache_control`。`prompt_cache_retention` 没有等价承诺，仍拒绝。
-- `reasoning.effort=none`（或 Chat 的 `reasoning_effort=none`）转为 `thinking.type=disabled`。可选摘要和 `include=reasoning.encrypted_content` 不会制造不存在的推理或密文。
+- 跨协议请求未提供推理、推理为 null/空对象，或显式设置 `reasoning.effort=none`（Chat 为 `reasoning_effort=none`）时，明确发送 `thinking.type=disabled`，避免上游在工具场景自动开启签名推理，导致付费执行后桥接失败。只有合法 summary 提示而没有 effort 不会启用推理；非法 summary、非 null 的 `reasoning.context` 及非零 effort 均拒绝。可选摘要和 `include=reasoning.encrypted_content` 不会制造不存在的推理或密文。原生 Messages 的 thinking 字段保持原样，包括不传此字段的请求。
 - `low` 等非零推理努力仍在调用前拒绝。当前原生 Anthropic 签名 thinking 的跨协议响应、流和工具续轮尚未形成完整可重放链，不能直接启用 adaptive 再等付费响应到达后断流，也不能伪造签名或把低推理偷偷改为关闭。
 
 同协议请求完整保留原始字段。本目录单测覆盖参数映射、边界和发送前拒绝；真实 Codex 默认模式仍需后续签名推理端到端工作，显式 `none` 的测试不得充当默认模式验收。
+
+## Messages 拒绝响应与后续对话
+
+原生 Messages 保留 `stop_reason=refusal`、`stop_details`、空 `content:[]`、实测用量和完整 `message_stop` 生命周期。合法模型拒绝不能被误判成断流。
+
+没有部分输出且 `stop_details.explanation` 提供真实说明时，Chat 使用 `message.refusal`（流式为 `delta.refusal`），Responses 使用标准 refusal 内容块及完整拒绝事件生命周期。不编造拒绝说明。缺失/空说明、已产生部分文本/工具/推理、畸形详情和截断流无法等价转换时明确失败，不能输出空白成功。
+
+后续请求中，本桥接生成的单一标准 Chat/Responses 公开拒绝会投影为助手历史文本，原样保留说明。这样用户改问正常问题时，可以继续同一 Messages 上游或切换模型，公开拒绝不会被当作依赖原连接的密文。本轮响应仍保留显式拒绝标记；同协议请求原文不变。合法混合拒绝/其他输出或空拒绝历史仍可原生重放，仅拒绝跨协议转换。拒绝块含未知字段、字段类型非法或非助手角色的拒绝历史则在解析时明确报错。
+
+依据：[Anthropic 拒绝文档](https://platform.claude.com/docs/en/build-with-claude/refusals-and-fallback)、[OpenAI 流事件规范](https://developers.openai.com/api/reference/resources/responses/streaming-events)。适配层保留上游报告的 token 用量，不根据拒绝类别推测上游发票费用。

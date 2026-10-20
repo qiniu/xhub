@@ -45,30 +45,28 @@ func budgetSelectPrices(rates []catalog.Rate, window, ttl string) (budgetTierPri
 	} else if r, found := budgetRate(rates, "cache_read", "", window); found {
 		p.CacheRead = &r
 	}
-	if ttl == "" {
-		// 上游可能自行选择缓存期限；未声明时冻结每种已知价格，预占只取最大值，结算必须读取实测分桶。
-		for _, variant := range []string{"", "1h"} {
-			if r, found := budgetRate(rates, "cache_write", variant, window); found {
-				if p.CacheWriteByTTL == nil {
-					p.CacheWriteByTTL = map[string]catalog.Rate{}
-				}
-				p.CacheWriteByTTL[variant] = r
-				if p.CacheWrite == nil || r.USD > p.CacheWrite.USD {
-					cp := r
-					p.CacheWrite = &cp
-				}
+	// 客户端声明只约束其缓存块；透明代理还可能注入另一期限的系统前缀缓存。
+	// 因此新计划始终冻结全部已知写价并取最大值预占，不能把请求TTL当成全部实测维度的上界。
+	for _, variant := range []string{"", "1h"} {
+		if r, found := budgetRate(rates, "cache_write", variant, window); found {
+			if p.CacheWriteByTTL == nil {
+				p.CacheWriteByTTL = map[string]catalog.Rate{}
+			}
+			p.CacheWriteByTTL[variant] = r
+			if p.CacheWrite == nil || r.USD > p.CacheWrite.USD {
+				cp := r
+				p.CacheWrite = &cp
 			}
 		}
-		return p, nil
 	}
-	variant := ""
-	if ttl == "1h" {
-		variant = "1h"
-	}
-	if r, found := budgetRate(rates, "cache_write", variant, window); found {
-		p.CacheWrite = &r
-	} else if ttl != "" {
-		return p, budgetFailure("unsupported_budget", "strict budget requires a cache write rate for requested caching")
+	if ttl != "" {
+		variant := ""
+		if ttl == "1h" {
+			variant = "1h"
+		}
+		if _, found := p.CacheWriteByTTL[variant]; !found {
+			return p, budgetFailure("unsupported_budget", "strict budget requires a cache write rate for requested caching")
+		}
 	}
 	return p, nil
 }

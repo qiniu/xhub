@@ -77,7 +77,7 @@ func budgetCacheCreationCounts(raw map[string]any) (five, hour int, present bool
 }
 
 // budgetValidateCacheTTL 对比原始分桶与冻结费率，不修改计划或回退到最新目录。
-// 参数为可为空的冻结计划及已验证数量；未声明TTL允许已冻结的混合桶，显式TTL仍要求完全匹配。
+// 参数为可为空的冻结计划及已验证数量；新计划允许已冻结的混合桶，历史单期限快照仍要求完全匹配。
 func budgetValidateCacheTTL(plan *budgetPriceSnapshot, five, hour int) error {
 	fail := func() error {
 		return budgetFailure("invalid_usage", "measured cache creation TTL differs from the reserved price")

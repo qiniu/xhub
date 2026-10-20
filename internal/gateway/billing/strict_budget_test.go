@@ -376,7 +376,13 @@ func TestStrictBudgetCacheRates(t *testing.T) {
 			if p.Amount < want || p.Amount-want > 1e-12 {
 				t.Fatalf("缓存未按最坏写入量预占: %g want>=%g", p.Amount, want)
 			}
-			charge, err := p.Charge(catalog.Usage{PromptTokens: 100, CompletionTokens: 8, CachedTokens: 20, CacheWriteTokens: 30})
+			raw := map[string]any{"input_tokens": 80, "output_tokens": 8, "cache_read_input_tokens": 20, "cache_creation_input_tokens": 30}
+			bucket := "ephemeral_5m_input_tokens"
+			if tc.ttl == "1h" {
+				bucket = "ephemeral_1h_input_tokens"
+			}
+			raw["cache_creation"] = map[string]any{bucket: 30}
+			charge, err := p.Charge(catalog.Usage{PromptTokens: 100, CompletionTokens: 8, CachedTokens: 20, CacheWriteTokens: 30}, raw)
 			if err != nil || math.Abs(charge.Total-(80*0.000001+8*0.000002+20*0.0000001+30*tc.wantWrite)) > 1e-12 {
 				t.Fatalf("缓存费用分项错误 %+v %v", charge, err)
 			}
@@ -646,7 +652,8 @@ func TestStrictBudgetRawUsageValidation(t *testing.T) {
 	}
 }
 
-// TestStrictBudgetRawCacheTTL 验证实测缓存期限与冻结价格一致且分桶总数可对账；构造5m/1h计划，无真实缓存或清理副作用。
+// TestStrictBudgetRawCacheTTL 验证历史单TTL快照仍限制实际期限，分桶总数必须可对账。
+// 参数t为测试上下文；显式构造缺少多期限映射的旧快照，无真实缓存或清理副作用。
 func TestStrictBudgetRawCacheTTL(t *testing.T) {
 	plans := map[string]BudgetPlan{}
 	for _, ttl := range []string{"5m", "1h"} {
@@ -656,6 +663,13 @@ func TestStrictBudgetRawCacheTTL(t *testing.T) {
 		b := strictBudgetBody("anthropic-messages")
 		b["cache_control"] = map[string]any{"type": "ephemeral", "ttl": ttl}
 		p, _ := strictBudgetMustPlan(t, d, b, "anthropic-messages")
+		// 模拟旧版已持久化的单期限契约，不能把新目录费率补进历史快照。
+		variant := ""
+		if ttl == "1h" {
+			variant = "1h"
+		}
+		oldRate := p.frozen.CacheWriteByTTL[variant]
+		p.frozen.CacheWrite, p.frozen.CacheWriteByTTL = &oldRate, nil
 		plans[ttl] = p
 	}
 	for _, tc := range []struct {

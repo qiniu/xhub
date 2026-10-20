@@ -32,8 +32,11 @@ type Dialogue struct {
 // DialogueResult 保存实测回复与用量；ID 来源上游，由网关按该 ID 保存临时续接上下文。
 type DialogueResult struct {
 	ID, Text, Stop string
-	Calls          []Turn
-	Usage          map[string]any
+	// Refused 表示上游明确拒绝；Refusal 仅保存上游提供的公开说明，空说明不能伪装成空白成功。
+	Refused bool
+	Refusal string
+	Calls   []Turn
+	Usage   map[string]any
 	// Reasoning 保存公开推理文本，用于 Chat/Responses 桥接，不承载密文。
 	Reasoning string
 	// 原始回复用于同协议输出，防止推理项、扩展用量和供应商字段被重新编码丢失。

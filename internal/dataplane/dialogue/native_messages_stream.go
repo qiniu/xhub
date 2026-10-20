@@ -42,6 +42,8 @@ func (s *nativeMessagesStream) consume(event map[string]any) (llmdialogue.Dialog
 			return fail("message_start content must be empty")
 		}
 		s.message = m
+		// 合法拒绝可不产生任何内容块；必须回构 [] 而不是 nil 编码出的 null，否则终态会被自己的解析器拒绝。
+		s.blocks = []any{}
 		s.active = -1
 		s.usage = llmdialogue.MergeDialogueUsage(nil, streamMap(m["usage"]))
 		return llmdialogue.DialogueResult{}, false, nil
@@ -152,6 +154,9 @@ func (s *nativeMessagesStream) consume(event map[string]any) (llmdialogue.Dialog
 			reason, ok := value.(string)
 			if !ok || reason == "" {
 				return fail("invalid stop_reason")
+			}
+			if s.stop != "" && s.stop != reason {
+				return fail("conflicting stop_reason")
 			}
 			s.stop = reason
 		}

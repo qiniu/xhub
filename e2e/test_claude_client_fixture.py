@@ -35,3 +35,45 @@ class ClaudeClientFixtureTest(unittest.TestCase):
         payload, events = claude_client_payload({"max_tokens": 64, "messages": [{"role": "user", "content": "Verify automatic cache."}]})
         self.assertEqual(payload["usage"]["cache_creation_input_tokens"], 5)
         self.assertEqual(events[0]["message"]["usage"]["cache_creation"]["ephemeral_1h_input_tokens"], 3)
+
+    def test_explicit_cache_buckets(self):
+        """显式5m/1h声明原样到达时均返回混合桶，错误或缺失声明必须拒绝，无外部资源。"""
+        body = {"max_tokens": 64, "messages": [{"role": "user", "content": "Verify explicit cache."}]}
+        for ttl in ("5m", "1h"):
+            payload, _ = claude_client_payload({**body, "cache_control": {"type": "ephemeral", "ttl": ttl}})
+            self.assertEqual(payload["usage"]["cache_creation_input_tokens"], 5)
+        with self.assertRaises(ValueError):
+            claude_client_payload(body)
+
+    def test_bridge_thinking_and_native_preservation(self):
+        """跨协议缺省必须明确关闭推理，原生keep-all请求不能被注入thinking；只操作内存。"""
+        body = {"max_tokens": 64, "messages": [{"role": "user", "content": "Verify default bridge."}]}
+        claude_client_payload({**body, "thinking": {"type": "disabled"}})
+        with self.assertRaises(ValueError):
+            claude_client_payload(body)
+        with self.assertRaises(ValueError):
+            claude_client_payload({"max_tokens": 64, "thinking": {"type": "disabled"},
+                                  "context_management": {"edits": [{"type": "clear_thinking_20251015", "keep": "all"}]}})
+
+    def test_empty_content_refusal(self):
+        """拒绝保留空数组、明确原因、真实usage及message_stop，不能变成一般文本成功；无持久副作用。"""
+        payload, events = claude_client_payload({"max_tokens": 64, "messages": [{"role": "user", "content": "Verify explicit refusal."}]})
+        self.assertEqual(payload["content"], [])
+        self.assertEqual(payload["stop_reason"], "refusal")
+        self.assertEqual(payload["usage"]["output_tokens"], 0)
+        self.assertEqual(events[-1]["type"], "message_stop")
+        self.assertEqual(events[-2]["delta"]["stop_details"]["explanation"], "Synthetic upstream refusal.")
+
+    def test_bridged_blocks_and_refusal_history(self):
+        """桥接文本块同样触发场景断言，拒绝续轮必须保留assistant原文；无网络或持久资源。"""
+        payload, _ = claude_client_payload({"max_tokens": 64, "messages": [
+            {"role": "user", "content": [{"type": "text", "text": "Verify explicit refusal."}]}]})
+        self.assertEqual(payload["stop_reason"], "refusal")
+        with self.assertRaises(ValueError):
+            claude_client_payload({"max_tokens": 64, "messages": [
+                {"role": "user", "content": [{"type": "text", "text": "Verify default bridge."}]}]})
+        body = {"max_tokens": 64, "messages": [{"role": "assistant", "content": "Synthetic upstream refusal."},
+                                             {"role": "user", "content": "Verify refusal continuation."}]}
+        claude_client_payload(body)
+        with self.assertRaises(ValueError):
+            claude_client_payload({**body, "messages": body["messages"][1:]})

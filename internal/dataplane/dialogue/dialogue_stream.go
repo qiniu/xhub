@@ -47,6 +47,13 @@ type dialogueStream struct {
 	capture bytes.Buffer
 	// 客户端协议、公开模型、响应 ID、累计文本与归一结束原因；均为本请求私有状态。
 	protocol, model, id, text, stop string
+	// refused/refusal 保存 Messages 的拒绝事实和真实说明；只在完整终态后输出标准 refusal 字段。
+	refused bool
+	refusal string
+	// Messages 拒绝终态复用原生生命周期校验；不能只凭一个 stop_reason 将缺开始、未闭合块或冲突终态发布成成功。
+	messagesVerifier nativeMessagesStream
+	messagesVerified llmdialogue.DialogueResult
+	messagesError    error
 	// responseItemSeed 在首次输出时固定；上游迟到或重复的响应 ID 不得改变已发布的 item_id。
 	responseItemSeed string
 	// 上游工具索引到累积调用的映射，逐帧拼接名称和 JSON 参数。
@@ -348,6 +355,9 @@ func (s *dialogueStream) observeUsage(u map[string]any) {
 // 若随后终态写入失败，已保存归属不会回滚；回调不是客户端接收确认，也不能保存未验证的工具参数。
 // 副作用为 HTTP 帧与回调状态写入，函数不能修复已发生的部分写出。
 func (s *dialogueStream) finish() error {
+	if s.refused {
+		return s.finishRefusal()
+	}
 	if err := s.start(); err != nil {
 		return err
 	}
@@ -567,6 +577,13 @@ func (s *dialogueStream) consume(protocol string, data string) error {
 	}
 	s.observeUsage(streamMap(m["usage"]))
 	typ := streamString(m["type"])
+	if protocol == "anthropic-messages" && s.messagesError == nil {
+		result, complete, err := s.messagesVerifier.consume(m)
+		s.messagesError = err
+		if complete {
+			s.messagesVerified = result
+		}
+	}
 	switch protocol {
 	case "gemini", "vertex":
 		if m["candidates"] == nil {
@@ -787,7 +804,20 @@ func (s *dialogueStream) consume(protocol string, data string) error {
 		case "message_delta":
 			d := streamMap(m["delta"])
 			if stop := streamString(d["stop_reason"]); stop != "" {
+				if s.refused && stop != "refusal" {
+					return fmt.Errorf("conflicting upstream refusal stop_reason")
+				}
 				s.stop = stop
+			}
+			if d["stop_reason"] == "refusal" {
+				explanation, err := llmdialogue.MessagesRefusalExplanation(d["stop_details"])
+				if err != nil {
+					return err
+				}
+				if s.refused && s.refusal != explanation {
+					return fmt.Errorf("conflicting upstream refusal explanation")
+				}
+				s.refused, s.refusal = true, explanation
 			}
 			if d["stop_reason"] == "max_tokens" {
 				s.stop = "length"
