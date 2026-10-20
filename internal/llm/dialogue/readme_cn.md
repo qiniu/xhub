@@ -74,7 +74,7 @@ model 定义统一表示，request/response 编解码，validation 校验字段�
 - `parallel_tool_calls` 转为 `tool_choice.disable_parallel_tool_use` 的反值，保持指定工具和强制工具选择。没有工具或选择 `none` 时无需附加并行开关。映射依据：[Anthropic 并行工具文档](https://platform.claude.com/docs/en/agents-and-tools/tool-use/parallel-tool-use)。
 - `text.format.type=text` 是默认文本输出，可规范化；结构化输出和 `verbosity` 仍拒绝。
 - `prompt_cache_key` 只接受字符串，跨协议不转发这个 OpenAI 缓存路由提示，不保证缓存命中，也不自动开启可能增加缓存写入费用的 `cache_control`。`prompt_cache_retention` 没有等价承诺，仍拒绝。
-- 跨协议请求未提供推理、推理为 null/空对象，或显式设置 `reasoning.effort=none`（Chat 为 `reasoning_effort=none`）时，明确发送 `thinking.type=disabled`，避免上游在工具场景自动开启签名推理，导致付费执行后桥接失败。只有合法 summary 提示而没有 effort 不会启用推理；非法 summary、非 null 的 `reasoning.context` 及非零 effort 均拒绝。可选摘要和 `include=reasoning.encrypted_content` 不会制造不存在的推理或密文。原生 Messages 的 thinking 字段保持原样，包括不传此字段的请求。
+- 只有显式 `reasoning.effort=none`（Chat 为 `reasoning_effort=none`）才映射为 `thinking.type=disabled`，且必须由所选上游型号支持关闭推理。未提供推理、推理为 null/空对象，或只有合法 summary 而没有 effort 时不设置 thinking，保留上游默认；部分型号强制 adaptive 并拒绝 disabled，不能给普通文字请求擅自注入关闭设置。非法 summary 和非 null 的 `reasoning.context` 仍拒绝。可选摘要和 `include=reasoning.encrypted_content` 不会制造不存在的推理或密文，原生 Messages 设置保持原样。上游自动返回 signed thinking 的跨协议响应与回放仍属于 #56 未实现边界，保留默认不代表该能力已修复。
 - `low` 等非零推理努力仍在调用前拒绝。当前原生 Anthropic 签名 thinking 的跨协议响应、流和工具续轮尚未形成完整可重放链，不能直接启用 adaptive 再等付费响应到达后断流，也不能伪造签名或把低推理偷偷改为关闭。
 
 同协议请求完整保留原始字段。本目录单测覆盖参数映射、边界和发送前拒绝；真实 Codex 默认模式仍需后续签名推理端到端工作，显式 `none` 的测试不得充当默认模式验收。

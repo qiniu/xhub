@@ -11,8 +11,9 @@ import (
 	"testing"
 )
 
-// TestMessagesBridgeDefaultThinkingToolRoundTrip 验证真实网关把无推理的 Chat/Responses 工具续轮送至 Messages 时明确关闭 thinking。
-// 前置私有 PostgreSQL、有限额 Key 与本地 Messages 上游；检查完整历史、JSON/SSE 终态、两轮结算及错误的零外发，原生 Messages 缺省保持不变。
+// TestMessagesBridgeDefaultThinkingToolRoundTrip 验证真实网关把未声明推理的工具续轮送至 Messages 时保留上游默认。
+// 前置私有 PostgreSQL、有限额 Key 与拒绝 disabled 的本地 Messages 上游；检查完整历史、JSON/SSE 终态、两轮结算及错误的零外发。
+// fixture 只返回可表达的文本与工具，不能证明自动 signed thinking 已可跨协议；该能力仍属于 #56 未实现边界。
 // harness 和 httptest 在结束时删除测试 schema、身份、Key 与 HTTP 服务，不调用付费供应商。
 func TestMessagesBridgeDefaultThinkingToolRoundTrip(t *testing.T) {
 	t.Setenv("XHUB_REGRESSION_REDIS_URL", "")
@@ -28,12 +29,16 @@ func TestMessagesBridgeDefaultThinkingToolRoundTrip(t *testing.T) {
 						t.Error(err)
 					}
 					thinking, _ := body["thinking"].(map[string]any)
-					if protocol == "messages" {
-						if _, exists := body["thinking"]; exists {
-							t.Error("原生 Messages 被注入默认 thinking")
-						}
-					} else if thinking["type"] != "disabled" {
-						t.Error("无推理的跨协议请求未关闭上游自动 thinking")
+					// 复现 Sonnet/Fable 的能力约束：未声明 effort 不代表供应商接受 disabled。
+					// 这里返回真实 HTTP 400，让错误的默认注入在网关完整链路测试中失败。
+					if thinking["type"] == "disabled" {
+						w.Header().Set("Content-Type", "application/json")
+						w.WriteHeader(http.StatusBadRequest)
+						_, _ = io.WriteString(w, `{"type":"error","error":{"type":"invalid_request_error","message":"This model requires adaptive thinking; disabled is unsupported."}}`)
+						return
+					}
+					if _, exists := body["thinking"]; exists {
+						t.Error("未声明 effort 却注入了供应商 thinking 设置")
 					}
 					if body["max_tokens"] != float64(64) {
 						t.Error("跨协议输出上限丢失")

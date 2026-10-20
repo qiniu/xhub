@@ -24,8 +24,8 @@ def claude_client_payload(request):
     messages = request.get("messages", [])
     prompt = _message_text(messages[0]) if len(messages) == 1 else ""
     if prompt == "Verify default bridge.":
-        if request.get("thinking") != {"type": "disabled"}:
-            raise ValueError("implicit upstream thinking was not disabled")
+        if "thinking" in request:
+            raise ValueError("This model requires adaptive thinking; implicit override is unsupported.")
     if messages and _message_text(messages[-1]) == "Verify refusal continuation.":
         if not any(message.get("role") == "assistant" and _message_text(message) == "Synthetic upstream refusal." for message in messages):
             raise ValueError("refusal history was lost")

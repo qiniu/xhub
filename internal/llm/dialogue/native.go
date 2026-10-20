@@ -503,21 +503,17 @@ func bridgeOptions(d Dialogue, target string, out map[string]any) (map[string]an
 			return nil, fmt.Errorf("%s requires native %s", key, d.Source)
 		}
 	}
-	if target == "anthropic-messages" && out["thinking"] == nil {
-		// 未声明推理的跨协议请求只承诺文字和工具语义。显式关闭上游可能自动开启的签名
-		// thinking，避免上游付费执行之后才因响应不能跨协议回放而失败；同协议不经过此处。
-		if err := bridgeMessagesReasoning(nil, out); err != nil {
-			return nil, err
-		}
-	}
 	return out, nil
 }
 
-// bridgeMessagesReasoning 供 bridgeOptions 将未请求推理或显式关闭推理的 OpenAI 请求编码至 Messages。
-// 参数为 reasoning effort 与目标正文；缺省和 none 均输出原生 disabled，不依赖供应商的隐式默认。
+// bridgeMessagesReasoning 供 bridgeOptions 将显式关闭推理的 OpenAI 请求编码至 Messages。
+// 参数为 reasoning effort 与目标正文；只有显式 none 输出 disabled，缺省保持供应商默认，避免拒绝不支持关闭推理的型号。
 // 返回能力错误时不修改正文；非零推理需要尚未实现的签名响应与回放链，必须在发送前拒绝。
 func bridgeMessagesReasoning(effort any, out map[string]any) error {
-	if effort != nil && effort != "none" {
+	if effort == nil {
+		return nil
+	}
+	if effort != "none" {
 		return fmt.Errorf("reasoning effort requires native Messages: signed thinking response and replay are not supported by this bridge")
 	}
 	out["thinking"] = map[string]any{"type": "disabled"}

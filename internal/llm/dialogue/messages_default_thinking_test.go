@@ -5,8 +5,8 @@ import (
 	"testing"
 )
 
-// TestMessagesBridgeDefaultThinking 验证跨协议的无推理请求不依赖 Messages 上游的隐式 thinking 默认值。
-// 前置为独立 Chat/Responses 请求；缺省、空对象、none 和合法摘要输出 disabled，非法及显式推理提前失败；无外部资源需清理。
+// TestMessagesBridgeDefaultThinking 验证跨协议请求只在显式 none 时关闭 Messages thinking。
+// 前置为独立 Chat/Responses 请求；缺省、空对象和合法摘要保留上游默认，none 输出 disabled，非法及显式推理提前失败；无外部资源需清理。
 func TestMessagesBridgeDefaultThinking(t *testing.T) {
 	for _, source := range []string{"openai-responses", "openai-chat"} {
 		for _, tc := range []struct {
@@ -59,8 +59,14 @@ func TestMessagesBridgeDefaultThinking(t *testing.T) {
 					if err == nil {
 						t.Fatalf("非法或未支持推理被静默关闭: %#v", tc.fields)
 					}
-				} else if err != nil || dialogueMap(out["thinking"])["type"] != "disabled" {
-					t.Fatalf("未请求推理却保留上游自动推理: out=%#v err=%v", out, err)
+				} else if err != nil {
+					t.Fatalf("合法推理选项被拒绝: fields=%#v err=%v", tc.fields, err)
+				} else if tc.name == "none" || tc.name == "chat_none" {
+					if dialogueMap(out["thinking"])["type"] != "disabled" {
+						t.Fatalf("显式 none 未关闭推理: out=%#v", out)
+					}
+				} else if _, exists := out["thinking"]; exists {
+					t.Fatalf("缺省 effort 被改写为上游可能拒绝的 thinking: out=%#v", out)
 				}
 				if !reflect.DeepEqual(body, before) {
 					t.Fatal("桥接修改了原始请求")

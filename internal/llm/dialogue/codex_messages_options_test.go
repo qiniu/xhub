@@ -149,12 +149,16 @@ func TestCodexMessagesUnsupportedOptions(t *testing.T) {
 }
 
 // TestMessagesReasoningNoneAndDefault 验证 Chat 的 none 与未指定 effort 的边界。
-// 参数 t 为上下文；合法 none 与缺省均输出 disabled，非 none 失败且原文不修改；纯内存无需清理。
+// 参数 t 为上下文；显式 none 输出 disabled，缺省保留上游默认，非 none 失败且原文不修改；纯内存无需清理。
 func TestMessagesReasoningNoneAndDefault(t *testing.T) {
 	for _, effort := range []any{nil, "none", "low", true} {
 		out := map[string]any{}
 		err := bridgeMessagesReasoning(effort, out)
-		if effort == nil || effort == "none" {
+		if effort == nil {
+			if err != nil || len(out) != 0 {
+				t.Fatalf("缺省 effort 被改写: %v %v", out, err)
+			}
+		} else if effort == "none" {
 			if err != nil || dialogueMap(out["thinking"])["type"] != "disabled" {
 				t.Fatalf("none 未映射: %v %v", out, err)
 			}

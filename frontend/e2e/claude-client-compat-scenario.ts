@@ -80,6 +80,7 @@ export function registerClaudeClientCompatScenario(locale: "zh-CN" | "en") {
       }
       // 客户端显式期限不限制上游其他缓存点；4次混合写入仍应每次收费0.000030。
       await expect.poll(async () => (await (await page.request.get(GATEWAY + "/key/info?key=" + keyID, { headers })).json()).info.spend).toBeCloseTo(0.000252, 8);
+      // 缺省推理必须保留上游默认；真实HTTP夹具拒绝任何注入，防止仅支持adaptive的型号被阻断。
       for (const protocol of ["chat", "responses"]) {
         const body = protocol === "chat"
           ? { model, max_tokens: 64, messages: [{ role: "user", content: "Verify default bridge." }] }

@@ -46,11 +46,12 @@ class ClaudeClientFixtureTest(unittest.TestCase):
             claude_client_payload(body)
 
     def test_bridge_thinking_and_native_preservation(self):
-        """跨协议缺省必须明确关闭推理，原生keep-all请求不能被注入thinking；只操作内存。"""
+        """跨协议缺省保留上游默认，模拟拒绝disabled的模型；原生keep-all也不能注入thinking，仅操作内存。"""
         body = {"max_tokens": 64, "messages": [{"role": "user", "content": "Verify default bridge."}]}
-        claude_client_payload({**body, "thinking": {"type": "disabled"}})
-        with self.assertRaises(ValueError):
-            claude_client_payload(body)
+        claude_client_payload(body)
+        for thinking in ({"type": "disabled"}, None, {"type": "adaptive"}):
+            with self.subTest(thinking=thinking), self.assertRaises(ValueError):
+                claude_client_payload({**body, "thinking": thinking})
         with self.assertRaises(ValueError):
             claude_client_payload({"max_tokens": 64, "thinking": {"type": "disabled"},
                                   "context_management": {"edits": [{"type": "clear_thinking_20251015", "keep": "all"}]}})
@@ -70,7 +71,7 @@ class ClaudeClientFixtureTest(unittest.TestCase):
             {"role": "user", "content": [{"type": "text", "text": "Verify explicit refusal."}]}]})
         self.assertEqual(payload["stop_reason"], "refusal")
         with self.assertRaises(ValueError):
-            claude_client_payload({"max_tokens": 64, "messages": [
+            claude_client_payload({"max_tokens": 64, "thinking": {"type": "disabled"}, "messages": [
                 {"role": "user", "content": [{"type": "text", "text": "Verify default bridge."}]}]})
         body = {"max_tokens": 64, "messages": [{"role": "assistant", "content": "Synthetic upstream refusal."},
                                              {"role": "user", "content": "Verify refusal continuation."}]}
