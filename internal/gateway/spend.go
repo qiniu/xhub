@@ -29,6 +29,7 @@ import (
 	"github.com/sunqirui1987/xhub/internal/gateway/requestlog"
 	"github.com/sunqirui1987/xhub/internal/iam"
 	"github.com/sunqirui1987/xhub/internal/live"
+	llmdialogue "github.com/sunqirui1987/xhub/internal/llm/dialogue"
 	"github.com/sunqirui1987/xhub/internal/util"
 )
 
@@ -574,6 +575,10 @@ func (s *Server) writeChatJSON(w http.ResponseWriter, p *auth.Principal, callID,
 		// Providers that do return usage are normalized below.
 		if usage == nil {
 			usage = map[string]any{}
+		}
+		// 同步 Responses 与原生流使用同一完整终态搜索计量，内部标记不写回客户端正文。
+		if op == "responses" {
+			usage = llmdialogue.ResponsesSearchUsage(parsed, usage)
 		}
 		s.recordSpend(w, p, callID, alias, op, usage, start, false, status, depID)
 		respBody, _ = json.Marshal(parsed)

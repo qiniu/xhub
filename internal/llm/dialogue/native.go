@@ -113,6 +113,13 @@ func ParseDialogue(protocol string, body map[string]any) (Dialogue, error) {
 				}
 				responseTools = append(responseTools, definitions...)
 				continue
+			case "web_search_call":
+				if !ValidWebSearchHistory(cp) {
+					return Dialogue{}, fmt.Errorf("invalid web search history item")
+				}
+				// 搜索执行事实只能由原生 Responses 保留；跨协议不伪造工具结果，也不重复执行历史搜索。
+				bridgeError = "web search history requires native Responses"
+				continue
 			case "tool_search_call", "tool_search_output":
 				// 客户端执行工具发现等价于一次工具往返；结果中的定义必须在下一次 Chat 请求中真正可调用。
 				definitions, err := projectClientSearchHistory(cp)
@@ -565,6 +572,9 @@ func ParseDialogueResult(protocol string, raw []byte) (DialogueResult, error) {
 				}
 			}
 		}
+	}
+	if protocol == "openai-responses" {
+		r.Usage = ResponsesSearchUsage(native, r.Usage)
 	}
 	r.Source, r.Native, r.BridgeError = protocol, native, bridgeError
 	return r, nil

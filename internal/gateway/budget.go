@@ -106,6 +106,9 @@ func (s *Server) PrepareBudgetAttempt(w http.ResponseWriter, r *http.Request, p 
 	}
 	s.budgetCalls[callID] = &budgetAttempt{Hold: hold, Plan: plan}
 	s.mu.Unlock()
+	if plan.SearchCalls > 0 {
+		w.Header().Set("X-XHub-Max-Tool-Calls", strconv.Itoa(plan.SearchCalls))
+	}
 	w.Header().Set("X-XHub-Max-Output-Tokens", strconv.Itoa(plan.OutputCap))
 	w.Header().Set("X-XHub-Budget-Input-Bound", strconv.Itoa(plan.InputBound))
 	w.Header().Set("X-XHub-Budget-Reserved", catalog.Format(plan.Amount))
@@ -186,7 +189,12 @@ func (s *Server) budgetCharge(callID string, rawUsage map[string]any, status int
 		err = errors.New("upstream billing outcome is uncertain")
 	} else {
 		if err = billing.ValidateStrictBudgetUsage(rawUsage, attempt.Plan); err == nil {
-			charge, err = attempt.Plan.Charge(catalog.NormalizeUsage(llmdialogue.NormalizeDialogueUsage(rawUsage)))
+			measured := catalog.NormalizeUsage(llmdialogue.NormalizeDialogueUsage(rawUsage))
+			if attempt.Plan.SearchCalls > 0 {
+				// 搜索按已验证终态的search动作计费；不改变供应商原始usage或无契约通道的计量语义。
+				measured.Searches = catalog.NormalizeUsage(map[string]any{"searches": rawUsage["xhub_web_search_searches"]}).Searches
+			}
+			charge, err = attempt.Plan.Charge(measured)
 		}
 	}
 	if err != nil {

@@ -36,11 +36,13 @@ type BudgetPlan struct {
 	Amount        float64
 	Defaulted     bool
 	PriceSnapshot string
+	SearchCalls   int
 	frozen        *budgetPriceSnapshot
 }
 
 // budgetPriceSnapshot 是无需重新查询可变目录的定价契约；金额和所有费率都只包含值，不引用部署配置。
 type budgetPriceSnapshot struct {
+	Search             *budgetSearch     `json:"search,omitempty"`
 	InputBound         int               `json:"input_bound"`
 	OutputCap          int               `json:"output_cap"`
 	Amount             float64           `json:"reserved_amount"`
@@ -62,7 +64,7 @@ func budgetFailure(code, message string) error { return &BudgetPlanError{Code: c
 
 // StrictBudgetPlan 校验最终JSON、设置真实输出cap并冻结单次尝试的费用上界。
 // 参数必须是已恢复历史、经护栏和协议转换后的实际部署/正文/协议与原请求开始时间；返回计划、新正文或分类错误。
-// 只支持有可信输入窗口和完整文字费率的单次文字生成；多模态、服务器工具、未知定价条件和远程历史引用拒绝。
+// 支持可信文字上界及显式认证的 Responses 搜索契约；其他服务器工具、多模态、未知定价和远程历史引用拒绝。
 // Chat 的cap字段须由可信 supported_parameters 声明，不从模型名称猜测；不修改传入部署或字节，不访问供应商。
 func StrictBudgetPlan(dep config.ModelEntry, finalBody []byte, protocol string, started time.Time) (BudgetPlan, []byte, error) {
 	fail := func(err error) (BudgetPlan, []byte, error) { return BudgetPlan{}, nil, err }
@@ -79,7 +81,11 @@ func StrictBudgetPlan(dep config.ModelEntry, finalBody []byte, protocol string, 
 	if protocol != "openai-chat" && protocol != "openai-responses" && protocol != "anthropic-messages" {
 		return fail(budgetFailure("unsupported_budget", "strict budget requires a supported text dialogue protocol"))
 	}
-	cacheTTL, err := budgetRequest(body, protocol)
+	search, err := budgetPrepareSearch(dep, protocol, body)
+	if err != nil {
+		return fail(err)
+	}
+	cacheTTL, err := budgetRequest(body, protocol, search != nil)
 	if err != nil {
 		return fail(err)
 	}
@@ -92,8 +98,14 @@ func StrictBudgetPlan(dep config.ModelEntry, finalBody []byte, protocol string, 
 	if err != nil {
 		return fail(err)
 	}
+	if search != nil {
+		if search.InputBound < input {
+			return fail(budgetFailure("unsupported_budget", "search cumulative input bound must cover the model input window"))
+		}
+		input = search.InputBound
+	}
 	window := catalog.WindowAt(started)
-	snapshot := budgetPriceSnapshot{InputBound: input, OutputCap: cap, Protocol: protocol, Window: window, Model: dep.ParamString("model", ""), StartedAt: started}
+	snapshot := budgetPriceSnapshot{Search: search, InputBound: input, OutputCap: cap, Protocol: protocol, Window: window, Model: dep.ParamString("model", ""), StartedAt: started}
 	if protocol == "openai-chat" && body["max_tokens"] != nil && budgetTrustedLegacyCap(dep) {
 		snapshot.CapSemanticsSource = strings.TrimSpace(dep.ModelInfo["max_tokens_semantics_source"].(string))
 	}
@@ -102,6 +114,9 @@ func StrictBudgetPlan(dep config.ModelEntry, finalBody []byte, protocol string, 
 		return fail(err)
 	}
 	if tiered {
+		if search != nil {
+			return fail(budgetFailure("unsupported_budget", "web search requires flat token pricing"))
+		}
 		snapshot.Tiers = tiers
 		snapshot.IntervalSemantics = "shared_boundaries_require_equal_rates"
 		// 原始目录不声明开闭边界；预占覆盖所有可达档，最终共享边界只有费率一致才可结算。
@@ -125,6 +140,9 @@ func StrictBudgetPlan(dep config.ModelEntry, finalBody []byte, protocol string, 
 	if snapshot.CacheWrite != nil {
 		amount += float64(input) * snapshot.CacheWrite.USD
 	}
+	if search != nil {
+		amount += float64(search.MaxCalls) * search.Rate.USD
+	}
 	snapshot.Amount, err = budgetRoundUp(amount)
 	if err != nil {
 		return fail(err)
@@ -137,7 +155,11 @@ func StrictBudgetPlan(dep config.ModelEntry, finalBody []byte, protocol string, 
 	if err != nil {
 		return fail(budgetFailure("invalid_request", "budgeted request cannot be encoded"))
 	}
-	return BudgetPlan{InputBound: input, OutputCap: cap, Amount: snapshot.Amount, Defaulted: defaulted, PriceSnapshot: string(rawSnapshot), frozen: &snapshot}, encoded, nil
+	searchCalls := 0
+	if search != nil {
+		searchCalls = search.MaxCalls
+	}
+	return BudgetPlan{SearchCalls: searchCalls, InputBound: input, OutputCap: cap, Amount: snapshot.Amount, Defaulted: defaulted, PriceSnapshot: string(rawSnapshot), frozen: &snapshot}, encoded, nil
 }
 
 // Charge 用冻结费率核对并计算本次已完成的实测账单；参数为归一化Usage，返回可直接结算的分项或违约错误。
@@ -170,7 +192,7 @@ func (p BudgetPlan) Charge(u catalog.Usage) (catalog.Charge, error) {
 	if u.PromptTokens < 0 || u.PromptTokens > s.InputBound || u.CompletionTokens < 0 || u.CompletionTokens > s.OutputCap || u.CachedTokens < 0 || u.CachedTokens > u.PromptTokens || u.CacheWriteTokens < 0 || u.CacheWriteTokens > s.InputBound {
 		return fail("measured token usage exceeds the reserved bounds")
 	}
-	if u.InputImageTokens != 0 || u.InputImages != 0 || u.Images != 0 || u.InputSeconds != 0 || u.Seconds != 0 || u.Searches != 0 || u.ImageVariant != "" || u.OutputVariant != "" || (u.PricingModel != "" && u.PricingModel != s.Model) {
+	if u.InputImageTokens != 0 || u.InputImages != 0 || u.Images != 0 || u.InputSeconds != 0 || u.Seconds != 0 || u.Searches < 0 || (u.Searches != 0 && (s.Search == nil || u.Searches > s.Search.MaxCalls)) || u.ImageVariant != "" || u.OutputVariant != "" || (u.PricingModel != "" && u.PricingModel != s.Model) {
 		return fail("measured usage contains an unreserved pricing dimension")
 	}
 	if u.InputTextTokens < 0 || u.InputTextTokens > u.PromptTokens {
@@ -192,6 +214,9 @@ func (p BudgetPlan) Charge(u catalog.Usage) (catalog.Charge, error) {
 	}
 	if u.CacheWriteTokens > 0 {
 		budgetAddCharge(&c, *s.CacheWrite, u.CacheWriteTokens)
+	}
+	if s.Search != nil {
+		budgetAddCharge(&c, s.Search.Rate, u.Searches)
 	}
 	c.Total = c.Input + c.Output + c.Cache
 	if math.IsNaN(c.Total) || math.IsInf(c.Total, 0) || c.Total > s.Amount {
@@ -229,7 +254,14 @@ func ValidateStrictBudgetUsage(raw map[string]any, plans ...BudgetPlan) error {
 		}
 		counts[group[0]] = first
 	}
-	if err := budgetUsageDimensions(raw); err != nil {
+	var search *budgetSearch
+	if len(plans) > 0 && plans[0].frozen != nil {
+		search = plans[0].frozen.Search
+	}
+	if err := budgetSearchUsage(raw, search); err != nil {
+		return err
+	}
+	if err := budgetUsageDimensions(raw, search != nil); err != nil {
 		return err
 	}
 	// 推理属于输出总量的子集，不能把明显遗漏隐藏推理的上游账单当成完整事实。
@@ -302,9 +334,9 @@ func budgetUsageInteger(value any) (int, bool) {
 	return int(n), true
 }
 
-// budgetUsageDimensions 递归检查usage计数，防止可选明细在目录转换时静默丢失；参数为用量树，返回不可计价错误。
+// budgetUsageDimensions 递归检查usage计数，防止可选明细被静默丢失；参数为用量树及已认证根层搜索授权，返回不可计价错误。
 // 只遍历小型计量对象，不读取请求正文；未知多模态和服务器工具非零计量不能套用文字价格。
-func budgetUsageDimensions(values map[string]any) error {
+func budgetUsageDimensions(values map[string]any, search bool) error {
 	for key, value := range values {
 		if value == nil {
 			continue
@@ -314,7 +346,7 @@ func budgetUsageDimensions(values map[string]any) error {
 			if !ok {
 				return budgetFailure("invalid_usage", "measured usage counts must be nonnegative integers")
 			}
-			if n > 0 && (strings.Contains(key, "audio") || strings.Contains(key, "image") || strings.Contains(key, "search") || strings.Contains(key, "fetch")) {
+			if n > 0 && (strings.Contains(key, "audio") || strings.Contains(key, "image") || (strings.Contains(key, "search") && !(search && (key == "searches" || key == "search_count" || key == "web_search_requests"))) || strings.Contains(key, "fetch")) {
 				return budgetFailure("invalid_usage", "measured usage contains an unreserved pricing dimension")
 			}
 		}
@@ -324,7 +356,7 @@ func budgetUsageDimensions(values map[string]any) error {
 			}
 		}
 		if nested, ok := value.(map[string]any); ok {
-			if err := budgetUsageDimensions(nested); err != nil {
+			if err := budgetUsageDimensions(nested, false); err != nil {
 				return err
 			}
 		}
@@ -595,9 +627,9 @@ func budgetRate(rates []catalog.Rate, side, variant, window string) (catalog.Rat
 	return catalog.Rate{}, false
 }
 
-// budgetRequest 验证文字生成收费维度并识别缓存TTL；参数为最终私有JSON和协议，返回单一TTL或拒绝原因，不修改内容。
-func budgetRequest(body map[string]any, protocol string) (string, error) {
-	allowed := strings.Fields("model stream stream_options messages input instructions system tools functions function_call tool_choice parallel_tool_calls max_tokens max_completion_tokens max_output_tokens temperature top_p frequency_penalty presence_penalty logit_bias logprobs top_logprobs seed stop user metadata reasoning reasoning_effort text response_format include store service_tier prompt_cache_key prompt_cache_retention thinking output_config n safety_identifier client_metadata verbosity cache_control")
+// budgetRequest 验证收费维度并识别缓存TTL；参数为最终私有JSON、协议和已冻结的搜索授权，返回TTL或错误，不修改内容。
+func budgetRequest(body map[string]any, protocol string, search bool) (string, error) {
+	allowed := strings.Fields("model stream stream_options messages input instructions system tools functions function_call tool_choice parallel_tool_calls max_tool_calls max_tokens max_completion_tokens max_output_tokens temperature top_p frequency_penalty presence_penalty logit_bias logprobs top_logprobs seed stop user metadata reasoning reasoning_effort text response_format include store service_tier prompt_cache_key prompt_cache_retention thinking output_config n safety_identifier client_metadata verbosity cache_control")
 	keys := map[string]bool{}
 	for _, key := range allowed {
 		keys[key] = true
@@ -625,7 +657,7 @@ func budgetRequest(body map[string]any, protocol string) (string, error) {
 	}
 	for _, key := range []string{"tools", "functions"} {
 		if value := body[key]; value != nil {
-			if err := budgetTools(value, &ttl); err != nil {
+			if err := budgetTools(value, &ttl, search && key == "tools"); err != nil {
 				return "", err
 			}
 		}
@@ -671,6 +703,10 @@ func budgetRequest(body map[string]any, protocol string) (string, error) {
 			}
 			if err := budgetContent(item["content"], &ttl); err != nil {
 				return "", err
+			}
+		case "web_search_call":
+			if protocol != "openai-responses" || !llmdialogue.ValidWebSearchHistory(item) {
+				return "", budgetFailure("invalid_request", "invalid web search history item")
 			}
 		case "reasoning", "function_call", "custom_tool_call":
 		case "function_call_output", "custom_tool_call_output":
@@ -761,8 +797,9 @@ func budgetContent(value any, ttl *string) error {
 	return nil
 }
 
-// budgetTools 检查客户端函数/custom工具定义，schema整体由输入整窗覆盖；参数为数组和TTL，服务器收费工具或未知定义拒绝。
-func budgetTools(value any, ttl *string) error {
+// budgetTools 检查工具定义；参数为数组、TTL及根层搜索授权，返回格式/能力错误。
+// 客户端schema由输入整窗覆盖；仅已冻结预算的根层web_search允许，嵌套或其他服务器工具拒绝。
+func budgetTools(value any, ttl *string, search ...bool) error {
 	list, ok := value.([]any)
 	if !ok {
 		return budgetFailure("invalid_request", "tool definitions must be an array")
@@ -777,6 +814,10 @@ func budgetTools(value any, ttl *string) error {
 		}
 		kind, _ := tool["type"].(string)
 		switch kind {
+		case "web_search":
+			if len(search) == 0 || !search[0] {
+				return budgetFailure("unsupported_budget", "web search requires a verified budget contract")
+			}
 		case "function", "custom":
 		case "":
 			if _, ok := tool["name"].(string); !ok {

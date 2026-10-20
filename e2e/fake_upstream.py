@@ -274,6 +274,17 @@ class Handler(BaseHTTPRequestHandler):
         model = req.get("model") or "gpt-4o-mini"
         if serve_stream_terminal(self, req):
             return
+        # 专属搜索预算夹具：必须真实收到搜索及次数上限，返回可独立计价的终态，不能靠网关删除工具蒙混通过。
+        if str(model).startswith("budget-search-browser-"):
+            if not self.path.endswith("/responses") or req.get("max_tool_calls") != 1 or not any(t.get("type") == "web_search" for t in req.get("tools", [])):
+                self.send_error(400, "search fixture requires Responses, search and cap 1")
+                return
+            result = {"id": "resp_budget_search", "object": "response", "status": "completed", "output": [{"id": "ws_budget_search", "type": "web_search_call", "status": "completed", "action": {"type": "search", "queries": ["Go programming language"]}}, {"id": "msg_budget_search", "type": "message", "role": "assistant", "content": [{"type": "output_text", "text": "e2e-budget-search"}]}], "usage": {"input_tokens": 8, "output_tokens": 2}}
+            if req.get("stream"):
+                self._sse([{"type": "response.completed", "response": result}])
+            else:
+                self._json(result)
+            return
         # 正常达到输出上限仍有可靠用量；原生 JSON/SSE 保留 incomplete，浏览器验证实际费用与释放预占。
         if str(model).startswith("pending-browser-hard-budget-length-"):
             if not self.path.endswith("/responses") or req.get("max_output_tokens") != 8:

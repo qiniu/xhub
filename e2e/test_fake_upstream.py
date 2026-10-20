@@ -10,6 +10,19 @@ from e2e.fake_upstream import Handler, ERROR_LOG_JSON_DIAGNOSTIC, ERROR_LOG_TEXT
 
 
 class ArkUpstreamTest(unittest.TestCase):
+    def test_hard_budget_search(self):
+        """本地HTTP验证真实搜索声明和cap，返回完整同步/流计费快照；非法cap拒绝，tearDown回收服务。"""
+        body = {"model": "budget-search-browser-unit", "input": "Search for Go.", "tools": [{"type": "web_search"}], "max_tool_calls": 1}
+        result = self.request("/v1/responses", body)
+        self.assertEqual(result["output"][0]["action"]["type"], "search")
+        with urlopen(Request(self.base + "/v1/responses", data=json.dumps({**body, "stream": True}).encode()), timeout=2) as response:
+            self.assertIn(b"response.completed", response.read())
+        for wrong in ({**body, "max_tool_calls": 2}, {**body, "tools": []}):
+            with self.assertRaises(HTTPError) as error:
+                self.request("/v1/responses", wrong)
+            self.assertEqual(error.exception.code, 400)
+            error.exception.close()
+
     def test_hard_budget_length(self):
         """私有本地 HTTP 验证 cap8 的 JSON/SSE 保留 incomplete 和完整用量，错误 cap/协议拒绝；tearDown 关闭服务。"""
         body = {"model": "pending-browser-hard-budget-length-unit", "input": "Verify normal output limit.", "max_output_tokens": 8}

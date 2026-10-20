@@ -2811,5 +2811,19 @@
     "title": "SAML HTTP expired zh-CN",
     "kind": "implemented",
     "environment": "default offline; expired local IdP certificate"
+  },
+  {
+    "id": "SC-433",
+    "file": "e2e/scenarios/regression/hard-budget-search-en.test.ts",
+    "title": "budgeted hosted search preserves tools and settles en",
+    "kind": "implemented",
+    "environment": "default offline; verified local search budget contract"
+  },
+  {
+    "id": "SC-434",
+    "file": "e2e/scenarios/regression/hard-budget-search-zh-CN.test.ts",
+    "title": "budgeted hosted search preserves tools and settles zh-CN",
+    "kind": "implemented",
+    "environment": "default offline; verified local search budget contract"
   }
 ]
