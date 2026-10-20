@@ -2829,14 +2829,14 @@
   {
     "id": "SC-435",
     "file": "e2e/scenarios/regression/claude-client-compat-en.test.ts",
-    "title": "Claude keep-all, public history and Chat terminal en",
+    "title": "Claude keep-all, cache TTL, refusal and public history en",
     "kind": "implemented",
     "environment": "default offline; native Messages contract and finite budget"
   },
   {
     "id": "SC-436",
     "file": "e2e/scenarios/regression/claude-client-compat-zh-CN.test.ts",
-    "title": "Claude keep-all, public history and Chat terminal zh-CN",
+    "title": "Claude keep-all, cache TTL, refusal and public history zh-CN",
     "kind": "implemented",
     "environment": "default offline; native Messages contract and finite budget"
   }
