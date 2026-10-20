@@ -47,16 +47,19 @@ type IDP struct {
 
 // New 启动本地 TLS IdP 并生成短期 RSA 证书；t 接收初始化错误并登记关闭，不读写外部身份平台。
 func New(t testing.TB) *IDP {
-	return newIDP(t, false)
+	return newIDP(t, false, false)
 }
 
 // NewExpired 提供真实过期签名证书的本地 IdP；仅供后台失败回归，验证验签库不会被配置导出绕过。
 func NewExpired(t testing.TB) *IDP {
-	return newIDP(t, true)
+	return newIDP(t, true, false)
 }
 
-// newIDP 按 expired 生成有效或过期证书并启动 TLS 服务；只影响 SAML 证书，HTTPS 连接仍使用独立有效证书。
-func newIDP(t testing.TB, expired bool) *IDP {
+// NewHTTP 启动无 TLS 的独立联调 IdP；供显式 HTTP 登录测试，返回实例并通过 t 自动回收服务。
+func NewHTTP(t testing.TB) *IDP { return newIDP(t, false, true) }
+
+// newIDP 按 expired 生成有效或过期签名证书；plainHTTP 选择浏览器联调传输，t 接收错误并登记清理。
+func newIDP(t testing.TB, expired, plainHTTP bool) *IDP {
 	t.Helper()
 	key, err := rsa.GenerateKey(rand.Reader, 2048)
 	if err != nil {
@@ -77,7 +80,11 @@ func newIDP(t testing.TB, expired bool) *IDP {
 	}
 	f := &IDP{sps: map[string]*saml.EntityDescriptor{}, mode: "valid"}
 	f.idp = &saml.IdentityProvider{Key: key, Signer: key, Certificate: cert, Logger: log.New(io.Discard, "", 0), ServiceProviderProvider: f, SignatureMethod: dsig.RSASHA256SignatureMethod}
-	f.Server = httptest.NewTLSServer(http.HandlerFunc(f.serve))
+	if plainHTTP {
+		f.Server = httptest.NewServer(http.HandlerFunc(f.serve))
+	} else {
+		f.Server = httptest.NewTLSServer(http.HandlerFunc(f.serve))
+	}
 	metadataURL, _ := url.Parse(f.Server.URL + "/metadata")
 	ssoURL, _ := url.Parse(f.Server.URL + "/sso")
 	f.idp.MetadataURL, f.idp.SSOURL = *metadataURL, *ssoURL

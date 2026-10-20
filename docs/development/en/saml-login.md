@@ -5,7 +5,7 @@ SSO settings support both existing OIDC connections and SAML 2.0. Each connectio
 ## Configuration and registration
 
 1. Create an SSO configuration, choose its organization and SAML 2.0.
-2. Enter the public XHub origin, for example `https://console.example.com`. For isolated testing, explicitly enable HTTP testing and use an origin such as `http://111.62.156.153:3000`. This option only permits HTTP for XHub addresses; IdP and metadata download endpoints still require HTTPS.
+2. Enter the public XHub origin, for example `https://console.example.com`. For isolated testing, explicitly enable HTTP testing and use an origin such as `http://111.62.156.153:3000`. This option permits HTTP for XHub addresses and IdP Redirect sign-in endpoints in manually pasted XML. Remote metadata downloads still require HTTPS, and remotely fetched metadata must retain HTTPS sign-in endpoints.
 3. Generate the ACS at `/auth/enterprise/saml/acs`, console return URL at `/ui/login`, and SP Entity ID. ACS and return URL must share an origin. Do not register a `/gw/...` callback.
 4. Supply an IdP HTTPS metadata URL (Qiniu: `https://sso.qiniu.io/saml2/meta`), or clear the URL and paste a single EntityDescriptor XML document. URL-based metadata is refreshed for each login and must retain the configured issuer. Network failures and expired metadata reject login. Pasted XML requires administrator-managed updates.
 5. The default stable identity attribute is `urn:oid:0.9.2342.19200300.100.1.1` (uid). It must occur once with one nonempty value. Transient NameID and email matching are not used for account linking.

@@ -9,7 +9,7 @@ import (
 
 // EnterpriseOIDC 保存单组织 OIDC/SAML 登录配置；保留旧表名兼容升级。
 // Protocol 区分协议，Secret 保存加密的客户端秘密或 SAML 私钥；Certificate 仅为公开证书。
-// AllowHTTP 仅供 SAML 本站联调，不放宽远端元数据和身份提供方 HTTPS 校验。
+// AllowHTTP 仅供 SAML 本站及手工 XML 中的 IdP 登录端点联调；远端元数据下载仍要求 HTTPS。
 type EnterpriseOIDC struct {
 	// IDPCertificateExpired 仅网关根据已加载元数据计算，不持久化，也不参与身份信任判断。
 	IDPCertificateExpired bool   `xorm:"-" json:"idp_certificate_expired,omitempty"`

@@ -167,7 +167,7 @@ func TestEnterpriseSAMLMetadata(t *testing.T) {
 		{"certificate_disallows_signing", enterpriseSAMLTestMetadata(noSigning), cfg.Issuer, false},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			got, err := enterpriseSAMLMetadata(tc.metadata, tc.issuer, now)
+			got, err := enterpriseSAMLMetadata(tc.metadata, tc.issuer, now, false)
 			if (err == nil) != tc.wantOK || (err == nil && got.EntityID != cfg.Issuer) {
 				t.Fatalf("IdP 元数据验证结果错误：允许=%t，错误=%v", tc.wantOK, err)
 			}
@@ -303,13 +303,30 @@ func TestEnterpriseSAMLProvider(t *testing.T) {
 			t.Fatal("空配置未拒绝")
 		}
 	})
-	t.Run("http_mode_never_allows_http_idp", func(t *testing.T) {
-		copy := cfg
-		copy.AllowHTTP = true
-		if _, err := enterpriseSAMLProvider(&copy, master, strings.Replace(metadata, "https://idp.example/sso", "http://idp.example/sso", 1)); err == nil {
-			t.Fatal("SP 的 HTTP 开关错误地放开了 IdP HTTP")
-		}
-	})
+	// 显式 HTTP 开关只允许手工 XML 的浏览器跳转；关闭开关或远程来源仍拒绝。
+	for _, tc := range []struct {
+		name     string
+		allow    bool
+		remote   string
+		endpoint string
+		ok       bool
+	}{
+		{"manual_http_enabled", true, "", "http://idp.example/sso", true},
+		{"manual_http_default_rejected", false, "", "http://idp.example/sso", false},
+		{"remote_http_endpoint_rejected", true, "https://idp.example/meta", "http://idp.example/sso", false},
+		{"http_credentials_rejected", true, "", "http://user@idp.example/sso", false},
+		{"http_query_rejected", true, "", "http://idp.example/sso?a=1", false},
+		{"http_fragment_rejected", true, "", "http://idp.example/sso#fragment", false},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			copy := cfg
+			copy.AllowHTTP, copy.IDPMetadataURL = tc.allow, tc.remote
+			_, err := enterpriseSAMLProvider(&copy, master, strings.Replace(metadata, "https://idp.example/sso", tc.endpoint, 1))
+			if (err == nil) != tc.ok {
+				t.Fatalf("手工 HTTP IdP 策略不符，允许=%t，错误=%v", tc.ok, err)
+			}
+		})
+	}
 	t.Run("decrypted_non_key_rejected", func(t *testing.T) {
 		copy := cfg
 		var err error

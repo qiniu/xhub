@@ -24,8 +24,8 @@ import (
 
 const enterpriseSAMLMetadataLimit = 2 << 20
 
-// enterpriseSAMLURL 校验 SAML 的浏览器端地址；raw 为绝对 URL，allowHTTP 只供显式开启的 SP HTTP 部署使用。
-// 返回解析地址或错误；拒绝凭据、查询、片段和不完整地址，不执行 DNS 或网络访问。IdP 调用方必须传 false。
+// enterpriseSAMLURL 校验 SAML 的浏览器端地址；raw 为绝对 URL，allowHTTP 只供显式开启的 SP/IdP HTTP 联调使用。
+// 返回解析地址或错误；拒绝凭据、查询、片段和不完整地址，不执行 DNS 或网络访问；远程元数据下载仍由独立 HTTPS 策略约束。
 func enterpriseSAMLURL(raw string, allowHTTP bool) (*url.URL, error) {
 	u, err := url.Parse(raw)
 	if err != nil || u == nil || u.Hostname() == "" || u.Opaque != "" ||
@@ -75,7 +75,7 @@ func enterpriseSAMLMaterial(master string) (encryptedKey, certificate string, er
 }
 
 // enterpriseSAMLProvider 从持久化配置及已取得的 IdP metadata 构造严格 SP；master 仅用于解密该连接的私钥。
-// 配置校验、登录发起与回调调用；返回提供方或错误，不下载 metadata、不写入状态，HTTP 开关绝不放宽 IdP HTTPS。
+// 配置校验、登录发起与回调调用；返回提供方或错误，不下载 metadata、不写入状态，仅粘贴元数据可通过 HTTP 开关允许 IdP HTTP Redirect 登录。
 func enterpriseSAMLProvider(c *iam.EnterpriseOIDC, master string, metadata string) (*saml.ServiceProvider, error) {
 	if c == nil || c.Protocol != "saml" || strings.TrimSpace(c.ClientID) == "" ||
 		strings.TrimSpace(c.Issuer) == "" || c.ConnectionID != strings.TrimSpace(c.ConnectionID) ||
@@ -95,7 +95,7 @@ func enterpriseSAMLProvider(c *iam.EnterpriseOIDC, master string, metadata strin
 		returnURL.Scheme != acs.Scheme || returnURL.Host != acs.Host {
 		return nil, errors.New("invalid enterprise SAML return URL")
 	}
-	idp, err := enterpriseSAMLMetadata(metadata, c.Issuer, time.Now())
+	idp, err := enterpriseSAMLMetadata(metadata, c.Issuer, time.Now(), c.AllowHTTP && strings.TrimSpace(c.IDPMetadataURL) == "")
 	if err != nil {
 		return nil, err
 	}
@@ -138,9 +138,9 @@ func enterpriseSAMLProvider(c *iam.EnterpriseOIDC, master string, metadata strin
 	}, nil
 }
 
-// enterpriseSAMLMetadata 解析一个受信任管理员提交的 IdP 实体；raw 限制为 2MiB，issuer 与 now 用于实体及有效期校验。
+// enterpriseSAMLMetadata 解析一个受信任管理员提交的 IdP 实体；raw 限制为 2MiB，issuer 与 now 用于实体及有效期校验，allowHTTP 仅允许手工 XML 联调的 HTTP 登录端点。
 // provider 构造调用；仅接受单一 EntityDescriptor、可用 Redirect SSO 和可解析签名证书，拒绝聚合/尾随 XML，不下载外部资源。
-func enterpriseSAMLMetadata(raw, issuer string, now time.Time) (*saml.EntityDescriptor, error) {
+func enterpriseSAMLMetadata(raw, issuer string, now time.Time, allowHTTP bool) (*saml.EntityDescriptor, error) {
 	fail := func() (*saml.EntityDescriptor, error) { return nil, errors.New("invalid enterprise SAML IdP metadata") }
 	if len(raw) == 0 || len(raw) > enterpriseSAMLMetadataLimit || strings.TrimSpace(issuer) == "" {
 		return fail()
@@ -200,7 +200,7 @@ func enterpriseSAMLMetadata(raw, issuer string, now time.Time) (*saml.EntityDesc
 		}
 		for _, endpoint := range descriptor.SingleSignOnServices {
 			if endpoint.Binding == saml.HTTPRedirectBinding {
-				if _, err := enterpriseSAMLURL(endpoint.Location, false); err != nil {
+				if _, err := enterpriseSAMLURL(endpoint.Location, allowHTTP); err != nil {
 					return fail()
 				}
 				redirectEndpoints++

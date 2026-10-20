@@ -5,7 +5,7 @@ import { translate, type Locale } from "../src/i18n/translate";
 import { GATEWAY, loginAdmin, sessionBearer, stableGoto } from "./helpers";
 
 /** 注册真实 SAML 浏览器流程；locale 与 secure 选择界面语言和控制台协议，mode 选择合法或拒绝路径。
- * 使用独立 SCIM 用户、本地 TLS IdP、真实 Next /auth 代理及后台会话；finally 删除本例配置和身份，外层脚本回收 schema。 */
+ * 使用独立 SCIM 用户、本地 HTTP/TLS IdP、真实 Next /auth 代理及后台会话；finally 删除本例配置和身份，外层脚本回收 schema。 */
 export function registerSAMLScenario(locale: Locale, secure: boolean, mode: "valid" | "unknown" | "tamper" | "replay" | "expired") {
   test(`SAML ${secure ? "HTTPS" : "HTTP"} ${mode} ${locale}`, async ({ page, browser, baseURL }) => {
     test.setTimeout(120_000);
@@ -34,7 +34,7 @@ export function registerSAMLScenario(locale: Locale, secure: boolean, mode: "val
       await expect(form.getByLabel(tr("enterprise.identity_claim"))).toHaveValue("urn:oid:0.9.2342.19200300.100.1.1");
       await expect(form.getByRole("switch", { name: tr("enterprise.allowHTTP") })).not.toBeChecked();
       await form.getByLabel(tr("enterprise.idp_metadata_url")).fill("");
-      await form.getByLabel(tr("enterprise.idp_metadata"), { exact: true }).fill(mode === "expired" ? f.saml_metadata_expired : f.saml_metadata);
+      await form.getByLabel(tr("enterprise.idp_metadata"), { exact: true }).fill(mode === "expired" ? f.saml_metadata_expired : secure ? f.saml_metadata : f.saml_metadata_http);
       await form.getByLabel(tr("enterprise.publicURL")).fill(origin);
       if (!secure) {
         await expect(form.getByRole("button", { name: tr("enterprise.generateSAMLURLs") })).toBeDisabled();
@@ -113,7 +113,7 @@ export function registerSAMLScenario(locale: Locale, secure: boolean, mode: "val
           const denied = await visitor.request.get(GATEWAY + "/audit/logs", { headers: session });
           expect(denied.status(), await denied.text()).toBe(403);
           if (mode === "replay") {
-            const captured = await (await page.request.get(f.control + "/saml/last")).json();
+            const captured = await (await page.request.get(f.control + "/saml/last?http=" + !secure)).json();
             const replayContext = await browser.newContext({ ignoreHTTPSErrors: true });
             try {
               const replayPage = await replayContext.newPage();

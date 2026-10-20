@@ -5,7 +5,7 @@ SSO 设置同时支持现有 OIDC 和 SAML 2.0。一个连接绑定一个组织�
 ## 配置和注册
 
 1. 在“单点登录设置”中新增配置，选择组织及 SAML 2.0。
-2. 填入 XHub 公开源，例如 `https://console.example.com`。仅联调可显式启用“允许 HTTP 联调”，填写 `http://111.62.156.153:3000`；此选项仅放宽本站地址，不允许 HTTP IdP 或 HTTP 元数据获取。
+2. 填入 XHub 公开源，例如 `https://console.example.com`。仅联调可显式启用“允许 HTTP 联调”，填写 `http://111.62.156.153:3000`；此选项允许本站地址及手工粘贴 XML 中的 IdP Redirect 登录端点使用 HTTP；远程元数据下载及其中的登录端点仍要求 HTTPS。
 3. 生成固定 ACS `/auth/enterprise/saml/acs`、控制台返回 `/ui/login` 和 SP Entity ID。ACS 与返回地址必须同源；不要将回调注册为 `/gw/...`。
 4. 填入 IdP HTTPS 元数据 URL（七牛：`https://sso.qiniu.io/saml2/meta`），或清空 URL 后粘贴单个 EntityDescriptor XML。使用 URL 时每次登录读取当前元数据，校验原 issuer 不变；网络失败或元数据过期时拒绝登录。粘贴 XML 需要管理员主动更新证书及有效期。
 5. 稳定身份属性默认 `urn:oid:0.9.2342.19200300.100.1.1`（uid）。只接受唯一非空单值，不以 transient NameID 或邮箱自动绑定用户。

@@ -32,6 +32,9 @@ func TestEnterpriseSAMLHTTPFlow(t *testing.T) {
 			}
 			admin := h.adminSession()
 			idp := samltest.New(t)
+			if !secure {
+				idp = samltest.NewHTTP(t)
+			}
 			org := h.ok("POST", "/organization/new", admin, map[string]any{"organization_alias": "SAML regression"}).json()
 			orgID := stringField(org, "organization_id")
 			dir := h.ok("POST", "/admin/directory/connections", admin, map[string]any{"organization_id": orgID, "name": "SAML directory"}).json()
@@ -42,6 +45,12 @@ func TestEnterpriseSAMLHTTPFlow(t *testing.T) {
 			userID := stringField(detail["users"].([]any)[0].(map[string]any), "user_id")
 			payload := map[string]any{"organization_id": orgID, "protocol": "saml", "name": "SAML test", "client_id": "urn:xhub:saml:regression:" + connection, "redirect_uri": h.server.URL + "/auth/enterprise/saml/acs", "return_uri": h.server.URL + "/ui/login", "idp_metadata": idp.Metadata(), "enabled": true}
 			if !secure {
+				// 先使用合法 HTTPS SP 地址，单独验证默认策略拒绝 HTTP IdP，避免被 SP 地址校验掩盖。
+				payload["redirect_uri"], payload["return_uri"] = "https://console.example/auth/enterprise/saml/acs", "https://console.example/ui/login"
+				if got := h.do("POST", "/admin/enterprise/sso", admin, payload); got.status != 400 {
+					t.Fatalf("默认配置必须单独拒绝 HTTP IdP，得到 %d: %s", got.status, got.text())
+				}
+				payload["redirect_uri"], payload["return_uri"] = h.server.URL+"/auth/enterprise/saml/acs", h.server.URL+"/ui/login"
 				if got := h.do("POST", "/admin/enterprise/sso", admin, payload); got.status != 400 {
 					t.Fatalf("默认配置必须拒绝 HTTP，得到 %d: %s", got.status, got.text())
 				}

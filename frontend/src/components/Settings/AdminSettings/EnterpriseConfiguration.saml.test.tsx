@@ -65,14 +65,15 @@ describe("SAML enterprise configuration", () => {
     expect(document.body).not.toHaveTextContent("enterprise.saml");
   });
 
-  // 前置公开IP HTTP；验证默认拒绝、明确开启后允许回调，但IdP元数据HTTP仍拒绝；两语言错误可见，清理组件。
-  it.each(["en", "zh-CN"] as const)("%s requires HTTP opt-in only for XHub addresses", async (locale) => {
+  // 前置公开IP HTTP；验证默认拒绝、明确开启后允许回调并展示 IdP 手工 XML 联调说明，但远程元数据 HTTP 仍拒绝；两语言错误可见，清理组件。
+  it.each(["en", "zh-CN"] as const)("%s requires HTTP opt-in and retains HTTPS metadata downloads", async (locale) => {
     const t = (key: string) => translate(locale, key);
     vi.mocked(api.saveEnterprise).mockResolvedValue();
     vi.mocked(api.readEnterprise).mockResolvedValue({...savedConfiguration(), allow_http:true});
     render(<I18nProvider initialLocale={locale}><EnterpriseConfiguration id="saved" publicOrigin="http://111.62.156.153:3000" /></I18nProvider>);
     fireEvent.change(screen.getByLabelText(t("enterprise.ssoName")), {target:{value:"HTTP Identity"}});
     fireEvent.change(screen.getByLabelText(t("enterprise.provider")), {target:{value:"saml"}});
+    expect(screen.getByText(t("enterprise.samlHTTPHint"))).toBeVisible();
     expect(screen.getByRole("button", {name:t("enterprise.generateSAMLURLs")})).toBeDisabled();
     fireEvent.click(screen.getByRole("button", {name:t("enterprise.save")}));
     expect(await screen.findByRole("alert")).toHaveTextContent(t("enterprise.samlAddressError"));

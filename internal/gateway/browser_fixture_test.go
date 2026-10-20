@@ -12,11 +12,11 @@ import (
 	qclient "github.com/qiniu/go-sdk/v7/client"
 	"github.com/qiniu/go-sdk/v7/storage"
 	"github.com/qiniu/go-sdk/v7/storagev2/uplog"
+	"github.com/sunqirui1987/xhub/cmd/regression/testsupport/samltest"
 	"github.com/sunqirui1987/xhub/internal/config"
 	"github.com/sunqirui1987/xhub/internal/iam"
 	"github.com/sunqirui1987/xhub/internal/live"
 	"github.com/sunqirui1987/xhub/internal/store"
-	"github.com/sunqirui1987/xhub/cmd/regression/testsupport/samltest"
 	"github.com/sunqirui1987/xhub/internal/util"
 	"io"
 	"math/big"
@@ -267,6 +267,7 @@ func TestBrowserEnterpriseFixture(t *testing.T) {
 	samlConsole := httptest.NewTLSServer(httputil.NewSingleHostReverseProxy(ui))
 	defer samlConsole.Close()
 	samlIDP := samltest.New(t)
+	httpSAMLIDP := samltest.NewHTTP(t)
 	expiredSAMLIDP := samltest.NewExpired(t)
 	identities := map[string]string{}
 	control := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -281,16 +282,21 @@ func TestBrowserEnterpriseFixture(t *testing.T) {
 				return
 			}
 			raw, err := io.ReadAll(io.LimitReader(r.Body, 2<<20))
-			if err != nil || samlIDP.Register(string(raw)) != nil {
+			if err != nil || samlIDP.Register(string(raw)) != nil || httpSAMLIDP.Register(string(raw)) != nil {
 				http.Error(w, "invalid SP metadata", 400)
 				return
 			}
 			_ = json.NewEncoder(w).Encode(map[string]bool{"registered": true})
 		case "/saml/mode":
 			samlIDP.SetMode(r.URL.Query().Get("value"))
+			httpSAMLIDP.SetMode(r.URL.Query().Get("value"))
 			_ = json.NewEncoder(w).Encode(map[string]bool{"configured": true})
 		case "/saml/last":
-			_ = json.NewEncoder(w).Encode(samlIDP.Last())
+			if r.URL.Query().Get("http") == "true" {
+				_ = json.NewEncoder(w).Encode(httpSAMLIDP.Last())
+			} else {
+				_ = json.NewEncoder(w).Encode(samlIDP.Last())
+			}
 		case "/monitor/tps/legacy":
 			// 只在此测试程序的私有 schema 写入旧 TPS 并移除完成标记；浏览器随后通过生产 Migrate 验证修复。
 			// 不改写账单、费用、Token 或其他统计；POST 以外拒绝，运行器最终删除专属 schema。
@@ -530,7 +536,7 @@ func TestBrowserEnterpriseFixture(t *testing.T) {
 		}
 	}))
 	defer control.Close()
-	metadata, _ := json.Marshal(map[string]string{"issuer": issuer, "console": consoleServer.URL, "control": control.URL, "saml_console": samlConsole.URL, "saml_metadata": samlIDP.Metadata(), "saml_metadata_expired": expiredSAMLIDP.Metadata()})
+	metadata, _ := json.Marshal(map[string]string{"issuer": issuer, "console": consoleServer.URL, "control": control.URL, "saml_console": samlConsole.URL, "saml_metadata": samlIDP.Metadata(), "saml_metadata_http": httpSAMLIDP.Metadata(), "saml_metadata_expired": expiredSAMLIDP.Metadata()})
 	if err = os.WriteFile(filepath.Join(dir, "enterprise-fixture.json"), metadata, 0600); err != nil {
 		t.Fatal(err)
 	}
