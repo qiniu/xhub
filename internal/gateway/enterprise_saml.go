@@ -54,6 +54,10 @@ func (s *Server) enterpriseSAMLMetadataXML(ctx context.Context, c *iam.Enterpris
 // prepareEnterpriseSAML 校验管理表单并生成或保留服务端密钥；配置保存调用，返回固定错误供接口脱敏。
 // 仅支持同一连接内更新；禁止 OIDC/SAML 原地互换造成旧身份绑定混用，私钥和证书不接受客户端覆盖。
 func (s *Server) prepareEnterpriseSAML(ctx context.Context, c *iam.EnterpriseOIDC) error {
+	// 在下载或生成密钥前拒绝不受控组合；运行时提供方再次检查，防止历史配置绕过管理入口。
+	if c.AllowExpiredIDPCertificate && (!c.AllowHTTP || strings.TrimSpace(c.IDPMetadataURL) != "" || strings.TrimSpace(c.IDPMetadata) == "") {
+		return iam.ErrInvalid
+	}
 	if c.IdentityClaim == "" {
 		c.IdentityClaim = "urn:oid:0.9.2342.19200300.100.1.1"
 	}
@@ -95,7 +99,7 @@ func (s *Server) prepareEnterpriseSAML(ctx context.Context, c *iam.EnterpriseOID
 	c.Issuer = descriptor.EntityID
 	c.IDPMetadata = metadata
 	c.IDPCertificateExpired = enterpriseSAMLExpiredCertificate(metadata)
-	if c.Enabled && c.IDPCertificateExpired {
+	if c.Enabled && c.IDPCertificateExpired && !c.AllowExpiredIDPCertificate {
 		return errSAMLExpiredCertificate
 	}
 	_, err = enterpriseSAMLProvider(c, s.Cfg.GeneralSettings.MasterKey, metadata)

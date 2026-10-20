@@ -30,8 +30,14 @@ HTTP exposes assertions and sessions in transit and is intended for isolated tes
 
 Qiniu production metadata identifies `https://sso.qiniu.io/saml2/meta` and advertises the Redirect endpoint `https://sso.qiniu.io`. Its advertised signing certificate expired on **2019-05-24**. Its SHA-256 fingerprint is `58:DC:21:82:03:E4:D7:B7:17:03:7E:F6:CF:33:37:4B:DF:B0:50:51:7E:E2:E8:5B:7C:1D:DF:B7:93:A4:DD:1F`.
 
-Disabled configuration and SP metadata export remain available, with an expiry warning; enabling is rejected. Real signed-response tests confirm that the underlying verifier rejects expired certificates. Signature verification and its clock are not bypassed. The SSO administrator must supply a current signing certificate and matching metadata before refreshing and enabling the configuration. Successful local IdP tests do not certify real Qiniu login.
+Disabled configuration and SP metadata export remain available, with an expiry warning; enabling is rejected by default. The isolated testing exception below can allow this pinned expired certificate without bypassing signature validation or changing clocks. For normal use, the SSO administrator must supply a current signing certificate and matching metadata. Successful local IdP tests do not certify real Qiniu login.
 
 The deployment server received HTTP 403 when fetching the same HTTPS metadata, while the desktop could read it. An administrator can paste the trusted XML instead. SAML front-channel login does not require a server-side userinfo call; renewed certificates must also be reimported.
 
 Automatic SP key rotation is not included. Before the one-year certificate expires, arrange a new connection and metadata registration; do not replace the stored certificate without its matching private key.
+
+## Pinned certificate expiry exception for isolated testing
+
+The default remains rejection of expired IdP signing certificates. `allow_expired_idp_certificate` is an independent, default-off connection option that requires SAML, `allow_http=true`, an empty metadata URL and manually pasted XML. The existing expiry warning stays visible. Disable the option after isolated testing; update the IdP certificate before normal rollout.
+
+The per-connection signature verifier copies the trusted certificate objects in memory and only extends an already-expired `NotAfter` for validation. Raw DER, public keys and `NotBefore` remain unchanged. goxmldsig still requires an exact Raw certificate match and validates the complete XML signature. Future certificates, untrusted certificates, tampering, expired assertions and replay remain rejected. No global or assertion clock is changed. This relies on the pinned goxmldsig v1.6.1 certificate matching behavior and must be reverified on dependency upgrades.

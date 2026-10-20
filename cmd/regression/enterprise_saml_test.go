@@ -18,10 +18,14 @@ import (
 // TestEnterpriseSAMLHTTPFlow 用独立 PostgreSQL schema、真实路由和本地签名 IdP 验证 HTTP/HTTPS 完整登录。
 // 覆盖默认 HTTPS、显式 HTTP、元数据导出、稳定身份和普通权限、篡改/未知身份/重放/无 Cookie；结束删配置并由 harness 回收 schema。
 func TestEnterpriseSAMLHTTPFlow(t *testing.T) {
-	for _, secure := range []bool{false, true} {
+	for _, variant := range []struct{ secure, expired bool }{{false, false}, {true, false}, {false, true}} {
+		secure := variant.secure
 		name := "http-explicit"
 		if secure {
 			name = "https-default"
+		}
+		if variant.expired {
+			name = "http-expired-explicit"
 		}
 		t.Run(name, func(t *testing.T) {
 			h := newHarness(t)
@@ -34,6 +38,9 @@ func TestEnterpriseSAMLHTTPFlow(t *testing.T) {
 			idp := samltest.New(t)
 			if !secure {
 				idp = samltest.NewHTTP(t)
+			}
+			if variant.expired {
+				idp = samltest.NewExpired(t)
 			}
 			org := h.ok("POST", "/organization/new", admin, map[string]any{"organization_alias": "SAML regression"}).json()
 			orgID := stringField(org, "organization_id")
@@ -55,6 +62,9 @@ func TestEnterpriseSAMLHTTPFlow(t *testing.T) {
 					t.Fatalf("默认配置必须拒绝 HTTP，得到 %d: %s", got.status, got.text())
 				}
 				payload["allow_http"] = true
+			}
+			if variant.expired {
+				payload["allow_expired_idp_certificate"] = true
 			}
 			created := h.ok("POST", "/admin/enterprise/sso", admin, payload)
 			if strings.Contains(created.text(), "PRIVATE KEY") || strings.Contains(created.text(), `"secret"`) {
@@ -166,6 +176,26 @@ func TestEnterpriseSAMLExpiredSigningCertificate(t *testing.T) {
 	idp := samltest.NewExpired(t)
 	org := h.ok("POST", "/organization/new", admin, map[string]any{"organization_alias": "Expired SAML signer"}).json()
 	config := map[string]any{"organization_id": stringField(org, "organization_id"), "protocol": "saml", "name": "Expired signer", "client_id": "urn:xhub:expired-signer", "redirect_uri": h.server.URL + "/auth/enterprise/saml/acs", "return_uri": h.server.URL + "/ui/login", "idp_metadata": idp.Metadata(), "enabled": false, "allow_http": true}
+	// 不合法例外组合应在网络访问前明确拒绝；使用不可达元数据地址证明没有依赖真实服务。
+	for _, mode := range []string{"http-disabled", "remote-metadata", "oidc"} {
+		invalid := map[string]any{}
+		for key, value := range config {
+			invalid[key] = value
+		}
+		invalid["allow_expired_idp_certificate"] = true
+		switch mode {
+		case "http-disabled":
+			invalid["allow_http"] = false
+		case "remote-metadata":
+			invalid["idp_metadata_url"] = "https://127.0.0.1:1/metadata"
+		case "oidc":
+			invalid["protocol"] = "oidc"
+			invalid["allow_http"] = false
+		}
+		if got := h.do("POST", "/admin/enterprise/sso", admin, invalid); got.status != 400 {
+			t.Fatalf("非法到期例外未拒绝 %s: %d", mode, got.status)
+		}
+	}
 	created := h.ok("POST", "/admin/enterprise/sso", admin, config).json()
 	if created["idp_certificate_expired"] != true {
 		t.Fatal("过期 IdP 证书必须显式呈现管理状态", created)

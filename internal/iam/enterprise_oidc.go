@@ -15,19 +15,21 @@ type EnterpriseOIDC struct {
 	IDPCertificateExpired bool   `xorm:"-" json:"idp_certificate_expired,omitempty"`
 	Name                  string `json:"name"`
 	Protocol              string `json:"protocol"`
-	AllowHTTP             bool   `xorm:"'allow_http'" json:"allow_http"`
-	IDPMetadata           string `xorm:"'idp_metadata'" json:"idp_metadata"`
-	IDPMetadataURL        string `xorm:"'idp_metadata_url'" json:"idp_metadata_url"`
-	Certificate           string `json:"certificate"`
-	ConnectionID          string `xorm:"pk 'connection_id'" json:"connection_id"`
-	Issuer                string `json:"issuer"`
-	ClientID              string `xorm:"'client_id'" json:"client_id"`
-	Secret                string `json:"-"`
-	RedirectURI           string `xorm:"'redirect_uri'" json:"redirect_uri"`
-	ReturnURI             string `xorm:"'return_uri'" json:"return_uri"`
-	IdentityClaim         string `xorm:"'identity_claim'" json:"identity_claim"`
-	Enabled               bool   `json:"enabled"`
-	Revision              int64  `json:"revision"`
+	// AllowExpiredIDPCertificate 是默认关闭的固定公钥到期联调例外，仅 SAML HTTP 加手工 XML 可用。
+	AllowExpiredIDPCertificate bool   `xorm:"'allow_expired_idp_certificate'" json:"allow_expired_idp_certificate"`
+	AllowHTTP                  bool   `xorm:"'allow_http'" json:"allow_http"`
+	IDPMetadata                string `xorm:"'idp_metadata'" json:"idp_metadata"`
+	IDPMetadataURL             string `xorm:"'idp_metadata_url'" json:"idp_metadata_url"`
+	Certificate                string `json:"certificate"`
+	ConnectionID               string `xorm:"pk 'connection_id'" json:"connection_id"`
+	Issuer                     string `json:"issuer"`
+	ClientID                   string `xorm:"'client_id'" json:"client_id"`
+	Secret                     string `json:"-"`
+	RedirectURI                string `xorm:"'redirect_uri'" json:"redirect_uri"`
+	ReturnURI                  string `xorm:"'return_uri'" json:"return_uri"`
+	IdentityClaim              string `xorm:"'identity_claim'" json:"identity_claim"`
+	Enabled                    bool   `json:"enabled"`
+	Revision                   int64  `json:"revision"`
 }
 
 // TableName 返回登录配置表，由 xorm 调用，无参数或副作用。

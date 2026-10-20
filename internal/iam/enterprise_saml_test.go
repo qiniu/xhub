@@ -17,7 +17,7 @@ func TestEnterpriseSAMLTransactions(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	config, err := db.CreateEnterpriseOIDC(ctx, by, org.ID, EnterpriseOIDC{Name: "SAML", Protocol: "saml", AllowHTTP: true, IDPMetadata: "public XML", IDPMetadataURL: "https://idp.example/meta", Certificate: "public certificate", Issuer: "https://idp.example", ClientID: "urn:xhub:test", Enabled: true})
+	config, err := db.CreateEnterpriseOIDC(ctx, by, org.ID, EnterpriseOIDC{Name: "SAML", Protocol: "saml", AllowHTTP: true, AllowExpiredIDPCertificate: true, IDPMetadata: "public XML", IDPMetadataURL: "https://idp.example/meta", Certificate: "public certificate", Issuer: "https://idp.example", ClientID: "urn:xhub:test", Enabled: true})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -27,7 +27,7 @@ func TestEnterpriseSAMLTransactions(t *testing.T) {
 		}
 	}
 	persisted, err := db.EnterpriseOIDCByID(ctx, config.ConnectionID)
-	if err != nil || persisted.Protocol != "saml" || !persisted.AllowHTTP || persisted.IDPMetadata != config.IDPMetadata || persisted.Certificate != config.Certificate {
+	if err != nil || persisted.Protocol != "saml" || !persisted.AllowHTTP || !persisted.AllowExpiredIDPCertificate || persisted.IDPMetadata != config.IDPMetadata || persisted.Certificate != config.Certificate {
 		t.Fatal("迁移丢失SAML配置", err)
 	}
 	for _, mode := range []string{"valid", "expired", "revision", "disabled", "oidc"} {

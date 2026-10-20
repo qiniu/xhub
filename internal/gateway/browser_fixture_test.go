@@ -282,7 +282,7 @@ func TestBrowserEnterpriseFixture(t *testing.T) {
 				return
 			}
 			raw, err := io.ReadAll(io.LimitReader(r.Body, 2<<20))
-			if err != nil || samlIDP.Register(string(raw)) != nil || httpSAMLIDP.Register(string(raw)) != nil {
+			if err != nil || samlIDP.Register(string(raw)) != nil || httpSAMLIDP.Register(string(raw)) != nil || expiredSAMLIDP.Register(string(raw)) != nil {
 				http.Error(w, "invalid SP metadata", 400)
 				return
 			}
@@ -290,6 +290,7 @@ func TestBrowserEnterpriseFixture(t *testing.T) {
 		case "/saml/mode":
 			samlIDP.SetMode(r.URL.Query().Get("value"))
 			httpSAMLIDP.SetMode(r.URL.Query().Get("value"))
+			expiredSAMLIDP.SetMode(r.URL.Query().Get("value"))
 			_ = json.NewEncoder(w).Encode(map[string]bool{"configured": true})
 		case "/saml/last":
 			if r.URL.Query().Get("http") == "true" {

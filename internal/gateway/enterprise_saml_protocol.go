@@ -16,6 +16,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/beevik/etree"
 	"github.com/crewjam/saml"
 	xrv "github.com/mattermost/xml-roundtrip-validator"
 	dsig "github.com/russellhaering/goxmldsig"
@@ -82,6 +83,9 @@ func enterpriseSAMLProvider(c *iam.EnterpriseOIDC, master string, metadata strin
 		c.ConnectionID == "." || c.ConnectionID == ".." || strings.ContainsAny(c.ConnectionID, "/\\?#%") {
 		return nil, errors.New("invalid enterprise SAML configuration")
 	}
+	if c.AllowExpiredIDPCertificate && (!c.AllowHTTP || strings.TrimSpace(c.IDPMetadataURL) != "" || strings.TrimSpace(c.IDPMetadata) == "") {
+		return nil, errors.New("expired IdP certificate testing requires HTTP opt-in and pasted metadata")
+	}
 	entityURL, err := url.Parse(c.ClientID)
 	if err != nil || !entityURL.IsAbs() {
 		return nil, errors.New("enterprise SAML entity ID must be an absolute URI")
@@ -121,7 +125,7 @@ func enterpriseSAMLProvider(c *iam.EnterpriseOIDC, master string, metadata strin
 	if c.ConnectionID != "" {
 		metadataURL.Path = "/auth/enterprise/" + c.ConnectionID + "/saml/metadata"
 	}
-	return &saml.ServiceProvider{
+	sp := &saml.ServiceProvider{
 		EntityID:    c.ClientID,
 		Key:         key,
 		Certificate: cert,
@@ -135,7 +139,37 @@ func enterpriseSAMLProvider(c *iam.EnterpriseOIDC, master string, metadata strin
 		AllowIDPInitiated:           false,
 		SignatureMethod:             dsig.RSASHA256SignatureMethod,
 		ValidateAudienceRestriction: enterpriseSAMLAudience(c.ClientID),
-	}, nil
+	}
+	if c.AllowExpiredIDPCertificate {
+		sp.SignatureVerifier = enterpriseSAMLExpiredVerifier{}
+	}
+	return sp, nil
+}
+
+// enterpriseSAMLExpiredVerifier 仅用于显式 HTTP 加手工 XML 的单连接联调；不修改全局时钟或断言时间。
+// 依赖 goxmldsig v1.6.1 先以 Raw DER 精确匹配固定公钥、再检查受信副本日历的行为，升级库时需保留对应测试。
+type enterpriseSAMLExpiredVerifier struct{}
+
+// VerifySignature 包装 crewjam 为本次断言创建的验签上下文；返回原库完整签名验证结果。
+// 只在内存副本忽略已过期的固定证书 NotAfter，保留 Raw、公钥、NotBefore 和所有签名检查；不改配置、XML 或时钟。
+func (enterpriseSAMLExpiredVerifier) VerifySignature(ctx *dsig.ValidationContext, el *etree.Element) error {
+	roots, err := ctx.CertificateStore.Certificates()
+	if err != nil {
+		return err
+	}
+	now := time.Now()
+	copies := make([]*x509.Certificate, len(roots))
+	for i, root := range roots {
+		copy := *root
+		if now.After(copy.NotAfter) && !now.Before(copy.NotBefore) {
+			copy.NotAfter = now.Add(time.Hour)
+		}
+		copies[i] = &copy
+	}
+	local := *ctx
+	local.CertificateStore = &dsig.MemoryX509CertificateStore{Roots: copies}
+	_, err = local.Validate(el)
+	return err
 }
 
 // enterpriseSAMLMetadata 解析一个受信任管理员提交的 IdP 实体；raw 限制为 2MiB，issuer 与 now 用于实体及有效期校验，allowHTTP 仅允许手工 XML 联调的 HTTP 登录端点。

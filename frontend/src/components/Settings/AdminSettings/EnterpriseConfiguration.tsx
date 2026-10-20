@@ -112,6 +112,8 @@ export default function EnterpriseConfiguration({ id, sso = false, organizations
     <p className="text-sm text-muted-foreground sm:col-span-2">{t("enterprise.samlEntityHint")}</p>
     <label className="!flex-row items-center sm:col-span-2"><Switch checked={value.allow_http === true} onCheckedChange={(checked) => {setValidation(null);setValue((old) => ({...old,allow_http:checked}));}} />{t("enterprise.allowHTTP")}</label>
     <p className="text-sm text-muted-foreground sm:col-span-2">{t("enterprise.samlHTTPHint")}</p>
+    <label className="!flex-row items-center sm:col-span-2"><Switch checked={value.allow_expired_idp_certificate === true} onCheckedChange={(checked) => {setValidation(null);setValue((old) => ({...old,allow_expired_idp_certificate:checked}));}} />{t("enterprise.allowExpiredIDPCertificate")}</label>
+    <p className="text-sm text-muted-foreground sm:col-span-2">{t("enterprise.samlExpiredTestingHint")}</p>
     <p className="text-sm text-muted-foreground sm:col-span-2">{t("enterprise.samlDownloadHint")}</p>
    </>}
    {!oidc && <>

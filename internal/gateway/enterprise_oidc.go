@@ -111,7 +111,7 @@ func (s *Server) enterpriseOIDCAdmin(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 	} else if in.Protocol == "oidc" {
-		if in.AllowHTTP {
+		if in.AllowHTTP || in.AllowExpiredIDPCertificate {
 			util.WriteError(w, 400, "invalid_request", "HTTP is only supported for SAML testing")
 			return
 		}

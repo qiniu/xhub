@@ -27,3 +27,5 @@ ALTER TABLE enterprise_login_transactions ADD COLUMN IF NOT EXISTS saml_subject 
 
 -- 不同组织不能共享同一 SAML 实体，以免 IdP 注册覆盖；旧 OIDC client_id 不受影响。
 CREATE UNIQUE INDEX IF NOT EXISTS enterprise_saml_entity_unique ON enterprise_oidc(client_id) WHERE protocol='saml';
+
+ALTER TABLE enterprise_oidc ADD COLUMN IF NOT EXISTS allow_expired_idp_certificate BOOLEAN NOT NULL DEFAULT false;

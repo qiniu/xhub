@@ -74,6 +74,8 @@ describe("SAML enterprise configuration", () => {
     fireEvent.change(screen.getByLabelText(t("enterprise.ssoName")), {target:{value:"HTTP Identity"}});
     fireEvent.change(screen.getByLabelText(t("enterprise.provider")), {target:{value:"saml"}});
     expect(screen.getByText(t("enterprise.samlHTTPHint"))).toBeVisible();
+    expect(screen.getByText(t("enterprise.samlExpiredTestingHint"))).toBeVisible();
+    expect(screen.getByRole("switch", {name:t("enterprise.allowExpiredIDPCertificate")})).not.toBeChecked();
     expect(screen.getByRole("button", {name:t("enterprise.generateSAMLURLs")})).toBeDisabled();
     fireEvent.click(screen.getByRole("button", {name:t("enterprise.save")}));
     expect(await screen.findByRole("alert")).toHaveTextContent(t("enterprise.samlAddressError"));

@@ -14,6 +14,14 @@ function configuration(): EnterpriseConfiguration {
 }
 
 describe("SAML form contracts", () => {
+  // 验证到期证书例外必须显式 HTTP 与手工 XML；不修改原始输入，无资源清理。
+  it("restricts expired certificate testing to explicit HTTP and pasted XML", () => {
+    const value = {...configuration(), allow_expired_idp_certificate:true, allow_http:true, idp_metadata_url:"", idp_metadata:"<EntityDescriptor/>"};
+    expect(samlConfigurationIssue(value)).toBeNull();
+    for (const invalid of [{...value,allow_http:false},{...value,idp_metadata_url:"https://idp.example/meta"}]) expect(samlConfigurationIssue(invalid)).toBe("enterprise.samlExpiredTestingRequires");
+    expect(ssoSaveConfiguration(value,true).allow_expired_idp_certificate).toBe(true);
+    expect(ssoSaveConfiguration(value,false)).not.toHaveProperty("allow_expired_idp_certificate");
+  });
   // 前置结构化证书错误、未知错误及缺正文；验证只翻译已确认类型，不暴露原始错误，纯内存无需清理。
   it("recognizes only the structured IdP certificate error", () => {
     expect(samlFailureKey(new ApiError("private detail", 400, {error:{type:"saml_certificate_expired"}}))).toBe("enterprise.samlCertificateExpired");

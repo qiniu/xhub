@@ -74,14 +74,22 @@ export function registerSAMLScenario(locale: Locale, secure: boolean, mode: "val
         await expect(page.getByText(tr("enterprise.samlCertificateExpired"), { exact: true }).first()).toBeVisible();
         await visitor.goto(origin + "/ui/login/");
         await expect(visitor.getByRole("link").filter({ hasText: name })).toHaveCount(0);
-        return;
+        // 默认拒绝后显式开启单连接例外，真实签名登录仍经同一浏览器及后台链路。
+        await page.getByRole("button", { name: tr("enterprise.configureName", { name }), exact: true }).click();
+        const exceptionForm = page.getByRole("dialog", { name: tr("enterprise.configureSSO"), exact: true });
+        await expect(exceptionForm.getByRole("switch", { name: tr("enterprise.allowExpiredIDPCertificate") })).not.toBeChecked();
+        await exceptionForm.getByRole("switch", { name: tr("enterprise.allowExpiredIDPCertificate") }).check();
+        const exceptionSaved = page.waitForResponse(r => r.url().includes("/admin/enterprise/sso/") && r.request().method() === "PUT");
+        await exceptionForm.getByRole("button", { name: tr("enterprise.save") }).click();
+        expect((await exceptionSaved).status()).toBe(200);
+        await expect(exceptionForm).not.toBeVisible();
       }
       const enabled = page.waitForResponse(r => r.url().includes("/admin/enterprise/sso/") && r.request().method() === "PUT");
       await toggle.click();
       const enableResult = await enabled;
       expect(enableResult.status(), await enableResult.text()).toBe(200);
       await expect(toggle).toBeChecked();
-      expect((await page.request.post(f.control + "/saml/mode?value=" + (mode === "replay" ? "valid" : mode))).status()).toBe(200);
+      expect((await page.request.post(f.control + "/saml/mode?value=" + (mode === "replay" || mode === "expired" ? "valid" : mode))).status()).toBe(200);
       await visitor.goto(origin + "/ui/login/");
       await visitor.getByRole("link").filter({ hasText: name }).click();
       await expect(visitor.getByLabel("Employee")).toBeVisible();

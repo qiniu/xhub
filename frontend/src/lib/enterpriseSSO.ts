@@ -43,6 +43,7 @@ export function samlConfigurationIssue(value: EnterpriseConfiguration): string |
       return "enterprise.samlMetadataHTTPS";
     }
   }
+  if (value.allow_expired_idp_certificate === true && (value.allow_http !== true || String(value.idp_metadata_url ?? "").trim() || !String(value.idp_metadata ?? "").trim())) return "enterprise.samlExpiredTestingRequires";
   try {
     const callback = new URL(String(value.redirect_uri ?? ""));
     const back = new URL(String(value.return_uri ?? ""));
@@ -70,7 +71,7 @@ export function samlConfigurationIssue(value: EnterpriseConfiguration): string |
 export function ssoSaveConfiguration(value: EnterpriseConfiguration, saml: boolean): EnterpriseConfiguration {
   const fields = [
     "connection_id", "organization_id", "name", "enabled", "client_id", "redirect_uri", "return_uri", "identity_claim",
-    ...(saml ? ["idp_metadata_url", "idp_metadata", "allow_http"] : ["issuer", "client_secret"]),
+    ...(saml ? ["idp_metadata_url", "idp_metadata", "allow_http", "allow_expired_idp_certificate"] : ["issuer", "client_secret"]),
   ];
   const result: EnterpriseConfiguration = { protocol: saml ? "saml" : "oidc" };
   for (const field of fields) if (value[field] !== undefined) result[field] = value[field];
