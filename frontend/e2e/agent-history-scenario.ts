@@ -180,13 +180,23 @@ export function registerAgentHistoryScenario(locale: "en" | "zh-CN") {
         const second = await sendHistory(page, key, { endpoint: "messages", session }, continuation);
         expect(second.status, second.text).toBe(200);
         expect(historyOutput(second.text, "messages", stream)).toEqual([{ type: "text", text: "history-ok" }]);
-        const rejected = await sendHistory(
+        const resumed = await sendHistory(
           page,
           key,
           { endpoint: "messages", session: session + "-unowned" },
           continuation,
         );
-        expect(rejected.status, rejected.text).toBe(400);
+        expect(resumed.status, resumed.text).toBe(200);
+        // 原生完整历史无需网关归属；改名后仍用同一Key和会话续轮，并核对模型目录同步显示。
+        const renamed = body.model + "-renamed";
+        expect((await page.request.post(GATEWAY + "/model/update", {headers, data:{id:ids[1],model_name:renamed}})).status()).toBe(200);
+        const afterRename = await sendHistory(page,key,{endpoint:"messages",session},{...continuation,model:renamed,max_tokens:129});
+        expect(afterRename.status,afterRename.text).toBe(200);
+        expect(historyOutput(afterRename.text,"messages",stream)).toEqual([{type:"text",text:"history-ok"}]);
+        await stableGoto(page,"/mine-models");
+        await page.getByRole("textbox",{name:tr("Search"),exact:true}).fill(renamed);
+        await expect(page.getByRole("heading",{name:renamed,exact:true})).toBeVisible();
+        expect((await page.request.post(GATEWAY + "/model/update", {headers,data:{id:ids[1],model_name:body.model}})).status()).toBe(200);
         const invalid = await sendHistory(
           page,
           key,

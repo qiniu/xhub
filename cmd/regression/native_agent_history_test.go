@@ -126,7 +126,7 @@ func historyReadMessages(t *testing.T, r reply, stream bool) []any {
 	return blocks
 }
 
-// TestNativeMessagesAgentHistory 验证原生思考/密文和caller在标准入口JSON/SSE完整工具续轮、账单、权限及换连接拒绝。
+// TestNativeMessagesAgentHistory 验证原生思考/密文和caller在标准入口JSON/SSE完整工具续轮、账单、模型改名、权限及上游验签失败。
 // 参数 t 为上下文；真实HTTP/私有数据库/用户Key，所有上游内容为合成；harness清理模型、凭据、用户和账单。
 func TestNativeMessagesAgentHistory(t *testing.T) {
 	for _, kind := range []string{"thinking", "redacted_thinking"} {
@@ -145,6 +145,11 @@ func TestNativeMessagesAgentHistory(t *testing.T) {
 					mu.Lock()
 					calls = append(calls, body)
 					mu.Unlock()
+					if r.Header.Get("x-api-key") == "changed-key" {
+						w.WriteHeader(400)
+						writeJSON(w, map[string]any{"type": "error", "error": map[string]any{"type": "invalid_request_error", "message": "signature rejected by upstream"}})
+						return
+					}
 					raw, _ := json.Marshal(body)
 					if strings.Contains(string(raw), "tool_result") {
 						messages := body["messages"].([]any)
@@ -179,24 +184,31 @@ func TestNativeMessagesAgentHistory(t *testing.T) {
 						t.Fatalf("原生思考账单不符: %v", bill)
 					}
 				}
+				// 改公开名、上游ID后回传同一完整历史；签名及工具结果仍须原样到达上游。
+				h.ok("POST", "/model/update", admin, map[string]any{"id": id, "model_name": "history-renamed", "litellm_params": map[string]any{"model": "renamed-upstream"}})
+				body["model"] = "history-renamed"
+				body["max_tokens"] = 65
+				if got := h.doHeaders("POST", "/v1/messages", owner.key, body, headers); got.status != 200 {
+					t.Fatalf("模型改名破坏原生续轮: %s", got.describe())
+				}
 				other := h.openScope(t, admin, "history-other")
-				if got := h.doHeaders("POST", "/v1/messages", other.key, body, headers); got.status != 400 {
-					t.Fatalf("他人签名历史放行: %s", got.describe())
+				h.ok("POST", "/key/update", admin, map[string]any{"key": other.key, "models": []string{"another-model"}})
+				if got := h.doHeaders("POST", "/v1/messages", other.key, body, headers); got.status < 400 {
+					t.Fatal("完整历史绕过模型权限")
 				}
 				h.ok("PATCH", "/credentials/history-credential", admin, map[string]any{"credential_values": map[string]any{"api_key": "changed-key"}})
-				// 新请求避开相同成功响应的内容缓存，真正验证旧签名不能外发至更新后的连接。
-				body["max_tokens"] = 65
-				if got := h.doHeaders("POST", "/v1/messages", owner.key, body, headers); got.status != 409 {
-					t.Fatalf("旧签名迁移到新连接: %s", got.describe())
+				body["max_tokens"] = 66
+				if got := h.doHeaders("POST", "/v1/messages", owner.key, body, headers); got.status != 400 || !strings.Contains(got.text(), "signature rejected by upstream") {
+					t.Fatalf("上游签名错误未保留: %s", got.describe())
 				}
 				mu.Lock()
 				n := len(calls)
 				mu.Unlock()
-				if n != 2 {
-					t.Fatalf("拒绝后仍调用上游: %d", n)
+				if n != 4 {
+					t.Fatalf("上游调用次数错误: %d", n)
 				}
 				// 未支持的程序化 caller 在同协议也明确拒绝，不删除来源后假装普通工具。
-				invalid := map[string]any{"model": "history-model", "messages": []any{map[string]any{"role": "assistant", "content": []any{map[string]any{"type": "tool_use", "id": "bad", "name": "lookup", "input": map[string]any{}, "caller": map[string]any{"type": "code_execution_20250825"}}}}}}
+				invalid := map[string]any{"model": "history-renamed", "messages": []any{map[string]any{"role": "assistant", "content": []any{map[string]any{"type": "tool_use", "id": "bad", "name": "lookup", "input": map[string]any{}, "caller": map[string]any{"type": "code_execution_20250825"}}}}}}
 				if rejected := h.do("POST", "/v1/messages", owner.key, invalid); rejected.status != 400 {
 					t.Fatalf("不支持的 caller 被接受: %s", rejected.describe())
 				}

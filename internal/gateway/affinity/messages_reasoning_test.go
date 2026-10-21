@@ -2,6 +2,7 @@ package affinity
 
 import (
 	"net/http/httptest"
+	"strings"
 	"testing"
 
 	"github.com/sunqirui1987/xhub/internal/auth"
@@ -41,31 +42,30 @@ func TestMessagesEnvelopeRequiresOwnedConnection(t *testing.T) {
 	}
 }
 
-// TestNativeMessagesRequiresOwnedConnection 验证原厂签名与密文同样要求原身份、会话和供应商连接，不因原生透传而放宽。
-// 参数 t 为上下文；纯内存状态，正常首轮建立归属后固定连接，另一身份/会话/别名拒绝；无外部清理。
-func TestNativeMessagesRequiresOwnedConnection(t *testing.T) {
+// TestNativeMessagesFullHistorySurvivesRename 验证完整原厂历史无需本地归属且改名后仍能选路。
+// 参数 t 为上下文；独立内存夹具覆盖首次、已绑定、改名及非法会话，保留原签名，无外部清理。
+func TestNativeMessagesFullHistorySurvivesRename(t *testing.T) {
 	for _, block := range []map[string]any{{"type": "thinking", "thinking": "Plan", "signature": "vendor-signature"}, {"type": "redacted_thinking", "data": "vendor-cipher"}} {
 		s := &State{}
 		p := &auth.Principal{UserID: "alice"}
 		r := httptest.NewRequest("POST", "/v1/messages", nil)
 		r.Header.Set("X-Session-Id", "native")
 		body := map[string]any{"messages": []any{map[string]any{"role": "assistant", "content": []any{block}}}}
-		if s.PlanRoute(r, "model", body, p).Err == nil {
-			t.Fatal("原厂状态未建立归属即放行")
+		first := s.PlanRoute(r, "model", body, p)
+		if first.Err != nil || first.Required {
+			t.Fatalf("完整原生历史不应要求本地归属: %+v", first)
 		}
-		first := s.PlanRoute(r, "model", map[string]any{"messages": []any{map[string]any{"role": "user", "content": "Read"}}}, p)
-		first.Target = dpcontract.RouteTarget{DeploymentID: "dep", ConnectionID: "account-a", Model: "model", Pool: "model"}
-		s.CommitRoute(first, "dep", "msg-first")
-		got := s.PlanRoute(r, "model", body, p)
-		if got.Err != nil || !got.Required || got.Target.ConnectionID != "account-a" {
-			t.Fatalf("原生历史未固定连接: %+v", got)
-		}
-		for _, tc := range []struct{ alias, user, session string }{{"other", "alice", "native"}, {"model", "bob", "native"}, {"model", "alice", "other"}} {
-			req := httptest.NewRequest("POST", "/v1/messages", nil)
-			req.Header.Set("X-Session-Id", tc.session)
-			if s.PlanRoute(req, tc.alias, body, &auth.Principal{UserID: tc.user}).Err == nil {
-				t.Fatalf("跨范围原生签名放行: %+v", tc)
+		first.Target = dpcontract.RouteTarget{DeploymentID: "old", ConnectionID: "account-a", Model: "model", Pool: "model"}
+		s.CommitRoute(first, "old", "msg-first")
+		for _, alias := range []string{"model", "renamed"} {
+			got := s.PlanRoute(r, alias, body, p)
+			if got.Err != nil || got.Required {
+				t.Fatalf("改名前后不应强制绑定旧部署: %+v", got)
 			}
+		}
+		r.Header.Set("X-Session-Id", strings.Repeat("x", 4097))
+		if s.PlanRoute(r, "renamed", body, p).Err == nil {
+			t.Fatal("完整历史不能绕过非法会话校验")
 		}
 	}
 }

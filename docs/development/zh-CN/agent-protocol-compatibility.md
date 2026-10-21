@@ -40,7 +40,7 @@
 
 `store` / `previous_response_id` 沿用 XHub 已有的受控临时历史机制：上游 `store=false`，网关在 PostgreSQL 持久保存身份、模型、入口隔离历史；本轮把原生输出项和密文也纳入其中。它不是 OpenAI 长期 Response 存储，不承诺 GET / DELETE / 后台 cancel 生命周期。HTTP 客户端取消会取消上游请求；缺终态或失败流不能发布成功续接历史。`store=false` 不等于网关完全不保留临时历史。
 
-提交完整加密历史时，也必须具有本身份已知的会话部署归属；不能因权重、冷却、目标禁用或共享缓存故障切换供应商连接。无法确认归属时应发起新会话。
+以下强制绑定适用于 Responses / Chat 封装及服务端历史引用，不适用于客户端完整回传的原生 Messages 历史。提交这些加密历史时，必须具有本身份已知的会话部署归属；不能因权重、冷却、目标禁用或共享缓存故障切换供应商连接。无法确认归属时应发起新会话。
 
 固定续接还会核对首次外发时已解析凭据的连接指纹。保留部署 ID 修改地址、上游型号、传输、凭据名或同名凭据中的密钥后，旧续接返回 409；普通请求更新路由偏好也不会重新绑定旧密文。新版本部署前缓存的归属若没有连接指纹，需要开启新会话；缓存只保存哈希，不保存密钥明文。
 
@@ -103,7 +103,7 @@ node --test scripts/test_release_workflow.cjs
 
 参考：[LiteLLM Responses](https://docs.litellm.ai/docs/response_api)、[官方推理指南](https://developers.openai.com/api/docs/guides/reasoning)、[DeepSeek Thinking Mode](https://api-docs.deepseek.com/guides/thinking_mode/)、[Claude Code 网关](https://code.claude.com/docs/en/llm-gateway)。适配器的固定源码版本见授权目录。
 
-Claude Code 原生会话：Messages 优先使用网关 `X-Session-Id` / `session_id`，随后读取 `X-Claude-Code-Session-Id`，或从 `metadata.user_id` 的 JSON 字符串 / 旧 `user_…_account_…_session_…` 格式中提取会话 ID；两类明确会话的日志来源均记为 `explicit`。这参考 LiteLLM 同一官方快照的会话提取规则，避免工具续轮修改首条用户内容或缓存提示后丢失密文归属。普通用户名、设备和账号标识不会被当作会话；原生头必须为 1–256 字节的 ASCII 字母、数字、连字符或下划线，冲突头拒绝，无法识别的可选 metadata 仍按原规则推断。调用方、模型、入口和原连接校验保持有效。已有密文但没有客户端会话归属的旧对话需重新开始。
+Claude Code 原生会话：Messages 优先使用网关 `X-Session-Id` / `session_id`，随后读取 `X-Claude-Code-Session-Id`，或从 `metadata.user_id` 的 JSON 字符串 / 旧 `user_…_account_…_session_…` 格式中提取会话 ID；两类明确会话的日志来源均记为 `explicit`。这参考 LiteLLM 同一官方快照的会话提取规则，避免工具续轮修改首条用户内容或缓存提示后丢失密文归属。普通用户名、设备和账号标识不会被当作会话；原生头必须为 1–256 字节的 ASCII 字母、数字、连字符或下划线，冲突头拒绝，无法识别的可选 metadata 仍按原规则推断。调用方、模型、入口和原连接校验保持有效。原生 Messages 完整历史不依赖旧会话归属；跨协议封装及服务端引用仍需归属验证。
 
 
 ## Chat 的 Responses 推理扩展
@@ -150,7 +150,7 @@ LiteLLM 来源、函数与许可证见 `third_party/litellm/NOTICE.md`。
 
 ### 原生 Agent 历史保留
 
-标准 Messages 入口在原生 Anthropic 部署上保留 `thinking.signature`、`redacted_thinking.data` 和 `tool_use.caller={"type":"direct"}`，同步与流式回复均可原样续轮。签名/密文必须回到同一身份、公开模型、会话和供应商连接；未知归属或连接凭据变化会拒绝，不能跨协议或跨供应商迁移。程序化工具 caller 仍明确拒绝。原生流只有在内容块、工具参数和消息终态完整时才记录可续轮归属。
+标准 Messages 入口在原生 Anthropic 部署上保留 `thinking.signature`、`redacted_thinking.data` 和 `tool_use.caller={"type":"direct"}`，同步与流式回复均可原样续轮。完整原生 Messages 历史不再要求网关保存旧部署归属：改公开模型名或上游 ID 后仍正常鉴权和选路，签名原样交给上游验证，不解密、不删除思考块。上游仍可能拒绝不兼容的签名，不保证跨供应商迁移。Responses 封装及服务端历史引用仍执行原连接归属校验。程序化工具 caller 仍明确拒绝。原生流只有在内容块、工具参数和消息终态完整时才记录可续轮归属。
 
 Chat SDK 累积或供应商回复中的非负整数 `tool_calls[].index` 可原样回传；同协议保留该字段，跨协议仅移除位置元数据，关联仍使用调用 ID。Responses 一轮中的连续函数调用在 Chat 投影中合并为同一条 assistant 消息，工具结果按 ID 关联并保留原顺序；用户、工具结果或独立推理项构成分组边界。
 

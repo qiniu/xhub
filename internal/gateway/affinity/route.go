@@ -154,7 +154,7 @@ func (s *State) PlanRoute(r *http.Request, alias string, body map[string]any, p 
 	}
 	key := sessionPinKey(alias, plan.Caller, plan.SessionID, endpoint)
 	// 加密推理依赖生成它的供应商连接，不能按普通会话偏好切换账户或降级读本机缓存。
-	opaque := requiresNativeOwnership(body)
+	opaque := requiresHistoryOwnership(body, endpoint == "messages")
 	// expected 是本轮读取的完整序列化值（含 Revision），而非仅部署 ID；
 	// local 指定本轮后续比较写入使用本机还是共享存储。普通偏好允许降级，
 	// 所以读取错误只记录日志，不设置 plan.Err，也不影响已恢复的父响应归属。
@@ -333,6 +333,13 @@ func (s *State) commitRoute(plan dpcontract.RoutePlan, deploymentID, responseID 
 // 参数 body 为未改写的用户正文，返回是否必须固定原部署；PlanRoute 调用，不解密、不写缓存。
 // 普通推理摘要和 DeepSeek 公开 reasoning_content 不触发固定；加密项即使格式错误也不能触发跨账户重试。
 func requiresNativeOwnership(body map[string]any) bool {
+	return requiresHistoryOwnership(body, false)
+}
+
+// requiresHistoryOwnership 按入口判断是否需要网关保存的原连接证明，参数为正文及是否为统一 Messages。
+// 返回强制绑定标志；PlanRoute 调用。完整原生 Messages 历史由客户端提供、上游验签，
+// 不读取其他用户数据，不因公开别名修改或本地归属缺失拒绝；封装的 Responses 密文仍绑定原连接。
+func requiresHistoryOwnership(body map[string]any, nativeMessages bool) bool {
 	items, _ := body["input"].([]any)
 	for _, value := range items {
 		item, _ := value.(map[string]any)
@@ -351,8 +358,9 @@ func requiresNativeOwnership(body map[string]any) bool {
 		blocks, _ := message["content"].([]any)
 		for _, value := range blocks {
 			block, _ := value.(map[string]any)
-			// 原生 Anthropic 签名/密文与 Responses 封装一样绑定原连接，不能被普通选路迁移。
-			if block["type"] == "redacted_thinking" || (block["type"] == "thinking" && block["signature"] != nil && block["signature"] != "") || llmdialogue.IsResponsesReasoningSignature(block["signature"]) || llmdialogue.IsResponsesReasoningSignature(block["data"]) {
+			// 原厂签名不授予读取网关历史的权限；统一 Messages 允许携带完整历史重新选路，签名原样交给上游验证。
+			// 跨协议封装不是原厂签名，不能借此绕过原连接校验；原生 bypass 保持原策略。
+			if llmdialogue.IsResponsesReasoningSignature(block["signature"]) || llmdialogue.IsResponsesReasoningSignature(block["data"]) || (!nativeMessages && (block["type"] == "redacted_thinking" || (block["type"] == "thinking" && block["signature"] != nil && block["signature"] != ""))) {
 				return true
 			}
 		}

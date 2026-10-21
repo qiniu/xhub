@@ -13,7 +13,7 @@ import (
 )
 
 // TestClaudeNativeConversationRestart 验证原生Claude带签名及隐藏推理的同会话在网关状态重建后完成工具续轮。
-// 前置私有PG、真实HTTP和独立Key；覆盖同步/流式及跨身份拒绝，harness清理全部资源。
+// 前置私有PG、真实HTTP和独立Key；覆盖同步/流式及无权限Key拒绝，harness清理全部资源。
 func TestClaudeNativeConversationRestart(t *testing.T) {
 	for _, stream := range []bool{false, true} {
 		t.Run(fmt.Sprint(stream), func(t *testing.T) {
@@ -57,8 +57,9 @@ func TestClaudeNativeConversationRestart(t *testing.T) {
 				t.Fatal(second.describe())
 			}
 			other := h.openScope(t, admin, "stranger")
+			h.ok("POST", "/key/update", admin, map[string]any{"key": other.key, "models": []string{"another-model"}})
 			denied := h.doHeaders("POST", "/v1/messages", other.key, body, headers)
-			if denied.status != 400 || calls.Load() != 2 {
+			if denied.status < 400 || calls.Load() != 2 {
 				t.Fatalf("跨身份读取或额外外发: %s calls=%d", denied.describe(), calls.Load())
 			}
 		})
