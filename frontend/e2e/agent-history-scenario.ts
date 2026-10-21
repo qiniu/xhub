@@ -159,7 +159,8 @@ export function registerAgentHistoryScenario(locale: "en" | "zh-CN") {
           max_tokens: 128,
           stream,
           messages: [{ role: "user", content: "Read the fixture." }],
-          tools: [{ name: "read", input_schema: { type: "object", properties: { path: { type: "string" } } } }],
+          // Claude Code 会显式携带非延迟标记；真实数据面必须接受并完成工具续轮。
+          tools: [{ name: "read", defer_loading: false, input_schema: { type: "object", properties: { path: { type: "string" } } } }],
         };
         const first = await sendHistory(page, key, { endpoint: "messages", session }, body);
         expect(first.status, first.text).toBe(200);

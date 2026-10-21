@@ -223,6 +223,20 @@ func ParseDialogue(protocol string, body map[string]any) (Dialogue, error) {
 		}
 		cp, _ := cloneObject(tool)
 		delete(cp, "cache_control")
+		// defer_loading 是 Anthropic 工具加载元数据；原生请求保留原值交给上游，不能让共享投影误拒绝。
+		// false 与普通工具等价；true 依赖原生发现机制，跨协议必须拒绝，不能静默改为立即加载。
+		if protocol == "anthropic-messages" {
+			if value, exists := cp["defer_loading"]; exists {
+				flag, ok := value.(bool)
+				if !ok {
+					return Dialogue{}, fmt.Errorf("defer_loading must be boolean")
+				}
+				if flag {
+					bridgeError = "deferred Messages tools require native Messages"
+				}
+				delete(cp, "defer_loading")
+			}
+		}
 		tools = append(tools, cp)
 	}
 	if _, exists := native["tools"]; exists {
