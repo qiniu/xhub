@@ -17,10 +17,14 @@ test("my models exposes prices, access, executable API examples and call guide",
   await page.context().grantPermissions(["clipboard-read", "clipboard-write"]);
   await loginAdmin(page);
   const headers = { Authorization: "Bearer " + (await sessionBearer(page)) };
-  const name = "e2e-mine-call-" + Date.now();
+  let name = "e2e-mine-call-" + Date.now();
+  const priceID = "custom/" + name;
   let id = "";
   let key = "";
   try {
+    expect((await page.request.post(GATEWAY + "/price/model", { headers, data: {
+      id: priceID, litellm_provider: "custom", input_cost_per_token: 0.000001, output_cost_per_token: 0.000002,
+    } })).status()).toBe(200);
     const created = await page.request.post(GATEWAY + "/model/new", {
       headers,
       data: {
@@ -30,10 +34,8 @@ test("my models exposes prices, access, executable API examples and call guide",
           custom_llm_provider: "custom",
           api_base: UPSTREAM,
           api_key: "sk-fake",
-          input_cost_per_token: 0.000001,
-          output_cost_per_token: 0.000002,
         },
-        model_info: { transport: "bypass_openai_chat", pricing_source: "manual", input_price: 1, output_price: 2 },
+        model_info: { transport: "bypass_openai_chat", pricing_source: "catalog", base_model: priceID },
       },
     });
     expect(created.status(), await created.text()).toBe(200);
@@ -48,6 +50,10 @@ test("my models exposes prices, access, executable API examples and call guide",
     });
     expect(minted.status(), await minted.text()).toBe(200);
     key = (await minted.json()).key;
+    // 先给旧公开名授权再改名；后续复制curl使用同一Key实际调用，不能重新发Key掩盖授权丢失。
+    name += "-renamed";
+    const renamed = await page.request.post(GATEWAY + "/model/update", { headers, data: { id, model_name: name } });
+    expect(renamed.status(), await renamed.text()).toBe(200);
     const loaded = page.waitForResponse((response) => new URL(response.url()).pathname === "/model/available");
     await stableGoto(page, "/mine-models");
     const available = await loaded;
@@ -139,6 +145,11 @@ test("my models exposes prices, access, executable API examples and call guide",
     await expect(page.getByPlaceholder("Type your message... (Shift+Enter for new line)")).toHaveValue(
       "Describe a sunrise in one sentence.",
     );
+    await stableGoto(page, "/mine-models");
+    await page.getByRole("textbox", { name: "Search", exact: true }).fill(name);
+    const englishCard = page.getByRole("article").filter({ has: page.getByRole("heading", { name, exact: true }) });
+    await expect(englishCard).toContainText("$1");
+    await expect(englishCard).toContainText("$2");
     await page.getByRole("button", { name: "中文", exact: true }).click();
   } finally {
     if (key)

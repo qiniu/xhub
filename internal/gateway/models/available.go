@@ -47,14 +47,30 @@ func Available(s Host, w http.ResponseWriter, r *http.Request) {
 	util.WriteJSON(w, 200, map[string]any{"object": "list", "data": data})
 }
 
-// 把一条部署收成可选模型卡片，价格优先用部署覆盖。
+// availableCard 把部署转换为可选模型卡片；优先使用部署价格，其次按base_model绑定读取目录，避免改名丢价。
 // 参数 entry（config.ModelEntry）：一条模型部署，含对外名、供应商参数和价格覆盖。
 // 返回 map[string]any（map[string]any）：可用卡片的字段表。缺键表示上游或库里没有这个字段。
 // 调用：仅在 available.go 内使用
-// 测试：无直接单测
+// 测试：available_pricing_test.go覆盖绑定、手工覆盖、免费和缺失；无持久化副作用。
 func availableCard(entry config.ModelEntry) map[string]any {
 	info := entry.ModelInfo
+	// 展示按明确价格绑定取目录，不能用可修改的公开别名替代 base_model。
 	row := availableCostRow(entry.ModelName)
+	if base := entry.ParamString("model", ""); base != "" {
+		if upstream := availableCostRow(base); upstream != nil {
+			row = upstream
+		}
+	}
+	if base, _ := info["base_model"].(string); base != "" {
+		row = availableCostRow(base)
+	}
+	priceInfo, priceRow := info, row
+	if source, _ := info["pricing_source"].(string); source == "manual" || source == "catalog" {
+		priceInfo = entry.LiteLLMParams
+		if source == "manual" {
+			priceRow = nil
+		}
+	}
 	card := map[string]any{
 		"endpoints":         providerdeployment.DeploymentEndpoints(entry),
 		"id":                entry.ModelName,
@@ -63,10 +79,10 @@ func availableCard(entry config.ModelEntry) map[string]any {
 		"capabilities":      []string{},
 		"max_input_tokens":  availableNumber(info, row, "max_input_tokens"),
 		"max_output_tokens": availableNumber(info, row, "max_output_tokens"),
-		"input_price":       firstPrice(info, row, "input_price", "input_cost_per_token"),
-		"output_price":      firstPrice(info, row, "output_price", "output_cost_per_token"),
-		"cache_read_price":  firstPrice(info, row, "cache_read_price", "cache_read_input_token_cost"),
-		"cache_write_price": firstPrice(info, row, "cache_write_price", "cache_creation_input_token_cost"),
+		"input_price":       firstPrice(priceInfo, priceRow, "input_price", "input_cost_per_token"),
+		"output_price":      firstPrice(priceInfo, priceRow, "output_price", "output_cost_per_token"),
+		"cache_read_price":  firstPrice(priceInfo, priceRow, "cache_read_price", "cache_read_input_token_cost"),
+		"cache_write_price": firstPrice(priceInfo, priceRow, "cache_write_price", "cache_creation_input_token_cost"),
 	}
 	if err := providerdeployment.ValidateDeployment(entry); err != nil {
 		card["unavailable_reason"] = err.Error()
@@ -152,7 +168,7 @@ func availableNumber(primary, fallback map[string]any, key string) any {
 	return nil
 }
 
-// 从优先表或备用表取价格。0 也算有效价格。
+// firstPrice 从部署覆盖或目录取价格；每Token价格换算为每百万Token，零有效，非法值返回nil。
 // 参数 primary（map[string]any）：优先读取的字段表。没有该键时再看备用表；fallback（map[string]any）：缺值或解析失败时用的默认；direct（string）：首个价格使用的direct。空串表示调用方没有提供这项；perToken（string）：首个价格使用的每令牌。空串表示调用方没有提供这项。
 // 返回 any（any）：找到的价格或数字。没有合格值时为 nil，调用方不要显示成 0。
 // 调用：仅在 available.go 内使用
@@ -160,6 +176,9 @@ func availableNumber(primary, fallback map[string]any, key string) any {
 func firstPrice(primary, fallback map[string]any, direct, perToken string) any {
 	if value, ok := primary[direct]; ok && number(value) >= 0 {
 		return value
+	}
+	if value, ok := primary[perToken]; ok && number(value) >= 0 {
+		return number(value) * 1000000
 	}
 	if value, ok := fallback[direct]; ok && number(value) >= 0 {
 		return value

@@ -9,7 +9,7 @@ import (
 	"github.com/sunqirui1987/xhub/internal/router"
 )
 
-// SaveModelDirectory 原子保存部署变更并清理模型默认及客户模板里的失效分配。
+// SaveModelDirectory 原子保存部署变更、衔接改名授权并清理模型默认及客户模板里的失效分配。
 // 参数 entry 非空表示创建/更新，deletedID 非空表示删除，directory 是变更后的完整目录（含配置文件部署）。
 // 由当前部署管理接口调用；失败整笔回滚，成功后清缓存，不修改内存目录，也不在启动时执行数据修复。
 func (s *Store) SaveModelDirectory(entry *ProxyModel, deletedID string, directory []config.ModelEntry) error {
@@ -23,6 +23,23 @@ func (s *Store) SaveModelDirectory(entry *ProxyModel, deletedID string, director
 	}
 	defer tx.Rollback()
 	if entry != nil {
+		// 在修改部署前取得旧公开名，并在同一事务内迁移显式授权；失败不能只保存改名。
+		var old proxyModelRow
+		found, err := tx.NoCache().ID(entry.ID).Get(&old)
+		if err != nil {
+			return err
+		}
+		if found && old.ModelName != entry.ModelName {
+			keepOld := false
+			for _, dep := range directory {
+				if dep.ModelName == old.ModelName {
+					keepOld = true
+				}
+			}
+			if err := s.renameModelGrants(tx, old.ModelName, entry.ModelName, keepOld); err != nil {
+				return err
+			}
+		}
 		params, err := json.Marshal(entry.Params)
 		if err != nil {
 			return err

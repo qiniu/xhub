@@ -204,6 +204,13 @@ func Update(s Host, w http.ResponseWriter, r *http.Request) {
 	m.ModelInfo["db_model"] = true
 	// 改名最后一个部署前检查公开名引用，不能让回退策略指向已消失的模型。
 	if old := (*s.ModelTable())[i]; old.ModelName != m.ModelName {
+		// 改名只迁移同一模型的授权，不将旧授权并入已有公开模型。
+		for j, other := range *s.ModelTable() {
+			if j != i && other.ModelName == m.ModelName {
+				util.WriteError(w, 409, "model_name_conflict", "model name already exists; rename cannot merge model permissions")
+				return
+			}
+		}
 		if err := checkRoutingGroupName(s, m.ModelName); err != nil {
 			util.WriteError(w, 409, "routing_group_conflict", err.Error())
 			return

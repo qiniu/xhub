@@ -1,5 +1,6 @@
 /** 供应商配置与模型管理界面文案；通过语义键及插值保持语言切换与业务字段独立。 */
 export const providerGuideUIEn = {
+  renameConflict: "This model name already exists. Choose another name to preserve existing permissions.",
   saveChanges: "Save changes",
   addModel: "Add model",
   saving: "Saving…",

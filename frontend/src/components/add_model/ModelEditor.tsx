@@ -240,11 +240,14 @@ export default function ModelEditor({
         ? await modelPatchUpdateCall(accessToken, payload, String(model.model_info.id))
         : await modelCreateCall(accessToken, payload);
       await queryClient.invalidateQueries({ queryKey: ["models"] });
+      await queryClient.invalidateQueries({ queryKey: ["mine-models"] });
       toast.success(model ? t("providerGuideUI.updated") : t("providerGuideUI.added"));
       if (!model) form.reset(editorDefaults());
       onSaved?.(result);
     } catch (cause) {
-      setError(cause instanceof Error ? cause.message : t("providerGuideUI.saveFailed"));
+      setError(cause instanceof Error && cause.message.includes("model name already exists; rename cannot merge model permissions")
+        ? t("providerGuideUI.renameConflict")
+        : cause instanceof Error ? cause.message : t("providerGuideUI.saveFailed"));
     } finally {
       setSaving(false);
     }

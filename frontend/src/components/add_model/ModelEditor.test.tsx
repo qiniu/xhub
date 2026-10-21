@@ -370,3 +370,14 @@ it.each(["zh-CN", "en"] as const)("%s shows incompatible reasoning configuration
   expect(mocks.patch).not.toHaveBeenCalled();
   setActiveLocale("zh-CN");
 });
+
+/** 前置中英文编辑表单和冲突响应；验证本地化错误及保留原始输入；自动卸载，无后台数据。 */
+it.each(["zh-CN", "en"] as const)("explains rename conflicts in %s", async (locale) => {
+ setActiveLocale(locale);
+ mocks.catalog = catalog;
+ mocks.patch.mockRejectedValueOnce(new Error("model name already exists; rename cannot merge model permissions"));
+ renderEditor({model:{model_name:"public-original",litellm_params:{model:"upstream-original",custom_llm_provider:"openai",litellm_credential_name:"relay-a",input_cost_per_token:0.000001},model_info:{id:"rename-conflict",transport:"bypass_openai_chat",endpoint_types:["chat"],pricing_source:"manual"}}});
+ await userEvent.click(screen.getByRole("button",{name:t("providerGuideUI.saveChanges"),exact:true}));
+ await waitFor(()=>expect(screen.getByRole("alert")).toHaveTextContent(t("providerGuideUI.renameConflict")));
+ expect(screen.getByDisplayValue("public-original")).toBeVisible();
+});

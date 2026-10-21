@@ -1,5 +1,6 @@
 /** 供应商配置与模型管理界面文案；通过语义键及插值保持语言切换与业务字段独立。 */
 export const providerGuideUIZhCN = {
+  renameConflict: "该模型名称已存在，请使用其他名称，避免合并不同模型的权限。",
   saveChanges: "保存修改",
   addModel: "添加模型",
   saving: "正在保存…",
