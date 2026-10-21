@@ -14,6 +14,7 @@ import (
 	"github.com/qiniu/go-sdk/v7/storagev2/uplog"
 	"github.com/sunqirui1987/xhub/cmd/regression/testsupport/samltest"
 	"github.com/sunqirui1987/xhub/internal/config"
+	"github.com/sunqirui1987/xhub/internal/gateway/affinity"
 	"github.com/sunqirui1987/xhub/internal/iam"
 	"github.com/sunqirui1987/xhub/internal/live"
 	"github.com/sunqirui1987/xhub/internal/store"
@@ -403,6 +404,15 @@ func TestBrowserEnterpriseFixture(t *testing.T) {
 				http.Error(w, err.Error(), http.StatusInternalServerError)
 				return
 			}
+			_ = json.NewEncoder(w).Encode(map[string]bool{"ok": true})
+		case "/conversation/restart":
+			// 仅测试控制端：两轮请求之间丢弃所有内存/Redis会话状态，以真实PG恢复续聊。
+			// 不编入生产程序；调用者必须等待前轮请求结束，私有schema由运行器回收。
+			if r.Method != http.MethodPost {
+				w.WriteHeader(405)
+				return
+			}
+			s.State = *affinity.NewDurable(nil, st)
 			_ = json.NewEncoder(w).Encode(map[string]bool{"ok": true})
 		case "/session/ttl":
 			// 仅缩短当前测试会话的存储 TTL；不删除或撤销凭据，让真实鉴权链等待到期后拒绝。

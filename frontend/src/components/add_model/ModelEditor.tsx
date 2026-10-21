@@ -396,7 +396,7 @@ export default function ModelEditor({
                     <option value="adaptive" disabled={values.transport !== "bypass_anthropic_messages"}>{t("providerGuideUI.messagesReasoningAdaptive")}</option>
                   </select>
                   <p className="text-xs text-muted-foreground">{t("providerGuideUI.messagesReasoningHelp")}</p>
-                  <p className="text-xs text-muted-foreground">{t("providerGuideUI.messagesReasoningHistory", { hours: 1 })}</p>
+                  <p className="text-xs text-muted-foreground">{t("providerGuideUI.messagesReasoningHistory")}</p>
                 </section>
                 <section aria-label={t("providerGuideUI.searchTitle")} className="space-y-3 rounded-lg border p-4">
                   <h4 className="font-medium">{t("providerGuideUI.searchTitle")}</h4>

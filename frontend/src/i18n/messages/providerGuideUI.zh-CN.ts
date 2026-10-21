@@ -191,7 +191,7 @@ export const providerGuideUIZhCN = {
   messagesReasoningDisabled: "不启用（默认）",
   messagesReasoningAdaptive: "自适应推理（已确认上游支持）",
   messagesReasoningHelp: "仅在确认此原生 Messages 连接支持自适应推理后启用。Responses 的 low、medium、high、max 推理强度映射为自适应推理；此设置不限制原生 Messages 请求。显式 none 仍请求关闭推理，上游可能拒绝。",
-  messagesReasoningHistory: "签名推理历史在 {hours} 小时后过期，并绑定调用方身份和上游连接，不能迁移到其他连接。",
+  messagesReasoningHistory: "签名推理历史保存在数据库中，不因缓存过期或网关重启而失效；仍绑定调用方身份和上游连接。",
   invalidMessagesReasoning: "请选择有效的 Messages 推理桥接模式。",
   messagesReasoningRequiresNative: "自适应推理需要原生 Anthropic Messages 上游协议。",
 };

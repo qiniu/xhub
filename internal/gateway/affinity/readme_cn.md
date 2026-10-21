@@ -1,3 +1,5 @@
+> 生产通过 `NewDurable` 将归属、响应、历史及 Messages 引用保存到 PostgreSQL 的 `kv` 表（kind 为 `conversation_state`），不自动过期。只有路由偏好使用一小时缓存；下文纯缓存描述仅适用于 `New` 创建的测试状态。
+
 # affinity：会话偏好、响应续接与任务归属
 
 [English](readme.md) · [上层架构](../readme_cn.md)

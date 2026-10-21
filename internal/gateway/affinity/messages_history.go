@@ -12,7 +12,7 @@ import (
 )
 
 // messagesHistoryRecord 将整轮原生助手内容及其公开投影绑定到创建时的会话和真实连接。
-// 仅存服务端短期缓存；客户端得到随机引用而非签名明文，引用不能跨调用方或模型授权使用。
+// 生产存于服务端PostgreSQL；客户端得到随机引用而非签名明文，引用不能跨调用方或模型授权使用。
 type messagesHistoryRecord struct {
 	Version int                        `json:"version"`
 	Session string                     `json:"session"`
@@ -57,7 +57,7 @@ func messagesHistoryRefs(items any) ([]string, error) {
 
 // prepareMessagesHistory 恢复完整历史和父响应历史中的原生助手引用，并安装本轮发布回调。
 // 参数plan必须已有可信Caller与会话；body只读。失败返回统一不可用错误，执行器必须零外发。
-// 缓存读取禁止Redis故障时本机降级；每个引用必须属于相同真实连接，不能让普通请求重新绑定旧签名。
+// 持久存储读取失败禁止降级猜测；每个引用必须属于相同真实连接，不能让普通请求重新绑定旧签名。
 func (s *State) prepareMessagesHistory(plan *dpcontract.RoutePlan, body map[string]any) error {
 	if plan.Endpoint != "responses" || plan.Caller == "" {
 		return nil

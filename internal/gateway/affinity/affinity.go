@@ -18,7 +18,7 @@ import (
 	"github.com/sunqirui1987/xhub/internal/util"
 )
 
-// affinityTTL 为偏好、响应归属和历史保留一小时；读取不续期，成功写入重新设置。
+// affinityTTL 为可丢弃路由偏好及无持久存储的测试状态保留一小时；生产续聊状态保存在数据库。
 const affinityTTL = time.Hour
 
 // responseContextKey 为统一 responses 的临时历史构造键，供 PlanRoute 读取、CommitRoute 发布。
@@ -215,11 +215,13 @@ type Redis interface {
 	SetString(context.Context, string, string, time.Duration)
 }
 
-// State 持有可选共享存储和本机 TTL 缓存，零值可直接用于纯内存存储。
+// State 持有持久会话存储、可选共享缓存和本机TTL缓存；零值仅用于纯内存测试。
 // 实例可服务多个请求，本机 map 由 affinityMu 保护；使用后不应复制包含锁的 State。
 // 网络访问及上游执行不持本机锁，不与网关配置锁交叉，不启动后台清理协程。
-// 本机记录受容量限制、读写时清理，重启会丢失；跨实例共享需要 Redis。
+// 本机偏好受容量限制且重启会丢失；生产会话历史通过PostgreSQL跨实例共享并长期保存。
 type State struct {
+	// durable 保存续聊必需状态，生产注入 PostgreSQL；与 Redis 路由偏好独立。
+	durable ConversationStore
 	// 可选共享存储；nil 使用进程内缓存，普通故障可降级，响应归属故障拒绝续接。
 	redis Redis
 	// 本机 TTL 缓存，存放偏好、响应上下文及任务归属；写入受容量限制，非持久化数据库。

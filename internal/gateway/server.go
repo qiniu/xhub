@@ -145,8 +145,11 @@ func New(cfg *config.Config, st *store.Store, db *iam.DB) *Server {
 			s.Live = client
 		}
 	}
+	// 会话归属和续聊历史持久化，避免 Redis 到期或网关重启中断客户端历史。
 	if s.Live != nil {
-		s.State = *affinity.New(s.Live)
+		s.State = *affinity.NewDurable(s.Live, st)
+	} else {
+		s.State = *affinity.NewDurable(nil, st)
 	}
 	models.LoadStored(s)
 	// Hand-entered price rows and suppliers are laid over the embedded price

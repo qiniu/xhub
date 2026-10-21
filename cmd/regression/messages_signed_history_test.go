@@ -3,6 +3,7 @@ package regression
 import (
 	"encoding/json"
 	"fmt"
+	"github.com/sunqirui1987/xhub/internal/gateway/affinity"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -159,6 +160,8 @@ func TestMessagesSignedHistoryRoundTrip(t *testing.T) {
 				history := []any{map[string]any{"role": "user", "content": "Read both synthetic values using lookup."}}
 				body := map[string]any{"model": dep.ModelName, "input": history, "stream": stream, "max_output_tokens": 64, "reasoning": map[string]any{"effort": "low", "summary": "auto"}, "parallel_tool_calls": true, "prompt_cache_key": "signed-test-session", "text": map[string]any{"format": map[string]any{"type": "text"}}, "tools": []any{map[string]any{"type": "function", "name": "lookup", "strict": false, "parameters": map[string]any{"type": "object", "properties": map[string]any{"step": map[string]any{"type": "integer"}}}}}}
 				for n := 1; n <= 4; n++ {
+					// 每轮丢弃整个内存状态，等价于缓存消失/网关重启；只允许PG恢复原历史。
+					h.gw.State = *affinity.NewDurable(nil, h.store)
 					response := h.ok(http.MethodPost, "/v1/responses", owner.key, body)
 					if strings.Contains(response.text(), "PRIVATE_SIGNATURE_") || strings.Contains(response.text(), "PRIVATE_REDACTED_") {
 						t.Fatal("原始私有签名泄露给客户端")

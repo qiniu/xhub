@@ -338,7 +338,7 @@ it.each(["zh-CN", "en"] as const)("%s persists explicit adaptive Messages reason
   renderEditor({ model });
   const selector = screen.getByLabelText(t("providerGuideUI.messagesReasoningMode"));
   expect(selector).toHaveValue("adaptive");
-  expect(screen.getByText(t("providerGuideUI.messagesReasoningHistory", { hours: 1 }))).toBeVisible();
+  expect(screen.getByText(t("providerGuideUI.messagesReasoningHistory"))).toBeVisible();
   expect(screen.getByText(t("providerGuideUI.messagesReasoningHelp"))).toBeVisible();
   await user.click(screen.getByRole("button", { name: t("providerGuideUI.saveChanges"), exact: true }));
   await waitFor(() => expect(mocks.patch).toHaveBeenCalledWith("token", expect.objectContaining({ model_name: "original-public", litellm_params: expect.objectContaining({ model: "original-upstream" }), model_info: expect.objectContaining({ messages_reasoning_mode: "adaptive" }) }), "reasoning-test"));

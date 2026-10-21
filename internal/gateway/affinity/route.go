@@ -260,7 +260,7 @@ func (s *State) CommitRoute(plan dpcontract.RoutePlan, deploymentID, responseID 
 
 // commitRoute 保存实际目标、完整上下文与固定归属，并返回影响父响应续接的保存错误。
 // 参数与公开 CommitRoute 相同；Messages 桥接准备回调必须检查错误后才能发布终态。
-// 动态偏好允许失败；历史先于归属写入，任意一步失败不发布成功，孤立临时记录按 TTL 清理。
+// 动态偏好允许失败；历史先于响应归属写入，保存失败返回错误；持久记录不依赖缓存TTL。
 func (s *State) commitRoute(plan dpcontract.RoutePlan, deploymentID, responseID string) error {
 	if deploymentID == "" || plan.Caller == "" {
 		return nil
@@ -283,18 +283,31 @@ func (s *State) commitRoute(plan dpcontract.RoutePlan, deploymentID, responseID 
 		// 首次成功目标只允许相同连接续期，不能由后续普通选路覆盖。
 		key := sessionOwnerKey(plan.Alias, plan.Caller, plan.SessionID, plan.Endpoint)
 		targetRaw, _ := json.Marshal(target)
+		// 先迁移仍有效的旧缓存归属，防止升级后首次成功请求覆盖原连接证明。
+		if s.durable != nil {
+			if _, _, err := s.cacheRead(key, false); err != nil {
+				return fmt.Errorf("conversation ownership could not be loaded")
+			}
+		}
 		current, err := s.cacheCompare(key, "", string(targetRaw), false)
+		if err != nil && s.durable != nil {
+			return fmt.Errorf("conversation ownership could not be saved")
+		}
 		if err == nil && current != string(targetRaw) {
 			var owner dpcontract.RouteTarget
 			if json.Unmarshal([]byte(current), &owner) == nil {
 				if owner.DeploymentID == target.DeploymentID && owner.ConnectionID == target.ConnectionID {
-					_, _ = s.cacheCompare(key, current, current, false)
+					if _, err := s.cacheCompare(key, current, current, false); err != nil && s.durable != nil {
+						return fmt.Errorf("conversation ownership could not be saved")
+					}
 				} else {
 					// 同一会话曾在不同连接成功，完整历史无法再仅凭会话 ID 确认出处。
 					// 保留不可用归属，禁止后续普通请求或迟到成功重新绑定；明确父响应仍有独立快照。
 					owner.ConnectionID = ""
 					invalid, _ := json.Marshal(owner)
-					_, _ = s.cacheCompare(key, current, string(invalid), false)
+					if _, err := s.cacheCompare(key, current, string(invalid), false); err != nil && s.durable != nil {
+						return fmt.Errorf("conversation ownership could not be saved")
+					}
 				}
 			}
 		}

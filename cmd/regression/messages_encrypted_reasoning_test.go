@@ -3,6 +3,7 @@ package regression
 import (
 	"encoding/json"
 	"fmt"
+	"github.com/sunqirui1987/xhub/internal/gateway/affinity"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -148,6 +149,8 @@ func TestMessagesEncryptedReasoningToolRoundTrip(t *testing.T) {
 					if signal == "claude-json" {
 						body["metadata"] = map[string]any{"user_id": `{"device_id":"changed-device","session_id":"encrypted-roundtrip"}`}
 					}
+					// 清空所有本机会话缓存，验证原生GPT密文通过Messages续轮仍从PG恢复。
+					h.gw.State = *affinity.NewDurable(nil, h.store)
 					second := h.doHeaders("POST", "/v1/messages", owner.key, body, headers)
 					if second.status != 200 || !strings.Contains(second.text(), "Done") || (stream && !strings.Contains(second.text(), "message_stop")) {
 						t.Fatalf("带密文工具续轮失败: %s", second.describe())

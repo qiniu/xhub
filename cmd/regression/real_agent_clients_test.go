@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"github.com/sunqirui1987/xhub/internal/gateway/affinity"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -273,7 +274,12 @@ func TestRealAgentClients(t *testing.T) {
 			}
 			h := newHarness(t, dep)
 			baseHandler := h.server.Config.Handler
+			var routeMu sync.Mutex
 			h.server.Config.Handler = http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				// 串行真实CLI请求，每轮前丢弃临时状态，验证客户端自带会话信号与PG可恢复历史。
+				routeMu.Lock()
+				defer routeMu.Unlock()
+				h.gw.State = *affinity.NewDurable(nil, h.store)
 				if r.URL.Path == "/v1/messages" || (variant.search && r.URL.Path == "/v1/responses") {
 					raw, _ := io.ReadAll(r.Body)
 					r.Body = io.NopCloser(bytes.NewReader(raw))

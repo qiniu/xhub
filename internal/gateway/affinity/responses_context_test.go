@@ -44,9 +44,10 @@ func TestResponsesContextIsolationAndExpiry(t *testing.T) {
 }
 
 // TestEncryptedHistoryRequiresOwnedDeployment 验证完整加密历史必须复用本身份已知部署，不能跨用户/别名/会话重选。
-// 参数 t 为上下文；前置独立内存状态，正常文本可自由选路，密文首次/错误身份拒绝；内存数据随测试回收。
+// 参数t为上下文；前置共享持久替身，重建State后密文仍固定原部署，错误身份拒绝；测试数据随内存回收。
 func TestEncryptedHistoryRequiresOwnedDeployment(t *testing.T) {
-	state := &State{}
+	db := &memoryConversation{rows: map[string]string{}}
+	state := NewDurable(nil, db)
 	principal := &auth.Principal{UserID: "alice"}
 	request := httptest.NewRequest("POST", "/v1/responses", nil)
 	request.Header.Set("X-Session-Id", "native-session")
@@ -56,6 +57,8 @@ func TestEncryptedHistoryRequiresOwnedDeployment(t *testing.T) {
 	}
 	first.Target.DeploymentID = "native-deployment"
 	state.CommitRoute(first, "native-deployment", "resp-1")
+	// 丢弃整个网关临时状态后仍可验证GPT原生密文归属。
+	state = NewDurable(nil, db)
 	body := map[string]any{"input": []any{map[string]any{"type": "reasoning", "encrypted_content": "cipher"}, map[string]any{"role": "user", "content": "Next"}}}
 	next := state.PlanRoute(request, "a", body, principal)
 	if next.Err != nil || !next.Required || next.Pinned != "native-deployment" {

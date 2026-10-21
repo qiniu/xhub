@@ -1,3 +1,5 @@
+> Production uses PostgreSQL (`conversation_state` in `kv`) for ownership, responses, history and Messages references without a cache TTL. Only routing preferences use the one-hour cache. Cache-only details below describe `New` test instances; production uses `NewDurable`.
+
 # affinity: Session preferences, response continuation and task ownership
 
 [中文](readme_cn.md) · [Parent architecture](../readme.md)

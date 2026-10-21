@@ -1,3 +1,5 @@
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
 import { expect, test } from "@playwright/test";
 import { translate } from "../src/i18n/translate";
 import { GATEWAY, UPSTREAM, loginAdmin, sessionBearer, stableGoto } from "./helpers";
@@ -44,13 +46,13 @@ export function registerMessagesSignedHistoryScenario(locale: "zh-CN" | "en") {
       const mode = page.getByLabel(tr("providerGuideUI.messagesReasoningMode"));
       await expect(mode).toHaveValue("disabled");
       await mode.selectOption("adaptive");
-      await expect(page.getByText(tr("providerGuideUI.messagesReasoningHistory", { hours: 1 }), { exact: true })).toBeVisible();
+      await expect(page.getByText(tr("providerGuideUI.messagesReasoningHistory"), { exact: true })).toBeVisible();
       await expect(page.getByText(tr("providerGuideUI.messagesReasoningHelp"), { exact: true })).toBeVisible();
       // 在同一张表单切换语言，选项和值必须保留，帮助文案使用新语言及实际插值。
       const other = locale === "en" ? "zh-CN" : "en";
       await page.getByRole("button", { name: translate(locale, other === "en" ? "language.en" : "language.zhCN"), exact: true }).click();
       await expect(page.getByLabel(translate(other, "providerGuideUI.messagesReasoningMode"))).toHaveValue("adaptive");
-      await expect(page.getByText(translate(other, "providerGuideUI.messagesReasoningHistory", { hours: 1 }), { exact: true })).toBeVisible();
+      await expect(page.getByText(translate(other, "providerGuideUI.messagesReasoningHistory"), { exact: true })).toBeVisible();
       await page.getByRole("button", { name: translate(other, locale === "en" ? "language.en" : "language.zhCN"), exact: true }).click();
       await expect(page.getByLabel(tr("providerGuideUI.publicName"))).toHaveValue(model);
       await expect(page.getByRole("combobox", { name: tr("providerGuideUI.upstreamLabel"), exact: true })).toHaveValue("e2e-claude-signed");
@@ -80,6 +82,10 @@ export function registerMessagesSignedHistoryScenario(locale: "zh-CN" | "en") {
       for (const stream of [false, true]) {
         const history: Record<string, unknown>[] = [{ role: "user", content: "Read both synthetic values using lookup." }];
         for (let round = 1; round <= 3; round++) {
+          // 前一轮完成后重建会话状态，浏览器续轮只能从真实数据库恢复签名历史。
+          const control = JSON.parse(readFileSync(join(process.env.E2E_RUN_DIR!, "enterprise-fixture.json"), "utf8")).control;
+          const restarted = await page.request.post(control + "/conversation/restart");
+          expect(restarted.status(), await restarted.text()).toBe(200);
           const response = await page.request.post(GATEWAY + "/v1/responses", { headers: keyHeaders, data: {
             model, stream, max_output_tokens: 64, input: history, reasoning: { effort: "low", summary: "auto" }, parallel_tool_calls: true,
             tools: [{ type: "function", name: "lookup", strict: false, parameters: { type: "object", properties: { step: { type: "integer" }, previous: { type: "string" } } } }],
