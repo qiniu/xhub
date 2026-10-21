@@ -2881,5 +2881,19 @@
     "title": "durable disk billing recovers after database disconnect zh-CN",
     "kind": "implemented",
     "environment": "default offline; E2E_REDIS=0"
+  },
+  {
+    "id": "REG-user-csv-en",
+    "file": "e2e/scenarios/regression/user-csv-import-en.test.ts",
+    "title": "CSV user template and real import en",
+    "kind": "implemented",
+    "environment": "default offline"
+  },
+  {
+    "id": "REG-user-csv-zh-CN",
+    "file": "e2e/scenarios/regression/user-csv-import-zh-CN.test.ts",
+    "title": "CSV user template and real import zh-CN",
+    "kind": "implemented",
+    "environment": "default offline"
   }
 ]

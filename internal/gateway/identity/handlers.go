@@ -35,6 +35,12 @@ func UserNew(g Gate, w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	body := readMap(r)
+	// 批量CSV和手动创建共用此接口；先返回可操作的400，避免密码校验错误被包装为500。
+	password := str(body["password"])
+	if len(password) < 8 || len(password) > 72 {
+		util.WriteError(w, 400, "invalid_request", "password must contain 8 to 72 UTF-8 bytes")
+		return
+	}
 	// 在可选额度解析前拒绝非法值，避免错误输入清空原额度。
 	if err := util.ValidateRateFields(body); err != nil {
 		util.WriteError(w, 400, "invalid_request", err.Error())

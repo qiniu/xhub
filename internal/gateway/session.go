@@ -655,7 +655,8 @@ func (s *Server) writeIAMError(w http.ResponseWriter, r *http.Request, err error
 		return
 	case err == iam.ErrNotFound:
 		util.WriteTypedError(w, r.URL.Path, 404, "not_found", "Not found")
-	case err == iam.ErrConflict:
+	// 数据库唯一约束会包装ErrConflict；重复导入应是409，不能误报服务异常。
+	case errors.Is(err, iam.ErrConflict):
 		util.WriteTypedError(w, r.URL.Path, 409, "conflict", err.Error())
 	case errors.Is(err, iam.ErrRateAllocation):
 		util.WriteError(w, 400, "rate_allocation_exceeded", "child RPM/TPM allocations exceed the parent limit")
