@@ -165,3 +165,5 @@ Chat SDK 累积或供应商回复中的非负整数 `tool_calls[].index` 可原�
 Messages 文本块的 `citations` 缺省、`null` 或空数组不阻止协议转换；原生 Messages 保留这些字段。非空引用仍须明确可表达，当前跨协议拒绝，避免丢掉引用事实。
 
 标准 Messages 接受普通函数工具上的布尔 `defer_loading`，同协议保留原值。`false` 可按普通函数桥接；`true` 只允许原生 Messages，不能静默转换为立即加载。这仅覆盖工具定义元数据，不代表已支持服务器工具搜索、`tool_reference` 或跨协议发现生命周期。
+
+原生 Claude Messages、OpenAI Responses 和 Chat 透传入口接受客户端完整提供的签名/密文历史，不要求旧模型或部署归属，原始字段交由供应商验证。修改公开名后仍须使用当前授权名称。`previous_response_id` 及任务查询继续验证原身份和连接；XHub随机历史引用或桥接签名不能直接交给原生透传入口。此行为不保证供应商接受其他账户或模型生成的签名，且不改变Key鉴权、模型授权和预算。

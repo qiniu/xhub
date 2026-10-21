@@ -48,7 +48,7 @@ async function sendHistory(
     async ({ key, endpoint, session, body }) => {
       // 此处必须从浏览器读取原始协议响应，防止产品客户端封装掩盖转换错误。
       // eslint-disable-next-line no-restricted-syntax
-      const response = await fetch("/gw/v1/" + endpoint, {
+      const response = await fetch(endpoint.startsWith("/bypass/") ? "/gw" + endpoint : "/gw/v1/" + endpoint, {
         method: "POST",
         headers: {
           Authorization: "Bearer " + key,
@@ -95,7 +95,7 @@ export function registerAgentHistoryScenario(locale: "en" | "zh-CN") {
       ).status(),
     ).toBe(200);
     try {
-      for (const protocol of ["chat", "messages"]) {
+      for (const protocol of ["chat", "messages", "responses"]) {
         const created = await page.request.post(GATEWAY + "/model/new", {
           headers,
           data: {
@@ -108,8 +108,8 @@ export function registerAgentHistoryScenario(locale: "en" | "zh-CN") {
               output_cost_per_token: 0.000002,
             },
             model_info: {
-              transport: protocol === "chat" ? "bypass_openai_chat" : "bypass_anthropic_messages",
-              endpoint_types: ["chat", "responses", "messages"],
+              transport: protocol === "chat" ? "bypass_openai_chat" : protocol === "messages" ? "bypass_anthropic_messages" : "bypass_openai_responses",
+              endpoint_types: ["chat", "responses", "messages", "bypass:" + (protocol === "messages" ? "anthropic-messages" : "openai-" + protocol)],
               pricing_source: "manual",
             },
           },
@@ -139,8 +139,7 @@ export function registerAgentHistoryScenario(locale: "en" | "zh-CN") {
       await page.getByRole("option", { name: `history-messages-${locale}`, exact: true }).click();
       await page.getByPlaceholder(tr("Select an endpoint"), { exact: true }).click();
       await page
-        .getByRole("option")
-        .filter({ hasText: /\/v1\/messages$/ })
+        .getByRole("option", { name: "Anthropic Messages · /v1/messages", exact: true })
         .click();
       await page
         .getByPlaceholder(tr("Type your message... (Shift+Enter for new line)"))
@@ -193,6 +192,9 @@ export function registerAgentHistoryScenario(locale: "en" | "zh-CN") {
         expect((await page.request.post(GATEWAY + "/model/update", {headers, data:{id:ids[1],model_name:renamed}})).status()).toBe(200);
         const afterRename = await sendHistory(page,key,{endpoint:"messages",session},{...continuation,model:renamed,max_tokens:129});
         expect(afterRename.status,afterRename.text).toBe(200);
+        const native = await sendHistory(page,key,{endpoint:"/bypass/anthropic/v1/messages",session},{...continuation,model:renamed,max_tokens:130});
+        expect(native.status,native.text).toBe(200);
+        expect(historyOutput(native.text,"messages",stream)).toEqual([{type:"text",text:"history-ok"}]);
         expect(historyOutput(afterRename.text,"messages",stream)).toEqual([{type:"text",text:"history-ok"}]);
         await stableGoto(page,"/mine-models");
         await page.getByRole("textbox",{name:tr("Search"),exact:true}).fill(renamed);
@@ -215,6 +217,12 @@ export function registerAgentHistoryScenario(locale: "en" | "zh-CN") {
         expect(invalid.status, invalid.text).toBe(400);
         lastCall = second.callID!;
       }
+      // GPT原生Responses完整密文来自客户端，不需要在网关先建立归属；改名后仍保留签名透传。
+      const nativeGPT = {model:`history-responses-${locale}`,max_output_tokens:128,input:[{type:"reasoning",encrypted_content:"vendor-history"},{role:"user",content:"Reply briefly."}]};
+      expect((await sendHistory(page,key,{endpoint:"/bypass/openai/v1/responses",session:"native-gpt"},nativeGPT)).status).toBe(200);
+      const renamedGPT=nativeGPT.model+"-renamed";
+      expect((await page.request.post(GATEWAY+"/model/update",{headers,data:{id:ids[2],model_name:renamedGPT}})).status()).toBe(200);
+      expect((await sendHistory(page,key,{endpoint:"/bypass/openai/v1/responses",session:"native-gpt"},{...nativeGPT,model:renamedGPT})).status).toBe(200);
       for (const endpoint of ["chat/completions", "responses"])
         for (const stream of [false, true]) {
           const session = `parallel-${locale}-${endpoint.replace("/", "-")}-${stream}`,
@@ -252,6 +260,10 @@ export function registerAgentHistoryScenario(locale: "en" | "zh-CN") {
             endpoint === "responses"
               ? { model, stream, previous_response_id: output.id, input: results, tools: [tool] }
               : { ...body, messages: [user, output, ...results] };
+          if (endpoint === "chat/completions") {
+            const nativeChat = await sendHistory(page,key,{endpoint:"/bypass/openai/v1/chat/completions",session},follow);
+            expect(nativeChat.status,nativeChat.text).toBe(200);
+          }
           const second = await sendHistory(page, key, { endpoint, session }, follow);
           expect(second.status, second.text).toBe(200);
           expect(second.text).toContain("history-ok");

@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"strings"
 
 	"github.com/sunqirui1987/xhub/internal/auth"
 	dpcontract "github.com/sunqirui1987/xhub/internal/dataplane/contract"
@@ -155,6 +156,15 @@ func (s *State) PlanRoute(r *http.Request, alias string, body map[string]any, p 
 	key := sessionPinKey(alias, plan.Caller, plan.SessionID, endpoint)
 	// 加密推理依赖生成它的供应商连接，不能按普通会话偏好切换账户或降级读本机缓存。
 	opaque := requiresHistoryOwnership(body, endpoint == "messages")
+	if endpoint == "bypass:anthropic-messages" || endpoint == "bypass:openai-responses" || endpoint == "bypass:openai-chat" {
+		// 原生完整历史来自当前请求，不读取网关私有历史；供应商签名由上游校验，不能因本地别名改动阻断。
+		// previous_response_id 已在前面绑定原响应；XHub封装不能当作原厂密文直接发送。
+		if hasGatewayHistoryReference(body) {
+			plan.Err = fmt.Errorf("gateway history references require their original unified endpoint")
+			return plan
+		}
+		opaque = false
+	}
 	// expected 是本轮读取的完整序列化值（含 Revision），而非仅部署 ID；
 	// local 指定本轮后续比较写入使用本机还是共享存储。普通偏好允许降级，
 	// 所以读取错误只记录日志，不设置 plan.Err，也不影响已恢复的父响应归属。
@@ -359,8 +369,47 @@ func requiresHistoryOwnership(body map[string]any, nativeMessages bool) bool {
 		for _, value := range blocks {
 			block, _ := value.(map[string]any)
 			// 原厂签名不授予读取网关历史的权限；统一 Messages 允许携带完整历史重新选路，签名原样交给上游验证。
-			// 跨协议封装不是原厂签名，不能借此绕过原连接校验；原生 bypass 保持原策略。
+			// 跨协议封装不是原厂签名，不能借此绕过原连接校验；原生 bypass 在 PlanRoute 中单独识别并拒绝网关封装。
 			if llmdialogue.IsResponsesReasoningSignature(block["signature"]) || llmdialogue.IsResponsesReasoningSignature(block["data"]) || (!nativeMessages && (block["type"] == "redacted_thinking" || (block["type"] == "thinking" && block["signature"] != nil && block["signature"] != ""))) {
+				return true
+			}
+		}
+	}
+	return false
+}
+
+// hasGatewayHistoryReference 检查原生透传历史中是否夹带XHub内部引用或Responses桥接签名。
+// 参数为客户端完整正文，返回是否需要原统一入口恢复；PlanRoute调用，不读取或改写历史。
+// 只检查协议历史字段，不能扫描用户文字或工具参数并将同名业务字段误当成引用。
+func hasGatewayHistoryReference(body map[string]any) bool {
+	// 只识别 reasoning 项中的内部随机引用，不将工具调用参数递归当作历史。
+	checkItems := func(value any) bool {
+		items, _ := value.([]any)
+		for _, value := range items {
+			item, _ := value.(map[string]any)
+			cipher, _ := item["encrypted_content"].(string)
+			if strings.HasPrefix(cipher, "xhub_messages_") {
+				return true
+			}
+		}
+		return false
+	}
+	if checkItems(body["input"]) {
+		return true
+	}
+	messages, _ := body["messages"].([]any)
+	for _, value := range messages {
+		message, _ := value.(map[string]any)
+		if message["role"] != "assistant" {
+			continue
+		}
+		if checkItems(message["reasoning_items"]) {
+			return true
+		}
+		blocks, _ := message["content"].([]any)
+		for _, value := range blocks {
+			block, _ := value.(map[string]any)
+			if (block["type"] == "thinking" || block["type"] == "redacted_thinking") && (llmdialogue.IsResponsesReasoningSignature(block["signature"]) || llmdialogue.IsResponsesReasoningSignature(block["data"])) {
 				return true
 			}
 		}
