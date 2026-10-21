@@ -9,7 +9,7 @@ import (
 	"testing"
 )
 
-// TestResponseConnectionChanges 验证连接变更后旧游标及原生密文拒绝，统一入口公开完整历史仍可继续。
+// TestResponseConnectionChanges 验证连接变更后旧游标拒绝，统一入口公开历史和原生透传完整历史仍可继续。
 // 参数 t 为上下文；真实 HTTP/PostgreSQL 创建供应商、用户、模型及账单，覆盖统一/原生入口和地址、型号、凭据名、同名凭据更新。
 // 验证原连接续接、未授权拒绝、普通请求仍可重新选路、成功记账；本地 HTTP 上游和私有 schema 由 Cleanup/harness 回收。
 func TestResponseConnectionChanges(t *testing.T) {
@@ -60,32 +60,33 @@ func TestResponseConnectionChanges(t *testing.T) {
 				expectedCalls := int32(2)
 				for index, body := range []map[string]any{previous, full} {
 					expectedStatus := 409
-					if path == "/v1/responses" && index == 1 {
+					if index == 1 {
 						expectedStatus = 200
 						expectedCalls++
 					}
 					blocked := h.doHeaders("POST", path, owner.key, body, headers)
 					if blocked.status != expectedStatus || calls.Load() != expectedCalls {
-						t.Fatalf("连接变化后历史仍外发: %s %s", mutation, blocked.describe())
+						t.Fatalf("连接变化后历史处理不符: %s %s", mutation, blocked.describe())
 					}
 				}
 				if bad := h.doHeaders("POST", path, "sk-invalid", previous, headers); bad.status != 401 || calls.Load() != expectedCalls {
 					t.Fatalf("未授权续接没有拒绝: %s", bad.describe())
 				}
-				// 原生入口不能用普通请求替旧密文重新签发归属；统一入口自身公开历史允许迁移。
+				// 完整历史由客户端提供，两种入口均可重新选路；父响应游标仍绑定原连接，普通请求不能替它重新签发归属。
 				fresh := h.doHeaders("POST", path, owner.key, map[string]any{"model": "connection-change", "input": "A fresh plain request"}, headers)
 				expectedCalls++
 				if fresh.status != 200 || calls.Load() != expectedCalls {
 					t.Fatalf("普通请求不能重新选路: %s", fresh.describe())
 				}
-				expectedStatus := 409
-				if path == "/v1/responses" {
-					expectedStatus = 200
-					expectedCalls++
-				}
+				expectedStatus := 200
+				expectedCalls++
 				blocked := h.doHeaders("POST", path, owner.key, full, headers)
 				if blocked.status != expectedStatus || calls.Load() != expectedCalls {
-					t.Fatalf("普通偏好更新绕过了旧历史归属: %s", blocked.describe())
+					t.Fatalf("完整历史不能正常续接: %s", blocked.describe())
+				}
+				// 普通请求成功不能重绑旧游标；仍必须拒绝从新连接读取原响应。
+				if got := h.doHeaders("POST", path, owner.key, previous, headers); got.status != 409 || calls.Load() != expectedCalls {
+					t.Fatalf("旧游标被普通请求重新授权: %s", got.describe())
 				}
 				h.flushSpend()
 				for _, response := range []reply{first, valid, fresh} {
