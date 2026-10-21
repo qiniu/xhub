@@ -2895,5 +2895,19 @@
     "title": "CSV user template and real import zh-CN",
     "kind": "implemented",
     "environment": "default offline"
+  },
+  {
+    "id": "REG-delete-contract-en",
+    "file": "e2e/scenarios/regression/delete-contract-en.test.ts",
+    "title": "console deletion contracts en",
+    "kind": "implemented",
+    "environment": "default offline"
+  },
+  {
+    "id": "REG-delete-contract-zh-CN",
+    "file": "e2e/scenarios/regression/delete-contract-zh-CN.test.ts",
+    "title": "console deletion contracts zh-CN",
+    "kind": "implemented",
+    "environment": "default offline"
   }
 ]

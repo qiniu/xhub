@@ -881,18 +881,20 @@ export const keyDeleteCall = async (accessToken: string, user_key: string) => {
   }
 };
 
-export const userDeleteCall = async (accessToken: string, userIds: string[]) => {
+/** 删除一个用户；供列表及详情调用，传入会话和用户ID，返回后台结果，鉴权及删除失败原样抛出。 */
+export const userDeleteCall = async (accessToken: string, userId: string) => {
   try {
-    return await apiClient.post(`/user/delete`, { accessToken, body: { user_ids: userIds } });
+    return await apiClient.post(`/user/delete`, { accessToken, body: { user_id: userId } });
   } catch (error) {
     console.error("Failed to delete user(s):", error);
     throw error;
   }
 };
 
+/** 删除一个团队；供团队页调用，传入会话和团队ID，返回后台结果，失败原样抛出。 */
 export const teamDeleteCall = async (accessToken: string, teamID: string) => {
   try {
-    return await apiClient.post(`/team/delete`, { accessToken, body: { team_ids: [teamID] } });
+    return await apiClient.post(`/team/delete`, { accessToken, body: { team_id: teamID } });
   } catch (error) {
     console.error("Failed to delete key:", error);
     throw error;
@@ -2459,19 +2461,6 @@ export const gatewayDailyActivityCall = async (accessToken: string, startTime: D
     });
   } catch (error) {
     console.error("Failed to fetch gateway daily activity:", error);
-    throw error;
-  }
-};
-
-export const getPossibleUserRoles = async (accessToken: string) => {
-  try {
-    const data = (await apiClient.get(`/user/available_roles`, { accessToken })) as Record<
-      string,
-      Record<string, string>
-    >;
-    return data;
-    // Handle success - you might want to update some state or UI based on the created key
-  } catch (error) {
     throw error;
   }
 };

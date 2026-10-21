@@ -329,11 +329,12 @@ export default function UserInfoView({
 
   const selectedTeamOption = availableTeamsForAdd.find((team) => team.team_id === selectedTeamId) ?? null;
 
+  /** 确认删除当前用户；无参数，使用当前会话及单个ID，成功更新页面，失败向用户显示错误。 */
   const handleDelete = async () => {
     try {
       if (!accessToken) return;
       setIsDeletingUser(true);
-      await userDeleteCall(accessToken, [userId]);
+      await userDeleteCall(accessToken, userId);
       toast.success(t("User deleted successfully"));
       if (onDelete) {
         onDelete();

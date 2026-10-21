@@ -15,10 +15,6 @@ const userListCall = vi.fn();
 vi.mock("@/components/networking", () => ({
   userListCall: (...args: unknown[]) => userListCall(...args),
   userDeleteCall: vi.fn().mockResolvedValue({}),
-  getPossibleUserRoles: vi.fn().mockResolvedValue({
-    Admin: { ui_label: "Admin" },
-    User: { ui_label: "User" },
-  }),
   modelAvailableCall: vi.fn().mockResolvedValue({ data: [] }),
   userUpdateUserCall: vi.fn().mockResolvedValue({}),
   getProxyBaseUrl: vi.fn().mockReturnValue("http://localhost:4000"),
@@ -103,6 +99,20 @@ describe("ViewUserDashboard", () => {
     });
   });
 
+  /** 无角色接口替身时仍提供真实两种账户角色；前置管理员页面，核对筛选选项，渲染由测试框架清理。 */
+  it("offers account role filters without a role API", async () => {
+    const user = userEvent.setup();
+    renderDashboard();
+    await screen.findByText("test@example.com");
+    await user.click(screen.getByRole("button", { name: "Filters", exact: true }));
+    await user.click(screen.getByPlaceholderText(translate("en", "pages.users.selectRole")));
+    expect(
+      await screen.findByRole("option", { name: translate("en", "Platform administrator"), exact: true }),
+    ).toBeInTheDocument();
+    expect(screen.getByRole("option", { name: translate("en", "Regular user"), exact: true })).toBeInTheDocument();
+    expect(screen.queryByRole("option", { name: "available_roles" })).not.toBeInTheDocument();
+  });
+
   it("should render the ViewUserDashboard component", async () => {
     renderDashboard();
 
@@ -118,11 +128,12 @@ describe("ViewUserDashboard", () => {
     expect(screen.queryByRole("tab", { name: "Default User Settings" })).not.toBeInTheDocument();
   });
 
+  /** 验证创建及批量导入入口位于管理工具栏，使用当前翻译名称；前置管理员渲染，组件测试自动清理。 */
   it("renders invite and bulk invite as toolbar actions alongside the other admin controls", async () => {
     renderDashboard();
 
     const inviteButton = await screen.findByRole("button", { name: /\+ create user/i });
-    const bulkInviteButton = screen.getByRole("button", { name: /\+ bulk invite users/i });
+    const bulkInviteButton = screen.getByRole("button", { name: translate("en", "userCsv.title") });
     const toolbar = screen.getByTestId("toggle-user-selection").parentElement;
 
     expect(inviteButton.parentElement).toBe(toolbar);
@@ -136,7 +147,7 @@ describe("ViewUserDashboard", () => {
     expect(screen.queryByRole("tab")).not.toBeInTheDocument();
     expect(screen.queryByTestId("toggle-user-selection")).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: /\+ create user/i })).not.toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: /\+ bulk invite users/i })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: translate("en", "userCsv.title") })).not.toBeInTheDocument();
   });
 
   it("keeps actions unavailable while the user list is loading", () => {

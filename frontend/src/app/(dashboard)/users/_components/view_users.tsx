@@ -1,3 +1,4 @@
+import { iamRoles } from "@/utils/iamRoles";
 import { parseAsString, useQueryState } from "nuqs";
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 
@@ -7,12 +8,7 @@ import { CreateUserButton } from "@/components/CreateUserButton";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 
-import {
-  getPossibleUserRoles,
-  getProxyBaseUrl,
-  userListCall,
-  UserListResponse,
-} from "@/components/networking";
+import { getProxyBaseUrl, userListCall, UserListResponse } from "@/components/networking";
 import SetPasswordModal from "@/components/SetPasswordModal";
 
 import { DEBOUNCE_WAIT_MS } from "@/utils/debounceConstants";
@@ -51,6 +47,7 @@ const DEFAULT_SORT_BY = "created_at";
 
 const DEFAULT_SORTING: SortingState = [{ id: DEFAULT_SORT_BY, desc: true }];
 
+/** 用户管理页：接收会话、权限及团队信息，返回列表与管理弹窗；角色来自既有账户定义，删除成功才更新缓存。 */
 const ViewUserDashboard: React.FC<ViewUserDashboardProps> = ({
   accessToken,
   token,
@@ -163,11 +160,12 @@ const ViewUserDashboard: React.FC<ViewUserDashboardProps> = ({
     setIsSetPasswordModalVisible(true);
   }, []);
 
+  /** 确认删除当前用户；无参数，使用当前会话及单个ID，成功更新页面，失败向用户显示错误。 */
   const confirmDelete = async () => {
     if (userToDelete && accessToken) {
       try {
         setIsDeletingUser(true);
-        await userDeleteCall(accessToken, [userToDelete.user_id]);
+        await userDeleteCall(accessToken, userToDelete.user_id);
 
         // Update the user list after deletion
         queryClient.setQueriesData<UserListResponse>({ queryKey: ["userList"] }, (previousData) => {
@@ -252,16 +250,14 @@ const ViewUserDashboard: React.FC<ViewUserDashboardProps> = ({
     placeholderData: (previousData) => previousData,
   });
 
-  const userRolesQuery = useQuery<Record<string, Record<string, string>>>({
-    queryKey: ["userRoles"],
-    initialData: () => ({}),
-    queryFn: async () => {
-      if (!accessToken) throw new Error(t("Access token required"));
-      return await getPossibleUserRoles(accessToken);
-    },
-    enabled: Boolean(accessToken && token && userRole && userID),
-  });
-  const possibleUIRoles = userRolesQuery.data;
+  // 账户角色只有admin/user；直接使用既有角色定义和当前语言标签，避免请求已废弃的占位接口。
+  const possibleUIRoles = useMemo(
+    () => ({
+      [iamRoles.RoleAdmin]: { ui_label: t("Platform administrator") },
+      [iamRoles.RoleUser]: { ui_label: t("Regular user") },
+    }),
+    [t],
+  );
 
   const users = useMemo<UserInfo[]>(() => userListQuery.data?.users ?? [], [userListQuery.data]);
   const totalUserCount = userListQuery.data?.total ?? 0;
