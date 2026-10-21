@@ -1,0 +1,4 @@
+interface:
+  display_name: "XHub Issue 规范"
+  short_description: "统一缺陷和功能提案格式，明确架构标签、证据边界和验收条件"
+  default_prompt: "使用 $xhub-issues 创建或整理 XHub issue，按类型填写提案、证据与验收条件。"
