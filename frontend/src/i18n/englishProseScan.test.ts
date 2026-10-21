@@ -86,3 +86,9 @@ describe("englishProseScan", () => {
     ]);
   });
 });
+
+// 后台错误匹配标记不应翻译，但同一条件的显示分支仍应检测；纯源码扫描不产生数据。
+it("does not translate error matching markers inside conditions", () => {
+  const source = `function save(cause) { setError(cause.message.includes("model name already exists; rename cannot merge model permissions") ? t("renameConflict") : "Please retry later"); }`;
+  expect(findHitsInSource("ModelEditor.tsx", source).map(hit => hit.template)).toEqual(["Please retry later"]);
+});

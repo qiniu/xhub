@@ -177,7 +177,7 @@ export default function KeyInfoView({
   /** 对账成功后读取真实Key余额并刷新详情/列表缓存；失败抛给对账区明确提示，不用本地算术伪造退款。 */
   const refreshBudgetAfterReconciliation = async () => {
     const response = await apiClient.get<{ info: KeyResponse }>("/key/info", { accessToken, query: { key: currentKeyData.token_id } });
-    if (!response.info || typeof response.info.budget_pending !== "number") throw new Error("Missing budget snapshot");
+    if (!response.info || typeof response.info.budget_pending !== "number") throw new Error(t("uiErrors.budgetMissing"));
     setCurrentKeyData(response.info);
     onKeyDataUpdate?.(response.info);
     await queryClient.invalidateQueries({ queryKey: keyKeys.all });

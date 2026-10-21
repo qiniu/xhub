@@ -1,3 +1,4 @@
+import { t as tRuntime } from "@/i18n/runtime";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   BreakdownMetrics,
@@ -364,7 +365,7 @@ export function usePaginatedDailyActivity({
             setData({ results: accumulatedResults, metadata: accumulatedMetadata });
             setProgress({ currentPage: loadedPages, totalPages: accumulatedMetadata.total_pages || loadedPages });
           }
-          setFailure({ key: requestIdentity, error: error instanceof Error ? error : new Error("Daily activity unavailable") });
+          setFailure({ key: requestIdentity, error: error instanceof Error ? error : new Error(tRuntime("uiErrors.dailyUnavailable")) });
           setLoading(false);
           setIsFetchingMore(false);
         }

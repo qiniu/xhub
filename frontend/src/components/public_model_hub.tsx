@@ -50,7 +50,7 @@ import { MessageType } from "@/components/chat_ui/types";
 import { getProviderLogoAndName } from "./provider_info_helpers";
 import { filterBySearchTerm, rankBySearchRelevance } from "@/utils/searchUtils";
 import { useT } from "@/i18n";
-import { isBrandOutbound, scrubBrand } from "@/i18n/brand";
+import { isBrandOutbound } from "@/i18n/brand";
 
 interface PublicModelHubProps {
   accessToken?: string | null;
@@ -119,11 +119,12 @@ const PublicModelHub: React.FC<PublicModelHubProps> = ({ accessToken, isEmbedded
         }
       };
 
+      /** 加载公开模型页配置；管理员填写的标题、说明和链接名称保持原文，不进行品牌词替换。无参数，失败交由现有加载流程处理。 */
       const fetchPublicModelHubInfo = async () => {
         const publicModelHubInfo = await getPublicModelHubInfo();
-        setPageTitle(scrubBrand(publicModelHubInfo.docs_title || "XHub"));
+        setPageTitle(publicModelHubInfo.docs_title || "XHub");
         setCustomDocsDescription(
-          publicModelHubInfo.custom_docs_description ? scrubBrand(publicModelHubInfo.custom_docs_description) : null,
+          publicModelHubInfo.custom_docs_description ? publicModelHubInfo.custom_docs_description : null,
         );
         setLitellmVersion(publicModelHubInfo.litellm_version);
         setUsefulLinks(publicModelHubInfo.useful_links || {});
@@ -343,7 +344,7 @@ const PublicModelHub: React.FC<PublicModelHubProps> = ({ accessToken, isEmbedded
                         className="flex min-w-0 items-center space-x-3 text-info transition-colors p-3 rounded-lg hover:bg-info/10 border border-border"
                       >
                         <ExternalLinkIcon className="w-4 h-4 shrink-0" />
-                        <p className="text-sm font-medium break-words">{scrubBrand(title)}</p>
+                        <p className="text-sm font-medium break-words">{title}</p>
                       </button>
                     ))}
                 </div>

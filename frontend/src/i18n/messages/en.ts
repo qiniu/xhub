@@ -5,6 +5,8 @@ import { pageDescriptionsEn } from "./pageDescriptions.en";
 import { routeTemplatesEn } from "./routeTemplates.en";
 
 export const en = {
+  uiErrors: {"dailyUnavailable": "Daily activity unavailable", "bulkUpdateInvalid": "Unexpected bulk update result", "reservationInvalid": "Invalid reservation response", "resolutionInvalid": "Invalid resolution response", "budgetMissing": "Missing budget snapshot", "samlMetadataInvalid": "Invalid SAML metadata response"},
+  createdKey: { warning: "Save this secret key in a secure location. You will not be able to view it again in XHub. If you lose it, generate a new key." },
   budgetReconciliation: budgetReconciliationEn,
   hardBudget: {
     "detailsLoadFailed": "Unable to load key details and pending budget. Retry before editing this key.",

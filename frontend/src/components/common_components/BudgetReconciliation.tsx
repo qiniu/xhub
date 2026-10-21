@@ -43,7 +43,7 @@ export function BudgetReconciliation({ keyId, accessToken, allowed, onReconciled
     setLoading(true); setReadError(false);
     apiClient.get<ReservationPage>("/budget/reservations", { accessToken, signal: controller.signal, query: { key_id: keyId, state: "uncertain", page, page_size: 50 } })
       .then(result => {
-        if (!Array.isArray(result.reservations) || !Number.isFinite(result.total)) throw new Error("Invalid reservation response");
+        if (!Array.isArray(result.reservations) || !Number.isFinite(result.total)) throw new Error(t("uiErrors.reservationInvalid"));
         if (!controller.signal.aborted) setData(result);
       })
       .catch(() => { if (!controller.signal.aborted) { setData(null); setReadError(true); } })
@@ -66,7 +66,7 @@ export function BudgetReconciliation({ keyId, accessToken, allowed, onReconciled
       const result = await apiClient.post<{ resolution: Resolution; already_resolved: boolean }>("/budget/reservations/" + encodeURIComponent(selected.reservation_id) + "/reconcile", {
         accessToken, body: { outcome, verified_cost_usd: actual, evidence: evidence.trim(), expected_fingerprint: selected.fingerprint },
       });
-      if (!result.resolution?.reservation_id || result.resolution.reservation_id !== selected.reservation_id) throw new Error("Invalid resolution response");
+      if (!result.resolution?.reservation_id || result.resolution.reservation_id !== selected.reservation_id) throw new Error(t("uiErrors.resolutionInvalid"));
       setReceipt(result); setSelected(null); setPage(1); setRefresh(value => value + 1);
       try { await onReconciled?.(); } catch { setRefreshFailed(true); }
     } catch (error) {

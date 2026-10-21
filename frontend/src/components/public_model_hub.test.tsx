@@ -1,3 +1,4 @@
+import { getPublicModelHubInfo } from "./networking";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { describe, it, expect, vi, beforeAll, beforeEach } from "vitest";
 import { render, screen, waitFor, within, fireEvent } from "@testing-library/react";
@@ -468,4 +469,12 @@ describe("public hub MCP details modal", () => {
     expect(screen.queryByRole("tab", { name: /MCP Hub/i })).not.toBeInTheDocument();
     expect(networkingModule.mcpHubPublicServersCall).not.toHaveBeenCalled();
   });
+});
+
+// 管理员自定义标题、说明及链接名含品牌词时必须原样显示；模拟只读目录，组件卸载后无持久数据。
+it("preserves administrator supplied model hub names", async () => {
+  vi.mocked(getPublicModelHubInfo).mockResolvedValueOnce({docs_title:"LiteLLM 我的模型", custom_docs_description:"Contact user@berri.ai", litellm_version:"1", useful_links:{"LiteLLM Guide":"https://example.com/guide"}});
+  renderHub();
+  expect(await screen.findByText("Contact user@berri.ai")).toBeInTheDocument();
+  expect(screen.getByText("LiteLLM Guide")).toBeInTheDocument();
 });

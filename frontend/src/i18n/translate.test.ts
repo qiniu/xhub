@@ -177,10 +177,11 @@ describe("production call sites", () => {
   it("resolves every catalog key used by the UI in both locales", () => {
     const used = keysUsedInProduction();
     expect(used.length).toBeGreaterThan(100);
+    const zhCatalog = catalogEntries(catalogs["zh-CN"]), enCatalog = catalogEntries(catalogs.en);
     const unresolved = used.filter((key) => {
       const zh = translate("zh-CN", key);
       const en = translate("en", key);
-      return zh.length === 0 || en.length === 0 || (zh === key && en === key);
+      return zh.length === 0 || en.length === 0 || (!zhCatalog.has(key) || !enCatalog.has(key));
     });
     expect(unresolved, `生产调用缺少双语目录项：${unresolved.join("\n")}`).toEqual([]);
     expect(translate("zh-CN", "pages.teams.title")).not.toBe(translate("en", "pages.teams.title"));
@@ -338,5 +339,25 @@ describe("parseLocale", () => {
     expect(parseLocale("zh-CN")).toBe("zh-CN");
     expect(parseLocale("fr")).toBe("zh-CN");
     expect(parseLocale(undefined)).toBe("zh-CN");
+  });
+});
+
+// 验证翻译仅修改固定文案，用户名称、模型标识、邮箱、空值和未知键保持约定；纯函数测试无需清理。
+describe("user data translation boundaries", () => {
+  for (const locale of ["zh-CN", "en"] as const) {
+    it(`preserves interpolated names and identifiers in ${locale}`, () => {
+      const name = "LiteLLM 我的模型 anthropic/claude-opus-5.5 user@berri.ai  two spaces";
+      expect(translate(locale, "Copy {label}", { label: name })).toContain(name);
+      expect(translate(locale, name)).toBe(name);
+      expect(translate(locale, "Copy {label}", { label: "" })).not.toContain("{label}");
+      expect(translate(locale, "Copy {label}")).toContain("{label}");
+    });
+  }
+  // 修复过的动态词条必须保留参数名；非法翻译不能通过中文字符检查蒙混过关。
+  it("renders repaired placeholders and complete key guidance", () => {
+    for (const [key, value] of catalogEntries(catalogs["zh-CN"])) expect(value, key).not.toMatch(/\{值\d+\}/);
+    expect(translate("zh-CN", "Assessment #{value0}", {value0: 7})).toBe("评估 #7");
+    expect(translate("zh-CN", "{value0} ascending", {value0: "LiteLLM"})).toBe("LiteLLM 升序");
+    expect(translate("zh-CN", "createdKey.warning")).toBe("请将此密钥保存在安全的位置。你将无法在 XHub 中再次查看它；如果丢失，请重新生成密钥。");
   });
 });

@@ -58,12 +58,13 @@ export function interpolate(template: string, vars?: TranslateVars): string {
   });
 }
 
+/** 翻译固定界面文案；locale/key 选择词条，vars 为原样插入的用户数据。先处理模板品牌，再插值，避免修改名称、模型 ID 或邮箱。未知键保持原文。 */
 export function translate(locale: Locale, key: string, vars?: TranslateVars): string {
   const fromLocale = lookup(catalogs[locale], key);
   const fromDefault = locale === defaultLocale ? undefined : lookup(catalogs[defaultLocale], key);
   const fromEn = locale === "en" ? undefined : lookup(catalogs.en, key);
   const template = fromLocale ?? fromDefault ?? fromEn ?? key;
-  return scrubBrand(interpolate(template, vars));
+  return interpolate(fromLocale != null || fromDefault != null || fromEn != null ? scrubBrand(template) : template, vars);
 }
 
 export function collectKeys(tree: unknown, prefix = ""): string[] {

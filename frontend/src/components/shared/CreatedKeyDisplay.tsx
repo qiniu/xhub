@@ -8,14 +8,12 @@ interface CreatedKeyDisplayProps {
   apiKey: string;
 }
 
-/**
- * Shared component for displaying a newly-created virtual key.
- * Used on the Virtual Keys page and in the Add Agent wizard.
- */
+/** 展示新建密钥及一次性保存提示；apiKey 为后台原始密钥，不参与翻译。供密钥创建流程使用，复制后短暂显示成功状态。 */
 const CreatedKeyDisplay: React.FC<CreatedKeyDisplayProps> = ({ apiKey }) => {
   const t = useT();
   const [copied, setCopied] = useState(false);
 
+  /** 复制完成后更新按钮和通知；无参数或返回值，2 秒后恢复初始状态。 */
   const handleCopy = () => {
     setCopied(true);
     toast.success(t("Key copied to clipboard"));
@@ -25,8 +23,7 @@ const CreatedKeyDisplay: React.FC<CreatedKeyDisplayProps> = ({ apiKey }) => {
   return (
     <div>
       <p className="mb-2">
-        {t("Please save this secret key somewhere safe and accessible. For security reasons,")}{" "}
-        <b>{t("you will not be able to view it again")}</b> {t("through your LiteLLM account. If you lose this secret key, you will need to generate a new one.")}
+        {t("createdKey.warning")}
       </p>
 
       <p className="text-sm text-muted-foreground mt-3 mb-1">{t("Virtual Key:")}</p>

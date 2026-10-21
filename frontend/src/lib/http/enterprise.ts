@@ -1,3 +1,4 @@
+import { t as tRuntime } from "@/i18n/runtime";
 import { createApiClient } from "./client";
 import { getAuthHeaderName, getAuthToken, getRequestBaseUrl } from "./runtime";
 
@@ -20,7 +21,7 @@ export function readEnterprise<T>(path: string): Promise<T> { return client.get(
  */
 export async function readSSOMetadata(id: string): Promise<string> {
   const result = await client.get<{metadata: string}>("/admin/enterprise/sso/" + encodeURIComponent(id) + "/metadata", {accessToken: getAuthToken()});
-  if (typeof result?.metadata !== "string" || !result.metadata.trim()) throw new Error("Invalid SAML metadata response");
+  if (typeof result?.metadata !== "string" || !result.metadata.trim()) throw new Error(tRuntime("uiErrors.samlMetadataInvalid"));
   return result.metadata;
 }
 /** 保存企业配置；path/body 为管理员输入，返回完成 Promise；凭据不写入浏览器存储。 */

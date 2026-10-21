@@ -90,7 +90,7 @@ const BulkBudgetForm: React.FC<BulkEditUserModalProps> = ({
         result.total_requested < 1 ||
         (!updateAllUsers && result.total_requested !== selectedUsers.length)
       ) {
-        throw new Error("Unexpected bulk update result");
+        throw new Error(t("uiErrors.bulkUpdateInvalid"));
       }
       toast.success(t("pages.users.bulkBudgetSuccess", { count: result.successful_updates }));
       onSuccess();

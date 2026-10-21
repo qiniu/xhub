@@ -1262,9 +1262,11 @@ function enclosingFunction(node: ts.Node): ts.Node | undefined {
   return undefined;
 }
 
+/** 判断字符串是否属于展示给用户的错误参数；条件表达式中的比较值不是输出文案，不能误翻译后台错误标记。参数为 AST 节点，返回是否需要国际化，无副作用。 */
 function inSetErrorArgument(node: ts.Node): boolean {
   let p: ts.Node | undefined = node.parent;
   while (p) {
+    if (ts.isConditionalExpression(p) && node.getStart() >= p.condition.getStart() && node.getEnd() <= p.condition.getEnd()) return false;
     if (ts.isCallExpression(p) && p.arguments.length > 0) {
       const arg = p.arguments[0];
       const expr = p.expression;

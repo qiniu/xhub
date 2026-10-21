@@ -6,6 +6,8 @@ import { pageDescriptionsZhCN } from "./pageDescriptions.zh-CN";
 import { routeTemplatesZhCN } from "./routeTemplates.zh-CN";
 
 export const zhCN = {
+  uiErrors: {"dailyUnavailable": "每日用量暂不可用", "bulkUpdateInvalid": "批量更新返回了异常结果", "reservationInvalid": "预算预占响应格式无效", "resolutionInvalid": "预算核对响应格式无效", "budgetMissing": "缺少预算快照", "samlMetadataInvalid": "SAML 元数据响应格式无效"},
+  createdKey: { warning: "请将此密钥保存在安全的位置。你将无法在 XHub 中再次查看它；如果丢失，请重新生成密钥。" },
   budgetReconciliation: budgetReconciliationZhCN,
   hardBudget: {
     "detailsLoadFailed": "密钥详情与待结算额度加载失败，请重试成功后再编辑。",

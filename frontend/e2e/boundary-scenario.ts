@@ -2,6 +2,7 @@ import { expect, test, type Page } from "@playwright/test";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { GATEWAY, UPSTREAM, loginAdmin, login, sessionBearer, stableGoto, uiPath, t } from "./helpers";
+import { translate } from "../src/i18n/translate";
 import { requireAuthorizationError } from "./assertions";
 
 /** 读取本轮私有企业控制端；返回本地 URL，仅浏览器测试使用；未启用夹具时明确失败。 */
@@ -60,13 +61,20 @@ export function registerSessionContinuity(title:string) {
  });
 }
 /** 注册密钥轮换；前置页面创建独立密钥，实际推理后轮换并验证旧密钥拒绝/不转发，新密钥成功且内部身份及日志不变；finally 删除密钥。 */
-export function registerKeyRotation(title:string) {
+export function registerKeyRotation(title:string, locale: "zh-CN" | "en" = "zh-CN") {
  test(title,async({page})=>{
-  await loginAdmin(page);const headers={Authorization:"Bearer "+await sessionBearer(page)};
-  await page.getByTestId("create-key-button").click();await page.getByLabel(t("Key Name")).fill("rotation-"+Date.now());const created=page.waitForResponse(r=>r.url().endsWith("/key/generate")&&r.request().method()==="POST");await page.getByRole("button",{name:t("pages.apiKeys.createSubmit"),exact:true}).click();const response=await created;expect(response.status()).toBe(200);const key=await response.json();let secret=key.key;
+  await loginAdmin(page);
+  if (locale === "en") await page.getByRole("button", {name:"English",exact:true}).click();
+  const t = (key: string) => translate(locale, key);
+  const alias = "LiteLLM-模型-rotation-" + Date.now();
+  const headers={Authorization:"Bearer "+await sessionBearer(page)};
+  await page.getByTestId("create-key-button").click();await page.getByLabel(t("Key Name")).fill(alias);const created=page.waitForResponse(r=>r.url().endsWith("/key/generate")&&r.request().method()==="POST");await page.getByRole("button",{name:t("pages.apiKeys.createSubmit"),exact:true}).click();const response=await created;expect(response.status()).toBe(200);const key=await response.json();let secret=key.key;
   /** 调用实际数据面；token 为待验证密钥、suffix 避免缓存，返回响应；账单随私有 schema 清理。 */
   const invoke=(token:string,suffix:string)=>page.request.post(GATEWAY+"/v1/chat/completions",{headers:{Authorization:"Bearer "+token},data:{model:"gpt-4o-mini",messages:[{role:"user",content:"Verify rotated credential "+suffix}]}});
   try {
+   await expect(page.getByText(t("createdKey.warning"),{exact:true})).toBeVisible();
+   await expect(page.getByRole("button",{name:t("Copy Virtual Key"),exact:true})).toBeVisible();
+   expect(key.key_alias).toBe(alias);
    const first=await invoke(secret,"before");expect(first.status()).toBe(200);const id=first.headers()["x-litellm-call-id"];
    await page.keyboard.press("Escape");await stableGoto(page,"/api-keys?key="+key.token_id);await page.getByRole("button",{name:t("More key actions"),exact:true}).click();await page.getByRole("menuitem",{name:t("Regenerate Key"),exact:true}).click();const rotated=page.waitForResponse(r=>r.url().includes("/regenerate")&&r.request().method()==="POST");await page.getByRole("button",{name:t("Regenerate"),exact:true}).click();const fresh=await rotated;expect(fresh.status()).toBe(200);secret=(await fresh.json()).key;expect(secret).not.toBe(key.key);
    const before=await count(page);const denied=await invoke(key.key,"revoked");requireAuthorizationError(denied.status(),await denied.json(),401);expect(await count(page)).toEqual(before);

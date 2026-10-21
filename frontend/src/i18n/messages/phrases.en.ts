@@ -1,4 +1,5 @@
 export const enPhrases: Record<string, string> = {
+  "To:": "To:",
   "Identity request failed ({value0})": "Identity request failed ({value0})",
   "Missing endpoint catalog": "Missing endpoint catalog",
   "ON PASS": "ON PASS",
