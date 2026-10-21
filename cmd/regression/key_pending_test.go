@@ -13,7 +13,7 @@ func TestKeyRotationPendingBudget(t *testing.T) {
 	h := newHarness(t, chatDeployment(model))
 	admin := h.adminSession()
 	c := h.openScope(t, admin, "rotation-pending")
-	h.setKeyBudget(t, admin, c.key, hardBudgetAmount(t, chatDeployment(model)))
+	h.setKeyBudget(t, admin, c.key, expectedCost())
 	h.ok(http.MethodPost, "/v1/chat/completions", c.key, chatRequest(model, "Exhaust original key budget."))
 	if got := h.do(http.MethodPost, "/v1/chat/completions", c.key, chatRequest(model, "Must be refused.")); got.status != 429 {
 		t.Fatalf("轮换前未用尽: %s", got.describe())
@@ -29,7 +29,7 @@ func TestKeyRotationPendingBudget(t *testing.T) {
 	if len(h.upstreamCalls()) != 1 {
 		t.Fatalf("额度拒绝仍调用上游: %d", len(h.upstreamCalls()))
 	}
-	h.setKeyBudget(t, admin, c.keyID, 10*hardBudgetAmount(t, chatDeployment(model)))
+	h.setKeyBudget(t, admin, c.keyID, 10*expectedCost())
 	next := h.ok(http.MethodPost, "/v1/chat/completions", fresh, chatRequest(model, "Verify accumulated cost after rotation."))
 	if got := parseFloatOrZero(next.header("x-litellm-key-spend")); !nearlyEqual(got, 2*expectedCost()) {
 		t.Fatalf("累计费用头未保留旧哈希消费: %v", got)

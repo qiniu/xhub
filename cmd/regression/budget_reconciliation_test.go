@@ -4,11 +4,12 @@ import (
 	"net/http"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/sunqirui1987/xhub/internal/iam"
 )
 
-// TestBudgetReconciliationHTTP 验证真实网关产生uncertain后，只有管理会话可按证据核销且费用/次数/审计一致。
+// TestBudgetReconciliationHTTP 验证升级前历史uncertain记录保留后，只有管理会话可按证据核销且费用/次数/审计一致。
 // 前置独立PG、无Redis、违约用量的本地供应商；分别确认免费和实际收费，重复/冲突/错误输入均有断言，harness清理schema与服务。
 func TestBudgetReconciliationHTTP(t *testing.T) {
 	for _, outcome := range []string{"no_charge", "charged"} {
@@ -21,10 +22,20 @@ func TestBudgetReconciliationHTTP(t *testing.T) {
 			c := h.openScope(t, admin, model)
 			h.setKeyBudget(t, admin, c.key, hardBudgetAmount(t, dep)*4)
 			h.mu.Lock()
-			h.rules = map[string]upstreamRule{model: {usage: map[string]any{"prompt_tokens": 2048, "completion_tokens": 5}}}
+			h.rules = map[string]upstreamRule{model: {usage: map[string]any{"prompt_tokens": 11}}}
 			h.mu.Unlock()
 			call := h.ok(http.MethodPost, "/v1/chat/completions", c.key, chatRequest(model, "Preserve uncertain billing for manual reconciliation."))
 			h.flushSpend()
+			// 显式模拟升级前留下的未知预占；新软预算请求不能自动制造这种记录。
+			var original iam.UsageEvent
+			if _, err := h.db.Engine.Where("request_id = ?", call.header("x-litellm-call-id")).Get(&original); err != nil {
+				t.Fatal(err)
+			}
+			_, err := h.db.Engine.Insert(&iam.BudgetReservation{RequestID: "legacy-hold", CallID: original.RequestID, Kind: "key", NodeID: c.keyID, KeyID: c.keyID, UserID: original.UserID, TeamID: original.TeamID, OrgID: original.OrganizationID, ProjectID: original.ProjectID, Amount: hardBudgetAmount(t, dep), Snapshot: `{"supplier":"local"}`, StartedAt: time.Now(), State: "uncertain", Reason: "Legacy provider outcome unknown"})
+			if err != nil {
+				t.Fatal(err)
+			}
+
 			before := h.moneyOf(t, c)
 			listPath := "/budget/reservations?key_id=" + c.keyID + "&state=uncertain&page=1&page_size=50"
 			for _, query := range []string{"page=0", "page_size=101", "page=bad", "state=resolved"} {

@@ -428,7 +428,7 @@ const CreateKey: React.FC<CreateKeyProps> = ({ team, teams, data, addKey, autoOp
                 <div className="mb-8 space-y-6">
                   <div>
                     <h3 className="mb-4 text-lg font-medium text-foreground">{t("Budget and Routing")}</h3>
-                    <p className="mb-4 text-sm text-muted-foreground">{t("hardBudget.contract", { cap: 4096 })}</p>
+                    <p className="mb-4 text-sm text-muted-foreground">{t("hardBudget.contract")}</p>
                     <div className="grid gap-5 rounded-lg border p-4 sm:grid-cols-2">
                       <MountedFormField
                         label={

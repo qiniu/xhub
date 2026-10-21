@@ -20,9 +20,9 @@ func TestBudgetAccumulatesAcrossCalls(t *testing.T) {
 	tn := h.provision(t, admin, "accumulate")
 	h.flushSpend()
 
-	// 上限刚好覆盖一次完整预占，结算后剩余余额不足下一次预占，不能按最终小费用跳过准入。
+	// 上限刚好覆盖一次实际消费；软预算完成后余额为零，下一次拒绝。
 	oneCall := expectedCost()
-	h.setUserBudget(t, admin, tn.userID, hardBudgetAmount(t, chatDeployment("regression-accumulate")))
+	h.setUserBudget(t, admin, tn.userID, oneCall)
 
 	first := h.ok(http.MethodPost, "/v1/chat/completions", tn.key, map[string]any{
 		"model": "regression-accumulate", "messages": []any{map[string]any{"role": "user", "content": "one"}},

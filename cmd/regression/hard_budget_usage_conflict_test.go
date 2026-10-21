@@ -38,7 +38,7 @@ func hardBudgetUsageFrames(protocol, mode string) string {
 }
 
 // TestHardBudgetStreamUsageConflict 验证标准三协议、原生旁路及跨协议在真实 HTTP 结算中一致阻止矛盾用量自动退款。
-// 前置私有 PostgreSQL、明确价格/上下文、无 Redis 和本地 SSE 上游；正常/合法增长流落账释放，矛盾流保留 uncertain 且下一调用429。
+// 前置私有 PostgreSQL、明确价格/上下文、无 Redis 和本地 SSE 上游；正常/合法增长流按实际用量落账，矛盾流不编造费用且不冻结后续调用。
 // 客户端仍收到完整回复，不因计量不可信诱发重试；harness 关闭服务并清理所有账号、Key、预占和 schema。
 func TestHardBudgetStreamUsageConflict(t *testing.T) {
 	for _, tc := range []struct{ source, target, path string }{
@@ -95,11 +95,11 @@ func TestHardBudgetStreamUsageConflict(t *testing.T) {
 					t.Fatal(err)
 				}
 				if mode == "conflict" {
-					if len(holds) != 1 || holds[0].State != "uncertain" || key.Spend != 0 {
+					if len(holds) != 0 || key.Spend != 0 {
 						t.Fatalf("矛盾用量被自动结算退款: holds=%+v spend=%g", holds, key.Spend)
 					}
-					if next := h.do(http.MethodPost, tc.path, owner.key, body); next.status != 429 {
-						t.Fatalf("未知费用被下一调用重用: %s", next.describe())
+					if next := h.do(http.MethodPost, tc.path, owner.key, body); next.status != 200 {
+						t.Fatalf("未知费用不应阻断下一调用: %s", next.describe())
 					}
 				} else if len(holds) != 0 || !nearlyEqual(key.Spend, 8*2e-6+2*8e-6) {
 					t.Fatalf("正常实测未结算: holds=%+v spend=%g", holds, key.Spend)

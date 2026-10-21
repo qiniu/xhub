@@ -37,6 +37,7 @@ type BudgetPlan struct {
 	Defaulted     bool
 	PriceSnapshot string
 	frozen        *budgetPriceSnapshot
+	soft          bool // 软预算仅复用实测计价校验，不限制服务器工具维度。
 }
 
 // budgetPriceSnapshot 是无需重新查询可变目录的定价契约；金额和所有费率都只包含值，不引用部署配置。
@@ -269,8 +270,10 @@ func ValidateStrictBudgetUsage(raw map[string]any, plans ...BudgetPlan) error {
 		counts[group[0]] = first
 	}
 	allowImages := len(plans) > 0 && plans[0].frozen != nil && plans[0].frozen.InputImagesIncluded
-	if err := budgetUsageDimensions(raw, "", allowImages); err != nil {
-		return err
+	if len(plans) == 0 || !plans[0].soft {
+		if err := budgetUsageDimensions(raw, "", allowImages); err != nil {
+			return err
+		}
 	}
 	// 图片与文字分桶属于总输入的子集；别名可能各提供半份明细，须合并后检查，不能靠缓存加总掩盖矛盾。
 	textDetails, imageDetails := 0, 0

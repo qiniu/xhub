@@ -57,13 +57,12 @@ export function registerOrganizationManagementScenario(locale: "en" | "zh-CN") {
    /** 每次提交不同的英文请求以验证真实准入；本地模型整窗输入 64、输出上限 8，返回原始 HTTP 响应，测试资源由 finally 清理。 */
    const call=()=>page.request.post(GATEWAY+"/v1/chat/completions",{headers:{Authorization:"Bearer "+credential.key},data:{model:name,max_completion_tokens:8,messages:[{role:"user",content:"Verify the organization renewal budget. Request "+(++requestSequence)}]}});
    const first=await call();expect(first.status(),await first.text()).toBe(200);
-   const reservationBound=Number(first.headers()["x-xhub-budget-reserved"]);
-   expect(reservationBound).toBeCloseTo(0.72,8);
+   expect(first.headers()["x-xhub-budget-guarantee"]).toBe("soft");
    let spend=0;
    await expect.poll(async()=>{const o=await (await page.request.get(GATEWAY+"/organization/info?organization_id="+orgID,{headers})).json();spend=o.spend;return spend}).toBeGreaterThan(0);
-   // 单次预占约 0.72、实际费用 0.10；将周期额度降至一次上界后，旧周期余额不足，新周期重置后恢复。
+   // 实际费用0.10；将额度降至已消费后余额为零，新周期重置后恢复。
    expect(spend).toBeCloseTo(0.1,8);
-   expect((await page.request.patch(GATEWAY+"/organization/update",{headers,data:{organization_id:orgID,max_budget:reservationBound}})).status()).toBe(200);
+   expect((await page.request.patch(GATEWAY+"/organization/update",{headers,data:{organization_id:orgID,max_budget:spend}})).status()).toBe(200);
    expect((await call()).status()).toBe(429);
    expect((await page.request.post(control+"/organization/budget/due",{data:{organization_id:orgID,pending_previous:true}})).status()).toBe(200);
    expect((await call()).status()).toBe(200);
@@ -95,7 +94,7 @@ export function registerOrganizationManagementScenario(locale: "en" | "zh-CN") {
    const removed=page.waitForResponse(r=>r.url().endsWith("/organization/member_delete"));
    await page.getByTestId("delete-member").click();expect((await removed).status()).toBe(200);
    await expect(page.getByText(tr("No organization administrators"),{exact:true})).toBeVisible();
-   await info.attach("organization-budget",{body:JSON.stringify({orgID,duration:"7d",initialSpend:spend,reservationBound,renewed:true,readonly:true}),contentType:"application/json"});
+   await info.attach("organization-budget",{body:JSON.stringify({orgID,duration:"7d",initialSpend:spend,budgetPolicy:"soft",renewed:true,readonly:true}),contentType:"application/json"});
   } finally {
    test.setTimeout(test.info().timeout+30000);
    if(keyID)expect((await page.request.post(GATEWAY+"/key/delete",{headers,data:{keys:[keyID]}})).status()).toBe(200);

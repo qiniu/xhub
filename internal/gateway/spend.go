@@ -98,8 +98,8 @@ func (s *Server) recordSpend(w http.ResponseWriter, p *auth.Principal, callID, a
 		usage = map[string]any{}
 	}
 	billed := catalog.NormalizeUsage(usage)
-	searchTokenOnly := s.searchTokenOnlyBudget(callID)
-	if searchTokenOnly {
+	tokenOnly := s.tokenOnlyBudget(callID)
+	if tokenOnly {
 		billed = billing.SearchTokenUsage(usage)
 	}
 	pt, ct := billed.PromptTokens, billed.CompletionTokens
@@ -107,6 +107,11 @@ func (s *Server) recordSpend(w http.ResponseWriter, p *auth.Principal, callID, a
 	// twice as much inside its peak hours, so this is the difference between
 	// charging the published rate and charging half of it.
 	total, in, out, okc, charge := billing.CallCost(s, alias, depID, billed, start)
+	// 软预算同样冻结价格，保留缓存TTL与分档核费，不能退回简化费率造成少扣。
+	if frozen, active, valid := s.softBudgetCharge(callID, usage); active {
+		charge, okc = frozen, valid
+		total, in, out = charge.Total, charge.Input, charge.Output
+	}
 	// A cache hit is a request fact, but it is not a second upstream generation.
 	// Keep the token metadata for observability while making the billable delta
 	// explicitly zero. This must happen before both the Redis and PostgreSQL
@@ -119,17 +124,11 @@ func (s *Server) recordSpend(w http.ResponseWriter, p *auth.Principal, callID, a
 		total, in, out = 0, 0, 0
 		charge = catalog.Charge{}
 	}
-	budgetID := ""
 	var budgetMetadata map[string]any
-	if searchTokenOnly {
+	if tokenOnly {
 		budgetMetadata = map[string]any{"state": "token_only", "billing_scope": "tokens_only", "tool_costs": "excluded", "guarantee": "soft"}
 	}
-	if frozen, active, valid, id, metadata := s.budgetCharge(callID, usage, status, cacheHit); active {
-		charge, okc = frozen, valid
-		total, in, out = charge.Total, charge.Input, charge.Output
-		budgetID, budgetMetadata = id, metadata
-		w.Header().Set("X-XHub-Budget-State", metadata["state"].(string))
-	}
+
 	// LiteLLM stores response_cost or 0.0. Unknown models still get a row, with spend 0.
 	spend := 0.0
 	if okc {
@@ -213,7 +212,7 @@ func (s *Server) recordSpend(w http.ResponseWriter, p *auth.Principal, callID, a
 		keyID = p.KeyID
 	}
 	priceSnapshot := catalog.SnapshotUsage(charge, billed, okc)
-	if searchTokenOnly {
+	if tokenOnly {
 		pricingStatus := "unpriced"
 		if okc {
 			pricingStatus = "priced"
@@ -235,7 +234,7 @@ func (s *Server) recordSpend(w http.ResponseWriter, p *auth.Principal, callID, a
 		SessionID: note.SessionID, SessionSource: note.SessionSource, CachedTokens: cachedColumn(usage),
 		Guardrail:           guardrail,
 		PriceSnapshot:       budgetPriceSnapshot(priceSnapshot, budgetMetadata),
-		BudgetReservationID: budgetID,
+		BudgetReservationID: "",
 	}
 	// 快照保存连接名称而非仅协议名；同协议的多家供应商不会合并。
 	row.Supplier, row.APIBase, row.UpstreamModel = note.Supplier, note.APIBase, note.UpstreamModel

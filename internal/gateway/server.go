@@ -81,10 +81,8 @@ type Server struct {
 	exchanges      map[string]promptExchange
 	callNotes      map[string]dpcontract.CallNote
 	guardrailNotes map[string]string
-	// budgetCalls 仅保存活跃请求最新尝试；完整占用和状态在 PostgreSQL 跨进程持久化。
-	budgetCalls      map[string]*budgetAttempt
-	budgetInitMu     sync.Mutex
-	budgetQueueReady bool
+	// budgetCalls 仅保存活跃请求最新尝试；冻结价格只用于实际计费，不预占额度。
+	budgetCalls map[string]*budgetAttempt
 	// State 独立管理会话与任务归属；通过组合提供数据面需要的路由接口。
 	affinity.State
 }

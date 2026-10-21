@@ -24,16 +24,11 @@ async function browserPost(page: Page, bearer: string, path: string, body: Recor
   );
 }
 
-/** 验证成功请求确实采用完整输入窗和输出cap预占；参数为真实响应头，无返回，失败指明预算约束。
- * 仅检查本地可信token费率，实际cap还由HTTP上游夹具校验；不接受无限额会话调用代替有限Key。
- */
-function expectStrictVisionBudget(headers: Record<string, string>) {
-  expect(headers["x-xhub-budget-input-bound"], "图片必须按可信1024输入整窗预占").toBe("1024");
-  const cap = Number(headers["x-xhub-max-output-tokens"]);
-  expect(cap, "实际输出cap必须公开").toBeGreaterThan(0);
-  expect(cap).toBeLessThanOrEqual(8192);
-  expect(Number(headers["x-xhub-budget-reserved"])).toBeCloseTo(1024 * 0.000001 + cap * 0.000002, 9);
-  expect(headers["x-xhub-budget-reservation-id"], "请求必须创建硬额度预占").toBeTruthy();
+/** 验证图片请求同样使用软预算，不产生整窗预占；参数为真实响应头，失败定位策略错误，无副作用。 */
+function expectSoftVisionBudget(headers: Record<string, string>) {
+ expect(headers["x-xhub-budget-guarantee"]).toBe("soft");
+ expect(headers["x-xhub-budget-reserved"]).toBeUndefined();
+ expect(headers["x-xhub-budget-reservation-id"]).toBeUndefined();
 }
 
 for (const locale of ["zh-CN", "en"] as const)
@@ -154,7 +149,7 @@ for (const locale of ["zh-CN", "en"] as const)
               reply.request().headers().authorization === "Bearer " + key.key,
               "Playground必须使用刚创建的有限额Key",
             ).toBe(true);
-            expectStrictVisionBudget(reply.headers());
+            expectSoftVisionBudget(reply.headers());
             await expect(page.getByText("green-pixel", { exact: true }).last()).toBeVisible();
             calls.push(reply.headers()["x-litellm-call-id"]);
           }
@@ -177,7 +172,7 @@ for (const locale of ["zh-CN", "en"] as const)
           expect(result.status, result.raw).toBe(200);
           expect(result.headers["content-type"]).toContain(stream ? "text/event-stream" : "application/json");
           expect(result.raw).toContain("green-pixel");
-          expectStrictVisionBudget(result.headers);
+          expectSoftVisionBudget(result.headers);
           calls.push(result.callID);
         }
         const toolHistory = [
@@ -206,7 +201,7 @@ for (const locale of ["zh-CN", "en"] as const)
         expect(nativeTool.status, nativeTool.raw).toBe(200);
         expect(nativeTool.headers["content-type"]).toContain(stream ? "text/event-stream" : "application/json");
         expect(nativeTool.raw).toContain("green-pixel");
-        expectStrictVisionBudget(nativeTool.headers);
+        expectSoftVisionBudget(nativeTool.headers);
         calls.push(nativeTool.callID);
         // 工具结果图片只认证原生Messages；跨协议失败必须可见，不能悄悄把图片丢掉后返回文字。
         for (const model of names.slice(0, 2)) {
@@ -229,8 +224,10 @@ for (const locale of ["zh-CN", "en"] as const)
           stream,
           input: [{ role: "user", content: [{ type: "input_image", image_url: "data:image/png;base64," + PNG }] }],
         });
-        expect(separateImageRate.status, separateImageRate.raw).toBe(400);
-        expect(JSON.parse(separateImageRate.raw).error.type).toBe("unsupported_budget");
+        expect(separateImageRate.status, separateImageRate.raw).toBe(200);
+        // 独立图片价格不再阻断请求；当前仅按实测 token 计费，也必须纳入账单核对。
+        calls.push(separateImageRate.callID);
+
         for (const id of calls)
           await expect
             .poll(async () => {

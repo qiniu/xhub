@@ -78,9 +78,9 @@ func hardBudgetCacheReply(protocol, mode string, stream bool) string {
 	}
 }
 
-// TestHardBudgetCacheUsageConflict 验证真实后台三协议 JSON/SSE、原生旁路及 Chat 桥接都不会按矛盾缓存计量释放预占。
-// 前置私有 PostgreSQL、无 Redis、本地明确缓存价格；正常和累计增长精确计费，矛盾仍返回完整输出但保留 uncertain，
-// 下一调用必须429且不再出站；harness 和 httptest 清理 schema、账号、Key、占用和服务，无付费依赖。
+// TestHardBudgetCacheUsageConflict 验证真实后台三协议 JSON/SSE、原生旁路及 Chat 桥接都不会按矛盾缓存计量编造费用。
+// 前置私有 PostgreSQL、无 Redis、本地明确缓存价格；正常和累计增长精确计费，矛盾仍返回完整输出但标记未定价，
+// 下一调用仍可出站且没有遗留预占；harness 和 httptest 清理 schema、账号、Key、占用和服务，无付费依赖。
 func TestHardBudgetCacheUsageConflict(t *testing.T) {
 	t.Setenv("XHUB_REGRESSION_REDIS_URL", "")
 	for _, tc := range []struct{ source, target, path string }{
@@ -148,8 +148,8 @@ func TestHardBudgetCacheUsageConflict(t *testing.T) {
 						t.Fatal(err)
 					}
 					if strings.HasSuffix(mode, "conflict") {
-						if len(holds) != 1 || holds[0].State != "uncertain" || !nearlyEqual(holds[0].Amount, plan.Amount) || key.Spend != 0 {
-							t.Fatalf("缓存矛盾被结算退款: holds=%+v spend=%g", holds, key.Spend)
+						if len(holds) != 0 || key.Spend != 0 {
+							t.Fatalf("缓存矛盾被错误计价或预占: holds=%+v spend=%g", holds, key.Spend)
 						}
 						// 使用新正文避开响应缓存；验证被保留的余额不能支付下一次实际出站。
 						nextBody := chatRequest(dep.ModelName, "Verify cache conflict retains funds for a new request.")
@@ -158,8 +158,8 @@ func TestHardBudgetCacheUsageConflict(t *testing.T) {
 							delete(nextBody, "messages")
 							nextBody["input"] = "Verify cache conflict retains funds for a new request."
 						}
-						if next := h.do(http.MethodPost, tc.path, owner.key, nextBody); next.status != 429 {
-							t.Fatalf("缓存未知费用占用被重用: %s", next.describe())
+						if next := h.do(http.MethodPost, tc.path, owner.key, nextBody); next.status != 200 {
+							t.Fatalf("软预算不应因未知费用冻结下一调用: %s", next.describe())
 						}
 					} else {
 						want := 6*2e-6 + 2*8e-6 + 2*0.5e-6 + 2*3e-6
@@ -170,7 +170,11 @@ func TestHardBudgetCacheUsageConflict(t *testing.T) {
 							t.Fatalf("合法缓存计量未精确结算: holds=%+v spend=%g want=%g", holds, key.Spend, want)
 						}
 					}
-					if calls.Load() != 1 {
+					wantCalls := int32(1)
+					if strings.HasSuffix(mode, "conflict") {
+						wantCalls = 2
+					}
+					if calls.Load() != wantCalls {
 						t.Fatalf("缓存计量校验导致重复外发: calls=%d", calls.Load())
 					}
 				})

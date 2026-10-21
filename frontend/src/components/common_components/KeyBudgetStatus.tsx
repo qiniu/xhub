@@ -25,7 +25,7 @@ export function KeyBudgetStatus({
   const states = new Set(["reserved", "submitted", "settling", "uncertain"]);
   return (
     <div className="space-y-2 text-sm" aria-label={t("hardBudget.details")}>
-      <p className="text-muted-foreground">{t("hardBudget.contract", { cap: 4096 })}</p>
+      <p className="text-muted-foreground">{t("hardBudget.contract")}</p>
       <p>{t("hardBudget.pending", { amount: pending })}</p>
       {rows.length > 0 && (
         <>

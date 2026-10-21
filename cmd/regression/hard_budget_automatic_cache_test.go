@@ -11,7 +11,7 @@ import (
 )
 
 // TestHardBudgetAutomaticCacheTTL 验证真实有限额Key在无声明或显式TTL时按上游实测5m/1h分桶结算。
-// 前置隔离PG与本地Messages供应商，覆盖三协议JSON/SSE、精确扣费、预占释放、非法计量保留和显式TTL下的透明上游缓存。
+// 前置隔离PG与本地Messages供应商，覆盖三协议JSON/SSE、精确扣费、无预占、非法计量标记未定价和显式TTL下的透明上游缓存。
 // 所有正文为合成英文，harness清理schema、用户、Key，httptest服务由Cleanup关闭，不访问付费上游。
 func TestHardBudgetAutomaticCacheTTL(t *testing.T) {
 	t.Setenv("XHUB_REGRESSION_REDIS_URL", "")
@@ -105,7 +105,7 @@ func TestHardBudgetAutomaticCacheTTL(t *testing.T) {
 					t.Fatal(err)
 				}
 				if tc.missing {
-					if len(holds) != 1 || holds[0].State != "uncertain" || key.Spend != 0 {
+					if len(holds) != 0 || key.Spend != 0 {
 						t.Fatalf("缓存不确定事实被错误结算: holds=%+v spend=%g", holds, key.Spend)
 					}
 				} else {

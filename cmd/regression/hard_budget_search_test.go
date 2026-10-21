@@ -135,7 +135,7 @@ func TestSearchTokenOnlySettlement(t *testing.T) {
 	}
 }
 
-// TestSearchTokenOnlyRejectOtherTools 验证仅搜索例外不扩大到image/code/server-tool-search；真实准入拒绝且零上游，无遗留占用。
+// TestSearchTokenOnlyRejectOtherTools 验证原生工具不再受硬预算白名单限制，上游错误原样返回且不预占。
 // 前置独立PG/本地计数上游，退出自动回收所有测试资源。
 func TestSearchTokenOnlyRejectOtherTools(t *testing.T) {
 	t.Setenv("XHUB_REGRESSION_REDIS_URL", "")
@@ -150,8 +150,8 @@ func TestSearchTokenOnlyRejectOtherTools(t *testing.T) {
 			owner := h.openScope(t, admin, dep.ModelName)
 			h.setKeyBudget(t, admin, owner.key, 1)
 			got := h.do("POST", "/bypass/openai/v1/responses", owner.key, map[string]any{"model": dep.ModelName, "input": "Hello", "tools": []any{map[string]any{"type": "web_search"}, map[string]any{"type": kind}}})
-			if got.status != 400 || calls.Load() != 0 {
-				t.Fatalf("其他收费工具错误放行 status=%d calls=%d", got.status, calls.Load())
+			if got.status != 500 || calls.Load() != 1 {
+				t.Fatalf("软预算应让原生工具请求到达上游 status=%d calls=%d", got.status, calls.Load())
 			}
 		})
 	}

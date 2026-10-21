@@ -177,7 +177,7 @@ func TestHardBudgetLengthTerminal(t *testing.T) {
 	}
 }
 
-// TestHardBudgetLengthUncertain 验证未知失败、错误工具类型和不可靠最终用量仍保留全部预占，下一不同请求 429 且不上游。
+// TestHardBudgetLengthUncertain 验证未知失败、错误工具类型和不可靠最终用量不生成预占，不可靠用量标记未知，下一请求仍可放行。
 // JSON/SSE 均使用私有 PG；SSE 先带完整中间用量，防止终态缺字段从旧帧补齐。服务/schema 由测试清理，无付费模型。
 func TestHardBudgetLengthUncertain(t *testing.T) {
 	t.Setenv("XHUB_REGRESSION_REDIS_URL", "")
@@ -225,12 +225,12 @@ func TestHardBudgetLengthUncertain(t *testing.T) {
 				if err != nil {
 					t.Fatal(err)
 				}
-				if len(holds) != 1 || holds[0].State != "uncertain" || !nearlyEqual(holds[0].Amount, plan.Amount) || key.Spend != 0 {
+				if len(holds) != 0 || (mode != "over-cap" && key.Spend != 0) {
 					t.Fatalf("未知用量错误退款 holds=%+v spend=%g", holds, key.Spend)
 				}
 				body["input"] = "Try a new request after uncertain cap."
 				refused := h.do("POST", "/bypass/openai/v1/responses", owner.key, body)
-				if refused.status != 429 || calls.Load() != 1 {
+				if refused.status != 200 || calls.Load() != 2 {
 					t.Fatalf("未知占用允许再次外发 status=%d calls=%d", refused.status, calls.Load())
 				}
 			})

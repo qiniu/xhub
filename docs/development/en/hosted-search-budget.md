@@ -15,6 +15,6 @@ Observable response headers:
 
 The usage price snapshot stores the same scope and guarantee under `budget`. Streaming clients receive the policy headers before generation. Tool usage is retained as upstream evidence, not charged. Supported public search history can be continued through native Responses; cross-protocol conversion of search history remains unsupported.
 
-Other hosted tools, including image generation, code interpreter and server-side tool search, are not enabled by this exception. Ordinary requests without search retain strict budget reservation behavior. Existing uncertain reservations are not released or modified.
+Soft budgets now apply to all model requests. The budget layer no longer rejects hosted tools using an allowlist; protocol conversion and upstream capability restrictions still apply. Existing uncertain reservations are not automatically released or modified.
 
 Regression uses local HTTP suppliers and a private PostgreSQL schema; browser tests create and clean up a model and limited key in both supported UI languages. These prove gateway policy, not upstream search availability, quality or compliance with client-provided limits.

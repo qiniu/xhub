@@ -321,7 +321,8 @@ func quotaPath(nodes map[string]*quotaNode, target string, hot func(string, stri
 				}
 				reserved += amount
 			}
-			if spent+reserved >= *n.Limit-1e-12 && scope == "" {
+			// 软预算只在实际可用余额非正时停止，不用预占误差阈值吞掉微小正余额。
+			if spent+reserved >= *n.Limit && scope == "" {
 				scope = n.Kind
 			}
 			credit = math.Max(0, *n.Limit-spent)

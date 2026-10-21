@@ -175,15 +175,16 @@ class ArkUpstreamTest(unittest.TestCase):
             self.assertEqual(error.exception.code, 400)
             error.exception.close()
 
-    def test_budgeted_vision_requires_protocol_cap(self):
-        """前置Chat/Responses图片夹具；验证各协议实际输出cap到达，缺失或错字段拒绝，tearDown回收本地HTTP服务。"""
+    def test_soft_budget_vision_optional_protocol_cap(self):
+        """前置Chat/Responses图片夹具；验证显式输出cap和省略cap均可用，非法显式值拒绝，tearDown回收本地HTTP服务。"""
         for path, field, body in (
             ("/v1/chat/completions", "max_tokens", {"messages": [{"role": "user", "content": [{"type": "image_url", "image_url": {"url": "data:image/png;base64," + VISION_PNG}}]}]}),
             ("/v1/responses", "max_output_tokens", {"input": [{"role": "user", "content": [{"type": "input_image", "image_url": "data:image/png;base64," + VISION_PNG}]}]}),
         ):
             body["model"] = "e2e-vision-budget-cap"
             self.request(path, {**body, field: 64})
-            for fields in ({}, {"max_completion_tokens": 64}):
+            self.request(path, body)
+            for fields in ({field: 0}, {field: -1}, {field: True}):
                 with self.subTest(path=path, fields=fields), self.assertRaises(HTTPError) as error:
                     self.request(path, {**body, **fields})
                 self.assertEqual(error.exception.code, 400)
@@ -300,10 +301,10 @@ class ArkUpstreamTest(unittest.TestCase):
             self.assertIn('"response.completed"', response.read().decode())
 
     def test_slow_agent_proxy_fixture(self):
-        """目的：仅专属模型触发超时边界等待并返回正常用量；前置本地服务，单元层替换等待避免耗时，浏览器层实际等待31秒，tearDown关闭服务。"""
+        """目的：仅专属模型触发超时边界等待并返回正常用量；前置本地服务，单元层替换等待避免耗时，浏览器层实际等待65秒，tearDown关闭服务。"""
         with patch("e2e.fake_upstream.time.sleep") as wait:
             result = self.request("/v1/chat/completions", {"model": "e2e-agent-proxy-slow", "messages": [{"role": "user", "content": "Reply OK."}]})
-            wait.assert_called_once_with(31)
+            wait.assert_called_once_with(65)
             self.assertEqual(result["choices"][0]["message"]["content"], "e2e-ok")
         with patch("e2e.fake_upstream.time.sleep") as wait:
             self.request("/v1/chat/completions", {"model": "normal-model"})

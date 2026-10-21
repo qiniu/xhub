@@ -1,3 +1,21 @@
+# API key soft budgets
+
+All model requests use soft budgets, including normal conversations, tools and native passthrough. Before each upstream attempt, the gateway checks the available balance of applicable key, user, team, organization and project scopes. A nonpositive balance rejects new requests. Fixed allocations, model access and RPM/TPM limits still apply independently.
+
+Requests admitted with a positive balance may finish and are charged for actual input, output and cache tokens. The budget layer no longer reserves the full context window or injects a 4096-token output cap. Prices are frozen at request start, including cache TTLs and pricing tiers. A single request or concurrent requests can overdraw the balance; subsequent requests are denied. A multi-turn CLI task is not one request.
+
+Client output limits and protocol requirements remain unchanged. Tool invocations are excluded from charges while raw usage remains in responses and logs. Missing or conflicting usage and incomplete prices are marked unpriced, never guessed. Billing storage failure retains pending records and can return 503 for new requests until recovered.
+
+Headers: `X-XHub-Budget-State: token_only`, `X-XHub-Budget-Guarantee: soft`, `X-XHub-Billing-Scope: tokens_only`, `X-XHub-Tool-Costs: excluded`. No new hard reservation headers are generated.
+
+## Upgrade and legacy records
+
+Existing submitted/uncertain/settling reservations still count against balance. Reconcile them using verified evidence; do not delete reservations, flush Redis or reset spending. Drain old gateways before switching versions. This filename is retained for existing links. The following historical contract describes legacy records only, not current admission.
+
+---
+
+## Historical hard-budget implementation
+
 # API key hard budgets
 
 When a key, user, team, organization, or project has a budget limit, XHub reserves an upper bound for each actual upstream attempt in a PostgreSQL transaction before sending it. Gateway instances share these durable reservations. Retries need separate reservations. Every applicable scope must have enough available budget.

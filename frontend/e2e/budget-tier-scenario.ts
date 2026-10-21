@@ -19,7 +19,7 @@ function tier(low: number, high: number, multiplier: number) {
 }
 
 /** 注册双语分档预算闭环；真实浏览器创建/编辑/删除Key，真实本地上游固定usage8/2验证高档账单。
- * 缺口在出站前拒绝，共享阈值保留未知占用，来源认证的旧cap推理请求正常准入；finally删除专用Key/模型。 */
+ * 缺口和共享阈值不阻断对话，账单明确未定价且不冻结额度，来源认证的旧cap推理请求正常准入；finally删除专用Key/模型。 */
 export function registerBudgetTierScenario(locale: "en" | "zh-CN") {
   test("tiered budget prices and ambiguous boundary " + locale, async ({ page }) => {
     test.setTimeout(120_000);
@@ -82,8 +82,8 @@ export function registerBudgetTierScenario(locale: "en" | "zh-CN") {
           },
         });
       const low = await invoke();
-      expect(low.status()).toBe(429);
-      expect((await low.json()).error.type).toBe("budget_reservation_exceeded");
+      expect(low.status()).toBe(200);
+      expect(low.headers()["x-xhub-budget-guarantee"]).toBe("soft");
       await stableGoto(page, "/api-keys?key=" + keyID);
       await expect(page.getByText(translate(locale, "hardBudget.contract", { cap: 4096 }))).toBeVisible();
       await page.getByLabel(tr("Max Budget (USD)"), { exact: true }).fill("1");
@@ -92,14 +92,14 @@ export function registerBudgetTierScenario(locale: "en" | "zh-CN") {
       expect((await updated).status()).toBe(200);
       const paid = await invoke();
       expect(paid.status(), await paid.text()).toBe(200);
-      expect(paid.headers()["x-xhub-max-output-tokens"]).toBe("10");
-      expect(Number(paid.headers()["x-xhub-budget-reserved"])).toBeCloseTo(0.49, 9);
+      expect(paid.headers()["x-xhub-max-output-tokens"]).toBeUndefined();
+      expect(paid.headers()["x-xhub-budget-reserved"]).toBeUndefined();
       await expect
         .poll(
           async () =>
             (await (await page.request.get(GATEWAY + "/key/info?key=" + keyID, { headers })).json()).info.spend,
         )
-        .toBeCloseTo(0.024, 9);
+        .toBeCloseTo(0.048, 9);
       const log = await page.request.get(GATEWAY + "/spend/logs/ui/" + paid.headers()["x-litellm-call-id"], {
         headers,
       });
@@ -150,27 +150,18 @@ export function registerBudgetTierScenario(locale: "en" | "zh-CN") {
       const gap = await setRules([tier(0, 7, 1), tier(9, 200, 2)]);
       expect(gap.status(), await gap.text()).toBe(200);
       const refused = await invoke();
-      expect(refused.status()).toBe(400);
-      expect((await refused.json()).error.type).toBe("unsupported_budget");
+      expect(refused.status()).toBe(200);
+      expect(refused.headers()["x-litellm-response-cost"]).toBeUndefined();
       const boundary = await setRules([tier(0, 8, 1), tier(8, 200, 2)]);
       expect(boundary.status(), await boundary.text()).toBe(200);
       const uncertain = await invoke();
       expect(uncertain.status(), await uncertain.text()).toBe(200);
-      await expect
-        .poll(
-          async () =>
-            (await (await page.request.get(GATEWAY + "/key/info?key=" + keyID, { headers })).json()).info
-              .budget_reservations?.[0]?.state,
-        )
-        .toBe("uncertain");
-      const details = (await (await page.request.get(GATEWAY + "/key/info?key=" + keyID, { headers })).json()).info;
+      expect(uncertain.headers()["x-litellm-response-cost"]).toBeUndefined();
+      const details = (await (await page.request.get(GATEWAY + "/key/info?key=" + keyID, {headers})).json()).info;
       expect(details.spend).toBeCloseTo(paidSpend, 9);
-      expect(details.budget_pending).toBeCloseTo(0.49, 9);
-      expect(details.budget_reservations[0].reason).toContain("ambiguous catalog pricing boundary");
-      await stableGoto(page, "/api-keys?key=" + keyID);
-      await expect(page.getByText(tr("hardBudget.reconcile"))).toBeVisible();
-      await expect(page.getByRole("listitem").filter({ hasText: tr("hardBudget.states.uncertain") })).toBeVisible();
-      expect((await invoke()).status()).toBe(429);
+      expect(details.budget_pending).toBe(0);
+      expect(details.budget_reservations ?? []).toHaveLength(0);
+      expect((await invoke()).status()).toBe(200);
       await page.getByRole("button", { name: tr("More key actions"), exact: true }).click();
       await page.getByRole("menuitem", { name: tr("Delete Key"), exact: true }).click();
       await page.getByRole("dialog").getByPlaceholder(alias, { exact: true }).fill(alias);

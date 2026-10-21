@@ -309,7 +309,7 @@ func settleBudgetHold(s *xorm.Session, r UsageRecord) error {
 }
 
 // CheckSoftBudgetBalance 只读检查软预算准入余额，计入现有预占和待结算费用；参数为身份及热费用读取函数，返回不足或存储错误。
-// 搜索token-only出站前调用；不新增预占、不释放历史uncertain，无法保证检查后并发调用的最终消费不超额。
+// 所有模型出站前调用；不新增预占、不释放历史uncertain，无法保证检查后并发调用的最终消费不超额。
 func (db *DB) CheckSoftBudgetBalance(ctx context.Context, kind, id string, hot func(string, string, ...time.Time) float64) error {
 	s := db.session(ctx)
 	defer s.Close()
@@ -343,7 +343,7 @@ func (db *DB) CheckSoftBudgetBalance(ctx context.Context, kind, id string, hot f
 		if math.IsNaN(spent) || math.IsInf(spent, 0) {
 			return ErrQuotaUnavailable
 		}
-		if spent >= *project.MaxBudget-1e-12 {
+		if spent >= *project.MaxBudget {
 			return ErrBudgetUnavailable
 		}
 	}

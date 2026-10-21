@@ -2710,16 +2710,16 @@
   {
     "id": "SC-402",
     "file": "e2e/scenarios/regression/hard-budget-en.test.ts",
-    "title": "hard budget reserves and recovers through key management en",
+    "title": "soft budget completes requests and stops after exhaustion en",
     "kind": "implemented",
-    "environment": "default offline; E2E_REDIS=0; includes cache alias conflicts, cumulative usage and native Responses output-limit settlement"
+    "environment": "default offline; E2E_REDIS=0; positive balance, actual settlement, exhaustion and UI limit update"
   },
   {
     "id": "SC-403",
     "file": "e2e/scenarios/regression/hard-budget-zh-CN.test.ts",
-    "title": "hard budget reserves and recovers through key management zh-CN",
+    "title": "soft budget completes requests and stops after exhaustion zh-CN",
     "kind": "implemented",
-    "environment": "default offline; E2E_REDIS=0; includes cache alias conflicts, cumulative usage and native Responses output-limit settlement"
+    "environment": "default offline; E2E_REDIS=0; positive balance, actual settlement, exhaustion and UI limit update"
   },
   {
     "id": "SC-420",

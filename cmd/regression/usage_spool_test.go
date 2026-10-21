@@ -82,7 +82,7 @@ func TestUsageSpoolDatabaseDisconnect(t *testing.T) {
 							t.Fatalf("本场景必须证明PG pending也不可写: n=%d err=%v", n, err)
 						}
 						holds, err := reopened.PendingKeyBudget(t.Context(), scope.keyID)
-						if err != nil || len(holds) != map[bool]int{false: 0, true: 1}[hard] {
+						if err != nil || len(holds) != 0 {
 							t.Fatalf("断库期间预占证据错误: holds=%d err=%v", len(holds), err)
 						}
 						fresh := gateway.New(h.gw.Cfg, h.store, reopened)

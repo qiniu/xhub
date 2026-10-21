@@ -267,10 +267,10 @@ class Handler(BaseHTTPRequestHandler):
         if req.get("model", "").startswith("e2e-vision-"):
             try:
                 text = vision_answer(req, self.path)
-                # 有限额度浏览器专用模型必须实际收到协议cap；仅凭客户端响应头不能证明出站约束已写入。
+                # 软预算不注入cap：Chat/Responses允许省略，Messages保留协议必填约束；显式cap仍校验。
                 if req["model"].startswith("e2e-vision-budget-"):
                     cap_field = "max_output_tokens" if self.path.endswith("/responses") else "max_tokens"
-                    if type(req.get(cap_field)) is not int or not 1 <= req[cap_field] <= 8192:
+                    if (cap_field in req or self.path.endswith("/messages")) and (type(req.get(cap_field)) is not int or not 1 <= req[cap_field] <= 8192):
                         raise ValueError("budgeted vision output cap missing")
             except (ValueError, TypeError, AttributeError):
                 self._response(400, b'{"error":{"message":"image payload invalid"}}', "application/json")

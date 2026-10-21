@@ -48,6 +48,9 @@ func TestSpendPendingFailureRecovery(t *testing.T) {
 			if result := h.do(http.MethodGet, "/spend/logs/ui/"+callID, admin, nil); result.status != http.StatusNotFound {
 				t.Fatalf("失败事务发布账单: %d %s", result.status, result.body)
 			}
+			if blocked := h.do(http.MethodPost, "/v1/chat/completions", c.key, chatRequest(model, "Wait until pending billing settles.")); blocked.status != 503 {
+				t.Fatalf("待结算费用未阻止读取旧余额: %s", blocked.describe())
+			}
 			if _, err := h.db.Engine.Exec("ALTER TABLE usage_events DROP CONSTRAINT reject_pending_model"); err != nil {
 				t.Fatal(err)
 			}
@@ -82,12 +85,12 @@ func TestSpendPendingFailureRecovery(t *testing.T) {
 				t.Fatalf("恢复后日志不完整: %+v", log)
 			}
 			usage := h.ok(http.MethodGet, "/user/daily/activity/aggregated?user_id="+c.userID, admin, nil).json()
-			if got := usage["metadata"].(map[string]any)["total_api_requests"]; got != float64(1) {
-				t.Fatalf("恢复后汇总次数=%v，预期1", got)
+			if got := usage["metadata"].(map[string]any)["total_api_requests"]; got != float64(2) {
+				t.Fatalf("恢复后汇总次数=%v，预期2（成功和存储拒绝各一次）", got)
 			}
 			monitor := h.ok(http.MethodGet, "/models/monitor?model="+model, admin, nil).json()
 			if got := monitor["summary"].(map[string]any)["requests"]; got != float64(1) {
-				t.Fatalf("恢复后监控次数=%v，预期1", got)
+				t.Fatalf("恢复后供应商监控次数=%v，预期1（拒绝请求未出站）", got)
 			}
 		})
 	}

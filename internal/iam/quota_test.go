@@ -273,3 +273,15 @@ func TestQuotaKeyPendingUnavailable(t *testing.T) {
 		}
 	}
 }
+
+// TestSoftQuotaPositiveBoundary 验证软预算不会把微小正余额视为耗尽；纯内存节点覆盖正数、零和超支，无需清理。
+func TestSoftQuotaPositiveBoundary(t *testing.T) {
+	limit := 1e-13
+	for _, spent := range []float64{0, 1e-13, 2e-13} {
+		nodes := map[string]*quotaNode{"user:soft": {ID: "soft", Kind: "user", Limit: &limit, Spend: spent}}
+		_, _, scope, err := quotaPath(nodes, "user:soft", nil)
+		if err != nil || (scope != "") != (spent >= limit) {
+			t.Fatalf("余额边界错误: spend=%g scope=%s err=%v", spent, scope, err)
+		}
+	}
+}

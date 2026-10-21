@@ -1,7 +1,6 @@
 package regression
 
 import (
-	"fmt"
 	"math"
 	"net/http"
 	"testing"
@@ -34,7 +33,7 @@ func hardTierDeployment(t *testing.T, name string) config.ModelEntry {
 	return dep
 }
 
-// TestHardBudgetTierSettlement 验证实际后台对低档/高档/缓存/边界执行预占、账单和保留状态；私有PG与本地上游随harness清理。
+// TestHardBudgetTierSettlement 验证实际后台对低档/高档/缓存/边界执行软预算、实测账单和未知价格标记；私有PG与本地上游随harness清理。
 func TestHardBudgetTierSettlement(t *testing.T) {
 	for _, tc := range []struct {
 		name      string
@@ -61,7 +60,7 @@ func TestHardBudgetTierSettlement(t *testing.T) {
 			body := chatRequest(dep.ModelName, "Verify frozen context tier.")
 			body["max_tokens"] = 10
 			got := h.ok(http.MethodPost, "/v1/chat/completions", scope.key, body)
-			if got.header("X-XHub-Max-Output-Tokens") != "10" {
+			if got.header("X-XHub-Budget-Guarantee") != "soft" {
 				t.Fatalf("最终cap未公开: %s", got.describe())
 			}
 			h.flushSpend()
@@ -74,11 +73,11 @@ func TestHardBudgetTierSettlement(t *testing.T) {
 				t.Fatal(err)
 			}
 			if tc.uncertain {
-				if len(holds) != 1 || holds[0].State != "uncertain" {
+				if len(holds) != 0 {
 					t.Fatalf("共享边界不能猜价格并退款: %+v", holds)
 				}
 				body["messages"] = []any{map[string]any{"role": "user", "content": "Cannot reuse ambiguous tier funds."}}
-				if next := h.do(http.MethodPost, "/v1/chat/completions", scope.key, body); next.status != 429 {
+				if next := h.do(http.MethodPost, "/v1/chat/completions", scope.key, body); next.status != 200 {
 					t.Fatalf("共享边界占用被重用: %s", next.describe())
 				}
 			} else if len(holds) != 0 {
@@ -143,10 +142,10 @@ func TestHardBudgetTierRejectsIncompleteCatalog(t *testing.T) {
 	h.setKeyBudget(t, admin, scope.key, 1)
 	catalog.SetModel(dep.ModelName, map[string]any{"input_cost_per_token": .001, "output_cost_per_token": .002, "pricing_rules_v2": []any{hardTierRule(0, 49, 1), hardTierRule(50, 200, 2)}})
 	got := h.do(http.MethodPost, "/v1/chat/completions", scope.key, chatRequest(dep.ModelName, "Reject missing tier coverage."))
-	if got.status != 400 || fmt.Sprint(got.json()["error"]) == "" {
+	if got.status != 200 {
 		t.Fatalf("缺口未明确拒绝: %s", got.describe())
 	}
-	if len(h.upstreamCalls()) != 0 {
+	if len(h.upstreamCalls()) != 1 {
 		t.Fatal("不完整价目仍访问上游")
 	}
 	holds, err := h.db.PendingKeyBudget(t.Context(), scope.keyID)
@@ -169,8 +168,8 @@ func TestHardBudgetTrustedLegacyReasoningCap(t *testing.T) {
 	body["max_tokens"] = 32
 	body["reasoning_effort"] = "high"
 	got := h.ok(http.MethodPost, "/v1/chat/completions", scope.key, body)
-	if got.header("X-XHub-Max-Output-Tokens") != "32" {
-		t.Fatal("有限额推理没有实际预占")
+	if got.header("X-XHub-Budget-Guarantee") != "soft" {
+		t.Fatal("软预算推理不应创建预占")
 	}
 	calls := h.upstreamCalls()
 	if len(calls) != 1 || calls[0].Body["max_tokens"] != float64(32) {
@@ -218,8 +217,8 @@ func TestHardBudgetCatalogNullManagement(t *testing.T) {
 		t.Fatal("更新后模型消失")
 	}
 	got := h.ok(http.MethodPost, "/v1/chat/completions", scope.key, chatRequest(alias, "Use catalog after clearing manual fields."))
-	if got.header("X-XHub-Budget-Reserved") == "" {
-		t.Fatal("未实际预占")
+	if got.header("X-XHub-Budget-Reserved") != "" {
+		t.Fatal("软预算不应创建预占")
 	}
 	key, err := h.db.GetKey(t.Context(), scope.keyID)
 	if err != nil || math.Abs(key.Spend-.021) > 1e-12 {

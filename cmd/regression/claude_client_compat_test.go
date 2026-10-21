@@ -75,8 +75,8 @@ func TestClaudeKeepAllBudgetAndStop(t *testing.T) {
 				if protocol == "messages" {
 					body["context_management"] = map[string]any{"edits": []any{map[string]any{"type": "compact_20260112"}}}
 					denied := h.do(http.MethodPost, path, owner.key, body)
-					if denied.status != 400 || !strings.Contains(denied.text(), "keep-all") || calls.Load() != 1 {
-						t.Fatalf("未知清理未在外发前拒绝: %s calls=%d", denied.describe(), calls.Load())
+					if denied.status != 200 || calls.Load() != 2 {
+						t.Fatalf("原生清理不应被预算层拒绝: %s calls=%d", denied.describe(), calls.Load())
 					}
 				}
 			})

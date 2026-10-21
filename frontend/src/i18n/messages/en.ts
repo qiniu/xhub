@@ -48,7 +48,7 @@ export const en = {
     "detailsLoadFailed": "Unable to load key details and pending budget. Retry before editing this key.",
     "retry": "Retry",
     "details": "Budget reservations",
-    "contract": "When this key or an ancestor has a budget, each attempt reserves the declared full input context plus the output limit (default: {cap} tokens). This can require more available balance than the final cost. Missing bounds or prices are rejected before forwarding. Stop new requests, wait for in-flight calls and drain pending billing before enabling a limit on an unlimited scope; existing calls cannot be retroactively reserved.",
+    "contract": "All models use soft budgets: requests start when the available balance is positive and are charged for actual token usage after completion. No full-context reservation or mid-request budget cutoff applies. A request or concurrent requests may overdraw the balance; subsequent requests are rejected. Legacy pending charges still count against the balance.",
     "pending": "Pending budget: ${amount}",
     "reconcile": "Submitted attempts with unknown usage keep their reservation without automatic expiry. Ask an administrator to reconcile the upstream bill before recovery.",
     "attempt": "${amount} · {state}",

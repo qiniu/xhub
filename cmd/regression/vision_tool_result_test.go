@@ -64,7 +64,7 @@ func TestVisionToolResultHardBudget(t *testing.T) {
 		body := visionToolResultRequest(dep.ModelName, stream, "AQID")
 		expected.Store(body["messages"])
 		got := h.do("POST", "/v1/messages", owner.key, body)
-		if got.status != 200 || !strings.Contains(got.text(), "TERMINAL_OK") || got.header("X-XHub-Budget-Input-Bound") != "1024" {
+		if got.status != 200 || !strings.Contains(got.text(), "TERMINAL_OK") || got.header("X-XHub-Budget-Guarantee") != "soft" {
 			t.Fatalf("Read 图片硬额度续轮失败: %s", got.describe())
 		}
 		if stream && !strings.Contains(got.text(), "message_stop") {
