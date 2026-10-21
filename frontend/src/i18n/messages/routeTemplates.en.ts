@@ -1,6 +1,26 @@
 import { routeTemplatesGuideEn } from "./routeTemplatesGuide.en";
 
 export const routeTemplatesEn = {
+  saveError: "Failed to save the template",
+  save: "Save template",
+  preview: {
+    region: "Live route preview",
+    title: "Route preview",
+    hint: "Filter compatible deployments before applying template rules. Shares describe new sessions; existing sessions prefer their original deployment. Preview does not call upstream providers.",
+    model: "Preview public model",
+    selectModel: "Select a model",
+    endpoint: "Preview endpoint",
+    busy: "Previewing",
+    run: "Preview draft route",
+    endpointsError: "Unable to load the endpoint catalog",
+    requestError: "Preview failed. Check template permissions and draft settings.",
+    summary: "Template source: {source} · Rule: {rule} · Strategy: {strategy}",
+    empty: "No matching deployments",
+    excluded: "Excluded: {reason}",
+    candidate: "Compatible candidate",
+    weight: "Weight {value}",
+    share: "Target share {value}%",
+  },
   title: "Route Templates",
   subtitle:
     "A template is one router settings document. An organization, team, and key each select at most one; the gateway checks key, then team, then organization and uses the first selection as a whole. With no selection, built-in settings use model-managed deployment defaults.",

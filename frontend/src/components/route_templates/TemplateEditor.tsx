@@ -7,6 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 import { TemplateGroups, TemplateFallbacks } from "./TemplateRoutingSections";
+import RoutePreview from "./RoutePreview";
 import ModelRoutingFields from "./ModelRoutingFields";
 import {
   bodyFromForm,
@@ -40,8 +41,8 @@ const NumberField: React.FC<{
 );
 
 /** TemplateEditor 编辑模板内负载均衡、路由组、故障转移与JSON，供模板库创建和编辑调用。
- * 参数包含名称、草稿、部署目录及更新回调；返回三个业务表单与双向同步JSON。
- * 父级拥有草稿；所有字段通过表单编辑，导入文件仍严格校验，组与回退仅随完整模板提交。 */
+ * 参数包含名称、草稿、部署目录、令牌、模板作用域及更新回调；返回业务表单、双向同步 JSON 和只读预览。
+ * 父级拥有草稿；非法 JSON 或字段禁止预览，避免使用上一份合法草稿；组与回退仅随完整模板提交。 */
 const TemplateEditor: React.FC<{
   name: string;
   form: TemplateFormState;
@@ -53,7 +54,7 @@ const TemplateEditor: React.FC<{
   onName: (name: string) => void;
   onChange: (form: TemplateFormState) => void;
   onJsonValid: (valid: boolean) => void;
-}> = ({ name, form, deployments, onName, onChange, onJsonValid }) => {
+}> = ({ name, form, deployments, accessToken, templateId, organizationId, teamId, onName, onChange, onJsonValid }) => {
   const t = useT();
   const [jsonOverride, setJsonOverride] = useState<string | null>(null);
   const [jsonError, setJsonError] = useState("");
@@ -233,6 +234,14 @@ const TemplateEditor: React.FC<{
           </div>
         </Tabs>
       </div>
+      <RoutePreview
+        accessToken={accessToken}
+        models={[...new Set(deployments.map((deployment) => deployment.model_name))]}
+        body={written.ok && !jsonError ? written.body : null}
+        templateId={templateId}
+        organizationId={organizationId}
+        teamId={teamId}
+      />
       {!written.ok && !jsonError && (
         <p role="alert" className="text-xs text-destructive">
           {t("pages.routeTemplates.invalidField", { field: written.field })}

@@ -48,6 +48,8 @@ describe("模板JSON与业务分区同步", () => {
     fireEvent.change(updated, { target: { value: "{" } });
     expect(screen.getByRole("tab", { name: "故障转移" })).toHaveAttribute("aria-disabled", "true");
     expect(screen.getByRole("alert")).toBeVisible();
+    expect(screen.getByRole("region", { name: "真实路由预览" })).toBeVisible();
+    expect(screen.getByRole("button", { name: "预览草稿路由" })).toBeDisabled();
   });
 });
 

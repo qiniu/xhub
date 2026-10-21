@@ -1,6 +1,26 @@
 import { routeTemplatesGuideZhCN } from "./routeTemplatesGuide.zh-CN";
 
 export const routeTemplatesZhCN = {
+  saveError: "保存模板失败",
+  save: "保存模板",
+  preview: {
+    region: "真实路由预览",
+    title: "路由预览",
+    hint: "先筛选兼容部署，再应用模板策略。份额表示新会话目标比例；已有会话优先固定原部署。预览不会调用上游。",
+    model: "预览公开模型",
+    selectModel: "选择模型",
+    endpoint: "预览用户入口",
+    busy: "正在预览",
+    run: "预览草稿路由",
+    endpointsError: "无法加载用户入口目录",
+    requestError: "预览失败，请检查模板权限和草稿配置",
+    summary: "模板来源：{source} · 规则：{rule} · 策略：{strategy}",
+    empty: "没有匹配的部署",
+    excluded: "排除：{reason}",
+    candidate: "兼容候选",
+    weight: "权重 {value}",
+    share: "目标份额 {value}%",
+  },
   title: "路由模板",
   subtitle:
     "一份模板就是一份完整的路由设置。组织、团队、密钥各最多选用一份；网关依次检查密钥、团队、组织，第一份选中的模板整份生效。都未选择时，内置设置使用模型管理默认部署。",

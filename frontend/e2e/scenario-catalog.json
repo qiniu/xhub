@@ -2909,5 +2909,19 @@
     "title": "console deletion contracts zh-CN",
     "kind": "implemented",
     "environment": "default offline"
+  },
+  {
+    "id": "REG-route-preview-zh-CN",
+    "file": "e2e/scenarios/routing/preview-readonly.test.ts",
+    "title": "页面路由预览只读及保存文案 zh-CN",
+    "kind": "implemented",
+    "environment": "default offline"
+  },
+  {
+    "id": "REG-route-preview-en",
+    "file": "e2e/scenarios/routing/preview-readonly-en.test.ts",
+    "title": "页面路由预览只读及保存文案 en",
+    "kind": "implemented",
+    "environment": "default offline"
   }
 ]

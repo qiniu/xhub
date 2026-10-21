@@ -145,6 +145,7 @@ const RouteTemplatesPanel: React.FC<{ accessToken: string | null }> = ({ accessT
     setDraft({ id: "", name: "", form: emptyForm() });
   };
 
+  /** save 提交当前合法草稿；无参数，返回完成 Promise；保存成功关闭编辑器，失败保留输入并显示本地化错误。 */
   const save = async () => {
     if (!accessToken || !draft) return;
     if (!jsonValid || saving || !draft.name.trim()) return;
@@ -164,7 +165,7 @@ const RouteTemplatesPanel: React.FC<{ accessToken: string | null }> = ({ accessT
       setDraft(null);
       await refresh();
     } catch {
-      toast.fromError(t("Failed to save the template"));
+      toast.fromError(t("pages.routeTemplates.saveError"));
     } finally {
       setSaving(false);
     }
@@ -299,7 +300,7 @@ const RouteTemplatesPanel: React.FC<{ accessToken: string | null }> = ({ accessT
               </Button>
               <Button onClick={() => void save()} disabled={saving || !jsonValid || !draft.name.trim()}>
                 {saving && <Loader2 className="animate-spin" />}
-                保存模板
+                {t("pages.routeTemplates.save")}
               </Button>
             </div>
           </div>
