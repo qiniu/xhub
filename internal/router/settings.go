@@ -41,7 +41,7 @@ func BuiltinDocument() map[string]any {
 	return map[string]any{
 		"model_routes": []any{},
 		"retry_policy": map[string]any{
-			"max_attempts": 1, "timeout_seconds": 60, "failure_threshold": 3, "cooldown_seconds": 0,
+			"max_attempts": 1, "timeout_seconds": 600, "failure_threshold": 3, "cooldown_seconds": 0,
 		},
 	}
 }
@@ -275,13 +275,13 @@ func (r RouteSettings) Retries() int {
 	return 1
 }
 
-// TimeoutSeconds 返回单次上游调用超时秒数；无效值使用 60。
+// TimeoutSeconds 返回单次上游调用超时秒数；无效值使用 600。包含首帧等待和完整响应读取，由执行器创建每次尝试的 deadline。
 func (r RouteSettings) TimeoutSeconds() float64 {
 	policy, _ := r.Settings["retry_policy"].(map[string]any)
 	if n, ok := numberIn(policy["timeout_seconds"]); ok && n > 0 {
 		return n
 	}
-	return 60
+	return 600
 }
 
 // AllowedFails 返回部署进入冷静期前允许的失败次数；缺失时使用 3。

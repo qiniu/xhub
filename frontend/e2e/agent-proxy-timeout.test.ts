@@ -1,7 +1,7 @@
 import { expect, test } from "@playwright/test";
 import { GATEWAY, UPSTREAM, loginAdmin, sessionBearer, stableGoto, t } from "./helpers";
 
-/** 验证用户在调试台等待超过30秒的非流式推理仍能收到答案和账单。前置真实浏览器、Next生产服务、Go网关、隔离库和实际等待31秒的本地上游；finally删除部署与凭据，运行器回收schema，不依赖外部服务。 */
+/** 验证用户在调试台等待超过60秒的非流式推理仍能收到答案和账单。前置真实浏览器、Next生产服务、Go网关、隔离库和实际等待65秒的本地上游；finally删除部署与凭据，运行器回收schema，不依赖外部服务。 */
 test("slow agent response survives the console gateway proxy", async ({ page }) => {
   test.setTimeout(120000);
   await loginAdmin(page);
@@ -28,11 +28,11 @@ test("slow agent response survives the console gateway proxy", async ({ page }) 
     await page.getByRole("option").filter({ hasText: /\/v1\/responses$/ }).click();
     await page.getByPlaceholder(t("Type your message... (Shift+Enter for new line)")).filter({ visible: true }).fill("Reply with a short greeting.");
     const start = Date.now();
-    const pending = page.waitForResponse(r => /\/responses$/.test(new URL(r.url()).pathname) && r.request().method() === "POST", { timeout: 65000 });
+    const pending = page.waitForResponse(r => /\/responses$/.test(new URL(r.url()).pathname) && r.request().method() === "POST", { timeout: 90000 });
     await page.getByRole("button", { name: t("Send message") }).click();
     const response = await pending;
     expect(response.status()).toBe(200);
-    expect(Date.now() - start).toBeGreaterThanOrEqual(30000);
+    expect(Date.now() - start).toBeGreaterThanOrEqual(60000);
     await expect(page.getByText("e2e-ok", { exact: true }).last()).toBeVisible();
     const callID = response.headers()["x-litellm-call-id"];
     expect(callID).toBeTruthy();

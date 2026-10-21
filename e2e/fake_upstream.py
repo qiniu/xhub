@@ -414,8 +414,8 @@ class Handler(BaseHTTPRequestHandler):
                 self._json(payload)
             return
         if model == "e2e-agent-proxy-slow":
-            # 真实等待超过 Next.js 默认 30 秒，验证浏览器到网关的代理不会提前断开；仅此隔离夹具触发。
-            time.sleep(31)
+            # 真实等待超过旧网关 60 秒，验证浏览器、控制台代理及网关不会提前断开；仅此隔离夹具触发。
+            time.sleep(65)
         if self._error_log_response(str(model)):
             return
         # 兼容层允许保留 openai/ 前缀；只对这两个专属夹具规范化，避免影响其他模型行为。
