@@ -20,6 +20,7 @@ var _ dpcontract.BudgetHost = (*Server)(nil)
 // budgetAttempt 保存本次出站冻结的计价源；软预算不创建持久预占或跟踪冻结状态。
 type budgetAttempt struct {
 	SoftPrice billing.SoftPricePlan
+	TokenOnly bool
 }
 
 // PrepareBudgetAttempt 为所有模型协议执行软预算准入，不再按输入窗口预占或改写输出上限。
@@ -36,20 +37,21 @@ func (s *Server) PrepareBudgetAttempt(w http.ResponseWriter, r *http.Request, p 
 	// 尚未持久化的账单不能被当成余额；沿用磁盘队列故障保护，不影响已经放行的调用。
 	if s.usageSpool != nil {
 		state, err := s.usageSpool.Status()
-		if err != nil || state.Pending > 0 {
+		if err == nil && state.Pending > 0 {
+			err = s.FlushLocalUsage(r.Context())
+		}
+		if err != nil {
 			util.WriteTypedError(w, r.URL.Path, 503, "billing_storage_pending", "pending token charges must settle before another request")
 			return nil, false
 		}
 	}
-	// 无Redis时失败账单可能只保存在PG；先恢复再检查，不能把未结算消费当成零。
+	// 无Redis时失败账单可能只保存在PG；先恢复，失败才拒绝。
+	// 并发结算会短暂产生正常pending，恢复成功后不能因新出现的在途记录误拒503。
 	pending, err := s.IAM.Engine.Context(r.Context()).Table("usage_pending").Count()
 	if err == nil && pending > 0 {
 		err = s.IAM.FlushPendingUsage(r.Context(), 100)
-		if err == nil {
-			pending, err = s.IAM.Engine.Context(r.Context()).Table("usage_pending").Count()
-		}
 	}
-	if err != nil || pending > 0 {
+	if err != nil {
 		util.WriteTypedError(w, r.URL.Path, 503, "billing_storage_pending", "pending token charges must settle before another request")
 		return nil, false
 	}
@@ -69,12 +71,18 @@ func (s *Server) PrepareBudgetAttempt(w http.ResponseWriter, r *http.Request, p 
 	if s.budgetCalls == nil {
 		s.budgetCalls = map[string]*budgetAttempt{}
 	}
-	s.budgetCalls[callID] = &budgetAttempt{SoftPrice: billing.NewSoftPricePlan(dep, start)}
+	tokenOnly := billing.SoftTokenOnly(dep, protocol)
+	s.budgetCalls[callID] = &budgetAttempt{SoftPrice: billing.NewSoftPricePlan(dep, start, tokenOnly), TokenOnly: tokenOnly}
 	s.mu.Unlock()
 	w.Header().Set("X-XHub-Budget-State", "token_only")
 	w.Header().Set("X-XHub-Billing-Scope", "tokens_only")
 	w.Header().Set("X-XHub-Budget-Guarantee", "soft")
 	w.Header().Set("X-XHub-Tool-Costs", "excluded")
+	if !tokenOnly {
+		w.Header().Set("X-XHub-Budget-State", "soft")
+		w.Header().Set("X-XHub-Billing-Scope", "model_usage")
+		w.Header().Del("X-XHub-Tool-Costs")
+	}
 	return body, true
 }
 
@@ -122,7 +130,7 @@ func (s *Server) tokenOnlyBudget(callID string) bool {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	attempt := s.budgetCalls[callID]
-	return attempt != nil
+	return attempt != nil && attempt.TokenOnly
 }
 
 // softBudgetCharge 使用出站时冻结价格计算实际token费用；返回账单、是否存在软预算尝试及计价有效性。

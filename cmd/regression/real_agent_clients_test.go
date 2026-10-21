@@ -82,11 +82,9 @@ func TestRealAgentClients(t *testing.T) {
 					capField = "max_completion_tokens"
 				}
 				capValue, _ := body[capField].(float64)
-				if capValue <= 0 || capValue > 131072 {
-					t.Errorf("真实CLI最终出站未附可信输出上限: %s=%v", capField, body[capField])
-				}
-				if client == "codex" && capValue != 4096 {
-					t.Errorf("Codex缺省上限未使用公开4096: %v", capValue)
+				// 软预算不注入输出上限；仅校验客户端实际提交的限制仍是合法正数。
+				if _, explicit := body[capField]; explicit && (capValue <= 0 || capValue > 131072) {
+					t.Errorf("真实CLI显式输出上限无效: %s=%v", capField, body[capField])
 				}
 				limit := 3
 				if live {
@@ -262,7 +260,7 @@ func TestRealAgentClients(t *testing.T) {
 			dep.ModelInfo["transport"] = "bypass_openai_" + transport
 			dep.ModelInfo["endpoint_types"] = []string{"chat", "responses", "messages"}
 			dep.ModelInfo["id"] = "real-cli-deployment"
-			// 本地供应商夹具声明可信整窗与完整费率，实际 CLI 默认输出上限必须经过硬额度准入。
+			// 本地供应商夹具提供完整费率；真实 CLI 经软预算准入，不额外注入默认输出上限。
 			dep.ModelInfo["max_input_tokens"] = 1048576
 			dep.ModelInfo["max_output_tokens"] = 131072
 			dep.ModelInfo["supported_parameters"] = []string{"max_completion_tokens", "max_tokens"}
@@ -411,7 +409,7 @@ func TestRealAgentClients(t *testing.T) {
 			}
 			holds, holdErr := h.db.PendingKeyBudget(t.Context(), owner.keyID)
 			if holdErr != nil || len(holds) != 0 {
-				t.Fatalf("真实 CLI 成功账单未释放预占: %+v %v", holds, holdErr)
+				t.Fatalf("真实 CLI 软预算账单不应创建预占: %+v %v", holds, holdErr)
 			}
 			if len(rows) != count {
 				t.Fatalf("%s CLI 调用数与成功账单不符: calls=%d rows=%d", client, count, len(rows))

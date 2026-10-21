@@ -7,7 +7,7 @@ import (
 	"testing"
 )
 
-// TestUsageFinalErrorsDoNotPoisonAdmission 验证常规错误和早期错误只保存一份完整账单，后续硬额度调用仍可用。
+// TestUsageFinalErrorsDoNotPoisonAdmission 验证常规错误和早期错误只保存一份完整账单，后续软预算调用仍可用。
 // 前置私有PG及本地上游，覆盖有无磁盘、入站护栏、鉴权、额度和执行链错误；验证日志唯一、pending为空，最后回收schema及磁盘。
 func TestUsageFinalErrorsDoNotPoisonAdmission(t *testing.T) {
 	for _, disk := range []bool{false, true} {
@@ -31,7 +31,8 @@ func TestUsageFinalErrorsDoNotPoisonAdmission(t *testing.T) {
 					token = "invalid-test-key"
 					want = 401
 				case "quota":
-					h.setKeyBudget(t, admin, scope.key, 0.000001)
+					// 软预算允许微小正余额请求完成；额度错误用零余额触发。
+					h.setKeyBudget(t, admin, scope.key, 0)
 					want = 429
 				case "pre_call", "post_call":
 					h.putGuardrail(t, "final-block", guardrailRow("final-block", "always_block", nil, kind))

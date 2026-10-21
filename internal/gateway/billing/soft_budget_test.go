@@ -47,3 +47,33 @@ func TestSoftPricePlan(t *testing.T) {
 		t.Fatal("快照损坏未返回错误")
 	}
 }
+
+// TestSoftBudgetNonTokenPricing 验证软预算不丢失原有非Token费用；纯内存部署，覆盖冻结价格、空用量和缺价，无需清理。
+func TestSoftBudgetNonTokenPricing(t *testing.T) {
+	dep := strictBudgetDeployment()
+	dep.LiteLLMParams = map[string]any{"output_cost_per_second": 0.05}
+	dep.ModelInfo["pricing_source"] = "manual"
+	if SoftTokenOnly(dep, "openai-chat") {
+		t.Fatal("按秒模型不应被当成Token对话")
+	}
+	plan := NewSoftPricePlan(dep, time.Now(), false)
+	dep.LiteLLMParams["output_cost_per_second"] = 99
+	charge, err := plan.Charge(map[string]any{"seconds": 8})
+	if err != nil || math.Abs(charge.Total-0.4) > 1e-10 {
+		t.Fatalf("按秒冻结计价错误: %+v %v", charge, err)
+	}
+	dep.LiteLLMParams = map[string]any{}
+	if _, err := NewSoftPricePlan(dep, time.Now(), false).Charge(map[string]any{"seconds": 8}); err == nil {
+		t.Fatal("缺价不能宣称免费")
+	}
+	if SoftTokenOnly(strictBudgetDeployment(), "openai-image-generation") {
+		t.Fatal("图片生成应保留模型计费维度")
+	}
+	if !SoftTokenOnly(strictBudgetDeployment(), "openai-responses") {
+		t.Fatal("普通对话应排除托管工具次数")
+	}
+	dep.LiteLLMParams = map[string]any{"rates": []any{map[string]any{"measure": "query", "side": "output", "unit_size": 1, "usd": 0.01}}}
+	if SoftTokenOnly(dep, "openai-chat") {
+		t.Fatal("仅查询费率应保留原计费方式")
+	}
+}

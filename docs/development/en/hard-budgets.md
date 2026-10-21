@@ -1,6 +1,6 @@
 # API key soft budgets
 
-All model requests use soft budgets, including normal conversations, tools and native passthrough. Before each upstream attempt, the gateway checks the available balance of applicable key, user, team, organization and project scopes. A nonpositive balance rejects new requests. Fixed allocations, model access and RPM/TPM limits still apply independently.
+All model requests use soft budgets, including normal conversations, tools and native passthrough. Existing image-generation, per-second and per-query model prices remain billable; only hosted tool calls within conversations are excluded. Before each upstream attempt, the gateway checks the available balance of applicable key, user, team, organization and project scopes. A nonpositive balance rejects new requests. Fixed allocations, model access and RPM/TPM limits still apply independently.
 
 Requests admitted with a positive balance may finish and are charged for actual input, output and cache tokens. The budget layer no longer reserves the full context window or injects a 4096-token output cap. Prices are frozen at request start, including cache TTLs and pricing tiers. A single request or concurrent requests can overdraw the balance; subsequent requests are denied. A multi-turn CLI task is not one request.
 

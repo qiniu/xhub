@@ -108,7 +108,9 @@ func (s *Server) recordSpend(w http.ResponseWriter, p *auth.Principal, callID, a
 	// charging the published rate and charging half of it.
 	total, in, out, okc, charge := billing.CallCost(s, alias, depID, billed, start)
 	// 软预算同样冻结价格，保留缓存TTL与分档核费，不能退回简化费率造成少扣。
+	softActive := false
 	if frozen, active, valid := s.softBudgetCharge(callID, usage); active {
+		softActive = true
 		charge, okc = frozen, valid
 		total, in, out = charge.Total, charge.Input, charge.Output
 	}
@@ -125,6 +127,9 @@ func (s *Server) recordSpend(w http.ResponseWriter, p *auth.Principal, callID, a
 		charge = catalog.Charge{}
 	}
 	var budgetMetadata map[string]any
+	if softActive {
+		budgetMetadata = map[string]any{"state": "soft", "billing_scope": "model_usage", "guarantee": "soft"}
+	}
 	if tokenOnly {
 		budgetMetadata = map[string]any{"state": "token_only", "billing_scope": "tokens_only", "tool_costs": "excluded", "guarantee": "soft"}
 	}

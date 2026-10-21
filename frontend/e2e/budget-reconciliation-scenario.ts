@@ -1,10 +1,13 @@
+import { execFileSync } from "node:child_process";
+import fs from "node:fs";
+import path from "node:path";
 import { expect, test } from "@playwright/test";
 import { translate } from "../src/i18n/translate";
 import { GATEWAY, UPSTREAM, loginAdmin, sessionBearer, stableGoto } from "./helpers";
 
 /** 注册平台管理员的双语人工对账全链路；参数为语言，无返回值，供独立登记场景调用。 */
 export function registerBudgetReconciliationScenario(locale: "en" | "zh-CN") {
-  /** 前置隔离PG、真实浏览器和缺失流终态的本地上游；页面创建有限额Key，截断流产生uncertain。
+  /** 前置隔离PG、真实浏览器和缺失流终态的本地上游；页面创建有限额Key，截断流完成后注入升级前遗留的uncertain夹具。
    * 验证额度被占、API Key不能管理、人工无收费/实际收费、审计回执、唯一差额、余额恢复和并发冲突。
    * finally删除自建Key及部署，隔离schema由运行器清理；不调用外部供应商、不更改用户数据。 */
   test("manual budget reconciliation restores verified balance " + locale, async ({ page }) => {
@@ -40,10 +43,23 @@ export function registerBudgetReconciliationScenario(locale: "en" | "zh-CN") {
         expect(response.status(), await response.text()).toBe(200);
         return (await response.json()).reservations as { reservation_id: string; call_id: string; fingerprint: string; can_reconcile: boolean; amount: number; ledger_cost: number | null }[];
       };
+      /** 为当前隔离 schema 的已记录请求补一条旧版预占，模拟升级数据；不触碰真实环境，最终随 schema 清理。 */
+      const seedLegacyHold = async (callID: string) => {
+        expect(await pending()).toHaveLength(0);
+        const schema = fs.readFileSync(path.join(process.env.E2E_RUN_DIR!, "schema.txt"), "utf8").trim();
+        if (!/^e2e_\d+_\d+$/.test(schema) || !/^[a-f0-9]+$/.test(callID)) throw new Error("Invalid isolated fixture identity");
+        const sql = `SET search_path TO "${schema}";
+          INSERT INTO budget_reservations (request_id,call_id,kind,node_id,key_id,user_id,team_id,org_id,project_id,amount,snapshot,state,reason,started_at,created_at)
+          SELECT 'legacy-' || request_id,request_id,'key',key_id,key_id,user_id,team_id,organization_id,project_id,0.0003,'{}','uncertain','Legacy test invoice',ts,NOW()
+          FROM usage_events WHERE request_id='${callID}' RETURNING request_id;`;
+        const inserted = execFileSync("docker", ["exec", "-i", "xhub-postgres", "psql", "-X", "-U", "xhub", "-d", process.env.E2E_DATABASE || "xhub", "-qAt", "-v", "ON_ERROR_STOP=1"], {input:sql,encoding:"utf8"});
+        expect(inserted).toContain("legacy-" + callID);
+      };
       let expectedSpend = 0;
       for (const outcome of ["no_charge", "charged"] as const) {
         const broken = await invoke("missing");
         expect(broken.status()).toBe(200); expect(await broken.text()).toContain("TERMINAL_BROWSER_OK");
+        await seedLegacyHold(broken.headers()["x-litellm-call-id"]);
         await expect.poll(async () => (await pending()).filter(row => row.can_reconcile).length).toBe(1);
         const row = (await pending())[0];
         expect(row.amount).toBeGreaterThan(0); expect((await invoke("length")).status()).toBe(429);
@@ -87,7 +103,8 @@ export function registerBudgetReconciliationScenario(locale: "en" | "zh-CN") {
         }).toEqual({ spend: Number(expectedSpend.toFixed(9)), pending: 0 });
       }
       // 在已打开的确认表单外完成同笔对账，随后提交不同结果必须真实409；不可把并发成功当作本次收费。
-      await invoke("missing");
+      const lastBroken = await invoke("missing");
+      await seedLegacyHold(lastBroken.headers()["x-litellm-call-id"]);
       await expect.poll(async () => (await pending()).filter(row => row.can_reconcile).length).toBe(1);
       const concurrent = (await pending())[0];
       const concurrentSpend = (await (await page.request.get(GATEWAY + "/key/info?key=" + keyID, { headers })).json()).info.spend;

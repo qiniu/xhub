@@ -74,12 +74,12 @@ func TestImagePlaygroundParameters(t *testing.T) {
 			if log["model"] != "image-playground" || !nearlyEqual(numberOrZero(log["spend"]), 0.000012) {
 				t.Fatalf("图片日志或计量错误: %+v", log)
 			}
-			// 只为隔离管理员账户启用有限额；普通用户 Key 的图片协议验证与预算拒绝是两个独立契约。
+			// 软预算对有限额会话同样放行图片生成，仍按模型实际用量计费。
 			limited := h.personalBillingSession()
 			before := calls.Load()
-			denied := h.do("POST", tc.path, limited, body)
-			if denied.status != 400 || !strings.Contains(denied.text(), "unsupported_budget") || calls.Load() != before {
-				t.Fatalf("有限额图片应在调用上游前明确拒绝，不能按文字费用估计: %s", denied.describe())
+			allowed := h.do("POST", tc.path, limited, body)
+			if allowed.status != 200 || allowed.header("X-XHub-Budget-Guarantee") != "soft" || calls.Load() != before+1 || !nearlyEqual(parseFloatOrZero(allowed.header("x-litellm-response-cost")), 0.000012) {
+				t.Fatalf("有限额图片软预算放行或计费错误: %s", allowed.describe())
 			}
 		})
 	}

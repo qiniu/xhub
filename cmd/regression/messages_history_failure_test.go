@@ -64,7 +64,7 @@ func (c *historyFaultCache) SetString(ctx context.Context, key, value string, tt
 }
 
 // TestMessagesHistoryPersistenceFailure 验证引用、父上下文或归属保存失败均不发布完成项和重试已成功上游。
-// 前置真实独立PG、有限额Key、两个候选部署与可注入缓存；JSON/SSE均保留usage与uncertain占用，harness统一清理。
+// 前置真实独立PG、有限额Key、两个候选部署与可注入缓存；JSON/SSE均不伪报完成且不遗留软预算预占，harness统一清理。
 func TestMessagesHistoryPersistenceFailure(t *testing.T) {
 	t.Setenv("XHUB_REGRESSION_REDIS_URL", "")
 	for _, stream := range []bool{false, true} {
@@ -103,8 +103,8 @@ func TestMessagesHistoryPersistenceFailure(t *testing.T) {
 					t.Fatalf("缓存失败未明确502: %s", got.describe())
 				}
 				holds, err := h.db.PendingKeyBudget(t.Context(), owner.keyID)
-				if err != nil || len(holds) != 1 || holds[0].State != "uncertain" {
-					t.Fatalf("未保留唯一待核对占用: %+v %v", holds, err)
+				if err != nil || len(holds) != 0 {
+					t.Fatalf("软预算历史保存失败不应遗留预占: %+v %v", holds, err)
 				}
 			})
 		}
