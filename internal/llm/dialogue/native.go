@@ -173,6 +173,14 @@ func ParseDialogue(protocol string, body map[string]any) (Dialogue, error) {
 			// cache_control 是缓存性能提示，桥接不能保证命中；保留原文、工具结果及其错误文本。
 			for _, part := range dialogueList(cp["content"]) {
 				block := dialogueMap(part)
+				// 工具发现引用只能原协议重放；共享文本投影不能因此阻断原生请求，也不能丢引用后跨协议发送。
+				referenceBoundary, e := projectMessagesToolReferences(block, dialogueString(cp["role"]))
+				if e != nil {
+					return Dialogue{}, e
+				}
+				if referenceBoundary != "" {
+					bridgeError = referenceBoundary
+				}
 				imageBoundary, e := projectMessagesToolResultImages(block, dialogueString(cp["role"]))
 				if e != nil {
 					return Dialogue{}, e

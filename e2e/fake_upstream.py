@@ -13,10 +13,12 @@ from urllib.parse import urlsplit
 from http.server import BaseHTTPRequestHandler, HTTPServer
 
 if __package__:
+    from .messages_reference_fixture import serve_reference_history
     from .stream_terminal_fixture import serve_stream_terminal
     from .claude_client_fixture import serve_claude_client
     from .messages_signed_fixture import serve_signed_history
 else:
+    from messages_reference_fixture import serve_reference_history
     from stream_terminal_fixture import serve_stream_terminal
     from claude_client_fixture import serve_claude_client
     from messages_signed_fixture import serve_signed_history
@@ -258,6 +260,8 @@ class Handler(BaseHTTPRequestHandler):
             req = json.loads(raw.decode() or "{}")
         except (json.JSONDecodeError, UnicodeDecodeError):
             req = {}
+        if serve_reference_history(self, req):
+            return
         if handle_agent_history(self, req):
             return
         if self._ark(req) or self._fal(req):

@@ -2923,5 +2923,19 @@
     "title": "页面路由预览只读及保存文案 en",
     "kind": "implemented",
     "environment": "default offline"
+  },
+  {
+    "id": "REG-messages-reference-en",
+    "file": "e2e/scenarios/regression/messages-reference-en.test.ts",
+    "title": "Messages tool references and native options en",
+    "kind": "implemented",
+    "environment": "default offline"
+  },
+  {
+    "id": "REG-messages-reference-zh-CN",
+    "file": "e2e/scenarios/regression/messages-reference-zh-CN.test.ts",
+    "title": "Messages tool references and native options zh-CN",
+    "kind": "implemented",
+    "environment": "default offline"
   }
 ]
