@@ -240,11 +240,18 @@ export const en = {
   },
   providerGuideUI: providerGuideUIEn,
   quotaGuide: {
+    personalUnlimited: "No personal cap",
+    personalTitle: "Personal budget (USD)",
+    personalLoading: "Loading personal budget…",
+    personalUnavailable: "Could not load personal budget. Refresh to retry; this does not mean unlimited.",
+    personalSummary: "Budget: {limit}; spent: {spent}; remaining: {remaining}.",
+    personalNote: "Recorded spending is shown; in-flight charges and team or organization limits can further reduce availability. Creating a key does not reserve funds.",
+
     personalBillingHelp: "Without a team, blank means unlimited personal spending. With a team, blank shares the team budget. A value limits cumulative personal spending across sessions and keys; zero blocks spending.",
     rateAllocationError:
       "Child RPM/TPM allocations exceed the parent limit. Reduce allocations or increase the parent limit.",
     rates:
-      "Allocate RPM and TPM like budgets: fixed child allocations must add up to at most the parent limit. Blank shares the unreserved capacity; zero blocks calls. All personal keys and sessions count together, then roll up to the team and organization. Unused fixed capacity is reserved each UTC minute. TPM uses the token estimate at admission.",
+      "Allocate RPM and TPM through the full hierarchy: fixed child allocations must add up to at most the parent limit. Blank shares the unreserved capacity; zero blocks calls. All personal keys and sessions count together, then roll up to the team and organization. Unused fixed capacity is reserved each UTC minute. TPM uses the token estimate at admission.",
     rateBlank: "Share parent remaining capacity",
     editMember: "Edit member",
     deleteMember: "Delete member",
@@ -261,8 +268,8 @@ export const en = {
       "A fixed organization budget reserves money for its teams. A budget of $1,000 can allocate $500 + $300 + $200; additional allocations are rejected.",
     team: "Fixed personal allocations and shared consumption must fit within the team budget. Team administrators allocate personal budgets; organization administrators allocate team budgets.",
     person:
-      "All your keys share your personal budget. Fixed key allocations reserve their unused amounts; keys without a budget share the remainder.",
-    key: "Key budgets are allocated from their owner’s personal budget. Leaving this blank shares the remaining personal budget and still counts toward the team and organization.",
+      "All your keys share your personal budget. Key caps do not reserve funds; all keys and console calls share the remaining personal budget.",
+    key: "Key budgets are optional spending caps, not reserved funds. Blank shares your personal remaining budget with other keys and the console; 0 blocks only this key. Spending still counts toward team and organization limits.",
     shared:
       "Blank means share the parent’s available pool; it does not bypass a parent limit. Zero blocks spending. Consumed money plus unused child allocations cannot exceed a fixed budget.",
     singleTeam:

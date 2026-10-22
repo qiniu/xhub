@@ -55,7 +55,7 @@ func TestBulkUserBudgetTree(t *testing.T) {
 		want                error
 	}{
 		{"exact allocation", 10, 2, 8, "", nil}, {"below spend and holds", 1, 2, 0, "", ErrQuotaAllocation},
-		{"below child reservation", 9, 2, 8, "", ErrQuotaAllocation}, {"ambiguous membership", 10, 0, 0, "ambiguous", ErrMultipleTeams}, {"orphan", 10, 0, 0, "team:missing", ErrInvalid},
+		{"key cap does not reserve", 9, 2, 8, "", nil}, {"ambiguous membership", 10, 0, 0, "ambiguous", ErrMultipleTeams}, {"orphan", 10, 0, 0, "team:missing", ErrInvalid},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			child := &quotaNode{Kind: "key", ID: "key", Limit: quotaLimit(tc.child)}

@@ -41,7 +41,7 @@ vi.mock("@/components/activity_metrics", () => ({
 }));
 
 vi.mock("@/components/view_user_spend", () => ({
-  default: () => <div>View User Spend</div>,
+  default: ({userMaxBudget}: {userMaxBudget: number | null}) => <div>View User Spend <span data-testid="personal-budget">{String(userMaxBudget)}</span></div>,
 }));
 
 vi.mock("@/components/UsagePage/components/EntityUsage/TopKeyView", () => ({
@@ -404,6 +404,13 @@ describe("UsagePage", () => {
       isLoading: false,
       error: null,
     } as any);
+  });
+
+  // 真实用量组件必须传递 0 上限，不能显示为无限制；前置公共 mock，测试框架清理 DOM。
+  it("preserves zero personal budget", async () => {
+    mockUseCurrentUser.mockReturnValue({data:{user_id:"user-123",max_budget:0},isLoading:false,isError:false} as any);
+    renderWithProviders(<UsagePage {...defaultProps} />);
+    await waitFor(() => expect(screen.getByTestId("personal-budget").textContent).toBe("0"));
   });
 
   it("keeps the daily spend loader up until the activity request resolves", async () => {

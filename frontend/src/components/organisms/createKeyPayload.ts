@@ -119,6 +119,8 @@ export const buildKeyCreatePayload = (input: KeyCreateInput): KeyPayloadResult =
     endpoint: "standard",
     payload: {
       ...withoutKeys(values, dropped),
+      // 空输入显式发送 null 表示共享；保留数值 0，不能把禁止消费误转成共享。
+      ...("max_budget" in values && { max_budget: typeof values.max_budget === "string" && values.max_budget.trim() === "" ? null : values.max_budget }),
       ...(values.organization_id === null && { organization_id: undefined }),
       ...(values.project_id === null && { project_id: undefined }),
       ...(input.keyOwner === "you" && { user_id: input.userID }),

@@ -80,7 +80,7 @@ const UsagePage: React.FC<UsagePageProps> = ({ teams, organizations }) => {
     to: initialToDate,
   });
 
-  const { data: currentUser } = useCurrentUser();
+  const { data: currentUser, isLoading: userBudgetLoading, isError: userBudgetError } = useCurrentUser();
   const isAdmin = all_admin_roles.includes(userRole || "");
   const isOrgAdmin = useIsOrgAdmin();
   const isTeamAdmin = useIsTeamAdminForAnyTeam();
@@ -454,11 +454,13 @@ const UsagePage: React.FC<UsagePageProps> = ({ teams, organizations }) => {
                         {t("Project Spend")}
                         {dateValue.from && dateValue.to ? ` · ${formatClosedRangeLabel(dateValue.from, dateValue.to)}` : ""}
                       </p>
-                      <ViewUserSpend
+                      {userBudgetLoading || userBudgetError || !currentUser ? (
+                        <p role="status">{t(userBudgetLoading ? "quotaGuide.personalLoading" : "quotaGuide.personalUnavailable")}</p>
+                      ) : <ViewUserSpend
                         userSpend={totalSpend}
                         selectedTeam={null}
-                        userMaxBudget={currentUser?.max_budget || null}
-                      />
+                        userMaxBudget={currentUser.max_budget ?? null}
+                      />}
                     </div>
 
                     <div className="lg:col-span-2">

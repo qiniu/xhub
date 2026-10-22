@@ -48,13 +48,13 @@ func TestQuotaHierarchyHTTP(t *testing.T) {
 	}
 	reserved := h.ok(http.MethodPost, "/key/generate", tn.session, map[string]any{"key_alias": "reserved", "max_budget": 400}).json()
 	overflow := h.do(http.MethodPost, "/key/generate", tn.session, map[string]any{"key_alias": "overflow", "max_budget": 1})
-	if overflow.status != 400 {
-		t.Fatalf("个人密钥超配未拒绝: %s", overflow.describe())
+	if overflow.status != 200 {
+		t.Fatalf("单 Key 上限不应预占个人额度: %s", overflow.describe())
 	}
 	mark := len(h.upstreamCalls())
 	blocked := h.do(http.MethodPost, "/v1/chat/completions", tn.key, chatRequest("quota-model", "shared key blocked"))
-	if blocked.status != 403 || len(h.upstreamSince(mark)) != 0 {
-		t.Fatalf("共享密钥花掉固定保留额: %s", blocked.describe())
+	if blocked.status != 200 || len(h.upstreamSince(mark)) != 1 {
+		t.Fatalf("共享密钥应使用个人实际余额: %s", blocked.describe())
 	}
 	// 更新接口同样拒绝坏值，并保留已分配的固定 Key 金额。
 	badPatch := h.do(http.MethodPost, "/key/update", tn.session, map[string]any{"key": firstString(reserved, "token_id"), "max_budget": "wrong"})

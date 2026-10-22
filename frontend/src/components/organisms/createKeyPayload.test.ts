@@ -476,3 +476,9 @@ describe("model_max_budget", () => {
     expect(payloadOf(build({}))).not.toHaveProperty("model_max_budget");
   });
 });
+
+// 验证空预算共享、0 禁用和数值保留；纯函数无外部状态，失败输入留给后台严格校验。
+it.each([undefined, null, "", "  ", 0, 500, "invalid"])("normalizes blank key budget %s", (value) => {
+  const result = payloadOf(build({ max_budget: value }));
+  expect(result.max_budget).toBe(typeof value === "string" && value.trim() === "" ? null : value);
+});

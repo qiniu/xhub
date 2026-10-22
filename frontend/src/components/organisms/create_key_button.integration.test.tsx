@@ -27,6 +27,7 @@ vi.mock("../networking", async (importOriginal) => {
   const actual = await importOriginal<typeof import("../networking")>();
   return {
     ...actual,
+    userGetInfoV2: vi.fn().mockResolvedValue({max_budget: 500, spend: 0}),
     keyCreateCall: vi.fn().mockResolvedValue({ key: "sk-created", soft_budget: null }),
     keyCreateServiceAccountCall: vi.fn().mockResolvedValue({ key: "sk-service-account", soft_budget: null }),
     modelAvailableCall: vi.fn().mockResolvedValue({ data: [{ id: "gpt-4" }] }),

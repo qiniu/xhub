@@ -79,13 +79,13 @@ func TestQuotaThousandAllocationHTTP(t *testing.T) {
 			// 金额共享用户已花费少量金额，因此先释放 Bob 的固定300，避免把已消费当作可退还分配。
 			h.ok(http.MethodPost, "/user/update", admin, map[string]any{"user_id": firstString(bob.json(), "user_id"), dimension: nil})
 			h.ok(http.MethodPost, "/user/update", admin, map[string]any{"user_id": tn.userID, dimension: 700})
-			// 金额已产生小额消费，预留1作为消费空间；速率同样使用699+2验证超配。
+			// Key 金额是独立上限，可以重叠；速率仍使用699+2验证超配。
 			for i, amount := range []int{100, 599, 2} {
 				key := h.do(http.MethodPost, "/key/generate", tn.session, map[string]any{"key_alias": fmt.Sprint("part-", i), dimension: amount})
-				if i < 2 && key.status != 200 {
+				if (i < 2 || dimension == "max_budget") && key.status != 200 {
 					t.Fatalf("合法Key分配: %s", key.describe())
 				}
-				if i == 2 && key.status != 400 {
+				if i == 2 && dimension != "max_budget" && key.status != 400 {
 					t.Fatalf("Key分配合计超过个人700: %s", key.describe())
 				}
 			}
