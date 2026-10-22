@@ -163,7 +163,7 @@ export function registerUserBulkBudgetScenario(locale: "en" | "zh-CN") {
       expect(zero).toMatchObject({ atomic: true, successful_updates: 2, failed_updates: 0, total_requested: 2 });
       for (const user of users) expect((await read(user.user_id)).max_budget).toBe(0);
       const denied = await callBulkBudgetModel(page, key, model);
-      expect(denied.status, denied.text).toBe(429);
+      expect(denied.status, denied.text).toBe(403);
       await openBulk();
       await save("set", "10");
       for (const user of users) expect((await read(user.user_id)).max_budget).toBe(10);

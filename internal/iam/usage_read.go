@@ -29,7 +29,10 @@ type UsageQuery struct {
 	KeyID     string
 	Model     string
 	Status    string
-	SessionID string
+	// ErrorCode 精确匹配最终 HTTP 状态；非法非空值匹配空集。ErrorMessage 为错误正文的字面子串。
+	ErrorCode    string
+	ErrorMessage string
+	SessionID    string
 	// RequestID 精确定位请求，Search 按请求 ID 子串检索；均在分页之前收窄授权范围。
 	RequestID string
 	Search    string
@@ -50,7 +53,7 @@ type UsageQuery struct {
 // 参数 db（*DB）：身份和用量库；ctx（context.Context）：上下文，取消时停止；table（string）：scoped会话使用的表。空串表示调用方没有提供这项。
 // 返回 *xorm.Session（*xorm.Session）：带当前过滤条件的数据库会话，调用方负责关闭。
 // 调用：仅在 usage_read.go 内使用
-// 测试：无直接单测
+// 测试：TestUsageErrorFilters 与 TestUsageLogCategories；筛选和权限均在分页前执行。
 func (q UsageQuery) scopedSession(db *DB, ctx context.Context, table string) *xorm.Session {
 	s := db.session(ctx).Table(table)
 	if q.Cond != nil {
@@ -91,6 +94,20 @@ func (q UsageQuery) scopedSession(db *DB, ctx context.Context, table string) *xo
 		default:
 			s = s.And("status = ?", q.Status)
 		}
+	}
+	if q.ErrorCode != "" {
+		code, err := strconv.Atoi(q.ErrorCode)
+		if err != nil || code < 100 || code > 599 {
+			// 用户输入非法码时返回空集，不能静默丢弃条件后展示其他错误。
+			s = s.And("1 = 0")
+		} else {
+			s = s.And("http_status = ?", code)
+		}
+	}
+	if q.ErrorMessage != "" {
+		// 完整错误独立保存在 request_logs；关联同一请求而非搜索提示词，
+		// EXISTS 不复制事件行，保证列表、计数、会话分页与权限条件保持一致。
+		s = s.And("EXISTS (SELECT 1 FROM request_logs WHERE request_logs.request_id = usage_events.request_id AND position(? in COALESCE(request_logs.error, '')) > 0)", q.ErrorMessage)
 	}
 	if q.SessionID != "" {
 		s = s.And("session_id = ?", q.SessionID)

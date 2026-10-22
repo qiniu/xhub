@@ -13,8 +13,8 @@ curl -i "$XHUB_BASE_URL/v1/chat/completions"   -H "Authorization: Bearer $XHUB_A
 | 现象 | 检查 |
 | --- | --- |
 | 401 | XHub 密钥是否有效，不能发送供应商 Key |
-| 403 / 隐藏存在性的 404 | 当前成员关系、所有权、模型范围 |
-| 429 | 预算、RPM/TPM、供应商响应 |
+| 403 / 隐藏存在性的 404 | 当前成员关系、所有权、模型范围；403 budget_exceeded 表示预算耗尽 |
+| 429 | RPM/TPM、供应商响应 |
 | 无可用部署 | 启用状态、transport、端点能力 |
 | 流中断 | 事件和最终日志；HTTP 状态可能已发送 |
 | 缺少费用 | 实测用量、价格快照、PostgreSQL、Redis 积压 |

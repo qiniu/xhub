@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"net/http/httptest"
+	"strings"
 	"testing"
 
 	"github.com/sunqirui1987/xhub/internal/auth"
@@ -31,7 +32,7 @@ func TestTeamlessIdentityAdmission(t *testing.T) {
 		status  int
 	}{
 		{"blank", nil, true, 200}, {"finite", &finite, true, 200},
-		{"zero", &zero, false, 429}, {"cleared", nil, true, 200},
+		{"zero", &zero, false, 403}, {"cleared", nil, true, 200},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			if _, err := f.db.AdminUpdateUser(ctx, by, f.member.user.ID, iam.UserUpdate{MaxBudget: &tc.budget}); err != nil {
@@ -115,5 +116,29 @@ func TestTeamlessKeyBudget(t *testing.T) {
 	}
 	if err := s.keyBudgetOK(ctx, p); !errors.Is(err, errKeyGone) {
 		t.Fatalf("已删除密钥未拒绝: %v", err)
+	}
+}
+
+// TestBudgetRefusalStatus 验证额度链耗尽返回403且保留错误类型，存储和身份错误不被误分类。
+// 参数t为测试上下文；覆盖五层预算、身份错误和存储故障输入；纯内存响应无需清理。
+func TestBudgetRefusalStatus(t *testing.T) {
+	for _, path := range []string{"/v1/chat/completions", "/v1/responses", "/v1/messages", "/bypass/anthropic/v1/messages"} {
+		for _, scope := range []string{"User", "Key", "Project", "Team", "Organization"} {
+			w := httptest.NewRecorder()
+			budgetRefusal(w, path, errBudget{scope: scope})
+			if w.Code != 403 || !strings.Contains(w.Body.String(), "budget_exceeded") || !strings.Contains(w.Body.String(), scope) {
+				t.Fatalf("预算应返回403及原始层级: %d %s", w.Code, w.Body.String())
+			}
+		}
+		for _, tc := range []struct {
+			err  error
+			code int
+		}{{iam.ErrQuotaUnavailable, 503}, {errKeyGone, 401}, {errKeyUnusable, 401}} {
+			w := httptest.NewRecorder()
+			budgetRefusal(w, path, tc.err)
+			if w.Code != tc.code {
+				t.Fatalf("非预算错误被改写: %v %d", tc.err, w.Code)
+			}
+		}
 	}
 }

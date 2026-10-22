@@ -1,6 +1,7 @@
 package gateway
 
 import (
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -108,6 +109,7 @@ func TestRecordEarlyErrorSkipsNonDataPlane(t *testing.T) {
 	}{
 		{"/v1/chat/completions", 200, "success"},
 		{"/model/new", 500, "management-error"},
+		{"/bypass/not-registered/v1/messages", 403, "unknown-bypass"},
 		{"/v1/chat/completions", 400, ""},
 		{"/v1/agents/agent1", 410, "retired-agent"},
 		{"/v1/tool/x", 410, "retired-tool"},
@@ -170,5 +172,39 @@ func TestIdempotentErrorDoesNotCreateAnotherSnapshot(t *testing.T) {
 	s.recordEarlyError(r, httptest.NewRequest("POST", "/v1/chat/completions", nil), nil, nil, time.Now())
 	if !r.usageRecorded || out.Code != 400 || out.Body.String() != string(hit.Body) || len(s.exchanges) != 0 {
 		t.Fatal("错误重放修改原响应或重复记录")
+	}
+}
+
+// TestRecordEarlyBypassError 验证注册Bypass的提前拒绝只落一笔完整错误，未知路径不纳入日志。
+// 参数t为测试上下文；前置隔离PG，覆盖401/403/429及已记录保护；testGatewayStores清理schema。
+func TestRecordEarlyBypassError(t *testing.T) {
+	cfg, st, db := testGatewayStores(t)
+	s := New(cfg, st, db)
+	for _, path := range []string{"/bypass/openai/v1/chat/completions", "/bypass/openai/v1/responses", "/bypass/anthropic/v1/messages"} {
+		for _, code := range []int{401, 403, 429} {
+			id := fmt.Sprintf("%s/%d", path, code)
+			w := &statusRecorder{ResponseWriter: httptest.NewRecorder(), code: 200}
+			w.Header().Set("x-litellm-call-id", id)
+			w.WriteHeader(code)
+			body := `{"error":{"message":"fixture rejection"}}`
+			_, _ = w.Write([]byte(body))
+			r := httptest.NewRequest("POST", path, nil)
+			s.recordEarlyError(w, r, nil, nil, time.Now())
+			s.recordEarlyError(w, r, nil, nil, time.Now())
+			var e iam.UsageEvent
+			ok, err := db.Engine.Where("request_id = ?", id).Get(&e)
+			if err != nil || !ok || e.HTTPStatus != code {
+				t.Fatalf("Bypass提前失败漏记: %s %v %+v", id, err, e)
+			}
+			var log iam.RequestLog
+			ok, err = db.Engine.Where("request_id = ?", id).Get(&log)
+			if err != nil || !ok || log.Error != body {
+				t.Fatalf("Bypass错误正文丢失: %s %v %+v", id, err, log)
+			}
+		}
+	}
+	count, err := db.Engine.Count(new(iam.UsageEvent))
+	if err != nil || count != 9 {
+		t.Fatalf("兜底重复记账: %d %v", count, err)
 	}
 }

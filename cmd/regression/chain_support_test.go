@@ -275,8 +275,8 @@ func (h *harness) assertBudgetStop(t *testing.T, c chained, admin, model, conten
 	beforeLogs := len(h.successRows(t, admin, model))
 	mark := len(h.upstreamCalls())
 	r := h.do(http.MethodPost, "/v1/chat/completions", c.key, chatRequest(model, content))
-	if r.status != http.StatusTooManyRequests {
-		t.Fatalf("a %s at its ceiling answered %d, want 429: %s", scope, r.status, r.describe())
+	if r.status != http.StatusForbidden {
+		t.Fatalf("a %s at its ceiling answered %d, want 403: %s", scope, r.status, r.describe())
 	}
 	message := errorMessage(r)
 	if !strings.Contains(message, scope) || !strings.Contains(message, "budget has been exceeded") {
@@ -293,7 +293,7 @@ func (h *harness) assertBudgetStop(t *testing.T, c chained, admin, model, conten
 	}
 }
 
-// assertStopped 断言调用被拒绝且没有新增上游。用在停用、过期、模型名单这些不是 429 的拒绝上。
+// assertStopped 断言调用被拒绝且没有新增上游。用在停用、过期、模型名单这些非预算拒绝上。
 func (h *harness) assertStopped(t *testing.T, c chained, model, content string) reply {
 	t.Helper()
 	before := h.moneyOf(t, c)

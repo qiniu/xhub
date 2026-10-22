@@ -35,7 +35,7 @@ export function registerSoftBudgetScenario(locale: "en" | "zh-CN") {
       const info = await (await page.request.get(GATEWAY + "/key/info?key=" + keyID, {headers})).json();
       expect(info.info.spend).toBeGreaterThan(0.000001);
       expect(info.info.budget_pending).toBe(0);
-      expect((await invoke()).status()).toBe(429);
+      expect((await invoke()).status()).toBe(403);
       await stableGoto(page, "/api-keys?key=" + keyID);
       await expect(page.getByText(tr("hardBudget.contract"))).toBeVisible();
       await page.getByLabel(tr("Max Budget (USD)"), {exact: true}).fill("1");

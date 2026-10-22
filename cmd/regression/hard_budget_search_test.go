@@ -126,7 +126,7 @@ func TestSearchTokenOnlySettlement(t *testing.T) {
 					}
 					body["input"] = "Try another request after the budget is exhausted."
 					denied := h.do("POST", path, owner.key, body)
-					if denied.status != 429 || calls.Load() != 1 {
+					if denied.status != 403 || calls.Load() != 1 {
 						t.Fatalf("已耗尽余额仍放行 status=%d calls=%d", denied.status, calls.Load())
 					}
 				})
@@ -188,14 +188,14 @@ func TestSearchTokenOnlyAdmission(t *testing.T) {
 				model = other.ModelName
 			case "exhausted":
 				h.setKeyBudget(t, admin, owner.key, 0)
-				expected = 429
+				expected = 403
 			case "project-hold":
 				h.setKeyBudget(t, admin, owner.key, 2)
 				h.setProjectBudget(t, admin, owner.projectID, 1)
 				if _, err := h.db.ReserveBudget(t.Context(), "preexisting-project-hold", "key", owner.keyID, 1); err != nil {
 					t.Fatal(err)
 				}
-				expected = 429
+				expected = 403
 			case "reserved", "uncertain":
 				if _, err := h.db.ReserveBudget(t.Context(), "preexisting-hold", "key", owner.keyID, 1); err != nil {
 					t.Fatal(err)
@@ -205,7 +205,7 @@ func TestSearchTokenOnlyAdmission(t *testing.T) {
 						t.Fatal(err)
 					}
 				}
-				expected = 429
+				expected = 403
 			}
 			got := h.do("POST", "/v1/responses", owner.key, map[string]any{"model": model, "input": "Search for Go.", "tools": []any{map[string]any{"type": "web_search"}}})
 			if got.status != expected || calls.Load() != 0 {

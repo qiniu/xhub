@@ -8,7 +8,7 @@ This document describes current execution paths and observable limits.
 
 [Quota calculation](../../../internal/iam/quota.go) builds the relevant organization tree and handles fixed allocations, shared budgets, and descendant reservations. Checks combine persisted PostgreSQL spending with Redis hot spending. Request cost is not guaranteed to depend only on path depth. Checking is not atomic reservation before forwarding and cannot guarantee that concurrent requests never overspend. Personal callers without a team still have user and key ceilings checked; unset ceilings do not limit that level, while explicit zero ceilings apply.
 
-Storage failure responses depend on the branch: unavailable authorization storage returns 503; identity reads and quota-chain errors can enter a 401 branch. Exceeded budgets return 429.
+Storage failure responses depend on the branch: unavailable authorization storage returns 503; identity reads and quota-chain errors can enter a 401 branch. Exceeded budgets return 403 (`budget_exceeded`); RPM/TPM limits return 429.
 
 ## Usage persistence
 

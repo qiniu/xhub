@@ -86,7 +86,7 @@ func fallbackSimulated(t *testing.T) {
 	})
 	mark = len(h.upstreamCalls())
 	stopped := h.do(http.MethodPost, "/v1/chat/completions", c.key, chatRequest(public, "budget between deployments"))
-	if stopped.status != http.StatusTooManyRequests || !strings.Contains(errorMessage(stopped), "Project") {
+	if stopped.status != http.StatusForbidden || !strings.Contains(errorMessage(stopped), "Project") {
 		t.Fatalf("the second deployment was not stopped by the project: %s", stopped.describe())
 	}
 	if got := h.upstreamSince(mark); strings.Join(got, ",") != "fail-a" {

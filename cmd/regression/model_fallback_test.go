@@ -395,7 +395,7 @@ func TestModelFallbackBudgetRecheck(t *testing.T) {
 	h.onUpstream("budget-primary", func() { h.setProjectBudget(t, admin, owner.projectID, before.project) })
 	h.resetUpstream()
 	result := h.do("POST", "/v1/chat/completions", owner.key, chatRequest("budget-primary", "budget-recheck"))
-	if result.status != 429 || !strings.Contains(errorMessage(result), "Project") {
+	if result.status != 403 || !strings.Contains(errorMessage(result), "Project") {
 		t.Fatalf("跨模型预算未复核: %s", result.describe())
 	}
 	if got := strings.Join(h.upstreamSince(0), ","); got != "budget-primary" {

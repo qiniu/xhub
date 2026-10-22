@@ -24,7 +24,7 @@ type budgetAttempt struct {
 }
 
 // PrepareBudgetAttempt 为所有模型协议执行软预算准入，不再按输入窗口预占或改写输出上限。
-// 参数为已鉴权身份、最终出站正文及部署；返回原始正文和是否放行，余额耗尽返回429，存储不可读返回503。
+// 参数为已鉴权身份、最终出站正文及部署；返回原始正文和是否放行，余额耗尽返回403，存储不可读返回503。
 // 每次重试重新核对余额；放行后允许该请求完成并按实际token结算，并发调用可能使余额变负。
 func (s *Server) PrepareBudgetAttempt(w http.ResponseWriter, r *http.Request, p *auth.Principal, callID string, dep config.ModelEntry, protocol string, body []byte, start time.Time) ([]byte, bool) {
 	s.finishBudgetCall(callID)
@@ -61,7 +61,7 @@ func (s *Server) PrepareBudgetAttempt(w http.ResponseWriter, r *http.Request, p 
 	}
 	if err := s.IAM.CheckSoftBudgetBalance(r.Context(), kind, id, s.hotSpendRef); err != nil {
 		if errors.Is(err, iam.ErrBudgetUnavailable) {
-			util.WriteTypedError(w, r.URL.Path, 429, "budget_exceeded", "available budget has been exhausted")
+			util.WriteTypedError(w, r.URL.Path, http.StatusForbidden, "budget_exceeded", "available budget has been exhausted")
 		} else {
 			budgetRefusal(w, r.URL.Path, iam.ErrQuotaUnavailable)
 		}

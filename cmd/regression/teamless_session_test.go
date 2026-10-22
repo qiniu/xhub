@@ -26,7 +26,7 @@ func TestTeamlessSessionBudgetHTTP(t *testing.T) {
 			markZero := len(h.upstreamCalls())
 			for _, credential := range credentials {
 				r := h.do(http.MethodPost, "/chat/completions", credential, chatRequest("solo-session", "zero "+role))
-				if r.status != 429 || !strings.Contains(r.describe(), "User budget") {
+				if r.status != 403 || !strings.Contains(r.describe(), "User budget") {
 					t.Fatalf("零预算未阻止个人调用: %s", r.describe())
 				}
 			}
@@ -62,7 +62,7 @@ func TestTeamlessSessionBudgetHTTP(t *testing.T) {
 				mark := len(h.upstreamCalls())
 				for _, credential := range credentials {
 					response := h.do(http.MethodPost, "/chat/completions", credential, chatRequest("solo-session", "blocked "+role))
-					if response.status != 429 || !strings.Contains(response.describe(), "User budget has been exceeded") {
+					if response.status != 403 || !strings.Contains(response.describe(), "User budget has been exceeded") {
 						t.Fatalf("个人消费上限未阻止调用: %s", response.describe())
 					}
 				}

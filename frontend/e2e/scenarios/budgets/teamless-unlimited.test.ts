@@ -56,7 +56,7 @@ test("teamless blank budgets allow streaming and personal caps can be cleared", 
     expect(Number(spend)).toBe(0);
     for (const credential of [headers.Authorization.slice(7), key.key]) {
       const blocked = await invoke(credential, "zero budget must block");
-      expect(blocked.status(), await blocked.text()).toBe(429);
+      expect(blocked.status(), await blocked.text()).toBe(403);
       expect(await blocked.text()).toContain("User budget");
     }
     expect(await (await page.request.get(UPSTREAM + "/e2e/request-count")).json()).toEqual(before);

@@ -56,7 +56,11 @@ func TestQuotaThousandAllocationHTTP(t *testing.T) {
 				}
 				mark := len(h.upstreamCalls())
 				blocked := h.do(http.MethodPost, "/v1/chat/completions", firstString(key, "key"), body)
-				if blocked.status != 429 || len(h.upstreamSince(mark)) != 0 {
+				wantStatus := 429
+				if dimension == "max_budget" {
+					wantStatus = 403
+				}
+				if blocked.status != wantStatus || len(h.upstreamSince(mark)) != 0 {
 					t.Fatalf("分满后的共享用户及零用户必须拦截: %s", blocked.describe())
 				}
 			}

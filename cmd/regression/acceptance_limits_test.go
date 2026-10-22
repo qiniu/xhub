@@ -102,7 +102,7 @@ func TestAcceptanceLimitsAndAccountingContract(t *testing.T) {
 		t.Cleanup(func() { setAcceptanceBudgets(t, h, admin, c, room) })
 		spent := h.moneyOf(t, c)
 		setAcceptanceBudgetsAtSpend(t, h, admin, c, spent)
-		assertAcceptanceRejected(t, h, admin, c, modelA, "budget-refused", http.StatusTooManyRequests, "User budget has been exceeded")
+		assertAcceptanceRejected(t, h, admin, c, modelA, "budget-refused", http.StatusForbidden, "User budget has been exceeded")
 		setAcceptanceBudgets(t, h, admin, c, room)
 		h.assertBilled(t, c, admin, modelA, "budget-restored", []string{modelA})
 	})

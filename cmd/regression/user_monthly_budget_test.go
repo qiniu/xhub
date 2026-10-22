@@ -47,7 +47,7 @@ func TestUserMonthlyBudgetContract(t *testing.T) {
 		t.Fatal("周期独立保存改变额度", got)
 	}
 	chat := map[string]any{"model": "monthly-chat", "messages": []any{map[string]any{"role": "user", "content": "Check monthly allowance."}}, "max_tokens": 8}
-	if r := h.do(http.MethodPost, "/v1/chat/completions", a.key, chat); r.status != 429 {
+	if r := h.do(http.MethodPost, "/v1/chat/completions", a.key, chat); r.status != 403 {
 		t.Fatalf("刷新前余额为零应拒绝: %s", r.describe())
 	}
 	// 仅调整本测试用户的到期时间，真实准入触发刷新，不能以mock绕开数据面。

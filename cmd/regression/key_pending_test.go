@@ -15,7 +15,7 @@ func TestKeyRotationPendingBudget(t *testing.T) {
 	c := h.openScope(t, admin, "rotation-pending")
 	h.setKeyBudget(t, admin, c.key, expectedCost())
 	h.ok(http.MethodPost, "/v1/chat/completions", c.key, chatRequest(model, "Exhaust original key budget."))
-	if got := h.do(http.MethodPost, "/v1/chat/completions", c.key, chatRequest(model, "Must be refused.")); got.status != 429 {
+	if got := h.do(http.MethodPost, "/v1/chat/completions", c.key, chatRequest(model, "Must be refused.")); got.status != 403 {
 		t.Fatalf("轮换前未用尽: %s", got.describe())
 	}
 	rotated := h.ok(http.MethodPost, "/key/regenerate", c.session, map[string]any{"key": c.key}).json()
@@ -23,7 +23,7 @@ func TestKeyRotationPendingBudget(t *testing.T) {
 	if got := h.do(http.MethodGet, "/v1/models", c.key, nil); got.status != 401 {
 		t.Fatalf("旧凭据未撤销: %s", got.describe())
 	}
-	if got := h.do(http.MethodPost, "/v1/chat/completions", fresh, chatRequest(model, "Rotated key remains exhausted.")); got.status != 429 {
+	if got := h.do(http.MethodPost, "/v1/chat/completions", fresh, chatRequest(model, "Rotated key remains exhausted.")); got.status != 403 {
 		t.Fatalf("轮换丢失待结算额度: %s", got.describe())
 	}
 	if len(h.upstreamCalls()) != 1 {

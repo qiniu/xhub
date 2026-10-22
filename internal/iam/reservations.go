@@ -9,7 +9,7 @@ import (
 	"xorm.io/xorm"
 )
 
-// ErrBudgetUnavailable 表示本次预占超过某层可用余额；调用方返回 429，不调用上游。
+// ErrBudgetUnavailable 表示本次预占超过某层可用余额；网关软预算准入返回 403，不调用上游。
 var ErrBudgetUnavailable = errors.New("budget reservation exceeds available balance")
 
 // BudgetReservation 保存每次上游尝试的计费路径和价格快照，不设自动过期。

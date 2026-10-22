@@ -36,13 +36,13 @@ func TestBudgetAccumulatesAcrossCalls(t *testing.T) {
 	second := h.do(http.MethodPost, "/v1/chat/completions", tn.key, map[string]any{
 		"model": "regression-accumulate", "messages": []any{map[string]any{"role": "user", "content": "two"}},
 	})
-	if second.status != http.StatusTooManyRequests {
+	if second.status != http.StatusForbidden {
 		t.Fatalf("the second call was not refused after the ceiling was reached: %s", second.describe())
 	}
 }
 
 // TestRateLimitIsSeparateFromBudget 证明频率上限拒绝时给的是限流错误，不是额度错误。
-// 两者到达调用方时状态码一样，所以只有错误信息能把它们区分开。
+// 预算为403、速率为429；前置独立账号与本地上游，验证状态和错误类型，harness清理数据。
 // 参数 t（*testing.T）：当前测试。
 // 返回：无。
 func TestRateLimitIsSeparateFromBudget(t *testing.T) {

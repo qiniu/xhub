@@ -159,3 +159,18 @@ func TestLogTPS(t *testing.T) {
 		})
 	}
 }
+
+// TestLogErrorFilters 验证日志接口完整接收错误码与消息，非法值交给查询层收窄为空集。
+// 前置内存请求，覆盖空值、组合、空白和SQL样式输入；无持久化副作用，不需清理。
+func TestLogErrorFilters(t *testing.T) {
+	for _, tc := range []struct{ code, message, want string }{
+		{"", "", ""}, {"403", "budget_exceeded", "403"}, {" 429 ", "rate_limit", "429"},
+		{"broken", "%_' OR true --", "broken"}, {"600", "Message With Spaces", "600"},
+	} {
+		raw := url.Values{"error_code": {tc.code}, "error_message": {tc.message}}
+		q := logQuery(httptest.NewRequest("GET", "/spend/logs/ui?"+raw.Encode(), nil), &authz.Scope{})
+		if q.ErrorCode != tc.want || q.ErrorMessage != tc.message {
+			t.Fatalf("错误筛选未原样进入查询: %+v", q)
+		}
+	}
+}

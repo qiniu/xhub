@@ -198,7 +198,7 @@ func TestAgentNativeProtocolMatrix(t *testing.T) {
 				budgetBody = map[string]any{"model": models[0].ModelName, "messages": []any{map[string]any{"role": "user", "content": "Hello"}}}
 			}
 			denied := h.do("POST", budgetPath, blockedOwner.key, budgetBody)
-			if denied.status != 429 || calls.Load() != before {
+			if denied.status != 403 || calls.Load() != before {
 				t.Fatalf("原生入口未遵守预算: %s", denied.describe())
 			}
 

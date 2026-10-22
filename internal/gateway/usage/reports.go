@@ -197,22 +197,25 @@ func collapseSessions(rows []map[string]any) []map[string]any {
 // 参数 r（*http.Request）：入站 HTTP 请求；sc（*authz.Scope）：日志查询使用的权限范围。
 // 返回 UsageQuery（iam.UsageQuery）：在权限范围之内、再按请求筛选收窄的日志查询。筛选不能把范围扩大。
 // 调用：仅在 reports.go 内使用
+// 错误码按最终客户端状态精确匹配，消息按完整诊断正文匹配；非法码不会扩大查询。
 // 测试：reports_test.go；排序字段由 iam 白名单处理，未知方向使用降序。
 func logQuery(r *http.Request, sc *authz.Scope) iam.UsageQuery {
 	raw := r.URL.Query()
 	q := iam.UsageQuery{
-		Cond:      sc.Cond,
-		From:      parseDay(raw.Get("start_date")),
-		To:        parseDayEnd(raw.Get("end_date")),
-		UserID:    raw.Get("user_id"),
-		TeamID:    raw.Get("team_id"),
-		KeyID:     raw.Get("api_key"),
-		Model:     raw.Get("model"),
-		SessionID: raw.Get("session_id"),
-		RequestID: raw.Get("request_id"),
-		Search:    raw.Get("search"),
-		SortBy:    raw.Get("sort_by"),
-		SortAsc:   raw.Get("sort_order") == "asc",
+		Cond:         sc.Cond,
+		From:         parseDay(raw.Get("start_date")),
+		To:           parseDayEnd(raw.Get("end_date")),
+		UserID:       raw.Get("user_id"),
+		TeamID:       raw.Get("team_id"),
+		KeyID:        raw.Get("api_key"),
+		Model:        raw.Get("model"),
+		SessionID:    raw.Get("session_id"),
+		RequestID:    raw.Get("request_id"),
+		Search:       raw.Get("search"),
+		ErrorCode:    strings.TrimSpace(raw.Get("error_code")),
+		ErrorMessage: raw.Get("error_message"),
+		SortBy:       raw.Get("sort_by"),
+		SortAsc:      raw.Get("sort_order") == "asc",
 	}
 	switch raw.Get("status_filter") {
 	case "success", "completed", "executing", "polling", "non_error":

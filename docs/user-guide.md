@@ -191,8 +191,8 @@ The [pricing reference](development/en/pricing.md) explains rate units, snapshot
 | --- | --- |
 | No available models | Team membership, team/project/key model scope, configured deployments, and operation capability |
 | `401` | Correct virtual key, expiry/revocation, disabled account, or an old session after a password reset |
-| `403` or a hidden object's `404` | Role and resource scope, blocked team, model permission |
-| `429` | Key RPM/TPM, budget status, and upstream rate limits |
+| `403` or a hidden object's `404` | Role and resource scope, blocked team, model permission; `403 budget_exceeded` means the budget is exhausted |
+| `429` | Key RPM/TPM and upstream rate limits |
 | `502` / `503` | Upstream secret, API base/model ID, deployment health, database/Redis, route template, and call log |
 | SDK receives HTML | Gateway URL should normally use port `4000`, not console port `3000` |
 | Stream stops midway | Inspect the call log; decide whether the application can safely make a new request |

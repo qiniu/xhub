@@ -63,7 +63,7 @@ export function registerOrganizationManagementScenario(locale: "en" | "zh-CN") {
    // 实际费用0.10；将额度降至已消费后余额为零，新周期重置后恢复。
    expect(spend).toBeCloseTo(0.1,8);
    expect((await page.request.patch(GATEWAY+"/organization/update",{headers,data:{organization_id:orgID,max_budget:spend}})).status()).toBe(200);
-   expect((await call()).status()).toBe(429);
+   expect((await call()).status()).toBe(403);
    expect((await page.request.post(control+"/organization/budget/due",{data:{organization_id:orgID,pending_previous:true}})).status()).toBe(200);
    expect((await call()).status()).toBe(200);
    const reset=await (await page.request.get(GATEWAY+"/organization/info?organization_id="+orgID,{headers})).json();
