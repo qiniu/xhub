@@ -156,8 +156,8 @@ test("层级限流 " + scenario, async ({ page }) => {
       expect(zero.status()).toBe(429);
       // 编辑页面清空 RPM 恢复共享；保存接口和真实推理同时验证，删除释放预留容量。
       await stableGoto(page, "/api-keys?key=" + own.token_id);
-      await page.getByRole("tab", { name: t("Settings"), exact: true }).click();
-      await page.getByRole("button", { name: t("Edit Settings"), exact: true }).click();
+      // 密钥详情已直接展示编辑器；等待真实表单，不再点击已移除的设置页签。
+      await expect(page.getByRole("region", { name: t("Key Settings") })).toBeVisible();
       await page.getByLabel(t("RPM Limit"), { exact: true }).fill("");
       await page.getByLabel(t("TPM Limit"), { exact: true }).fill("64");
       saved = page.waitForResponse(r => r.url().endsWith("/key/update") && r.request().method() === "POST");

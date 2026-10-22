@@ -50,7 +50,7 @@ func TestSoftBudgetProtocols(t *testing.T) {
 					t.Fatalf("软预算不应预占: %v %v", holds, err)
 				}
 				got = h.do("POST", path, c.key, body)
-				if got.status != 429 {
+				if got.status != 403 {
 					t.Fatalf("负余额未拒绝: %s", got.describe())
 				}
 			})
@@ -96,7 +96,7 @@ func TestSoftBudgetConcurrent(t *testing.T) {
 	if err != nil || !nearlyEqual(key.Spend, 3*expectedCost()) {
 		t.Fatalf("并发请求必须逐笔扣费且不重复: key=%v err=%v", key, err)
 	}
-	if got := h.do("POST", "/v1/chat/completions", c.key, chatRequest(dep.ModelName, "After exhaustion")); got.status != 429 {
+	if got := h.do("POST", "/v1/chat/completions", c.key, chatRequest(dep.ModelName, "After exhaustion")); got.status != 403 {
 		t.Fatal("耗尽后未拒绝")
 	}
 }

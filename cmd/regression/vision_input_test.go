@@ -104,7 +104,7 @@ func TestVisionInputProtocolMatrix(t *testing.T) {
 			owner := h.openScope(t, admin, "vision-owner")
 			// 图片也遵守软预算：余额为零时须在任何供应商请求之前拒绝。
 			h.setKeyBudget(t, admin, owner.key, 0)
-			if r := h.do("POST", "/v1/messages", owner.key, visionRequest("anthropic-messages", dep.ModelName, false)); r.status != 429 || calls.Load() != 0 {
+			if r := h.do("POST", "/v1/messages", owner.key, visionRequest("anthropic-messages", dep.ModelName, false)); r.status != 403 || calls.Load() != 0 {
 				t.Fatalf("图片请求绕过余额限制: %s", r.describe())
 			}
 			h.setKeyBudget(t, admin, owner.key, 1)

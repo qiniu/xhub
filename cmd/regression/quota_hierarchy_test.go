@@ -53,7 +53,7 @@ func TestQuotaHierarchyHTTP(t *testing.T) {
 	}
 	mark := len(h.upstreamCalls())
 	blocked := h.do(http.MethodPost, "/v1/chat/completions", tn.key, chatRequest("quota-model", "shared key blocked"))
-	if blocked.status != 429 || len(h.upstreamSince(mark)) != 0 {
+	if blocked.status != 403 || len(h.upstreamSince(mark)) != 0 {
 		t.Fatalf("共享密钥花掉固定保留额: %s", blocked.describe())
 	}
 	// 更新接口同样拒绝坏值，并保留已分配的固定 Key 金额。

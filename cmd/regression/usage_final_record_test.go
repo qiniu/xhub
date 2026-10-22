@@ -33,7 +33,7 @@ func TestUsageFinalErrorsDoNotPoisonAdmission(t *testing.T) {
 				case "quota":
 					// 软预算允许微小正余额请求完成；额度错误用零余额触发。
 					h.setKeyBudget(t, admin, scope.key, 0)
-					want = 429
+					want = 403
 				case "pre_call", "post_call":
 					h.putGuardrail(t, "final-block", guardrailRow("final-block", "always_block", nil, kind))
 				case "upstream", "idempotent":

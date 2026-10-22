@@ -18,8 +18,8 @@ This diagnostic makes a model call and may incur provider charges.
 | Symptom | Check |
 | --- | --- |
 | 401 | XHub key validity; do not send the upstream key |
-| 403 / concealed 404 | Current membership, ownership and model scope |
-| 429 | Budget, RPM/TPM and provider response |
+| 403 / concealed 404 | Current membership, ownership and model scope; 403 budget_exceeded means exhausted budget |
+| 429 | RPM/TPM and provider response |
 | No deployment | Enabled status, transport and endpoint capability |
 | Stream interrupted | Events and final log; HTTP status may already be sent |
 | Missing cost | Actual usage, rate snapshot, PostgreSQL and Redis backlog |

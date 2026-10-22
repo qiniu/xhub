@@ -27,6 +27,8 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/sunqirui1987/xhub/internal/authz"
 	"github.com/sunqirui1987/xhub/internal/catalog"
+	providercontract "github.com/sunqirui1987/xhub/internal/provider/contract"
+	providerregistry "github.com/sunqirui1987/xhub/internal/provider/registry"
 	"github.com/sunqirui1987/xhub/internal/util"
 )
 
@@ -464,13 +466,21 @@ func markUsageRecorded(w http.ResponseWriter) {
 	}
 }
 
-// recordEarlyError 为受支持的数据面尚未进入常规结算路径的失败补写日志。
+// recordEarlyError 为受支持的标准及注册Bypass数据面尚未进入常规结算路径的失败补写日志。
 // 参数 lw：最终状态和客户端正文；r/raw/body：原请求及解析结果；start：请求开始时间。
 // 返回：无。已删除或退役接口仅保留进程访问日志；已经进入 RecordSpend 的请求不重复生成另一份快照；鉴权失败无法认领身份时仅管理员可见。
 // 调用：Handler 的失败 defer，覆盖鉴权、限流、未认领模型和路由配置错误；测试见 early_error_log_test.go。
 func (s *Server) recordEarlyError(lw *statusRecorder, r *http.Request, raw []byte, body map[string]any, start time.Time) {
-	if s == nil || lw == nil || lw.code < 400 || lw.usageRecorded || !catalog.IsDataPlanePath(r.URL.Path) {
+	if s == nil || lw == nil || r == nil || lw.code < 400 || lw.usageRecorded {
 		return
+	}
+	if !catalog.IsDataPlanePath(r.URL.Path) {
+		// Bypass 在 Gin 前分派，其显式路径不在旧目录前缀中。
+		// 使用与 serveBypass 相同的注册表和方法匹配，补记准入拒绝且不吞入任意未知路径。
+		hit, ok := providerregistry.Match(r.Method, r.URL.Path)
+		if !ok || hit.Transport.Kind != providercontract.KindBypass {
+			return
+		}
 	}
 	// 兼容路由仍会返回 410，已删除路由会返回 404；它们不再提供模型服务，
 	// 不能因为历史数据面前缀而写入模型请求日志、用量统计或 Redis 花费队列。

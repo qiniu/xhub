@@ -116,7 +116,7 @@ func (s *Server) checkIdentityLimits(w http.ResponseWriter, path string, p *auth
 			return false
 		}
 		if overBudget(user.MaxBudget, user.Spend, s.hotSpendRef("user", user.ID, userPeriod(user))) {
-			util.WriteTypedError(w, path, 429, "budget_exceeded", "User budget has been exceeded")
+			util.WriteTypedError(w, path, http.StatusForbidden, "budget_exceeded", "User budget has been exceeded")
 			return false
 		}
 		// A session has no key row, so the chain that resolves a template for a
@@ -353,11 +353,11 @@ type errBudget struct{ scope string }
 // 测试：无直接单测
 func (e errBudget) Error() string { return e.scope + " budget has been exceeded" }
 
-// budgetRefusal writes the response for a failed ownership walk.
-// 参数 w（http.ResponseWriter）：调用方的 HTTP 响应，状态码和正文写在这里；path（string）：预算Refusal要定位的路径。可能是 URL，也可能是字段路径；err（error）：失败原因，nil 表示这一步成功。
-// 返回：无。预算用尽时写 429 和 JSON 错误。
-// 调用：仅在 limits.go 内使用
-// 测试：无直接单测
+// budgetRefusal 将额度链失败写为客户端错误响应。
+// 参数 w（http.ResponseWriter）：调用方的 HTTP 响应，状态码和正文写在这里；path（string）：预算Refusal要定位的路径。可能是 URL，也可能是字段路径；err（error）：非 nil 的失败原因。
+// 返回：无。预算用尽时写 403 和 JSON 错误。
+// 调用：身份额度链检查及 budget.go 的预算准入；不修改账单。
+// 测试：TestBudgetRefusalStatus 与真实后台额度回归。
 func budgetRefusal(w http.ResponseWriter, path string, err error) {
 	if errors.Is(err, iam.ErrQuotaUnavailable) {
 		util.WriteTypedError(w, path, 503, "quota_unavailable", "pending quota usage is temporarily unavailable")
@@ -365,7 +365,7 @@ func budgetRefusal(w http.ResponseWriter, path string, err error) {
 	}
 	var over errBudget
 	if errors.As(err, &over) {
-		util.WriteTypedError(w, path, 429, "budget_exceeded", over.Error())
+		util.WriteTypedError(w, path, http.StatusForbidden, "budget_exceeded", over.Error())
 		return
 	}
 	util.WriteTypedError(w, path, 401, "invalid_request_error", err.Error())

@@ -143,7 +143,7 @@ func TestMessagesToolReferencesContract(t *testing.T) {
 	h.ok("POST", "/key/update", admin, map[string]any{"key": owner.key, "models": []string{dep.ModelName}})
 	zero := h.openScope(t, admin, "zero-reference")
 	h.setKeyBudget(t, admin, zero.key, 0)
-	if got := h.do("POST", "/v1/messages", zero.key, body); got.status != 429 {
+	if got := h.do("POST", "/v1/messages", zero.key, body); got.status != 403 {
 		t.Fatalf("零预算未拒绝: %s", got.describe())
 	}
 	if calls.Load() != before {

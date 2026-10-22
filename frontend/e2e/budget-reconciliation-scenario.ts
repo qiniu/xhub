@@ -62,7 +62,7 @@ export function registerBudgetReconciliationScenario(locale: "en" | "zh-CN") {
         await seedLegacyHold(broken.headers()["x-litellm-call-id"]);
         await expect.poll(async () => (await pending()).filter(row => row.can_reconcile).length).toBe(1);
         const row = (await pending())[0];
-        expect(row.amount).toBeGreaterThan(0); expect((await invoke("length")).status()).toBe(429);
+        expect(row.amount).toBeGreaterThan(0); expect((await invoke("length")).status()).toBe(403);
         const beforeReconcileSpend = (await (await page.request.get(GATEWAY + "/key/info?key=" + keyID, { headers })).json()).info.spend;
         const denied = await page.request.get(GATEWAY + "/budget/reservations?key_id=" + keyID, { headers: keyHeaders });
         expect(denied.status()).toBe(403);

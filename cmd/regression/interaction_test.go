@@ -172,7 +172,7 @@ func TestChangingABudgetTakesEffectImmediately(t *testing.T) {
 	}
 	h.setUserBudget(t, admin, tn.userID, user.Spend)
 	r := h.do(http.MethodPost, "/v1/chat/completions", tn.key, request)
-	if r.status != http.StatusTooManyRequests {
+	if r.status != http.StatusForbidden {
 		t.Fatalf("a budget set to cumulative spend did not stop the next call: %s", r.describe())
 	}
 
@@ -229,7 +229,7 @@ func TestDeletingATeamPreservesPersonalKeys(t *testing.T) {
 // TestModelRestrictionAndBudgetAreIndependent 证明模型名单和额度是两件独立的事，
 // 而且分别报出各自的理由。
 //
-// 两者都用 401 或 429 拒绝，所以只有错误信息能把它们区分开。混在一起会让运维
+// 两者可能使用相同的 403，应结合错误类型和信息区分。混在一起会让运维
 // 不知道该去改哪个。
 // 参数 t（*testing.T）：当前测试。
 // 返回：无。
@@ -260,7 +260,7 @@ func TestModelRestrictionAndBudgetAreIndependent(t *testing.T) {
 	overBudget := h.do(http.MethodPost, "/v1/chat/completions", key, map[string]any{
 		"model": "regression-allowed", "messages": []any{map[string]any{"role": "user", "content": "y"}},
 	})
-	if overBudget.status != http.StatusTooManyRequests {
+	if overBudget.status != http.StatusForbidden {
 		t.Fatalf("an over-budget call answered %d: %s", overBudget.status, overBudget.describe())
 	}
 	if message := errorMessage(overBudget); !containsSubstring(message, "budget") {

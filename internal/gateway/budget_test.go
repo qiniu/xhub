@@ -35,7 +35,7 @@ func TestBudgetAttemptLifecycle(t *testing.T) {
 				w := httptest.NewRecorder()
 				out, ok := s.PrepareBudgetAttempt(w, r, p, "call", config.ModelEntry{}, protocol, raw, time.Now())
 				if balance <= 0 {
-					if ok || w.Code != 429 {
+					if ok || w.Code != 403 {
 						t.Fatalf("非正余额未拒绝: %d %s", w.Code, w.Body.String())
 					}
 					return

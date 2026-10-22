@@ -71,10 +71,10 @@ export function registerBudgetBoundary(layer: "organization" | "team" | "persona
       const before = await info();
       const upstream = await requestCount(page);
       const blocked = await invoke("blocked");
-      expect(blocked.status(), await blocked.text()).toBe(429);
+      expect(blocked.status(), await blocked.text()).toBe(403);
       // 预算协议明确使用英文范围名；明确校验归因，防止其他层拒绝误算通过。
       const scope = { organization: "Organization", team: "Team", personal: "User", project: "Project", key: "Key" }[layer];
-      expect(await blocked.json()).toMatchObject({ error: { type: "budget_exceeded", code: "429", message: scope + " budget has been exceeded" } });
+      expect(await blocked.json()).toMatchObject({ error: { type: "budget_exceeded", code: "403", message: scope + " budget has been exceeded" } });
       expect(await requestCount(page), "预算拒绝不得转发上游").toEqual(upstream);
       const after = await info();
       expect(after.spend, "预算拒绝不得增加支出").toEqual(before.spend);

@@ -133,7 +133,7 @@ test("层级预算 " + scenario, async ({ page }) => {
       headers: { Authorization: "Bearer " + shared.key },
       data: body,
     });
-    expect(blocked.status()).toBe(429);
+    expect(blocked.status()).toBe(403);
     const inference = await page.request.post(GATEWAY + "/v1/chat/completions", {
       headers: { Authorization: "Bearer " + fixed.key },
       data: body,
@@ -167,7 +167,7 @@ test("层级预算 " + scenario, async ({ page }) => {
     const newInference = await page.request.post(GATEWAY + "/v1/chat/completions", {
       headers: { Authorization: "Bearer " + newKey.key }, data: body,
     });
-    expect(newInference.status(), "固定 Key 已占满个人分配，新共享 Key 不能凭空增加预算").toBe(429);
+    expect(newInference.status(), "固定 Key 已占满个人分配，新共享 Key 不能凭空增加预算").toBe(403);
     const expanded = await page.request.post(GATEWAY + "/user/update", {
       headers, data: { user_id: userID, max_budget: 401 },
     });

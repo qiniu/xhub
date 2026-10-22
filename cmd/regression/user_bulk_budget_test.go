@@ -89,7 +89,7 @@ func TestUserBulkBudgetContract(t *testing.T) {
 	h.ok(http.MethodPost, "/user/bulk_update", admin, bulkBudgetRequest(ids, 0))
 	calls := len(h.upstreamCalls())
 	chat := map[string]any{"model": "bulk-budget-chat", "messages": []any{map[string]any{"role": "user", "content": "Verify budget execution."}}, "max_tokens": 8}
-	if r := h.do(http.MethodPost, "/v1/chat/completions", a.key, chat); r.status != 429 {
+	if r := h.do(http.MethodPost, "/v1/chat/completions", a.key, chat); r.status != 403 {
 		t.Fatalf("零预算未拦截实际Key调用: %s", r.describe())
 	}
 	if len(h.upstreamCalls()) != calls {

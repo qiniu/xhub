@@ -43,7 +43,7 @@ export function registerHardBudgetSearchScenario(locale: "zh-CN" | "en") {
       await stableGoto(page, "/api-keys?key=" + keyID);
       await expect(page.getByLabel(tr("Max Budget (USD)"), { exact: true })).toHaveValue("0.00002");
       const denied = await page.request.post(GATEWAY + "/v1/responses", { headers: { Authorization: "Bearer " + key.key }, data: { model: name, input: "Search again.", tools: [{ type: "web_search" }], max_output_tokens: 32 } });
-      expect(denied.status()).toBe(429);
+      expect(denied.status()).toBe(403);
       expect((await denied.json()).error).toBeTruthy();
     } finally {
       if (keyID) expect((await page.request.post(GATEWAY + "/key/delete", { headers, data: { keys: [keyID] } })).ok()).toBeTruthy();

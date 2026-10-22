@@ -65,3 +65,58 @@ func TestUsageLogCategories(t *testing.T) {
 		}
 	}
 }
+
+// TestUsageErrorFilters 验证最终状态和完整错误正文在分页、计数及会话聚合前共同收窄。
+// 前置私有数据库，覆盖字面通配符、非法码、缺少详情、零匹配和身份隔离；testDB清理schema。
+func TestUsageErrorFilters(t *testing.T) {
+	db := testDB(t)
+	ctx := context.Background()
+	for _, tc := range []struct {
+		id, user, message string
+		code              int
+	}{
+		{"budget-a", "owner", "budget_exceeded %_", 403}, {"budget-b", "owner", "budget_exceeded second", 403},
+		{"rate", "owner", "rate_limit", 429}, {"foreign", "other", "budget_exceeded %_", 403},
+		{"missing", "owner", "", 402},
+	} {
+		r := usageRecord(tc.id, "", 0)
+		r.UserID, r.SessionID, r.Status, r.HTTPStatus, r.Error = tc.user, "shared", "error", tc.code, tc.message
+		if err := db.RecordUsage(ctx, []UsageRecord{r}); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if _, err := db.Engine.Exec("DELETE FROM request_logs WHERE request_id = ?", "missing"); err != nil {
+		t.Fatal(err)
+	}
+	for _, tc := range []struct {
+		code, message string
+		count         int
+	}{
+		{"", "", 4}, {"403", "", 2}, {"429", "", 1}, {"402", "", 1}, {"403", "budget_exceeded", 2},
+		{"403", "%_", 1}, {"429", "budget_exceeded", 0}, {"", "no-such-error", 0},
+		{"", "' OR true --", 0}, {"invalid", "", 0}, {"99", "", 0}, {"600", "", 0}, {"403 OR true", "", 0},
+	} {
+		q := UsageQuery{UserID: "owner", ErrorCode: tc.code, ErrorMessage: tc.message, Limit: 1}
+		count, err := db.CountUsage(ctx, q)
+		if err != nil || count != int64(tc.count) {
+			t.Fatalf("筛选%+v计数错误: %d %v", tc, count, err)
+		}
+		rows, err := db.ListUsage(ctx, q)
+		want := min(tc.count, 1)
+		if err != nil || len(rows) != want {
+			t.Fatalf("筛选%+v分页错误: %d %v", tc, len(rows), err)
+		}
+		groups, total, err := db.ListUsageSessions(ctx, q)
+		if err != nil || len(groups) != want || total != int64(want) {
+			t.Fatalf("会话筛选%+v错误: %d %d %v", tc, len(groups), total, err)
+		}
+		if want > 0 && groups[0].SessionCount != int64(tc.count) {
+			t.Fatalf("会话统计未收窄: %+v", groups)
+		}
+	}
+	q := UsageQuery{UserID: "owner", ErrorCode: "403", Limit: 1, Offset: 1}
+	rows, err := db.ListUsage(ctx, q)
+	if err != nil || len(rows) != 1 {
+		t.Fatalf("第二页遗漏匹配记录: %v %v", rows, err)
+	}
+}

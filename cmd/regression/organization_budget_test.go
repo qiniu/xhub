@@ -8,7 +8,7 @@ import (
 	"time"
 )
 
-// TestOrganizationBudgetPendingPeriod 验证 Redis 旧周期积压及重置后迟到旧账单不会阻塞新预算，当前费用仍执行 429。
+// TestOrganizationBudgetPendingPeriod 验证 Redis 旧周期积压及重置后迟到旧账单不会阻塞新预算，当前费用仍执行 403。
 // 前置专用 Redis、隔离 PostgreSQL 和本地真实 HTTP 网关；同时覆盖升级前无索引队列、虚拟 Key 与会话入口。
 // 参数 t 为测试上下文，无返回；原始队列经生产 Flush 唯一落库，harness 和 isolatedSpendRedis 清理资源。
 func TestOrganizationBudgetPendingPeriod(t *testing.T) {
@@ -32,7 +32,7 @@ func TestOrganizationBudgetPendingPeriod(t *testing.T) {
 			} else if err := h.gw.Live.EnqueueSpend(row); err != nil {
 				t.Fatal(err)
 			}
-			if got := h.do("POST", "/v1/chat/completions", owner.key, chatRequest("budget-pending-model", "Check exhausted previous budget.")); got.status != 429 {
+			if got := h.do("POST", "/v1/chat/completions", owner.key, chatRequest("budget-pending-model", "Check exhausted previous budget.")); got.status != 403 {
 				t.Fatalf("到期前积压应阻止调用: %s", got.describe())
 			}
 			if _, err := h.db.Engine.Exec("UPDATE organizations SET budget_reset_at=? WHERE id=?", time.Now().Add(-time.Second), owner.orgID); err != nil {
@@ -50,7 +50,7 @@ func TestOrganizationBudgetPendingPeriod(t *testing.T) {
 			}
 			for _, token := range []string{owner.key, owner.session} {
 				got := h.do("POST", "/v1/chat/completions", token, chatRequest("budget-pending-model", "Verify current period limit."))
-				if got.status != 429 {
+				if got.status != 403 {
 					t.Fatalf("当前周期积压未执行限额: %s", got.describe())
 				}
 			}
@@ -116,7 +116,7 @@ func TestOrganizationBudgetAndFilters(t *testing.T) {
 		t.Fatal(err)
 	}
 	mark := len(h.upstreamCalls())
-	if r := h.do("POST", "/v1/chat/completions", owner.key, chatRequest("period-model", "Verify exhausted organization budget.")); r.status != 429 || len(h.upstreamCalls()) != mark {
+	if r := h.do("POST", "/v1/chat/completions", owner.key, chatRequest("period-model", "Verify exhausted organization budget.")); r.status != 403 || len(h.upstreamCalls()) != mark {
 		t.Fatal("到期前没有拒绝", r.describe())
 	}
 	if _, err := h.db.Engine.Exec("UPDATE organizations SET budget_reset_at=? WHERE id=?", time.Now().Add(-time.Second), owner.orgID); err != nil {
