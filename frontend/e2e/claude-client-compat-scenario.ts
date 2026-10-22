@@ -139,9 +139,15 @@ export function registerClaudeClientCompatScenario(locale: "zh-CN" | "en") {
         const info = (await (await page.request.get(GATEWAY + "/key/info?key=" + keyID, { headers })).json()).info;
         return { spend: Number(Number(info.spend).toFixed(9)), pending: Number(info.budget_pending || 0) };
       }).toEqual({ spend: 0.000360, pending: 0 });
+      // 软预算不再按严格预算拦截上下文编辑；请求应抵达夹具上游，由上游返回不支持的编辑错误。
+      // 保留状态码、错误来源及余额断言，防止误恢复网关硬拦截或失败请求留下预占费用。
       const rejected = await page.request.post(GATEWAY + "/v1/messages", { headers: keyHeaders, data: { model, max_tokens: 64, messages: [{ role: "user", content: "Hello" }], context_management: { edits: [{ type: "compact_20260112" }] } } });
       expect(rejected.status()).toBe(400);
-      expect(await rejected.text()).toContain("keep-all");
+      expect(await rejected.text()).toContain("context edits changed");
+      await expect.poll(async () => {
+        const info = (await (await page.request.get(GATEWAY + "/key/info?key=" + keyID, { headers })).json()).info;
+        return { spend: Number(Number(info.spend).toFixed(9)), pending: Number(info.budget_pending || 0) };
+      }).toEqual({ spend: 0.000360, pending: 0 });
       await stableGoto(page, "/api-keys?key=" + keyID);
       await expect(page.getByLabel(tr("Max Budget (USD)"), { exact: true })).toHaveValue("1");
     } finally {
