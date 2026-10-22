@@ -253,7 +253,7 @@ func (s *Server) recordSpend(w http.ResponseWriter, p *auth.Principal, callID, a
 	}
 	if status >= 400 {
 		// 失败正文是排障证据，不能受提示词保存开关影响。请求正文仍按原开关处理。
-		row.Error = ex.rawResponse
+		row.Error = requestlog.FailureJSON(note.Upstream, ex.rawResponse)
 		row.Response = ex.rawResponse
 	}
 	if note.SettlementID != "" {

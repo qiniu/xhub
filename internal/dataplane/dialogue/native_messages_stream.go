@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"math"
 
+	dpdiagnostics "github.com/sunqirui1987/xhub/internal/dataplane/diagnostics"
 	llmdialogue "github.com/sunqirui1987/xhub/internal/llm/dialogue"
 )
 
@@ -30,8 +31,8 @@ func (s *nativeMessagesStream) consume(event map[string]any) (llmdialogue.Dialog
 	if typ == "ping" {
 		return llmdialogue.DialogueResult{}, false, nil
 	}
-	if typ == "error" || event["error"] != nil {
-		return fail("upstream error")
+	if upstreamErr := dpdiagnostics.ExtractUpstreamError(event); upstreamErr != nil {
+		return llmdialogue.DialogueResult{}, false, upstreamErr
 	}
 	if typ == "message_start" {
 		m := streamMap(event["message"])
