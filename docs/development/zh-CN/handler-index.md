@@ -183,6 +183,7 @@ x-litellm-call-id 关联调用与日志，x-litellm-response-cost 表示这次�
 | 方法与路径 | 处理器 | 注册源码 |
 | --- | --- | --- |
 | `GET /v1/models` | `List` | [mount.go](../../../internal/gateway/models/mount.go) |
+| `GET /v1/models/{id}` | `Detail` | [mount.go](../../../internal/gateway/models/mount.go) |
 | `GET /models` | `List` | [mount.go](../../../internal/gateway/models/mount.go) |
 | `GET /model/groups` | `Groups` | [mount.go](../../../internal/gateway/models/mount.go) |
 | `PUT /model/fallback` | `SetFallback` | [mount.go](../../../internal/gateway/models/mount.go) |

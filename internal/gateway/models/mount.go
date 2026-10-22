@@ -21,6 +21,7 @@ func Module(h Host) util.Module {
 	traceModule("models")
 	return util.Bind("models", func(reg util.Registrar) {
 		reg.Handle("GET /v1/models", func(w http.ResponseWriter, r *http.Request) { List(h, w, r) })
+		reg.Handle("GET /v1/models/{id}", func(w http.ResponseWriter, r *http.Request) { Detail(h, w, r) })
 		reg.Handle("GET /models", func(w http.ResponseWriter, r *http.Request) { List(h, w, r) })
 		reg.Handle("GET /model/groups", func(w http.ResponseWriter, r *http.Request) { Groups(h, w, r) })
 		reg.Handle("PUT /model/fallback", func(w http.ResponseWriter, r *http.Request) { SetFallback(h, w, r) })
