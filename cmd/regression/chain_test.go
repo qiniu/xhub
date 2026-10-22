@@ -8,7 +8,7 @@ import (
 
 // TestRequestChain 用同一个租户把路由、回退、项目额度、密钥重置和模型名单串起来。
 // 分开的链路各自绿，凑在一起仍可能互相抵消，所以这里再走一遍主路径。
-// 参数 t 为测试上下文，无返回；验证重置重新预留额度时的拒绝回滚及父级扩容后的恢复，harness 清理隔离资源。
+// 参数 t 为测试上下文，无返回；验证 Key 不预占预算时重置只清理自身消费，父级消费与限制仍生效，harness 清理隔离资源。
 func TestRequestChain(t *testing.T) { runSimulated(t, requestChainSimulated) }
 
 // requestChainSimulated 使用真实网关和本地供应商串联路由、项目耗尽、密钥重置与模型名单。
@@ -64,19 +64,8 @@ func requestChainSimulated(t *testing.T) {
 	h.setProjectBudget(t, admin, c.projectID, spent)
 	h.assertBudgetStop(t, c, admin, public, "project is the reason", "Project")
 
-	// 密钥归零会恢复未用预留金额，父级已消费不能被抹掉；满额分配时应拒绝且整体回滚。
+	// Key 金额只是独立上限，不预占个人额度；重置只清理当前 Key 的消费，不能抹掉父级消费。
 	beforeReset := h.moneyOf(t, c)
-	deniedReset := h.do(http.MethodPost, "/key/"+c.keyID+"/reset_spend", admin, map[string]any{})
-	if deniedReset.status != http.StatusBadRequest || deniedReset.json()["error"].(map[string]any)["type"] != "quota_allocation_exceeded" {
-		t.Fatalf("密钥重置超出个人可分配余额应返回 400: %s", deniedReset.describe())
-	}
-	if after := h.moneyOf(t, c); !after.same(beforeReset) {
-		t.Fatalf("重置拒绝未回滚五级金额: before=%+v after=%+v", beforeReset, after)
-	}
-	// 按组织、团队、个人顺序补足重新预留所需空间，项目保持耗尽，证明重置不解除项目限制。
-	h.setOrgBudget(t, admin, c.orgID, ceiling*2)
-	h.setTeamBudget(t, admin, c.teamID, ceiling*2)
-	h.setUserBudget(t, admin, c.userID, ceiling*2)
 	h.ok(http.MethodPost, "/key/"+c.keyID+"/reset_spend", admin, map[string]any{})
 	afterReset := h.moneyOf(t, c)
 	unchanged := afterReset
