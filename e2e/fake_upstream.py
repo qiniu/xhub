@@ -260,6 +260,11 @@ class Handler(BaseHTTPRequestHandler):
             req = json.loads(raw.decode() or "{}")
         except (json.JSONDecodeError, UnicodeDecodeError):
             req = {}
+        # 计数独立于生成：验证模型映射和服务端凭据，不要求 max_tokens。
+        if self.path.split("?")[0] == "/v1/messages/count_tokens":
+            valid = req.get("model") == "count-upstream" and isinstance(req.get("messages"), list) and self.headers.get("x-api-key") == "sk-fake"
+            self._response(200 if valid else 400, b'{"input_tokens":123}' if valid else b'{"error":{"message":"Invalid count contract"}}', "application/json")
+            return
         if serve_reference_history(self, req):
             return
         if handle_agent_history(self, req):

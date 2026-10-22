@@ -55,7 +55,7 @@ func ServeBypass(h dpcontract.Bypass, w http.ResponseWriter, r *http.Request, hi
 	}
 	body := requestBody.Fields
 	// 某些同步协议没有动作名，以登记的 ModelField 判定创建；任务 ID 则按路径/查询登记读取。
-	if hit.Action.Name == "create" || hit.Transport.ModelField != "" && hit.Action.Name == "" {
+	if hit.Action.Name == "count_tokens" || hit.Action.Name == "create" || hit.Transport.ModelField != "" && hit.Action.Name == "" {
 		serveBypassCreate(h, w, r, hit, p, body, raw, callID, start)
 		return
 	}
@@ -72,9 +72,9 @@ func ServeBypass(h dpcontract.Bypass, w http.ResponseWriter, r *http.Request, hi
 	serveBypassFollow(h, w, r, hit, id, callID, start, p)
 }
 
-// serveBypassCreate 为原生创建请求选择合法部署，转发原始协议并记录后续任务归属。
+// serveBypassCreate 为原生创建或只读计数请求选择合法部署，转发原始协议并按动作记录用量。
 // 参数 h、w、r、hit 为原生入口环境；principal 为已鉴权身份；body 是路由/计价字段投影，raw 是完整载荷；callID、start 标识本次调用与开始时间。
-// 返回值：无，写入原生响应或网关错误；仅由 ServeBypass 的创建分支调用。
+// 返回值：无，写入原生响应或网关错误；由 ServeBypass 的创建/计数分支调用，计数不预留或结算生成费用。
 // 公开模型可来自正文或登记路径；路径固定模型必须唯一映射公开别名，歧义时要求显式选择。
 // 每个候选都复核实际模型/组权限，附加服务端凭据，用登记传输替换模型并移除网关字段。
 // 同步对话且非 background 才允许安全重放；异步创建遭遇网络中断、超时或 5xx 时可能已创建付费任务，因此不能盲目再创建。
@@ -82,6 +82,8 @@ func ServeBypass(h dpcontract.Bypass, w http.ResponseWriter, r *http.Request, hi
 // 成功时按调用方与传输隔离任务 ID，保存部署和创建时计费事实，改写队列查询 URL，并提交成功会话目标。
 // 每次执行记录协议实测用量与出站诊断；资源清理由尝试上下文和响应正文关闭完成，远程任务生命周期由调用方管理。
 func serveBypassCreate(h dpcontract.Bypass, w http.ResponseWriter, r *http.Request, hit providercontract.Hit, principal *auth.Principal, body map[string]any, raw []byte, callID string, start time.Time) {
+	// 计数是原厂只读辅助操作，不预留生成预算、不提交响应归属、不提取计费用量。
+	countOnly := hit.Action.Name == "count_tokens"
 	requestBody, _ := dptransport.ParseBypassBody(raw, r.Header.Get("Content-Type"))
 	field := hit.Transport.ModelField
 	if field == "" {
@@ -233,7 +235,7 @@ func serveBypassCreate(h dpcontract.Bypass, w http.ResponseWriter, r *http.Reque
 						return
 					}
 				}
-				if budget, ok := h.(dpcontract.BudgetHost); ok {
+				if budget, ok := h.(dpcontract.BudgetHost); ok && !countOnly {
 					var allowed bool
 					payload, allowed = budget.PrepareBudgetAttempt(w, r, principal, callID, candidate, candidateHit.Transport.Protocol, payload, start)
 					if !allowed {
@@ -350,7 +352,7 @@ forwarded:
 		h.PinOfficial(scope, selectedID)
 	}
 	respBody = rewriteQueueURLs(hit, doc, respBody)
-	if status >= 200 && status < 300 {
+	if !countOnly && status >= 200 && status < 300 {
 		responseID, _ := doc["id"].(string)
 		if response.Streamed {
 			responseID = response.ResponseID
@@ -367,7 +369,7 @@ forwarded:
 	note.Upstream = response.Diagnostics
 	h.AnnotateCall(callID, note)
 	var usage map[string]any
-	if status >= 200 && status < 300 && hit.Transport.ResponseUsage != nil {
+	if !countOnly && status >= 200 && status < 300 && hit.Transport.ResponseUsage != nil {
 		usage = hit.Transport.ResponseUsage(doc, body)
 		if response.Streamed {
 			usage = response.Usage
@@ -575,7 +577,13 @@ func sameEndpoint(dep config.ModelEntry, hit providercontract.Hit) bool {
 func eligible(h dpcontract.Bypass, hit providercontract.Hit) []config.ModelEntry {
 	var out []config.ModelEntry
 	for _, m := range h.Models() {
-		if providerdeployment.Includes(m, hit.Transport.ID) && (hit.Action.Model == "" ||
+		// 使用本次入口权限与动作校验；标准计数不隐式打开 Bypass，跨协议计数不入池。
+		allowed := providerdeployment.Includes(m, hit.Transport.ID)
+		if hit.Action.Name == "count_tokens" {
+			_, resolveErr := providerdeployment.ResolveHit(hit, m)
+			allowed = resolveErr == nil
+		}
+		if allowed && (hit.Action.Model == "" ||
 			providercontract.OfficialID(hit.Transport.StripPrefix, m.ParamString("model", m.ModelName)) == hit.Action.Model) {
 			out = append(out, m)
 		}

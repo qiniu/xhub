@@ -65,6 +65,10 @@ func ResolveHit(hit providercontract.Hit, m config.ModelEntry) (providercontract
 	if !ok {
 		return providercontract.Hit{}, fmt.Errorf("execution profile missing")
 	}
+	// 原厂计数没有跨协议等价实现，禁止把 Anthropic 请求发给 OpenAI 执行器。
+	if hit.Action.Name == "count_tokens" && t.Protocol != hit.Transport.Protocol {
+		return providercontract.Hit{}, fmt.Errorf("native token counting requires matching upstream protocol")
+	}
 	// 固定动作保存上游模型路径；部署可保留执行传输声明的目录前缀。
 	model := providercontract.OfficialID(t.StripPrefix, m.ParamString("model", ""))
 	for _, a := range t.Actions {

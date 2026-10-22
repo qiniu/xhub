@@ -39,6 +39,10 @@ func (s *Server) serveBypass(w http.ResponseWriter, r *http.Request) bool {
 	if !ok || hit.Transport.Kind != providercontract.KindBypass {
 		return false
 	}
+	// 标准计数沿用 Messages 接入权限；Bypass 计数仍要求显式启用透传。
+	if hit.Action.Name == "count_tokens" && hit.Action.PublicPath == "/v1/messages/count_tokens" {
+		hit.Transport.EndpointID = "messages"
+	}
 	// Google 公共对话进入统一转换器；countTokens 保留原厂计数操作。
 	if (hit.Transport.Protocol == "gemini" || hit.Transport.Protocol == "vertex") && !strings.HasPrefix(hit.Action.PublicPath, "/bypass/") && !strings.HasSuffix(hit.Action.PublicPath, ":countTokens") {
 		raw, err := io.ReadAll(io.LimitReader(r.Body, (64<<20)+1))

@@ -25,6 +25,7 @@ import (
 // 测试只操作内存配置或本地假上游，HTTP 服务及正文由本例关闭，不创建外部付费任务或持久化数据。
 func TestNativeBypassJSONAndUsage(t *testing.T) {
 	for _, spec := range []struct{ transport, path, upstream, protocol, response string }{
+		{"bypass_openai_chat", "/bypass/openai/v1/chat/completions", "/v1/chat/completions", "openai", `{"id":"c1","usage":{"prompt_tokens":100,"completion_tokens":4,"prompt_tokens_details":{"cached_tokens":25}}}`},
 		{"bypass_openai_responses", "/bypass/openai/v1/responses", "/v1/responses", "openai", `{"id":"r1","usage":{"input_tokens":100,"output_tokens":4,"input_tokens_details":{"cached_tokens":25}}}`},
 		{"bypass_anthropic_messages", "/bypass/anthropic/v1/messages", "/v1/messages", "anthropic", `{"id":"m1","usage":{"input_tokens":20,"output_tokens":4,"cache_read_input_tokens":30,"cache_creation_input_tokens":10}}`},
 	} {

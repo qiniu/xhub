@@ -15,6 +15,10 @@ func init() {
 		EndpointID: "bypass:anthropic-messages", Protocol: "anthropic-messages", Family: "chat", ModelField: "model",
 		Auth: contract.AuthConfig{Header: "x-api-key"}, Headers: map[string]string{"anthropic-version": "2023-06-01"},
 		ResponseUsage: measurement.NativeUsage("anthropic-messages"),
-		Actions:       []contract.Action{{Name: "create", Method: "POST", PublicPath: "/bypass/anthropic/v1/messages", UpstreamPath: "/v1/messages"}},
+		Actions: []contract.Action{
+			{Name: "create", Method: "POST", PublicPath: "/bypass/anthropic/v1/messages", UpstreamPath: "/v1/messages"},
+			{Name: "count_tokens", Method: "POST", PublicPath: "/bypass/anthropic/v1/messages/count_tokens", UpstreamPath: "/v1/messages/count_tokens"},
+			{Name: "count_tokens", Method: "POST", PublicPath: "/v1/messages/count_tokens", UpstreamPath: "/v1/messages/count_tokens"},
+		},
 	})
 }

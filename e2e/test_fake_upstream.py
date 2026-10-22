@@ -10,6 +10,18 @@ from e2e.fake_upstream import Handler, ERROR_LOG_JSON_DIAGNOSTIC, ERROR_LOG_TEXT
 
 
 class ArkUpstreamTest(unittest.TestCase):
+    def test_native_token_count(self):
+        """本地HTTP验证计数无需生成上限，模型/凭据错误400；前置setUp服务，tearDown回收。"""
+        body = {"model": "count-upstream", "messages": [{"role": "user", "content": "Count this input."}]}
+        request = Request(self.base + "/v1/messages/count_tokens", data=json.dumps(body).encode(), headers={"x-api-key": "sk-fake"})
+        with urlopen(request, timeout=2) as response:
+            self.assertEqual(json.load(response), {"input_tokens": 123})
+        for wrong in ({}, body):
+            with self.assertRaises(HTTPError) as error:
+                self.request("/v1/messages/count_tokens", wrong)
+            self.assertEqual(error.exception.code, 400)
+            error.exception.close()
+
     def test_hard_budget_search(self):
         """本地HTTP验证搜索声明不被注入cap，返回完整同步/流计费快照；注入cap拒绝，tearDown回收服务。"""
         body = {"model": "budget-search-browser-unit", "input": "Search for Go.", "tools": [{"type": "web_search"}]}
