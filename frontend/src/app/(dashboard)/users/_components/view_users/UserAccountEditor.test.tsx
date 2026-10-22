@@ -24,6 +24,24 @@ describe("UserAccountEditor", () => {
     await waitFor(() => expect(update).toHaveBeenCalledWith("session", expect.objectContaining({ max_budget: null }), null));
   });
 
+  /** 双语周期设置与取消：前置已有日期，验证完整选项和真实字段；失败保留日期，mock及组件由测试清理。 */
+  it.each(["en", "zh-CN"] as const)("edits calendar dates in %s", async (locale) => {
+    setActiveLocale(locale);
+    const actor = userEvent.setup();
+    render(<UserAccountEditor user={{ ...account, budget_reset_day: 15 }} accessToken="session" onSaved={vi.fn()} onCancel={vi.fn()} />);
+    const control = screen.getByLabelText(translate(locale, "userBudgetReset.label"));
+    expect(control).toHaveValue("15");
+    expect(control.querySelectorAll("option")).toHaveLength(32);
+    await actor.selectOptions(control, "31");
+    update.mockRejectedValueOnce(new Error("Unavailable"));
+    await actor.click(screen.getByRole("button", { name: translate(locale, "pages.users.saveChanges") }));
+    await waitFor(() => expect(fromError).toHaveBeenCalled());
+    expect(control).toHaveValue("31");
+    await actor.selectOptions(control, "0");
+    await actor.click(screen.getByRole("button", { name: translate(locale, "pages.users.saveChanges") }));
+    await waitFor(() => expect(update).toHaveBeenLastCalledWith("session", expect.objectContaining({ budget_reset_day: 0 }), null));
+  });
+
   /** 团队预算说明：前置已有团队且个人额度为空，双语占位符保持共享上级；卸载及恢复语言清理。 */
   it.each(["en", "zh-CN"] as const)("keeps the shared budget placeholder with a team in %s", (locale) => {
     setActiveLocale(locale);
@@ -43,7 +61,7 @@ describe("UserAccountEditor", () => {
     await user.type(screen.getByLabelText("Max Budget (USD)"), "0");
     await user.click(screen.getByRole("button", { name: "Save Changes" }));
     await waitFor(() => expect(onSaved).toHaveBeenCalledOnce());
-    expect(update).toHaveBeenCalledWith("session", { user_id: "u1", user_email: "user@example.com", user_alias: "After", user_role: "user", max_budget: 0, rpm_limit: null, tpm_limit: null, blocked: false }, null);
+    expect(update).toHaveBeenCalledWith("session", { user_id: "u1", user_email: "user@example.com", user_alias: "After", budget_reset_day: 0, user_role: "user", max_budget: 0, rpm_limit: null, tpm_limit: null, blocked: false }, null);
   });
 
   /** 边界保存：前置名称/预算为空且账户禁用，验证空名称和无限预算不会被默认值覆盖；卸载清理。 */

@@ -285,3 +285,20 @@ func TestSoftQuotaPositiveBoundary(t *testing.T) {
 		}
 	}
 }
+
+// TestUserQuotaHotPeriod 验证个人预算独立向热费用读取器传递周期，包含余额耗尽边界；纯内存，无资源清理。
+func TestUserQuotaHotPeriod(t *testing.T) {
+	start := time.Now()
+	for _, spent := range []float64{0, 10} {
+		u := &quotaNode{ID: "u", Kind: "user", PeriodStart: &start, Limit: quotaLimit(10)}
+		_, _, scope, err := quotaPath(map[string]*quotaNode{"user:u": u}, "user:u", func(kind, id string, since ...time.Time) float64 {
+			if kind != "user" || id != "u" || len(since) != 1 || !since[0].Equal(start) {
+				t.Fatal("个人热账单丢失周期")
+			}
+			return spent
+		})
+		if err != nil || (scope == "user") != (spent == 10) {
+			t.Fatalf("个人余额判断错误: %s %v", scope, err)
+		}
+	}
+}

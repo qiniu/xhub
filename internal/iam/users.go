@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"strings"
+	"time"
 
 	"github.com/sunqirui1987/xhub/internal/util"
 	"golang.org/x/crypto/bcrypt"
@@ -146,13 +147,15 @@ func defaultAdminName(email string) string {
 
 // UserInput creates an account. Only platform administrators call this.
 type UserInput struct {
-	RPMLimit  *int
-	TPMLimit  *int
-	Email     string
-	Name      string
-	Password  string
-	Role      string
-	MaxBudget *float64
+	// BudgetResetDay为可选个人刷新日，缺省不刷新。
+	BudgetResetDay *int
+	RPMLimit       *int
+	TPMLimit       *int
+	Email          string
+	Name           string
+	Password       string
+	Role           string
+	MaxBudget      *float64
 	// TeamID and TeamRole put the new account on a team in the same
 	// transaction that creates it. Creating an account and adding it to a team
 	// were two calls, and the second could fail on its own, which left a person
@@ -192,6 +195,11 @@ func (db *DB) CreateUser(ctx context.Context, by Actor, in UserInput) (*User, er
 	err = db.tx(ctx, func(s *xorm.Session) error {
 		u := User{ID: newID(), Email: normEmail(in.Email), Name: in.Name, PasswordHash: hash,
 			Role: in.Role, Status: StatusActive, SessionVersion: 1, MaxBudget: in.MaxBudget, RPMLimit: in.RPMLimit, TPMLimit: in.TPMLimit}
+		if in.BudgetResetDay != nil {
+			if err := configureUserBudget(&u, *in.BudgetResetDay, time.Now()); err != nil {
+				return err
+			}
+		}
 		if _, err := s.Insert(&u); err != nil {
 			return err
 		}
@@ -257,6 +265,9 @@ func (db *DB) UsersByIDs(ctx context.Context, ids []string) (map[string]User, er
 // 调用：authz/decide.go、gateway/identity/handlers.go、gateway/limits.go、gateway/session.go
 // 测试：authz_test.go
 func (db *DB) GetUser(ctx context.Context, id string) (*User, error) {
+	if err := db.ResetUserBudgets(ctx, time.Now()); err != nil {
+		return nil, err
+	}
 	s := db.session(ctx)
 	defer s.Close()
 	return getUser(ctx, s, id)
@@ -284,6 +295,9 @@ func getUser(_ context.Context, s *xorm.Session, id string) (*User, error) {
 // 调用：gateway/access.go、gateway/identity/handlers.go、gateway/usage/reports.go
 // 测试：无直接单测
 func (db *DB) ListUsers(ctx context.Context, query string, limit, offset int) ([]User, error) {
+	if err := db.ResetUserBudgets(ctx, time.Now()); err != nil {
+		return nil, err
+	}
 	if limit <= 0 || limit > 500 {
 		limit = 100
 	}
@@ -447,13 +461,15 @@ func (db *DB) SetPassword(ctx context.Context, by Actor, id, password string) er
 
 // UserUpdate 是管理员修改账户时的增量字段；nil 保留原值，Name 的空字符串用于清空显示名称。
 type UserUpdate struct {
-	RPMLimit  **int
-	TPMLimit  **int
-	Name      *string
-	Role      *string
-	Status    *string
-	MaxBudget **float64
-	Email     *string
+	// BudgetResetDay缺省保持，0取消，1至31按北京时间月度刷新。
+	BudgetResetDay *int
+	RPMLimit       **int
+	TPMLimit       **int
+	Name           *string
+	Role           *string
+	Status         *string
+	MaxBudget      **float64
+	Email          *string
 }
 
 // AdminUpdateUser 在同一事务中修改名称、角色、状态、邮箱和预算；供用户更新接口调用。
@@ -469,6 +485,11 @@ func (db *DB) AdminUpdateUser(ctx context.Context, by Actor, id string, in UserU
 			return err
 		}
 		next := *cur
+		if in.BudgetResetDay != nil {
+			if err := configureUserBudget(&next, *in.BudgetResetDay, time.Now()); err != nil {
+				return err
+			}
+		}
 		if in.RPMLimit != nil {
 			next.RPMLimit = *in.RPMLimit
 		}
@@ -507,7 +528,7 @@ func (db *DB) AdminUpdateUser(ctx context.Context, by Actor, id string, in UserU
 		if next.Role != cur.Role || next.Status != cur.Status {
 			next.SessionVersion = cur.SessionVersion + 1
 		}
-		if _, err := s.ID(id).Cols("name", "role", "status", "max_budget", "email", "session_version", "rpm_limit", "tpm_limit").Update(&next); err != nil {
+		if _, err := s.ID(id).Cols("name", "role", "status", "max_budget", "email", "session_version", "rpm_limit", "tpm_limit", "budget_reset_day", "budget_reset_at").Update(&next); err != nil {
 			return err
 		}
 		if next.Status != StatusActive && cur.Status == StatusActive {
@@ -524,7 +545,7 @@ func (db *DB) AdminUpdateUser(ctx context.Context, by Actor, id string, in UserU
 			}
 		}
 		return writeAudit(s, by, Audit{Action: "user.update", ObjectType: "user", ObjectID: id,
-			Detail: map[string]any{"role": next.Role, "status": next.Status}})
+			Detail: map[string]any{"role": next.Role, "status": next.Status, "previous_budget_reset_day": cur.BudgetResetDay, "budget_reset_day": next.BudgetResetDay}})
 	})
 	return out, err
 }

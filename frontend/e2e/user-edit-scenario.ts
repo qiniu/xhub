@@ -24,6 +24,7 @@ test("users can be edited and their team access follows membership changes", asy
     await page.getByRole("menuitem", { name: t("pages.users.editUser"), exact: true }).click();
     await expect(page.getByLabel(t("pages.users.alias"))).toHaveValue("编辑前");
     await page.getByLabel(t("pages.users.alias")).fill("编辑后");
+    await page.getByLabel(t("userBudgetReset.label")).selectOption("15");
     await page.getByLabel(t("pages.users.email")).fill("user-edited@xhub.local");
     await page.getByLabel(t("pages.users.maxBudget")).fill("25");
     const saved = page.waitForResponse((response) => response.url().includes("/user/update") && response.request().method() === "POST");
@@ -34,6 +35,7 @@ test("users can be edited and their team access follows membership changes", asy
     await page.reload();
     await page.getByRole("button", { name: t("pages.users.editUser"), exact: true }).click();
     await expect(page.getByLabel(t("pages.users.alias"))).toHaveValue("编辑后");
+    await expect(page.getByLabel(t("userBudgetReset.label"))).toHaveValue("15");
     await page.getByLabel(t("pages.users.alias")).fill("未保存");
     await page.getByRole("button", { name: t("common.cancel"), exact: true }).click();
     await expect(page.getByText("编辑后", { exact: true })).toBeVisible();
@@ -62,7 +64,10 @@ test("users can be edited and their team access follows membership changes", asy
     expect(inference.ok(), await inference.text()).toBeTruthy();
     expect((await inference.json()).choices[0].message.content).toMatch(/ok/);
     await page.getByRole("button", { name: t("Remove from {value0}").replace("{value0}", team.team_alias), exact: true }).click();
+    // 页面会先隐藏成员行，必须等真实删除接口提交，避免推理与成员删除事务并发导致不一致快照。
+    const removed = page.waitForResponse(r => r.url().endsWith("/team/member_delete") && r.request().method() === "POST");
     await page.getByRole("dialog").getByRole("button", { name: t("common.delete"), exact: true }).click();
+    expect((await removed).status()).toBe(200);
     await expect(roleControl).toHaveCount(0);
     // 离队保留个人凭证；本账号已有个人预算，推理应继续成功，原团队管理权则必须消失。
     const personal = await page.request.post(GATEWAY + "/v1/chat/completions", { headers: { Authorization: "Bearer " + key.key }, data: { model: "gpt-4o-mini", messages: [{ role: "user", content: "personal access after leaving" }] } });

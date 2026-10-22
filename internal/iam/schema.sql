@@ -349,3 +349,9 @@ ALTER TABLE usage_events ADD COLUMN IF NOT EXISTS reasoning_effort TEXT NOT NULL
 
 -- 完整用量快照摘要用于磁盘重放精确确认；旧账单保持未知，不能伪造摘要。
 ALTER TABLE usage_events ADD COLUMN IF NOT EXISTS usage_fingerprint TEXT NOT NULL DEFAULT '';
+
+-- 个人预算默认不刷新；独立于组织周期，保留升级前的累计消费。
+ALTER TABLE users ADD COLUMN IF NOT EXISTS budget_reset_day INTEGER NOT NULL DEFAULT 0 CHECK (budget_reset_day BETWEEN 0 AND 31);
+ALTER TABLE users ADD COLUMN IF NOT EXISTS budget_reset_at TIMESTAMPTZ;
+ALTER TABLE users ADD COLUMN IF NOT EXISTS budget_period_start TIMESTAMPTZ;
+CREATE INDEX IF NOT EXISTS users_budget_reset_due ON users(budget_reset_at) WHERE budget_reset_day > 0;

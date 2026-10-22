@@ -54,7 +54,7 @@ func applyBudgetHolds(s *xorm.Session, nodes map[string]*quotaNode) error {
 		for kind, id := range map[string]string{"key": h.KeyID, "user": h.UserID, "team": h.TeamID, "org": h.OrgID} {
 			if n := nodes[kind+":"+id]; n != nil {
 				// 组织按请求开始时间归属周期；旧周期占用仍保留在其他层级与核对列表。
-				if kind == "org" && n.PeriodStart != nil && h.StartedAt.Before(*n.PeriodStart) {
+				if (kind == "org" || kind == "user") && n.PeriodStart != nil && h.StartedAt.Before(*n.PeriodStart) {
 					continue
 				}
 				n.Spend += h.Amount
@@ -190,7 +190,7 @@ func (db *DB) ReserveBudget(ctx context.Context, requestID, kind, id string, amo
 			if n.Parent == "ambiguous" {
 				return ErrMultipleTeams
 			}
-			if n.Limit != nil && !(n.Kind == "org" && n.PeriodStart != nil && hold.StartedAt.Before(*n.PeriodStart)) {
+			if n.Limit != nil && !((n.Kind == "org" || n.Kind == "user") && n.PeriodStart != nil && hold.StartedAt.Before(*n.PeriodStart)) {
 				reserved := 0.0
 				for _, c := range n.Children {
 					value := quotaReserved(c)

@@ -114,6 +114,20 @@ export function registerUserBulkBudgetScenario(locale: "en" | "zh-CN") {
         expect(created.status(), await created.text()).toBe(200);
         users.push(await created.json());
       }
+      // 实际单用户编辑入口也必须保存并回读月度日期，不能只验证仓库中未挂载的旧组件。
+      await stableGoto(page, "/users");
+      await page.getByTestId(`user-actions-${users[0].user_id}`).click();
+      await page.getByRole("menuitem", { name: tr("pages.users.editUser"), exact: true }).click();
+      await page.getByLabel(tr("userBudgetReset.label")).selectOption("15");
+      const singleSaved = page.waitForResponse(r => r.url().endsWith("/user/update") && r.request().method() === "POST");
+      await page.getByRole("button", { name: tr("pages.users.saveChanges"), exact: true }).click();
+      expect((await singleSaved).status()).toBe(200);
+      expect((await read(users[0].user_id)).budget_reset_day).toBe(15);
+      await expect(page.getByText(tr("userBudgetReset.day", { day: 15 }), { exact: true })).toBeVisible();
+      await page.reload();
+      await page.getByRole("button", { name: tr("pages.users.editUser"), exact: true }).click();
+      await expect(page.getByLabel(tr("userBudgetReset.label"))).toHaveValue("15");
+      await page.getByRole("button", { name: tr("common.cancel"), exact: true }).click();
       const minted = await page.request.post(GATEWAY + "/key/generate", {
         headers,
         data: { user_id: users[0].user_id, key_alias: prefix },
@@ -122,6 +136,23 @@ export function registerUserBulkBudgetScenario(locale: "en" | "zh-CN") {
       const mintedKey = await minted.json();
       key = mintedKey.key;
       keyID = mintedKey.token_id;
+      // 双语页面只改刷新日期，额度必须保持null；再取消日期，刷新时间清空且原始用户名称保留。
+      for (const day of ["31", "0"]) {
+        const periodDialog = await openBulk();
+        await periodDialog.getByLabel(tr("userBudgetReset.label")).selectOption(day);
+        const changed = page.waitForResponse(r => r.url().endsWith("/user/bulk_update") && r.request().method() === "POST");
+        await periodDialog.getByRole("button", { name: tr("pages.users.saveChanges"), exact: true }).click();
+        expect((await changed).status()).toBe(200);
+        await expect(periodDialog).toHaveCount(0);
+        for (const user of users) {
+          const value = await read(user.user_id);
+          expect(value.max_budget).toBeNull();
+          expect(value.budget_reset_day).toBe(Number(day));
+          if (day === "0") expect(value.budget_reset_at).toBeNull();
+          else expect(value.budget_reset_at).toBeTruthy();
+          expect(value.user_alias).toContain("原始用户");
+        }
+      }
       const initialDialog = await openBulk();
       await initialDialog.getByLabel(tr("pages.users.bulkBudgetAction")).selectOption("set");
       await initialDialog.getByLabel(tr("pages.users.maxBudget"), { exact: true }).fill("-1");

@@ -148,7 +148,7 @@ export default function BulkCreateUsersButton({ accessToken, teams, onUsersCreat
               <table className="w-full text-sm">
                 <thead>
                   <tr>
-                    {["row", "email", "role", "budget", "status"].map((key) => (
+                    {["row", "email", "role", "budget", "resetDay", "status"].map((key) => (
                       <th key={key}>{tr(key)}</th>
                     ))}
                   </tr>
@@ -160,6 +160,7 @@ export default function BulkCreateUsersButton({ accessToken, teams, onUsersCreat
                       <td>{row.user.user_email}</td>
                       <td>{row.user.user_role}</td>
                       <td>{row.user.max_budget ?? "—"}</td>
+                      <td>{row.user.budget_reset_day ? t("userBudgetReset.day", { day: row.user.budget_reset_day }) : t("userBudgetReset.none")}</td>
                       <td>
                         {row.errors.length ? row.errors.map((key) => tr(key)).join("; ") : tr(row.status ?? "pending")}
                         {row.status === "failed" && <p>{tr("requestError")}</p>}

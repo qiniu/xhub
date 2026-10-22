@@ -1,3 +1,4 @@
+import { UserBudgetReset } from "@/components/common_components/user_budget_reset";
 import { useState } from "react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -11,7 +12,7 @@ import { useT } from "@/i18n";
 
 /** 管理员账户编辑表单。参数 user 为已加载账户、accessToken 为会话、onSaved/onCancel 为保存/取消回调；返回表单。
  * 供用户详情调用，仅提交后台支持的字段；预算留空共享唯一团队余额，无团队时留空不限额，填写预算限制个人累计消费。
- * 分钟上限留空继承上级，失败保留输入，提交期间禁止重复操作。
+ * 月度日期0不刷新，1至31为北京时间日期；分钟上限留空继承上级，失败保留输入，提交期间禁止重复操作。
  */
 export default function UserAccountEditor({ user, accessToken, onSaved, onCancel }: {
   user: UserInfoV2Response & { blocked?: boolean };
@@ -26,6 +27,7 @@ export default function UserAccountEditor({ user, accessToken, onSaved, onCancel
   const [budget, setBudget] = useState(user.max_budget == null ? "" : String(user.max_budget));
   const [rpm, setRpm] = useState(user.rpm_limit == null ? "" : String(user.rpm_limit));
   const [tpm, setTpm] = useState(user.tpm_limit == null ? "" : String(user.tpm_limit));
+  const [resetDay, setResetDay] = useState(String(user.budget_reset_day ?? 0));
   const [blocked, setBlocked] = useState(user.blocked ?? false);
   const [saving, setSaving] = useState(false);
   const roles = [{ value: "admin", label: t("Platform administrator") }, { value: "user", label: t("Regular user") }];
@@ -37,7 +39,7 @@ export default function UserAccountEditor({ user, accessToken, onSaved, onCancel
     setSaving(true);
     try {
       await userUpdateUserCall(accessToken, { user_id: user.user_id, user_email: email.trim(), user_alias: alias,
-        user_role: role, max_budget: budget === "" ? null : Number(budget), rpm_limit: rpm === "" ? null : Number(rpm), tpm_limit: tpm === "" ? null : Number(tpm), blocked }, null);
+        budget_reset_day: Number(resetDay), user_role: role, max_budget: budget === "" ? null : Number(budget), rpm_limit: rpm === "" ? null : Number(rpm), tpm_limit: tpm === "" ? null : Number(tpm), blocked }, null);
       await onSaved();
       toast.success(t("User updated successfully"));
     } catch (error) {
@@ -62,6 +64,9 @@ export default function UserAccountEditor({ user, accessToken, onSaved, onCancel
         <Field><FieldLabel htmlFor="edit-user-budget">{t("pages.users.maxBudget")}</FieldLabel>
           <Input id="edit-user-budget" type="number" min="0" step="0.01" aria-describedby="edit-user-budget-help" placeholder={t(user.teams?.length ? "quotaGuide.blank" : "pages.users.unlimited")} value={budget} onChange={(event) => setBudget(event.target.value)} />
           <p id="edit-user-budget-help" className="text-sm text-muted-foreground">{t("quotaGuide.personalBillingHelp")}</p></Field>
+        <Field><FieldLabel htmlFor="edit-user-reset-day">{t("userBudgetReset.label")}</FieldLabel>
+          <UserBudgetReset id="edit-user-reset-day" value={resetDay} onChange={setResetDay} disabled={saving} />
+          <p className="text-sm text-muted-foreground">{t("userBudgetReset.help")}</p></Field>
         <p className="text-sm text-muted-foreground">{t("quotaGuide.rates")}</p>
         <Field><FieldLabel htmlFor="edit-user-rpm">{t("Requests per minute Limit (RPM)")}</FieldLabel>
           <Input id="edit-user-rpm" type="number" min="0" max="2147483647" step="1" placeholder={t("quotaGuide.rateBlank")} value={rpm} onChange={(event) => setRpm(event.target.value)} /></Field>

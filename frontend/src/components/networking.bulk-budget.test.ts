@@ -40,6 +40,13 @@ describe("user bulk budget HTTP contract", () => {
     await userBulkUpdateUserCall("session", { max_budget: null }, undefined, true);
     expect(JSON.parse(fetcher.mock.calls[0][1].body)).toEqual({ all_users: true, user_updates: { max_budget: null } });
   });
+  /** 只设置刷新日期时不得序列化max_budget；真实请求构造配合HTTP替身，结束恢复fetch。 */
+  it("sends a reset date without clearing the cap", async () => {
+    const fetcher = vi.fn().mockResolvedValue(new Response(JSON.stringify({ atomic: true }), { status: 200 }));
+    global.fetch = fetcher;
+    await userBulkUpdateUserCall("session", { budget_reset_day: 0 }, ["first"]);
+    expect(JSON.parse(fetcher.mock.calls[0][1].body)).toEqual({ users: [{ user_id: "first", budget_reset_day: 0 }] });
+  });
   /** 验证空目标不会隐式扩大到全部；前置空数组，HTTP不应调用，console输出由测试恢复。 */
   it("rejects missing target before HTTP", async () => {
     vi.spyOn(console, "error").mockImplementation(() => undefined);

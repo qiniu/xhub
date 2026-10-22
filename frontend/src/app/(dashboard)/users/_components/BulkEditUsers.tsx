@@ -1,3 +1,4 @@
+import { UserBudgetReset } from "@/components/common_components/user_budget_reset";
 import React, { useId, useState } from "react";
 import { userBulkUpdateUserCall } from "@/components/networking";
 import { toast } from "@/lib/toast";
@@ -40,7 +41,7 @@ export function bulkBudgetErrorKey(error: unknown): string {
 }
 
 /** 用户批量预算表单；参数为目标用户、管理会话和关闭/刷新回调，返回真实原子接口驱动的可访问对话框。
- * 只支持设置预算上限或明确取消个人上限，零不等于留空；成功后刷新用户列表，失败保留输入，不修改角色/模型/团队或历史消费。 */
+ * 支持独立设置预算上限及月度刷新日，零不等于留空；成功后刷新用户列表，失败保留输入，不修改角色/模型/团队或历史消费。 */
 const BulkBudgetForm: React.FC<BulkEditUserModalProps> = ({
   open,
   onCancel,
@@ -53,6 +54,8 @@ const BulkBudgetForm: React.FC<BulkEditUserModalProps> = ({
   const [loading, setLoading] = useState(false);
   const [updateAllUsers, setUpdateAllUsers] = useState(false);
   const [mode, setMode] = useState("");
+  const [resetDay, setResetDay] = useState("");
+  const resetId = useId();
   const [budget, setBudget] = useState("");
   const [error, setError] = useState("");
   const allId = useId(),
@@ -66,7 +69,7 @@ const BulkBudgetForm: React.FC<BulkEditUserModalProps> = ({
     if (
       !accessToken ||
       (!updateAllUsers && selectedUsers.length === 0) ||
-      !mode ||
+      (!mode && resetDay === "") ||
       (mode === "set" && (budget.trim() === "" || !Number.isFinite(Number(budget)) || Number(budget) < 0))
     ) {
       setError(t("pages.users.bulkBudgetInvalid"));
@@ -75,10 +78,12 @@ const BulkBudgetForm: React.FC<BulkEditUserModalProps> = ({
     setLoading(true);
     setError("");
     try {
-      const value = mode === "clear" ? null : Number(budget);
+      const changes: { max_budget?: number | null; budget_reset_day?: number } = {};
+      if (mode) changes.max_budget = mode === "clear" ? null : Number(budget);
+      if (resetDay !== "") changes.budget_reset_day = Number(resetDay);
       const result = await userBulkUpdateUserCall(
         accessToken,
-        { max_budget: value },
+        changes,
         updateAllUsers ? undefined : selectedUsers.map((user) => user.user_id),
         updateAllUsers,
       );
@@ -189,6 +194,11 @@ const BulkBudgetForm: React.FC<BulkEditUserModalProps> = ({
               <option value="clear">{t("pages.users.bulkBudgetClear")}</option>
             </select>
           </div>
+          <div className="space-y-2">
+            <label htmlFor={resetId}>{t("userBudgetReset.label")}</label>
+            <UserBudgetReset id={resetId} value={resetDay} onChange={setResetDay} allowKeep disabled={loading} />
+            <p className="text-sm text-muted-foreground">{t("userBudgetReset.help")}</p>
+          </div>
           {mode === "set" && (
             <div className="space-y-2">
               <label htmlFor={budgetId} className="text-sm font-medium">
@@ -216,7 +226,7 @@ const BulkBudgetForm: React.FC<BulkEditUserModalProps> = ({
             <Button type="button" variant="outline" disabled={loading} onClick={onCancel}>
               {t("Cancel")}
             </Button>
-            <Button type="submit" disabled={loading || !mode || (!updateAllUsers && selectedUsers.length === 0)}>
+            <Button type="submit" disabled={loading || (!mode && resetDay === "") || (!updateAllUsers && selectedUsers.length === 0)}>
               {t(loading ? "pages.users.saving" : "pages.users.saveChanges")}
             </Button>
           </div>

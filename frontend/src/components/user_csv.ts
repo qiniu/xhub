@@ -1,6 +1,6 @@
 import Papa from "papaparse";
 
-export const USER_CSV_COLUMNS = ["user_email", "user_role", "password", "user_alias", "team_id", "max_budget"];
+export const USER_CSV_COLUMNS = ["user_email", "user_role", "password", "user_alias", "team_id", "max_budget", "budget_reset_day"];
 /** 提交给用户创建接口的白名单字段；密码仅用于本次请求，不得写入预览和导出。 */
 export interface CsvUser {
   user_email: string;
@@ -9,6 +9,7 @@ export interface CsvUser {
   user_alias?: string;
   team_id?: string;
   max_budget?: number;
+  budget_reset_day?: number;
 }
 /** 导入记录及非敏感结果；错误保存翻译键，以支持语言实时切换。 */
 export interface CsvRow {
@@ -58,6 +59,11 @@ export function parseUserCsv(text: string, teamIDs: string[]): CsvParse {
       if (!/^(?:\d+(?:\.\d*)?|\.\d+)$/.test(budget) || !Number.isFinite(Number(budget))) errors.push("budgetError");
       else user.max_budget = Number(budget);
     }
+    const resetDay = field("budget_reset_day").trim();
+    if (resetDay) {
+      if (!/^\d+$/.test(resetDay) || Number(resetDay) > 31) errors.push("resetDayError");
+      else user.budget_reset_day = Number(resetDay);
+    }
     if (field("user_alias").trim()) user.user_alias = field("user_alias").trim();
     if (field("team_id").trim()) {
       user.team_id = field("team_id").trim();
@@ -72,7 +78,7 @@ export function parseUserCsv(text: string, teamIDs: string[]): CsvParse {
 export function userCsvTemplate(): string {
   return Papa.unparse([
     USER_CSV_COLUMNS,
-    ["new.user@example.com", "user", "Replace-before-import-123!", "New User", "", "10"],
+    ["new.user@example.com", "user", "Replace-before-import-123!", "New User", "", "10", "1"],
   ]);
 }
 

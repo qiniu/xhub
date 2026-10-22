@@ -115,7 +115,7 @@ func (s *Server) checkIdentityLimits(w http.ResponseWriter, path string, p *auth
 			util.WriteTypedError(w, path, 401, "invalid_request_error", "user not found or blocked")
 			return false
 		}
-		if overBudget(user.MaxBudget, user.Spend, s.hotSpendRef("user", user.ID)) {
+		if overBudget(user.MaxBudget, user.Spend, s.hotSpendRef("user", user.ID, userPeriod(user))) {
 			util.WriteTypedError(w, path, 429, "budget_exceeded", "User budget has been exceeded")
 			return false
 		}
@@ -282,7 +282,7 @@ func (s *Server) keyBudgetOK(ctx context.Context, p *auth.Principal) error {
 		if !owner.Active() {
 			return errKeyUnusable
 		}
-		if overBudget(owner.MaxBudget, owner.Spend, s.hotSpendRef("user", owner.ID)) {
+		if overBudget(owner.MaxBudget, owner.Spend, s.hotSpendRef("user", owner.ID, userPeriod(owner))) {
 			return errBudget{scope: "User"}
 		}
 	}
@@ -397,6 +397,9 @@ func (s *Server) hotSpendRef(kind, id string, since ...time.Time) float64 {
 		}
 		return amount
 	}
+	if kind == "user" && len(since) > 0 && !since[0].IsZero() {
+		return s.Live.HotUserSpendSince(id, since[0])
+	}
 	if kind == "org" && len(since) > 0 && !since[0].IsZero() {
 		return s.Live.HotSpendSince(id, since[0])
 	}
@@ -477,6 +480,14 @@ func (s *Server) admitLocalRatePlan(plan live.RatePlan, est int, now time.Time) 
 func organizationPeriod(org *iam.Organization) time.Time {
 	if org.BudgetPeriodStart != nil {
 		return *org.BudgetPeriodStart
+	}
+	return time.Time{}
+}
+
+// userPeriod 返回个人预算起点；供身份准入过滤旧周期热账单，无周期时返回零值，不修改用户。
+func userPeriod(u *iam.User) time.Time {
+	if u != nil && u.BudgetPeriodStart != nil {
+		return *u.BudgetPeriodStart
 	}
 	return time.Time{}
 }

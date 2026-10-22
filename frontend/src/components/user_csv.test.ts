@@ -41,3 +41,15 @@ describe("user CSV contract", () => {
     expect(parsed.rows[1].errors).toEqual(["emailError", "roleError", "passwordError", "teamError"]);
   });
 });
+
+/** 日期解析兼容旧CSV；合法边界、缺省和错误输入均不修改原文，无持久资源。 */
+describe("CSV monthly reset dates", () => {
+  it.each(["", "0", "1", "31"])("accepts optional reset %s", (day) => {
+    const row = parseUserCsv(`user_email,user_role,password,budget_reset_day\nu@example.com,user,password1,${day}`, []).rows[0];
+    expect(row.errors).toEqual([]);
+    expect(row.user.budget_reset_day).toBe(day === "" ? undefined : Number(day));
+  });
+  it.each(["-1", "32", "1.5", "monthly", "NaN"])("rejects invalid reset %s", (day) => {
+    expect(parseUserCsv(`user_email,user_role,password,budget_reset_day\nu@example.com,user,password1,${day}`, []).rows[0].errors).toContain("resetDayError");
+  });
+});

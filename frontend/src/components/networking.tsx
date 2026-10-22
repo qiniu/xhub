@@ -902,6 +902,8 @@ export const teamDeleteCall = async (accessToken: string, teamID: string) => {
 };
 
 export interface UserInfo {
+  budget_reset_day?: number;
+  budget_reset_at?: string | null;
   user_id: string;
   user_email: string;
   user_alias: string | null;
@@ -971,6 +973,7 @@ export const userListCall = async (
  * Response type for /v2/user/info — lightweight endpoint that returns only the user object.
  */
 export interface UserInfoV2Response {
+  budget_reset_day?: number;
   rpm_limit?: number | null;
   tpm_limit?: number | null;
   user_id: string;
@@ -3015,11 +3018,11 @@ export const userUpdateUserCall = async (
   }
 };
 
-/** 原子设置用户预算上限；参数为会话、明确max_budget、选定ID或全部标记，返回真实批次结果。
+/** 原子设置用户预算及月度日期；参数为会话、独立可选的预算/日期、选定ID或全部标记，返回真实批次结果。
  * null取消个人上限，0保留为有效上限；未选择目标直接拒绝，不默认为全部，不重置消费。 */
 export const userBulkUpdateUserCall = async (
   accessToken: string,
-  formValues: { max_budget: number | null },
+  formValues: { max_budget?: number | null; budget_reset_day?: number },
   userIds?: string[],
   allUsers: boolean = false,
 ) => {

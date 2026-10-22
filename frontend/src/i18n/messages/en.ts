@@ -5,11 +5,14 @@ import { pageDescriptionsEn } from "./pageDescriptions.en";
 import { routeTemplatesEn } from "./routeTemplates.en";
 
 export const en = {
+  userBudgetReset: {"label": "Budget reset date", "keep": "Keep unchanged", "none": "No automatic reset", "day": "Day {day} of each month", "help": "Reset spending at 00:00 Beijing time (UTC+8). Short months use their last day. Changing this setting does not reset spending immediately or change other budget scopes.", "next": "Next reset: {date} (Beijing time)"},
   userCsv: {
+ "resetDay": "Reset date",
+ "resetDayError": "Reset day must be an integer from 0 to 31.",
   "title": "Bulk create users",
   "template": "Download CSV template",
   "upload": "Upload CSV",
-  "help": "Required: user_email, user_role (user or admin), password (8–72 UTF-8 bytes). Optional: user_alias, team_id, max_budget (USD; 0 blocks spending; blank leaves no personal cap). Only one team per user. No API keys are generated. Replace every example value before importing.",
+  "help": "Required: user_email, user_role (user or admin), password (8–72 UTF-8 bytes). Optional: user_alias, team_id, max_budget (USD; 0 blocks spending; blank leaves no personal cap). Only one team per user. No API keys are generated. Replace every example value before importing. Optional budget_reset_day: blank or 0 disables resets; 1–31 selects the monthly day (00:00 Beijing time; short months use the last day).",
   "privacy": "The CSV contains initial passwords. Keep it private. Passwords are never included in the preview or results.",
   "create": "Create {count} users",
   "reset": "Choose another file",
@@ -946,7 +949,7 @@ export const en = {
       export: "Export Data",
     },
     users: {
-      bulkBudgetHelp: "Set a maximum budget for each user. This does not add credit or reset spending. Only budgets are supported here; role, models, metadata, budget period and team membership stay as they are. A batch either updates every target or none.",
+      bulkBudgetHelp: "Change the budget cap and reset date independently. Fields left unchanged are preserved. Changes do not immediately reset spending. The whole batch succeeds or rolls back.",
       bulkBudgetAction: "Budget action",
       bulkBudgetKeep: "Do not change",
       bulkBudgetSet: "Set maximum budget",

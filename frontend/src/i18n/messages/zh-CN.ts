@@ -6,11 +6,14 @@ import { pageDescriptionsZhCN } from "./pageDescriptions.zh-CN";
 import { routeTemplatesZhCN } from "./routeTemplates.zh-CN";
 
 export const zhCN = {
+  userBudgetReset: {"label": "预算刷新日期", "keep": "保持原值", "none": "不自动刷新", "day": "每月 {day} 日", "help": "北京时间 00:00 刷新已消费额度。短月份取当月最后一天；修改设置不会立即清零消费，不影响其他层级额度。", "next": "下次刷新：{date}（北京时间）"},
   userCsv: {
+ "resetDay": "刷新日期",
+ "resetDayError": "刷新日期必须是 0～31 的整数。",
   "title": "批量创建用户",
   "template": "下载 CSV 模板",
   "upload": "上传 CSV",
-  "help": "必填：user_email、user_role（user 或 admin）、password（8–72 个 UTF-8 字节）。可选：user_alias、team_id、max_budget（美元；0 表示禁止消费；留空表示不设置个人上限）。每人仅支持一个团队，不自动生成 Key。导入前请替换全部示例值。",
+  "help": "必填：user_email、user_role（user 或 admin）、password（8–72 个 UTF-8 字节）。可选：user_alias、team_id、max_budget（美元；0 表示禁止消费；留空表示不设置个人上限）。每人仅支持一个团队，不自动生成 Key。导入前请替换全部示例值。 可选 budget_reset_day：留空或 0 不刷新，1～31 为每月刷新日（北京时间 00:00，短月取末日）。",
   "privacy": "CSV 包含初始密码，请妥善保管。预览和结果文件不会显示密码。",
   "create": "创建 {count} 个用户",
   "reset": "选择其他文件",
@@ -912,7 +915,7 @@ export const zhCN = {
       export: "导出数据",
     },
     users: {
-      bulkBudgetHelp: "为每位用户设置预算上限，不是增加余额，也不会重置已有消费。此处仅支持预算；角色、模型、元数据、预算周期和团队归属不变。整批全部成功或全部回滚。",
+      bulkBudgetHelp: "可分别修改预算上限和刷新日期；保持原值的项目不会变动。修改不会立即清零已消费额度，整批全部成功或全部回滚。",
       bulkBudgetAction: "预算操作",
       bulkBudgetKeep: "不修改",
       bulkBudgetSet: "设置预算上限",

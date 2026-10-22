@@ -142,6 +142,10 @@ func (db *DB) tx(ctx context.Context, fn func(*xorm.Session) error) error {
 		_ = s.Rollback()
 		return mapErr(err)
 	}
+	if err := resetUserBudgets(s, time.Now()); err != nil {
+		_ = s.Rollback()
+		return mapErr(err)
+	}
 	if err := fn(s); err != nil {
 		_ = s.Rollback()
 		return mapErr(err)

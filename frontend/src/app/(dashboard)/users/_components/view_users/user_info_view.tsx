@@ -35,7 +35,7 @@ import { ArrowLeft, CheckIcon, CopyIcon, KeyRound, Pencil, Plus, Trash2 } from "
 import UserAccountEditor from "./UserAccountEditor";
 import SetPasswordModal from "@/components/SetPasswordModal";
 import { toast } from "@/lib/toast";
-import { getBudgetDurationLabel } from "@/components/common_components/budget_duration_dropdown";
+
 import DeleteResourceModal from "@/components/common_components/DeleteResourceModal";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 
@@ -167,6 +167,8 @@ const memberRoleOptions = () => [
  * 保存后重新读取后台状态；普通用户仅查看，管理员可编辑账户、增删团队及调整团队角色，失败保留操作上下文。
  * 预算为空时有团队共享上级额度，无团队不限额；固定个人预算限制累计消费。
  */
+/** 用户详情展示与编辑入口；参数指定用户、管理会话及关闭回调，返回账户、团队和个人周期信息。
+ * 日期按北京时间显示；读取失败保留既有错误反馈，编辑通过真实账户接口保存并重新加载。 */
 export default function UserInfoView({
   userId,
   onClose,
@@ -657,10 +659,11 @@ export default function UserInfoView({
                   </div>
                 ))}
                 <div>
-                  <p className="font-medium">{t("pages.users.budgetReset")}</p>
-                  <p>{getBudgetDurationLabel(userData.budget_duration ?? null)}</p>
+                  <p className="font-medium">{t("userBudgetReset.label")}</p>
+                  <p>{userData.budget_reset_day ? t("userBudgetReset.day", { day: userData.budget_reset_day }) : t("userBudgetReset.none")}</p>
                 </div>
 
+                {userData.budget_reset_at && <p>{t("userBudgetReset.next", { date: new Intl.DateTimeFormat("sv-SE", { timeZone: "Asia/Shanghai", dateStyle: "short", timeStyle: "short" }).format(new Date(userData.budget_reset_at)) })}</p>}
                 <div>
                   <p className="font-medium">{t("pages.users.metadata")}</p>
                   <pre className="bg-muted p-2 rounded-sm text-xs overflow-auto mt-1">

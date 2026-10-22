@@ -307,6 +307,36 @@ func (c *Client) HotSpendSince(id string, since time.Time) float64 {
 	return total
 }
 
+// HotUserSpendSince 汇总用户本周期待落库费用；id和since指定个人周期，不修改队列。
+// 准入调用；一次队列快照避免扫描期间变动，损坏记录或读取失败返回NaN使准入明确失败。
+func (c *Client) HotUserSpendSince(id string, since time.Time) float64 {
+	if c == nil || id == "" {
+		return 0
+	}
+	if c.rdb == nil {
+		return math.NaN()
+	}
+	rows, err := c.rdb.LRange(context.Background(), "xhub:spendlog", 0, -1).Result()
+	if err != nil {
+		return math.NaN()
+	}
+	var total float64
+	for _, raw := range rows {
+		var row SpendLog
+		if json.Unmarshal([]byte(raw), &row) != nil {
+			return math.NaN()
+		}
+		if row.UserID != id || !row.SpendValid {
+			continue
+		}
+		started, err := time.Parse(time.RFC3339Nano, row.Start)
+		if err != nil || !started.Before(since) {
+			total += row.Spend
+		}
+	}
+	return total
+}
+
 var organizationPendingScript = redis.NewScript(`
 -- 全局待结算索引的数量必须覆盖整个队列，才能确认没有旧进程写入的未索引账单。
 if redis.call('SCARD', KEYS[2]) ~= redis.call('LLEN', KEYS[1]) then return nil end

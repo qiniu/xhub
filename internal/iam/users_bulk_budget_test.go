@@ -14,18 +14,18 @@ func TestNormalizeBulkUserBudgets(t *testing.T) {
 		in   BulkUserBudgetInput
 		want error
 	}{
-		{"selected", BulkUserBudgetInput{Users: []UserBudgetUpdate{{"b", quotaLimit(0)}, {"a", nil}}}, nil},
+		{"selected", BulkUserBudgetInput{Users: []UserBudgetUpdate{{UserID: "b", MaxBudget: quotaLimit(0)}, {UserID: "a", MaxBudget: nil}}}, nil},
 		{"all", BulkUserBudgetInput{AllUsers: true, MaxBudget: quotaLimit(1)}, nil},
 		{"all clear", BulkUserBudgetInput{AllUsers: true}, nil},
 		{"empty", BulkUserBudgetInput{}, ErrInvalid},
-		{"duplicate", BulkUserBudgetInput{Users: []UserBudgetUpdate{{"a", nil}, {"a", nil}}}, ErrInvalid},
-		{"empty ID", BulkUserBudgetInput{Users: []UserBudgetUpdate{{"", nil}}}, ErrInvalid},
-		{"whitespace ID", BulkUserBudgetInput{Users: []UserBudgetUpdate{{" a", nil}}}, ErrInvalid},
-		{"negative", BulkUserBudgetInput{Users: []UserBudgetUpdate{{"a", quotaLimit(-1)}}}, ErrInvalid},
+		{"duplicate", BulkUserBudgetInput{Users: []UserBudgetUpdate{{UserID: "a", MaxBudget: nil}, {UserID: "a", MaxBudget: nil}}}, ErrInvalid},
+		{"empty ID", BulkUserBudgetInput{Users: []UserBudgetUpdate{{UserID: "", MaxBudget: nil}}}, ErrInvalid},
+		{"whitespace ID", BulkUserBudgetInput{Users: []UserBudgetUpdate{{UserID: " a", MaxBudget: nil}}}, ErrInvalid},
+		{"negative", BulkUserBudgetInput{Users: []UserBudgetUpdate{{UserID: "a", MaxBudget: quotaLimit(-1)}}}, ErrInvalid},
 		{"infinite", BulkUserBudgetInput{AllUsers: true, MaxBudget: quotaLimit(math.Inf(1))}, ErrInvalid},
 		{"NaN", BulkUserBudgetInput{AllUsers: true, MaxBudget: quotaLimit(math.NaN())}, ErrInvalid},
-		{"mixed", BulkUserBudgetInput{AllUsers: true, Users: []UserBudgetUpdate{{"a", nil}}}, ErrInvalid},
-		{"implicit uniform", BulkUserBudgetInput{MaxBudget: quotaLimit(1), Users: []UserBudgetUpdate{{"a", nil}}}, ErrInvalid},
+		{"mixed", BulkUserBudgetInput{AllUsers: true, Users: []UserBudgetUpdate{{UserID: "a", MaxBudget: nil}}}, ErrInvalid},
+		{"implicit uniform", BulkUserBudgetInput{MaxBudget: quotaLimit(1), Users: []UserBudgetUpdate{{UserID: "a", MaxBudget: nil}}}, ErrInvalid},
 		{"too many", BulkUserBudgetInput{Users: make([]UserBudgetUpdate, MaxBulkUserBudgets+1)}, ErrBulkUserBudgetTooLarge},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
@@ -93,7 +93,7 @@ func TestAdminBulkUserBudgetsAtomic(t *testing.T) {
 		t.Fatal(err)
 	}
 	// 增加者放在数组最前，同一事务应按最终分配判断，不能受逐用户调用顺序影响。
-	result, err := db.AdminBulkUserBudgets(ctx, by, BulkUserBudgetInput{Users: []UserBudgetUpdate{{b.ID, quotaLimit(70)}, {a.ID, quotaLimit(30)}}})
+	result, err := db.AdminBulkUserBudgets(ctx, by, BulkUserBudgetInput{Users: []UserBudgetUpdate{{UserID: b.ID, MaxBudget: quotaLimit(70)}, {UserID: a.ID, MaxBudget: quotaLimit(30)}}})
 	if err != nil || len(result.Users) != 2 || result.BatchID == "" {
 		t.Fatalf("额度转移失败: %+v %v", result, err)
 	}
@@ -112,7 +112,7 @@ func TestAdminBulkUserBudgetsAtomic(t *testing.T) {
 		}
 	}
 	assertBudgets(30, 70)
-	for _, in := range []BulkUserBudgetInput{{Users: []UserBudgetUpdate{{a.ID, quotaLimit(40)}, {b.ID, quotaLimit(70)}}}, {Users: []UserBudgetUpdate{{a.ID, quotaLimit(20)}, {"missing", nil}}}} {
+	for _, in := range []BulkUserBudgetInput{{Users: []UserBudgetUpdate{{UserID: a.ID, MaxBudget: quotaLimit(40)}, {UserID: b.ID, MaxBudget: quotaLimit(70)}}}, {Users: []UserBudgetUpdate{{UserID: a.ID, MaxBudget: quotaLimit(20)}, {UserID: "missing", MaxBudget: nil}}}} {
 		if _, err := db.AdminBulkUserBudgets(ctx, by, in); err == nil {
 			t.Fatal("非法混合批次未拒绝")
 		}
@@ -121,7 +121,7 @@ func TestAdminBulkUserBudgetsAtomic(t *testing.T) {
 	if _, err := db.ReserveBudget(ctx, "bulk-hold", "user", a.ID, 10); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := db.AdminBulkUserBudgets(ctx, by, BulkUserBudgetInput{Users: []UserBudgetUpdate{{a.ID, quotaLimit(9)}, {b.ID, quotaLimit(60)}}}); !errors.Is(err, ErrQuotaAllocation) {
+	if _, err := db.AdminBulkUserBudgets(ctx, by, BulkUserBudgetInput{Users: []UserBudgetUpdate{{UserID: a.ID, MaxBudget: quotaLimit(9)}, {UserID: b.ID, MaxBudget: quotaLimit(60)}}}); !errors.Is(err, ErrQuotaAllocation) {
 		t.Fatalf("降额绕过硬预占: %v", err)
 	}
 	assertBudgets(30, 70)
@@ -131,7 +131,7 @@ func TestAdminBulkUserBudgetsAtomic(t *testing.T) {
 	if _, err := db.Engine.ID(a.ID).Cols("spend").Update(&User{Spend: 2}); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := db.AdminBulkUserBudgets(ctx, by, BulkUserBudgetInput{Users: []UserBudgetUpdate{{a.ID, quotaLimit(1)}, {b.ID, quotaLimit(60)}}}); !errors.Is(err, ErrQuotaAllocation) {
+	if _, err := db.AdminBulkUserBudgets(ctx, by, BulkUserBudgetInput{Users: []UserBudgetUpdate{{UserID: a.ID, MaxBudget: quotaLimit(1)}, {UserID: b.ID, MaxBudget: quotaLimit(60)}}}); !errors.Is(err, ErrQuotaAllocation) {
 		t.Fatalf("降额低于已有消费: %v", err)
 	}
 	result, err = db.AdminBulkUserBudgets(ctx, by, BulkUserBudgetInput{AllUsers: true})

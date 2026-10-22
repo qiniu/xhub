@@ -100,7 +100,7 @@ func (db *DB) OrgsByIDs(ctx context.Context, ids []string) (map[string]Organizat
 // 调用：authz/decide.go、gateway/identity/handlers.go、gateway/limits.go
 // 测试：无直接单测
 func (db *DB) GetOrg(ctx context.Context, id string) (*Organization, error) {
-	if err := db.ResetOrganizationBudgets(ctx, time.Now()); err != nil {
+	if err := db.ResetDueBudgets(ctx, time.Now()); err != nil {
 		return nil, err
 	}
 	s := db.session(ctx)
@@ -127,7 +127,7 @@ func getOrg(_ context.Context, s *xorm.Session, id string) (*Organization, error
 // 调用：gateway/identity/handlers.go、gateway/usage/entity_activity.go
 // 测试：无直接单测
 func (db *DB) ListOrgs(ctx context.Context, userID string) ([]Organization, error) {
-	if err := db.ResetOrganizationBudgets(ctx, time.Now()); err != nil {
+	if err := db.ResetDueBudgets(ctx, time.Now()); err != nil {
 		return nil, err
 	}
 	s := db.session(ctx)

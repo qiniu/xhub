@@ -28,7 +28,7 @@ func readBulkUserBudgetRequest(body io.Reader) (iam.BulkUserBudgetInput, error) 
 }
 
 // bulkUserBudgetFields 严格解析批量预算请求；参数为JSON对象，返回唯一目标模式或非法请求错误。
-// 仅支持max_budget：明确null取消个人上限，0是真实上限，留空/缺失不隐式清空；其他字段即使为null也拒绝。
+// 支持独立修改max_budget和budget_reset_day；缺省保持原值，额度null取消上限，周期0取消刷新。
 // 两种契约为users:[{user_id,max_budget}]，或all_users:true加user_updates:{max_budget}，不访问存储。
 func bulkUserBudgetFields(body map[string]any) (iam.BulkUserBudgetInput, error) {
 	var in iam.BulkUserBudgetInput
@@ -49,11 +49,14 @@ func bulkUserBudgetFields(body map[string]any) (iam.BulkUserBudgetInput, error) 
 			return in, iam.ErrInvalid
 		}
 		m, ok := body["user_updates"].(map[string]any)
-		if !ok || len(m) != 1 {
+		if !ok {
 			return in, iam.ErrInvalid
 		}
-		v, err := bulkBudgetValue(m)
-		in.MaxBudget = v
+		if _, exists := m["user_id"]; exists {
+			return in, iam.ErrInvalid
+		}
+		v, err := bulkUserChanges(m)
+		in.MaxBudget, in.KeepBudget, in.BudgetResetDay = v.MaxBudget, v.KeepBudget, v.BudgetResetDay
 		return in, err
 	}
 	if _, exists := body["user_updates"]; exists {
@@ -69,7 +72,7 @@ func bulkUserBudgetFields(body map[string]any) (iam.BulkUserBudgetInput, error) 
 	seen := map[string]bool{}
 	for _, value := range list {
 		m, ok := value.(map[string]any)
-		if !ok || len(m) != 2 {
+		if !ok {
 			return in, iam.ErrInvalid
 		}
 		id, ok := m["user_id"].(string)
@@ -78,15 +81,16 @@ func bulkUserBudgetFields(body map[string]any) (iam.BulkUserBudgetInput, error) 
 		}
 		seen[id] = true
 		for key := range m {
-			if key != "user_id" && key != "max_budget" {
+			if key != "user_id" && key != "max_budget" && key != "budget_reset_day" {
 				return in, iam.ErrInvalid
 			}
 		}
-		budget, err := bulkBudgetValue(m)
+		update, err := bulkUserChanges(m)
 		if err != nil {
 			return in, err
 		}
-		in.Users = append(in.Users, iam.UserBudgetUpdate{UserID: id, MaxBudget: budget})
+		update.UserID = id
+		in.Users = append(in.Users, update)
 	}
 	return in, nil
 }
@@ -132,7 +136,7 @@ func UserBulkBudgetUpdate(g Gate, w http.ResponseWriter, r *http.Request) {
 	}
 	switch {
 	case errors.Is(err, iam.ErrInvalid):
-		util.WriteError(w, 400, "bulk_budget_invalid", "Submit explicit numeric max_budget or null for unique users; no other updates are supported")
+		util.WriteError(w, 400, "bulk_budget_invalid", "Submit max_budget (nonnegative number or null) and/or budget_reset_day (0 to 31) for unique users")
 	case errors.Is(err, iam.ErrBulkUserBudgetTooLarge):
 		util.WriteError(w, 400, "bulk_budget_too_large", "An atomic batch supports at most 1000 users; select smaller batches")
 	case errors.Is(err, iam.ErrNotFound):
@@ -142,4 +146,43 @@ func UserBulkBudgetUpdate(g Gate, w http.ResponseWriter, r *http.Request) {
 	default:
 		g.WriteIAMError(w, r, err)
 	}
+}
+
+// userResetDay 解析可选刷新日；缺省保持原值，0不刷新，1至31为日期，拒绝null、字符串及小数。
+// 单人创建、更新及批量入口共用，不修改请求或持久化数据。
+func userResetDay(body map[string]any) (*int, error) {
+	raw, exists := body["budget_reset_day"]
+	if !exists {
+		return nil, nil
+	}
+	n, ok := raw.(float64)
+	if !ok || math.IsNaN(n) || math.IsInf(n, 0) || n < 0 || n > 31 || n != math.Trunc(n) {
+		return nil, iam.ErrInvalid
+	}
+	day := int(n)
+	return &day, nil
+}
+
+// bulkUserChanges 读取预算与周期独立变更；至少显式提交一项，缺省预算保持，返回严格命令或错误。
+// 批量解析器调用；不接受其他字段，以免忽略拼写错误造成看似保存成功。
+func bulkUserChanges(m map[string]any) (iam.UserBudgetUpdate, error) {
+	u := iam.UserBudgetUpdate{KeepBudget: true}
+	for k := range m {
+		if k != "user_id" && k != "max_budget" && k != "budget_reset_day" {
+			return u, iam.ErrInvalid
+		}
+	}
+	var err error
+	if _, ok := m["max_budget"]; ok {
+		u.KeepBudget = false
+		u.MaxBudget, err = bulkBudgetValue(m)
+		if err != nil {
+			return u, err
+		}
+	}
+	u.BudgetResetDay, err = userResetDay(m)
+	if err != nil || (u.KeepBudget && u.BudgetResetDay == nil) {
+		return u, iam.ErrInvalid
+	}
+	return u, nil
 }

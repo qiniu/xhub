@@ -29,8 +29,11 @@ export function registerUserCsvScenario(locale: "en" | "zh-CN") {
       const csv = template.replace("new.user@example.com", email).replace("New User", "测试名字");
       await dialog
         .getByLabel(tr("upload"))
-        .setInputFiles({ name: "users.csv", mimeType: "text/csv", buffer: Buffer.from(csv.replace(/10$/, "10abc")) });
+        .setInputFiles({ name: "users.csv", mimeType: "text/csv", buffer: Buffer.from(csv.replace(/,10,1$/, ",10abc,1")) });
       await expect(dialog.getByText(tr("budgetError"))).toBeVisible();
+      await expect(dialog.getByRole("button", { name: tr("create", { count: 1 }) })).toBeDisabled();
+      await dialog.getByLabel(tr("upload")).setInputFiles({ name: "users.csv", mimeType: "text/csv", buffer: Buffer.from(csv.replace(/,1$/, ",32")) });
+      await expect(dialog.getByText(tr("resetDayError"))).toBeVisible();
       await expect(dialog.getByRole("button", { name: tr("create", { count: 1 }) })).toBeDisabled();
       await dialog
         .getByLabel(tr("upload"))
@@ -48,6 +51,8 @@ export function registerUserCsvScenario(locale: "en" | "zh-CN") {
       expect(read.status()).toBe(200);
       const user = (await read.json()).user_info;
       expect(user.max_budget).toBe(10);
+      expect(user.budget_reset_day).toBe(1);
+      expect(user.budget_reset_at).toBeTruthy();
       expect(user.user_alias).toBe("测试名字");
       const signedIn = await page.request.post(GATEWAY + "/v2/login", {
         data: { username: email, password: "Replace-before-import-123!" },

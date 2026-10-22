@@ -86,7 +86,7 @@ func RecordUsage(h Runtime, id string, tokens int) {
 // FlushLoop 按指定周期将 Redis 用量队列刷入身份数据库；网关启动及隔离测试调用。
 // 参数 ctx 控制循环退出，h 提供存储依赖，interval 为启动时确定的周期；非正值回退到 5 秒。
 // 返回值无；取消后停止 ticker，正在进行的 Flush 会完成，不额外确认或清空未提交的队列。
-// 每轮同时补执行到期组织预算，即使 Redis 不可用；失败保留状态供下轮重试，重置与审计同事务。
+// 每轮同时补执行到期组织及个人预算，即使 Redis 不可用；失败保留状态供下轮重试，重置与审计同事务。
 // 队列失败保留批次，数据库提交后才确认 Redis，不改变可靠结算语义。
 func FlushLoop(ctx context.Context, h Runtime, interval time.Duration) {
 	if interval <= 0 {
@@ -101,8 +101,8 @@ func FlushLoop(ctx context.Context, h Runtime, interval time.Duration) {
 		case <-t.C:
 			// 没有 Redis 或没有调用时也执行到期充值；失败保留状态，由下轮/准入重试。
 			if db := h.Identity(); db != nil {
-				if err := db.ResetOrganizationBudgets(ctx, time.Now()); err != nil {
-					util.Error("organization budget reset failed: %v", err)
+				if err := db.ResetDueBudgets(ctx, time.Now()); err != nil {
+					util.Error("budget reset failed: %v", err)
 				}
 			}
 			Flush(h)

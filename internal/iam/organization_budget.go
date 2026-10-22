@@ -46,7 +46,7 @@ func configureOrganizationBudget(o *Organization, value string, now time.Time) e
 
 // ResetOrganizationBudgets 补执行到期组织预算；ctx 控制取消，now 为 UTC 检查时刻，返回存储错误。
 // 后台循环、组织读取及准入调用；无到期项只查询，有到期项通过管理/记账共用事务锁串行重置并写审计。
-// 停机跨多个周期直接推进到当前周期，不累积充值；历史 usage_events/daily、团队、用户、Key 额度均不改写。
+// 停机跨多个周期直接推进到当前周期，不累积充值；本组织重置不改写历史、团队和Key计数，事务另行检查独立的个人到期周期。
 func (db *DB) ResetOrganizationBudgets(ctx context.Context, now time.Time) error {
 	s := db.session(ctx)
 	defer s.Close()

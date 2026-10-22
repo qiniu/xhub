@@ -50,13 +50,19 @@ func UserNew(g Gate, w http.ResponseWriter, r *http.Request) {
 		util.WriteError(w, 400, "invalid_request", err.Error())
 		return
 	}
+	resetDay, resetErr := userResetDay(body)
+	if resetErr != nil {
+		util.WriteError(w, 400, "invalid_request", "budget_reset_day must be an integer from 0 to 31")
+		return
+	}
 	in := iam.UserInput{
-		Email:     str(body["user_email"]),
-		Name:      str(body["user_alias"]),
-		Password:  str(body["password"]),
-		Role:      iam.StoreRole(str(body["user_role"])),
-		MaxBudget: floatPtr(body["max_budget"]),
-		RPMLimit:  util.Rate(body, "rpm_limit"), TPMLimit: util.Rate(body, "tpm_limit"),
+		BudgetResetDay: resetDay,
+		Email:          str(body["user_email"]),
+		Name:           str(body["user_alias"]),
+		Password:       str(body["password"]),
+		Role:           iam.StoreRole(str(body["user_role"])),
+		MaxBudget:      floatPtr(body["max_budget"]),
+		RPMLimit:       util.Rate(body, "rpm_limit"), TPMLimit: util.Rate(body, "tpm_limit"),
 		TeamID:      str(body["team_id"]),
 		AdminOrgIDs: stringList(body["admin_organization_ids"]),
 	}
@@ -302,6 +308,11 @@ func UserUpdate(g Gate, w http.ResponseWriter, r *http.Request) {
 		util.WriteError(w, 400, "invalid_request", err.Error())
 		return
 	}
+	resetDay, resetErr := userResetDay(body)
+	if resetErr != nil {
+		util.WriteError(w, 400, "invalid_request", "budget_reset_day must be an integer from 0 to 31")
+		return
+	}
 	target := r.PathValue("user_id")
 	if target == "" {
 		target = str(body["user_id"])
@@ -310,22 +321,22 @@ func UserUpdate(g Gate, w http.ResponseWriter, r *http.Request) {
 		target = p.UserID
 	}
 	// 额度管理员只提交额度字段；独立授权避免借额度入口提升账号权限。
-	if !p.PlatformAdmin() && (optionalFloat(body, "max_budget") != nil || util.OptionalRate(body, "rpm_limit") != nil || util.OptionalRate(body, "tpm_limit") != nil) {
+	if !p.PlatformAdmin() && (resetDay != nil || optionalFloat(body, "max_budget") != nil || util.OptionalRate(body, "rpm_limit") != nil || util.OptionalRate(body, "tpm_limit") != nil) {
 		invalidFields := false
 		for key := range body {
-			if key != "user_id" && key != "max_budget" && key != "rpm_limit" && key != "tpm_limit" {
+			if key != "budget_reset_day" && key != "user_id" && key != "max_budget" && key != "rpm_limit" && key != "tpm_limit" {
 				invalidFields = true
 			}
 		}
 		if invalidFields {
-			util.WriteError(w, 400, "invalid_request", "limit updates must contain only user_id, max_budget, rpm_limit and tpm_limit")
+			util.WriteError(w, 400, "invalid_request", "limit updates must contain only user_id, max_budget, rpm_limit, tpm_limit and budget_reset_day")
 			return
 		}
 		if err := g.Authorize(r, p, authz.ActionUserBudget, authz.Object{Type: authz.ObjectUser, ID: target}); err != nil {
 			g.WriteAuthz(w, r, err)
 			return
 		}
-		u, err := g.Identity().AdminUpdateUser(r.Context(), actorOf(p), target, iam.UserUpdate{MaxBudget: optionalFloat(body, "max_budget"),
+		u, err := g.Identity().AdminUpdateUser(r.Context(), actorOf(p), target, iam.UserUpdate{BudgetResetDay: resetDay, MaxBudget: optionalFloat(body, "max_budget"),
 			RPMLimit: util.OptionalRate(body, "rpm_limit"), TPMLimit: util.OptionalRate(body, "tpm_limit")})
 		if err != nil {
 			g.WriteIAMError(w, r, err)
@@ -352,7 +363,7 @@ func UserUpdate(g Gate, w http.ResponseWriter, r *http.Request) {
 	// never read for them. A platform administrator's own save falls through,
 	// because a name and a password alone are a complete request for them too.
 	if !self || p.PlatformAdmin() {
-		in := iam.UserUpdate{
+		in := iam.UserUpdate{BudgetResetDay: resetDay,
 			Name:      stringPtr(body, "user_alias"),
 			Role:      storedRolePtr(body),
 			Status:    statusPtr(body),
@@ -360,7 +371,7 @@ func UserUpdate(g Gate, w http.ResponseWriter, r *http.Request) {
 			MaxBudget: optionalFloat(body, "max_budget"),
 			RPMLimit:  util.OptionalRate(body, "rpm_limit"), TPMLimit: util.OptionalRate(body, "tpm_limit"),
 		}
-		if in.Name == nil && in.Role == nil && in.Status == nil && in.Email == nil && in.MaxBudget == nil && in.RPMLimit == nil && in.TPMLimit == nil {
+		if in.BudgetResetDay == nil && in.Name == nil && in.Role == nil && in.Status == nil && in.Email == nil && in.MaxBudget == nil && in.RPMLimit == nil && in.TPMLimit == nil {
 			if !self {
 				util.WriteError(w, 400, "invalid_request", "no supported field to update")
 				return
@@ -1680,27 +1691,29 @@ func userPublic(u *iam.User, teams []map[string]any) map[string]any {
 		teams = []map[string]any{}
 	}
 	return map[string]any{
-		"user_id":         u.ID,
-		"user_email":      u.Email,
-		"user_alias":      u.Name,
-		"user_name":       u.Name,
-		"user_role":       iam.ConsoleRole(u.Role),
-		"role":            iam.ConsoleRole(u.Role),
-		"status":          u.Status,
-		"blocked":         u.Status != iam.StatusActive,
-		"max_budget":      floatJSON(u.MaxBudget),
-		"spend":           u.Spend,
-		"teams":           teams,
-		"organizations":   []any{},
-		"models":          []string{},
-		"created_at":      u.CreatedAt.UTC().Format(time.RFC3339),
-		"updated_at":      u.UpdatedAt.UTC().Format(time.RFC3339),
-		"key_count":       0,
-		"sso_user_id":     nil,
-		"tpm_limit":       u.TPMLimit,
-		"rpm_limit":       u.RPMLimit,
-		"budget_duration": nil,
-		"metadata":        map[string]any{},
+		"user_id":          u.ID,
+		"user_email":       u.Email,
+		"user_alias":       u.Name,
+		"user_name":        u.Name,
+		"user_role":        iam.ConsoleRole(u.Role),
+		"role":             iam.ConsoleRole(u.Role),
+		"status":           u.Status,
+		"blocked":          u.Status != iam.StatusActive,
+		"max_budget":       floatJSON(u.MaxBudget),
+		"spend":            u.Spend,
+		"teams":            teams,
+		"organizations":    []any{},
+		"models":           []string{},
+		"created_at":       u.CreatedAt.UTC().Format(time.RFC3339),
+		"updated_at":       u.UpdatedAt.UTC().Format(time.RFC3339),
+		"key_count":        0,
+		"sso_user_id":      nil,
+		"tpm_limit":        u.TPMLimit,
+		"rpm_limit":        u.RPMLimit,
+		"budget_reset_day": u.BudgetResetDay,
+		"budget_reset_at":  u.BudgetResetAt,
+		"budget_duration":  nil,
+		"metadata":         map[string]any{},
 	}
 }
 

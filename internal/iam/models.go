@@ -40,19 +40,23 @@ const (
 
 // User is a platform account. Role is the only account-level grant.
 type User struct {
-	RPMLimit       *int      `xorm:"'rpm_limit'" json:"rpm_limit"`
-	TPMLimit       *int      `xorm:"'tpm_limit'" json:"tpm_limit"`
-	ID             string    `xorm:"pk 'id'" json:"id"`
-	Email          string    `xorm:"'email'" json:"email"`
-	Name           string    `xorm:"'name'" json:"name"`
-	PasswordHash   string    `xorm:"'password_hash'" json:"-"`
-	Role           string    `xorm:"'role'" json:"role"`
-	Status         string    `xorm:"'status'" json:"status"`
-	SessionVersion int       `xorm:"'session_version'" json:"-"`
-	MaxBudget      *float64  `xorm:"'max_budget'" json:"max_budget"`
-	Spend          float64   `xorm:"'spend'" json:"spend"`
-	CreatedAt      time.Time `xorm:"created 'created_at'" json:"created_at"`
-	UpdatedAt      time.Time `xorm:"updated 'updated_at'" json:"-"`
+	// 个人自然月刷新配置；0不刷新，起点用于排除迟到的旧周期账单。
+	BudgetResetDay    int        `xorm:"'budget_reset_day'" json:"budget_reset_day"`
+	BudgetResetAt     *time.Time `xorm:"'budget_reset_at'" json:"budget_reset_at"`
+	BudgetPeriodStart *time.Time `xorm:"'budget_period_start'" json:"budget_period_start"`
+	RPMLimit          *int       `xorm:"'rpm_limit'" json:"rpm_limit"`
+	TPMLimit          *int       `xorm:"'tpm_limit'" json:"tpm_limit"`
+	ID                string     `xorm:"pk 'id'" json:"id"`
+	Email             string     `xorm:"'email'" json:"email"`
+	Name              string     `xorm:"'name'" json:"name"`
+	PasswordHash      string     `xorm:"'password_hash'" json:"-"`
+	Role              string     `xorm:"'role'" json:"role"`
+	Status            string     `xorm:"'status'" json:"status"`
+	SessionVersion    int        `xorm:"'session_version'" json:"-"`
+	MaxBudget         *float64   `xorm:"'max_budget'" json:"max_budget"`
+	Spend             float64    `xorm:"'spend'" json:"spend"`
+	CreatedAt         time.Time  `xorm:"created 'created_at'" json:"created_at"`
+	UpdatedAt         time.Time  `xorm:"updated 'updated_at'" json:"-"`
 }
 
 // 告诉 xorm 这个结构体对应数据库表 users。

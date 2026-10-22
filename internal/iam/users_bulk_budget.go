@@ -6,6 +6,7 @@ import (
 	"math"
 	"sort"
 	"strings"
+	"time"
 
 	"xorm.io/xorm"
 )
@@ -16,18 +17,23 @@ const MaxBulkUserBudgets = 1000
 // ErrBulkUserBudgetTooLarge 表示显式选择或全部用户快照超过单次限制，接口应提示分批选择。
 var ErrBulkUserBudgetTooLarge = errors.New("bulk user budget operation exceeds 1000 users")
 
-// UserBudgetUpdate 是显式设置个人预算上限的命令；nil取消个人上限、零禁止新增消费，均不重置消费。
+// UserBudgetUpdate 独立设置个人额度及月度日期；KeepBudget保持额度，否则nil取消上限、零禁止消费。
+// BudgetResetDay缺省保持、0取消周期、1至31指定日期；设置时均不立即重置消费。
 type UserBudgetUpdate struct {
-	UserID    string
-	MaxBudget *float64
+	KeepBudget     bool
+	BudgetResetDay *int
+	UserID         string
+	MaxBudget      *float64
 }
 
 // BulkUserBudgetInput 区分全部用户统一设置与指定用户逐项设置；调用方只提交一种目标模式。
-// AllUsers为真时使用MaxBudget，否则使用Users；HTTP解析器负责要求max_budget字段显式存在。
+// AllUsers为真时使用顶层变更，否则使用Users；KeepBudget表示不改额度，BudgetResetDay缺省表示不改周期。
 type BulkUserBudgetInput struct {
-	AllUsers  bool
-	MaxBudget *float64
-	Users     []UserBudgetUpdate
+	KeepBudget     bool
+	BudgetResetDay *int
+	AllUsers       bool
+	MaxBudget      *float64
+	Users          []UserBudgetUpdate
 }
 
 // BulkUserBudgetResult 返回同一提交的用户快照与批次号；仅事务成功时可作为成功响应，失败不返回局部结果。
@@ -47,14 +53,15 @@ func normalizeBulkUserBudgets(in BulkUserBudgetInput) (BulkUserBudgetInput, erro
 		v := *n
 		return &v
 	}
+	validDay := func(day *int) bool { return day == nil || *day >= 0 && *day <= 31 }
 	if in.AllUsers {
-		if len(in.Users) > 0 || !valid(in.MaxBudget) {
+		if len(in.Users) > 0 || !valid(in.MaxBudget) || !validDay(in.BudgetResetDay) || (in.KeepBudget && in.BudgetResetDay == nil) {
 			return BulkUserBudgetInput{}, ErrInvalid
 		}
 		in.MaxBudget = copyBudget(in.MaxBudget)
 		return in, nil
 	}
-	if len(in.Users) == 0 || in.MaxBudget != nil {
+	if len(in.Users) == 0 || in.MaxBudget != nil || in.KeepBudget || in.BudgetResetDay != nil {
 		return BulkUserBudgetInput{}, ErrInvalid
 	}
 	if len(in.Users) > MaxBulkUserBudgets {
@@ -63,11 +70,11 @@ func normalizeBulkUserBudgets(in BulkUserBudgetInput) (BulkUserBudgetInput, erro
 	out := BulkUserBudgetInput{Users: make([]UserBudgetUpdate, len(in.Users))}
 	seen := map[string]bool{}
 	for i, u := range in.Users {
-		if u.UserID == "" || u.UserID != strings.TrimSpace(u.UserID) || seen[u.UserID] || !valid(u.MaxBudget) {
+		if u.UserID == "" || u.UserID != strings.TrimSpace(u.UserID) || seen[u.UserID] || !valid(u.MaxBudget) || !validDay(u.BudgetResetDay) || (u.KeepBudget && u.BudgetResetDay == nil) {
 			return BulkUserBudgetInput{}, ErrInvalid
 		}
 		seen[u.UserID] = true
-		out.Users[i] = UserBudgetUpdate{UserID: u.UserID, MaxBudget: copyBudget(u.MaxBudget)}
+		out.Users[i] = UserBudgetUpdate{UserID: u.UserID, MaxBudget: copyBudget(u.MaxBudget), KeepBudget: u.KeepBudget, BudgetResetDay: u.BudgetResetDay}
 	}
 	sort.Slice(out.Users, func(i, j int) bool { return out.Users[i].UserID < out.Users[j].UserID })
 	return out, nil
@@ -75,7 +82,7 @@ func normalizeBulkUserBudgets(in BulkUserBudgetInput) (BulkUserBudgetInput, erro
 
 // AdminBulkUserBudgets 在现有全局写事务锁内原子设置个人预算、验证最终额度树并记录每位用户的审计。
 // 参数ctx/by/in为上下文、已通过平台管理鉴权的操作者和显式目标命令；返回已提交快照或错误，失败整体回滚。
-// 全部模式在事务内读取至多1001个当前账号，包含管理员和停用账号；超限不会部分更新。历史消费、角色和周期均保留。
+// 全部模式在事务内读取至多1001个当前账号，包含管理员和停用账号；超限不会部分更新。历史消费和角色均保留；周期只能通过显式字段变更。
 // 通过applyBudgetHolds复用硬额度预占约束，与ReserveBudget/结算共用锁，不能把在途金额重新分配给其他用户。
 func (db *DB) AdminBulkUserBudgets(ctx context.Context, by Actor, in BulkUserBudgetInput) (BulkUserBudgetResult, error) {
 	in, err := normalizeBulkUserBudgets(in)
@@ -107,21 +114,31 @@ func (db *DB) AdminBulkUserBudgets(ctx context.Context, by Actor, in BulkUserBud
 				return ErrNotFound
 			}
 		}
-		updates := map[string]*float64{}
+		updates := map[string]UserBudgetUpdate{}
 		for _, u := range in.Users {
-			updates[u.UserID] = u.MaxBudget
+			updates[u.UserID] = u
 		}
 		previous := map[string]*float64{}
+		previousDay := map[string]int{}
 		ids := make([]string, 0, len(users))
 		for i := range users {
 			u := &users[i]
 			previous[u.ID] = u.MaxBudget
-			u.MaxBudget = in.MaxBudget
+			previousDay[u.ID] = u.BudgetResetDay
+			update := UserBudgetUpdate{MaxBudget: in.MaxBudget, KeepBudget: in.KeepBudget, BudgetResetDay: in.BudgetResetDay}
 			if !in.AllUsers {
-				u.MaxBudget = updates[u.ID]
+				update = updates[u.ID]
 			}
-			ids = append(ids, u.ID)
-			if _, err := s.ID(u.ID).Cols("max_budget").Update(u); err != nil {
+			if !update.KeepBudget {
+				u.MaxBudget = update.MaxBudget
+				ids = append(ids, u.ID)
+			}
+			if update.BudgetResetDay != nil {
+				if err := configureUserBudget(u, *update.BudgetResetDay, time.Now()); err != nil {
+					return err
+				}
+			}
+			if _, err := s.ID(u.ID).Cols("max_budget", "budget_reset_day", "budget_reset_at").Update(u); err != nil {
 				return err
 			}
 		}
@@ -137,7 +154,7 @@ func (db *DB) AdminBulkUserBudgets(ctx context.Context, by Actor, in BulkUserBud
 			return err
 		}
 		for _, u := range users {
-			if err := writeAudit(s, by, Audit{Action: "user.bulk_budget", ObjectType: "user", ObjectID: u.ID, Detail: map[string]any{"batch_id": out.BatchID, "all_users": in.AllUsers, "previous_max_budget": previous[u.ID], "max_budget": u.MaxBudget, "spend": u.Spend}}); err != nil {
+			if err := writeAudit(s, by, Audit{Action: "user.bulk_budget", ObjectType: "user", ObjectID: u.ID, Detail: map[string]any{"batch_id": out.BatchID, "all_users": in.AllUsers, "previous_max_budget": previous[u.ID], "max_budget": u.MaxBudget, "spend": u.Spend, "previous_budget_reset_day": previousDay[u.ID], "budget_reset_day": u.BudgetResetDay}}); err != nil {
 				return err
 			}
 		}

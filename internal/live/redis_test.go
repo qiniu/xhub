@@ -375,3 +375,30 @@ func TestPendingSpendCount(t *testing.T) {
 		t.Fatal("Redis失败被当成空队列")
 	}
 }
+
+// TestUserPendingPeriod 验证个人热账单的跨月边界、其他用户隔离及损坏失败路径；独立Redis由testRedis清理。
+func TestUserPendingPeriod(t *testing.T) {
+	c := testRedis(t)
+	cutoff := time.Now().UTC()
+	for _, row := range []SpendLog{
+		{RequestID: "old", UserID: "u", APIKey: "k", Spend: 10, SpendValid: true, Start: cutoff.Add(-time.Second).Format(time.RFC3339Nano)},
+		{RequestID: "current", UserID: "u", APIKey: "k", Spend: 2, SpendValid: true, Start: cutoff.Format(time.RFC3339Nano)},
+		{RequestID: "other", UserID: "v", APIKey: "k", Spend: 9, SpendValid: true, Start: cutoff.Format(time.RFC3339Nano)},
+	} {
+		if err := c.EnqueueSpend(row); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if got := c.HotUserSpendSince("u", cutoff); got != 2 {
+		t.Fatalf("个人周期热费用错误: %v", got)
+	}
+	if got := c.HotUserSpendSince("missing", cutoff); got != 0 {
+		t.Fatal(got)
+	}
+	if err := c.rdb.RPush(t.Context(), "xhub:spendlog", "broken").Err(); err != nil {
+		t.Fatal(err)
+	}
+	if !math.IsNaN(c.HotUserSpendSince("u", cutoff)) {
+		t.Fatal("损坏账单必须明确失败")
+	}
+}

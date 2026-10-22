@@ -57,7 +57,17 @@ for (const locale of ["en", "zh-CN"] as const)
       expect(screen.getByText(tr("pages.users.bulkBudgetHelp"))).toBeVisible();
       expect(screen.getByText("原始邮箱@example.com")).toBeVisible();
       expect(screen.queryByText(tr("pages.users.teamManagement"))).not.toBeInTheDocument();
-      expect(screen.getAllByRole("combobox")).toHaveLength(1);
+      expect(screen.getAllByRole("combobox")).toHaveLength(2);
+    });
+
+    /** 验证双语独立日期编辑不发送预算，允许取消刷新；组件替身由beforeEach重置，无持久数据。 */
+    it("updates only the chosen reset date", async () => {
+      const user = userEvent.setup();
+      renderWithProviders(<BulkEditUserModal {...props()} />);
+      await user.selectOptions(screen.getByLabelText(tr("userBudgetReset.label")), "31");
+      expect(screen.getByText(translate(locale, "userBudgetReset.day", { day: 31 }))).toBeInTheDocument();
+      await user.click(screen.getByRole("button", { name: tr("pages.users.saveChanges") }));
+      expect(request).toHaveBeenCalledWith("test-token", { budget_reset_day: 31 }, ["a", "b"], false);
     });
 
     /** 验证数字零确为上限而非取消；提交后只在确认全部成功时刷新关闭，fixture不写真实资源。 */
@@ -65,7 +75,7 @@ for (const locale of ["en", "zh-CN"] as const)
       const user = userEvent.setup(),
         p = props();
       renderWithProviders(<BulkEditUserModal {...p} />);
-      await user.selectOptions(screen.getByRole("combobox"), "set");
+      await user.selectOptions(screen.getByRole("combobox", { name: tr("pages.users.bulkBudgetAction") }), "set");
       await user.type(screen.getByLabelText(tr("pages.users.maxBudget")), "0");
       await user.click(screen.getByRole("button", { name: tr("pages.users.saveChanges") }));
       await waitFor(() => expect(request).toHaveBeenCalledWith("test-token", { max_budget: 0 }, ["a", "b"], false));
@@ -78,7 +88,7 @@ for (const locale of ["en", "zh-CN"] as const)
     it("clears only through the explicit remove action", async () => {
       const user = userEvent.setup();
       renderWithProviders(<BulkEditUserModal {...props()} />);
-      await user.selectOptions(screen.getByRole("combobox"), "clear");
+      await user.selectOptions(screen.getByRole("combobox", { name: tr("pages.users.bulkBudgetAction") }), "clear");
       expect(screen.getByText(tr("pages.users.bulkBudgetClearHelp"))).toBeVisible();
       await user.click(screen.getByRole("button", { name: tr("pages.users.saveChanges") }));
       await waitFor(() => expect(request).toHaveBeenCalledWith("test-token", { max_budget: null }, ["a", "b"], false));
@@ -88,7 +98,7 @@ for (const locale of ["en", "zh-CN"] as const)
     it("rejects blank values without calling the API", async () => {
       const user = userEvent.setup();
       renderWithProviders(<BulkEditUserModal {...props()} />);
-      await user.selectOptions(screen.getByRole("combobox"), "set");
+      await user.selectOptions(screen.getByRole("combobox", { name: tr("pages.users.bulkBudgetAction") }), "set");
       await user.click(screen.getByRole("button", { name: tr("pages.users.saveChanges") }));
       expect(screen.getByRole("alert")).toHaveTextContent(tr("pages.users.bulkBudgetInvalid"));
       expect(request).not.toHaveBeenCalled();
@@ -98,7 +108,7 @@ for (const locale of ["en", "zh-CN"] as const)
     it("rejects negative budgets with a localized error", async () => {
       const user = userEvent.setup();
       renderWithProviders(<BulkEditUserModal {...props()} />);
-      await user.selectOptions(screen.getByRole("combobox"), "set");
+      await user.selectOptions(screen.getByRole("combobox", { name: tr("pages.users.bulkBudgetAction") }), "set");
       await user.type(screen.getByLabelText(tr("pages.users.maxBudget")), "-1");
       await user.click(screen.getByRole("button", { name: tr("pages.users.saveChanges") }));
       expect(screen.getByRole("alert")).toHaveTextContent(tr("pages.users.bulkBudgetInvalid"));
@@ -112,7 +122,7 @@ for (const locale of ["en", "zh-CN"] as const)
       renderWithProviders(<BulkEditUserModal {...props()} />);
       await user.click(screen.getByRole("checkbox", { name: tr("pages.users.updateAllUsers") }));
       expect(screen.getByText(translate(locale, "pages.users.bulkBudgetAllWarning", { count: 1000 }))).toBeVisible();
-      await user.selectOptions(screen.getByRole("combobox"), "set");
+      await user.selectOptions(screen.getByRole("combobox", { name: tr("pages.users.bulkBudgetAction") }), "set");
       await user.type(screen.getByLabelText(tr("pages.users.maxBudget")), "12.5");
       await user.click(screen.getByRole("button", { name: tr("pages.users.saveChanges") }));
       await waitFor(() => expect(request).toHaveBeenCalledWith("test-token", { max_budget: 12.5 }, undefined, true));
@@ -125,7 +135,7 @@ for (const locale of ["en", "zh-CN"] as const)
         p = props();
       request.mockRejectedValue({ body: { error: { type: "bulk_budget_allocation", message: "server diagnostic" } } });
       renderWithProviders(<BulkEditUserModal {...p} />);
-      await user.selectOptions(screen.getByRole("combobox"), "set");
+      await user.selectOptions(screen.getByRole("combobox", { name: tr("pages.users.bulkBudgetAction") }), "set");
       await user.type(screen.getByLabelText(tr("pages.users.maxBudget")), "7");
       await user.click(screen.getByRole("button", { name: tr("pages.users.saveChanges") }));
       await waitFor(() => expect(screen.getByRole("alert")).toHaveTextContent(tr("pages.users.bulkBudgetAllocation")));
@@ -140,7 +150,7 @@ for (const locale of ["en", "zh-CN"] as const)
         p = props();
       request.mockResolvedValue({ ...result(), successful_updates: 1, failed_updates: 1 });
       renderWithProviders(<BulkEditUserModal {...p} />);
-      await user.selectOptions(screen.getByRole("combobox"), "clear");
+      await user.selectOptions(screen.getByRole("combobox", { name: tr("pages.users.bulkBudgetAction") }), "clear");
       await user.click(screen.getByRole("button", { name: tr("pages.users.saveChanges") }));
       await waitFor(() => expect(screen.getByRole("alert")).toHaveTextContent(tr("pages.users.bulkBudgetFailed")));
       expect(toast.success).not.toHaveBeenCalled();
@@ -153,13 +163,13 @@ for (const locale of ["en", "zh-CN"] as const)
         p = props();
       const view = renderWithProviders(<BulkEditUserModal {...p} />);
       await user.click(screen.getByRole("checkbox", { name: tr("pages.users.updateAllUsers") }));
-      await user.selectOptions(screen.getByRole("combobox"), "clear");
+      await user.selectOptions(screen.getByRole("combobox", { name: tr("pages.users.bulkBudgetAction") }), "clear");
       await user.click(screen.getByRole("button", { name: tr("Cancel") }));
       expect(p.onCancel).toHaveBeenCalledOnce();
       expect(request).not.toHaveBeenCalled();
       view.rerender(<BulkEditUserModal {...p} open={false} />);
       view.rerender(<BulkEditUserModal {...p} />);
-      expect(screen.getByRole("combobox")).toHaveValue("");
+      expect(screen.getByRole("combobox", { name: tr("pages.users.bulkBudgetAction") })).toHaveValue("");
       expect(screen.getByRole("checkbox")).not.toBeChecked();
     });
   });
