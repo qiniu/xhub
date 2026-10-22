@@ -7,7 +7,7 @@ import (
 )
 
 // TestRotateKeyAtomicSettings 验证持久层轮换事务；前置隔离数据库及一美元用户预算，testDB 清理 schema。
-// 正常更新同时保存额度/限流/期限；超过父预算或输入数量异常必须回滚哈希及所有字段，缺省更新保留已存配置。
+// 正常更新同时保存额度/限流/期限；负预算或输入数量异常必须回滚哈希及所有字段，缺省更新保留已存配置。
 func TestRotateKeyAtomicSettings(t *testing.T) {
 	db := testDB(t)
 	ctx := context.Background()
@@ -21,7 +21,7 @@ func TestRotateKeyAtomicSettings(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	tooMuch := 2.0
+	tooMuch := -1.0
 	for _, inputs := range [][]KeyInput{{{Name: "invalid", MaxBudget: &tooMuch}}, {{}, {}}} {
 		if _, _, err := db.RotateKey(ctx, by, original.ID, inputs...); err == nil {
 			t.Fatal("非法轮换未失败")

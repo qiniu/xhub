@@ -114,7 +114,7 @@ func TestUnifiedUserAllocationExamples(t *testing.T) {
 			if _, e := db.CreateUser(ctx, by, userInput("replacement", &remainder)); e != nil {
 				t.Fatalf("删除用户应释放全部未用分配: %v", e)
 			}
-			// 子 Key 分配也使用同一策略，不能用创建更多 Key 增大用户上限。
+			// 金额 Key 不预占个人资金；RPM/TPM 继续按固定分配校验。
 			for i, n := range []int{100, 200, 1} {
 				in := KeyInput{UserID: users[0].ID, OwnerType: OwnerPersonal, Name: fmt.Sprint(i)}
 				switch dimension {
@@ -126,10 +126,10 @@ func TestUnifiedUserAllocationExamples(t *testing.T) {
 					in.TPMLimit = &n
 				}
 				_, _, e := db.CreateKey(ctx, by, in)
-				if i < 2 && e != nil {
+				if (i < 2 || dimension == "budget") && e != nil {
 					t.Fatal(e)
 				}
-				if i == 2 && !errors.Is(e, expected) {
+				if i == 2 && dimension != "budget" && !errors.Is(e, expected) {
 					t.Fatalf("Key100+200分满用户300，再分1必须失败: %v", e)
 				}
 			}

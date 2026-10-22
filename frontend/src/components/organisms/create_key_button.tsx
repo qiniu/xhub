@@ -35,7 +35,7 @@ import {
 import CreatedKeyDisplay from "../shared/CreatedKeyDisplay";
 import NumericalInput from "../shared/numerical_input";
 import { buildKeyCreatePayload, type KeyCreateInput } from "./createKeyPayload";
-import { simplifyKeyGenerateError } from "./utils";
+import PersonalBudgetSummary from "./PersonalBudgetSummary";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 
 const KEY_TYPE_OPTIONS = [
@@ -121,12 +121,10 @@ export const fetchUserModels = async (
   }
 };
 
-/** 创建个人 API Key 弹窗，供个人密钥页面使用，默认只绑定当前用户。
- * 参数包含显式团队上下文 team、已有密钥 data、新增回调 addKey 及预填配置；返回表单与明文展示。
- * 用户成员关系不自动绑定团队，个人入口忽略预填团队；显式团队上下文保留团队模型和额度约束。
- * 创建失败展示错误，成功刷新列表，关闭后重置表单；明文不持久化到浏览器。
- */
-/** 创建当前用户的模型调用密钥；参数提供归属与预填信息，返回表单；只展示已实现类型，后台拒绝旧链接中的不支持类型。 */
+/** 创建个人 API Key 弹窗，供个人密钥页面使用，默认绑定当前用户。
+ * 参数包含团队上下文、已有密钥、新增回调及预填配置；返回创建表单和一次性密钥展示。
+ * 读取个人预算快照，空金额共享；显式团队上下文保留模型/额度校验，失败保留后台错误分类。
+ * 成功刷新列表，关闭重置表单；明文不持久化到浏览器。 */
 const CreateKey: React.FC<CreateKeyProps> = ({ team, teams, data, addKey, autoOpenCreate, prefillData }) => {
   const t = useT();
   const { accessToken, userId: userID, userRole } = useAuthorized();
@@ -238,8 +236,7 @@ const CreateKey: React.FC<CreateKeyProps> = ({ team, teams, data, addKey, autoOp
       form.reset(formDefaults);
       localStorage.removeItem("userData" + userID);
     } catch (error) {
-      const simplifiedError = simplifyKeyGenerateError(error);
-      toast.fromError(simplifiedError);
+      toast.fromError(error);
     }
   };
 
@@ -429,6 +426,7 @@ const CreateKey: React.FC<CreateKeyProps> = ({ team, teams, data, addKey, autoOp
                   <div>
                     <h3 className="mb-4 text-lg font-medium text-foreground">{t("Budget and Routing")}</h3>
                     <p className="mb-4 text-sm text-muted-foreground">{t("hardBudget.contract")}</p>
+                    <PersonalBudgetSummary />
                     <div className="grid gap-5 rounded-lg border p-4 sm:grid-cols-2">
                       <MountedFormField
                         label={

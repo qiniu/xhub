@@ -999,16 +999,14 @@ export interface UserInfoV2Response {
   model_max_budget_usage?: Record<string, ModelBudgetUsage> | null;
 }
 
-/**
- * Lightweight user info fetch from /v2/user/info.
- * Returns only the user object — no keys, no teams objects.
- *
- * @param accessToken - Bearer token for auth
- * @param userId - Optional user ID to look up. If omitted, returns the caller's own info.
- */
+/** 读取用户详情并解包 user_info，供用量页和 Key 预算提示使用。
+ * 参数 accessToken 为当前会话，userId 可选；返回完整用户对象；鉴权、网络或协议失败向调用方抛错，无写入副作用。 */
 export const userGetInfoV2 = async (accessToken: string, userId?: string): Promise<UserInfoV2Response> => {
   try {
-    return await apiClient.get(`/v2/user/info`, { accessToken, query: { user_id: userId || undefined } });
+    // 网关的两个用户详情路由都使用 user_info 包装；调用方始终接收用户本身。
+    const result = await apiClient.get<{ user_info: UserInfoV2Response }>(`/v2/user/info`, { accessToken, query: { user_id: userId || undefined } });
+    if (!result.user_info) throw new Error(t("quotaGuide.personalUnavailable"));
+    return result.user_info;
   } catch (error) {
     console.error("Failed to fetch user info v2:", error);
     throw error;

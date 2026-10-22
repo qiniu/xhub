@@ -241,10 +241,17 @@ export const zhCN = {
   },
   providerGuideUI: providerGuideUIZhCN,
   quotaGuide: {
+    personalUnlimited: "未设置个人上限",
+    personalTitle: "个人预算（美元）",
+    personalLoading: "正在读取个人预算…",
+    personalUnavailable: "个人预算读取失败，请刷新重试；这不代表无限额。",
+    personalSummary: "总预算：{limit}；已用：{spent}；剩余：{remaining}。",
+    personalNote: "显示已记账消费；未结算费用、团队或组织限制可能进一步减少可用额度。创建密钥不预占资金。",
+
     personalBillingHelp: "没有团队时，留空表示个人不限额；有团队时，留空共享团队额度。填写金额限制所有会话和密钥的个人累计消费，0 禁止消费。",
     rateAllocationError: "下级 RPM/TPM 固定分配合计超过上级限制，请减少分配或调整上级限制。",
     rates:
-      "RPM、TPM 与金额额度按同一层级分配：下级固定分配合计不能超过上级。留空共享未分配容量，0 禁止调用。个人所有 Key 与会话汇总，再逐级汇总到团队和组织；固定分配的未用容量每个 UTC 自然分钟保留，TPM 按准入时预估 token 计数。",
+      "RPM、TPM 按同一层级分配：下级固定分配合计不能超过上级。留空共享未分配容量，0 禁止调用。个人所有 Key 与会话汇总，再逐级汇总到团队和组织；固定分配的未用容量每个 UTC 自然分钟保留，TPM 按准入时预估 token 计数。",
     rateBlank: "共享上级剩余容量",
     editMember: "编辑成员",
     deleteMember: "删除成员",
@@ -257,8 +264,8 @@ export const zhCN = {
     chain: "组织 → 团队 → 用户 → API Key · USD / RPM / TPM",
     organization: "组织固定额度用于分配给团队。例如组织额度 1,000，可分配 500＋300＋200；继续分配会被拒绝。",
     team: "员工固定额度与共享消费必须在团队额度内。团队管理员分配员工额度，组织管理员分配团队额度。",
-    person: "所有密钥共同使用个人额度。设置固定额度的密钥保留未消费金额；未设置的密钥共享剩余金额。",
-    key: "密钥额度从所属个人额度中分配。留空表示共享个人剩余额度，消费仍计入团队和组织。",
+    person: "所有密钥和控制台共享个人剩余额度。单 Key 上限不预占资金。",
+    key: "密钥预算是可选的单 Key 消费上限，不预占资金。留空与其他 Key、控制台共享个人剩余额度；0 只禁止此 Key 消费。实际消费仍计入团队和组织。",
     shared:
       "留空表示共享上级可用额度，不能绕过上级限制；0 表示禁止消费。已消费金额与下级未消费的保留额度之和不得超过固定额度。",
     singleTeam:

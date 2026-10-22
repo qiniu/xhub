@@ -31,9 +31,16 @@ type quotaNode struct {
 	Children         []*quotaNode
 }
 
-// quotaUnused 计算节点仍需由父级保留的金额。参数 n 是树节点；返回未消费保留金额或非法分配错误。
+// quotaUnused 计算组织、团队、个人仍需由父级保留的金额；Key 仅校验单项金额，不预留。参数 n 是树节点；返回未消费保留金额或非法分配错误。
 // 调用：管理写入及消费检查；共享节点递归传递下级保留金额，固定节点不得低于消费与下级保留总和。
 func quotaUnused(n *quotaNode) (float64, error) {
+	// Key 金额仅限制自身消费；软预算可能已超支，但不能因此锁住个人的其他入口。
+	if n.Kind == "key" {
+		if n.Limit != nil && (math.IsNaN(*n.Limit) || math.IsInf(*n.Limit, 0) || *n.Limit < 0) {
+			return 0, ErrQuotaAllocation
+		}
+		return 0, nil
+	}
 	unused := 0.0
 	for _, c := range n.Children {
 		amount, err := quotaUnused(c)
@@ -204,8 +211,11 @@ func validateQuota(s *xorm.Session, kind, id string) error {
 		if _, err := rateAllocated(n, true); err != nil {
 			return err
 		}
-		if _, err := quotaUnused(n); err != nil {
-			return err
+		// 创建或编辑 Key 不改变祖先金额分配，即使个人余额耗尽也允许管理 Key；调用准入仍检查余额。
+		if kind != "key" || n.Kind == "key" {
+			if _, err := quotaUnused(n); err != nil {
+				return err
+			}
 		}
 		if n.Parent != "" && nodes[n.Parent] == nil {
 			return ErrInvalid
@@ -279,8 +289,8 @@ func quotaPath(nodes map[string]*quotaNode, target string, hot func(string, stri
 	// 热账单同时影响父级消费和子级未用保留额，避免重复占用。
 	if hot != nil {
 		for _, node := range nodes {
-			// 共享 Key 无自身上限且不保留固定余额，其累计值不参与父级计算。
-			if node.Kind == "key" && node.Limit == nil {
+			// 只有目标固定 Key 需要自身热费用；兄弟 Key 不预留，读取失败不能阻塞其他入口。
+			if node.Kind == "key" && (node.Limit == nil || node != n) {
 				continue
 			}
 			ref := node.ID
@@ -325,7 +335,12 @@ func quotaPath(nodes map[string]*quotaNode, target string, hot func(string, stri
 			if spent+reserved >= *n.Limit && scope == "" {
 				scope = n.Kind
 			}
-			credit = math.Max(0, *n.Limit-spent)
+			// 只有真正预留资金的组织/团队/个人能抵扣祖先预留；Key 上限不产生可转移权益。
+			if n.Kind != "key" {
+				credit = math.Max(0, *n.Limit-spent)
+			} else {
+				credit = 0
+			}
 		}
 		if n.Parent != "" && nodes[n.Parent] == nil {
 			return team, org, "", ErrInvalid
@@ -339,6 +354,10 @@ func quotaPath(nodes map[string]*quotaNode, target string, hot func(string, stri
 // quotaReserved 计算运行时未使用的保留金额；参数 n 含热消费，返回非负金额。
 // 调用：QuotaPath；固定额度耗尽后的保留额为零，消费本身仍在祖先账单中。
 func quotaReserved(n *quotaNode) float64 {
+	// Key 不向个人或更高层保留未使用额度，控制台与兄弟 Key 可共享实际余额。
+	if n.Kind == "key" {
+		return 0
+	}
 	if n.Limit != nil {
 		return math.Max(0, *n.Limit-n.Spend)
 	}

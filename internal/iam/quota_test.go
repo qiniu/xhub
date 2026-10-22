@@ -41,7 +41,7 @@ func TestQuotaHotPeriod(t *testing.T) {
 func quotaLimit(value float64) *float64 { return &value }
 
 // TestQuotaUnused 验证逐级未消费保留；前置纯内存树，覆盖固定、共享、零、已消费和非法输入，无外部数据需清理。
-// 参数 t 为测试上下文，无返回；包含密钥重置恢复预留后超配拒绝、父级扩容恢复的边界。
+// 参数 t 为测试上下文，无返回；包含个人重置恢复预留后超配拒绝、父级扩容恢复的边界。
 func TestQuotaUnused(t *testing.T) {
 	for _, tc := range []struct {
 		name string
@@ -53,9 +53,9 @@ func TestQuotaUnused(t *testing.T) {
 		{"共享传递", &quotaNode{Children: []*quotaNode{{Limit: quotaLimit(400), Spend: 100}, {Limit: quotaLimit(300)}}}, 600, false},
 		{"正好分满", &quotaNode{Limit: quotaLimit(1000), Children: []*quotaNode{{Limit: quotaLimit(500)}, {Limit: quotaLimit(500)}}}, 1000, false},
 		{"消费后超配", &quotaNode{Limit: quotaLimit(1000), Spend: 100, Children: []*quotaNode{{Limit: quotaLimit(1000)}}}, 0, true},
-		{"重置前消费抵消密钥预留", &quotaNode{Limit: quotaLimit(1000), Spend: 100, Children: []*quotaNode{{Limit: quotaLimit(1000), Spend: 100}}}, 900, false},
-		{"重置密钥不得抹去父级消费", &quotaNode{Limit: quotaLimit(1000), Spend: 100, Children: []*quotaNode{{Limit: quotaLimit(1000), Spend: 0}}}, 0, true},
-		{"父级扩容后允许密钥重新预留", &quotaNode{Limit: quotaLimit(1100), Spend: 100, Children: []*quotaNode{{Limit: quotaLimit(1000), Spend: 0}}}, 1000, false},
+		{"重置前消费抵消个人预留", &quotaNode{Limit: quotaLimit(1000), Spend: 100, Children: []*quotaNode{{Limit: quotaLimit(1000), Spend: 100}}}, 900, false},
+		{"重置个人不得抹去父级消费", &quotaNode{Limit: quotaLimit(1000), Spend: 100, Children: []*quotaNode{{Limit: quotaLimit(1000), Spend: 0}}}, 0, true},
+		{"父级扩容后允许个人重新预留", &quotaNode{Limit: quotaLimit(1100), Spend: 100, Children: []*quotaNode{{Limit: quotaLimit(1000), Spend: 0}}}, 1000, false},
 		{"零", &quotaNode{Limit: quotaLimit(0)}, 0, false},
 		{"负数", &quotaNode{Limit: quotaLimit(-1)}, 0, true},
 		{"非数", &quotaNode{Limit: quotaLimit(math.NaN())}, 0, true},
@@ -105,16 +105,16 @@ func TestQuotaHierarchy(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if _, _, err = db.CreateKey(ctx, by, KeyInput{OwnerType: OwnerPersonal, UserID: u.ID, MaxBudget: quotaLimit(1)}); !errors.Is(err, ErrQuotaAllocation) {
-		t.Fatalf("密钥超配未拒绝: %v", err)
+	if _, _, err = db.CreateKey(ctx, by, KeyInput{OwnerType: OwnerPersonal, UserID: u.ID, MaxBudget: quotaLimit(1)}); err != nil {
+		t.Fatalf("密钥单项上限不应预占个人预算: %v", err)
 	}
 	teamID, orgID, scope, err := db.QuotaPath(ctx, "key", k.ID, nil)
 	if err != nil || scope != "" || teamID != team.ID || orgID != org.ID {
 		t.Fatalf("无团队绑定密钥计费路径: %s %s %s %v", teamID, orgID, scope, err)
 	}
 	_, _, scope, err = db.QuotaPath(ctx, "user", u.ID, nil)
-	if err != nil || scope != "user" {
-		t.Fatalf("会话不能使用密钥保留额: %s %v", scope, err)
+	if err != nil || scope != "" {
+		t.Fatalf("会话应共享个人余额: %s %v", scope, err)
 	}
 	// 热消费已占用个人金额，但相同消费也减少密钥保留额，不能重复占用。
 	_, _, scope, err = db.QuotaPath(ctx, "key", k.ID, func(kind, id string, _ ...time.Time) float64 {
@@ -158,8 +158,8 @@ func TestQuotaHierarchy(t *testing.T) {
 	if err = db.RemoveMember(ctx, by, team.ID, u.ID); err != nil {
 		t.Fatal(err)
 	}
-	if tid, oid, got, e := db.QuotaPath(ctx, "user", u.ID, nil); e != nil || tid != "" || oid != "" || got != "user" {
-		t.Fatalf("退出后应成为独立个人且继续保留密钥额度: %s %s %s %v", tid, oid, got, e)
+	if tid, oid, got, e := db.QuotaPath(ctx, "user", u.ID, nil); e != nil || tid != "" || oid != "" || got != "" {
+		t.Fatalf("退出后应成为独立个人且不预留密钥额度: %s %s %s %v", tid, oid, got, e)
 	}
 	old, err := db.GetKey(ctx, k.ID)
 	if err != nil || old.Status != StatusActive {
@@ -170,7 +170,7 @@ func TestQuotaHierarchy(t *testing.T) {
 	}
 }
 
-// TestQuotaSharedAncestorsAndBusiness 验证固定 Key 权益穿过空额度个人/团队，兄弟共享仍被拦截。
+// TestQuotaSharedAncestorsAndBusiness 验证 Key 上限不预占共享祖先资金，兄弟 Key 同样可用。
 // 前置独立 schema；同时验证不限额业务和成员编辑失败回滚，testDB 自动清理数据。
 func TestQuotaSharedAncestorsAndBusiness(t *testing.T) {
 	db := testDB(t)
@@ -199,8 +199,8 @@ func TestQuotaSharedAncestorsAndBusiness(t *testing.T) {
 	if tid, oid, scope, e := db.QuotaPath(ctx, "key", k.ID, nil); e != nil || scope != "" || tid != team.ID || oid != org.ID {
 		t.Fatalf("固定密钥穿过共享祖先: %s %s %s %v", tid, oid, scope, e)
 	}
-	if _, _, scope, e := db.QuotaPath(ctx, "key", shared.ID, nil); e != nil || scope != "org" {
-		t.Fatalf("共享密钥不得使用固定兄弟权益: %s %v", scope, e)
+	if _, _, scope, e := db.QuotaPath(ctx, "key", shared.ID, nil); e != nil || scope != "" {
+		t.Fatalf("共享密钥不应被固定兄弟上限拦截: %s %v", scope, e)
 	}
 	limit := quotaLimit(101)
 	if e := db.SetMemberRoleBudget(ctx, by, team.ID, u.ID, TeamAdmin, &limit); !errors.Is(e, ErrQuotaAllocation) {
