@@ -556,7 +556,7 @@
         "route": "/organization/update",
         "field": "organization_id",
         "method": "PATCH",
-        "expected_http_status": 429,
+        "expected_http_status": 403,
         "expected_upstream_attempts": 0
       },
       {
@@ -564,7 +564,7 @@
         "route": "/team/update",
         "field": "team_id",
         "method": "POST",
-        "expected_http_status": 429,
+        "expected_http_status": 403,
         "expected_upstream_attempts": 0
       },
       {
@@ -572,7 +572,7 @@
         "route": "/project/update",
         "field": "project_id",
         "method": "POST",
-        "expected_http_status": 429,
+        "expected_http_status": 403,
         "expected_upstream_attempts": 0
       },
       {
@@ -580,7 +580,7 @@
         "route": "/user/update",
         "field": "user_id",
         "method": "POST",
-        "expected_http_status": 429,
+        "expected_http_status": 403,
         "expected_upstream_attempts": 0
       },
       {
@@ -588,7 +588,7 @@
         "route": "/key/update",
         "field": "key",
         "method": "POST",
-        "expected_http_status": 429,
+        "expected_http_status": 403,
         "expected_upstream_attempts": 0
       }
     ],
