@@ -1,6 +1,6 @@
 import Papa from "papaparse";
 
-export const USER_CSV_COLUMNS = ["user_email", "user_role", "password", "user_alias", "team_id", "max_budget", "budget_reset_day"];
+export const USER_CSV_COLUMNS = ["user_email", "user_role", "password", "user_alias", "team_id", "max_budget", "budget_reset_day", "sso_connection_id", "sso_external_id"];
 /** 提交给用户创建接口的白名单字段；密码仅用于本次请求，不得写入预览和导出。 */
 export interface CsvUser {
   user_email: string;
@@ -10,6 +10,8 @@ export interface CsvUser {
   team_id?: string;
   max_budget?: number;
   budget_reset_day?: number;
+  sso_connection_id?: string;
+  sso_external_id?: string;
 }
 /** 导入记录及非敏感结果；错误保存翻译键，以支持语言实时切换。 */
 export interface CsvRow {
@@ -26,9 +28,9 @@ export interface CsvParse {
   vars?: Record<string, string>;
 }
 
-/** 解析用户导入文本；参数为CSV和当前可选团队ID，返回字段严格校验后的行或结构错误。
+/** 解析用户导入文本；参数为CSV、当前可选团队ID及可选的 SSO 连接白名单，返回字段严格校验后的行或结构错误。
  * 供上传组件调用；不发请求，不翻译用户内容，不将密码放入错误信息。 */
-export function parseUserCsv(text: string, teamIDs: string[]): CsvParse {
+export function parseUserCsv(text: string, teamIDs: string[], ssoConnectionIDs?: string[]): CsvParse {
   const result = Papa.parse<string[]>(text.replace(/^\uFEFF/, ""), { skipEmptyLines: "greedy" });
   const [rawHeaders, ...data] = result.data;
   const headers = rawHeaders?.map((v) => v.trim()) ?? [];
@@ -39,6 +41,7 @@ export function parseUserCsv(text: string, teamIDs: string[]): CsvParse {
   if (required.length || unknown.length)
     return { rows: [], error: "columns", vars: { columns: required.join(", "), unknown: unknown.join(", ") } };
   const seen = new Set<string>();
+  const seenEnterpriseIDs = new Set<string>();
   const rows = data.map((values, i): CsvRow => {
     const field = (key: string) => values[headers.indexOf(key)] ?? "";
     const user: CsvUser = {
@@ -69,6 +72,18 @@ export function parseUserCsv(text: string, teamIDs: string[]): CsvParse {
       user.team_id = field("team_id").trim();
       if (!teamIDs.includes(user.team_id)) errors.push("teamError");
     }
+    const connectionID = field("sso_connection_id").trim();
+    const externalID = field("sso_external_id").trim();
+    if (Boolean(connectionID) !== Boolean(externalID)) errors.push("enterpriseIdentityPairError");
+    if (connectionID && externalID) {
+      if (user.user_role !== "user") errors.push("enterpriseIdentityRoleError");
+      user.sso_connection_id = connectionID;
+      user.sso_external_id = externalID;
+      if (ssoConnectionIDs && !ssoConnectionIDs.includes(connectionID)) errors.push("enterpriseIdentityConnectionError");
+      const key = JSON.stringify([connectionID, externalID]);
+      if (seenEnterpriseIDs.has(key)) errors.push("enterpriseIdentityDuplicateError");
+      seenEnterpriseIDs.add(key);
+    }
     return { row: i + 2, user, errors };
   });
   return { rows };
@@ -78,7 +93,7 @@ export function parseUserCsv(text: string, teamIDs: string[]): CsvParse {
 export function userCsvTemplate(): string {
   return Papa.unparse([
     USER_CSV_COLUMNS,
-    ["new.user@example.com", "user", "Replace-before-import-123!", "New User", "", "10", "1"],
+    ["new.user@example.com", "user", "Replace-before-import-123!", "New User", "", "10", "1", "", ""],
   ]);
 }
 

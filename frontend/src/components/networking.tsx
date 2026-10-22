@@ -973,6 +973,10 @@ export const userListCall = async (
  * Response type for /v2/user/info — lightweight endpoint that returns only the user object.
  */
 export interface UserInfoV2Response {
+  sso_connection_id?: string;
+  sso_connection_name?: string;
+  sso_external_id?: string;
+  sso_binding_managed?: boolean;
   budget_reset_day?: number;
   rpm_limit?: number | null;
   tpm_limit?: number | null;

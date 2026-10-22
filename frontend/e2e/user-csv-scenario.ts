@@ -29,10 +29,10 @@ export function registerUserCsvScenario(locale: "en" | "zh-CN") {
       const csv = template.replace("new.user@example.com", email).replace("New User", "测试名字");
       await dialog
         .getByLabel(tr("upload"))
-        .setInputFiles({ name: "users.csv", mimeType: "text/csv", buffer: Buffer.from(csv.replace(/,10,1$/, ",10abc,1")) });
+        .setInputFiles({ name: "users.csv", mimeType: "text/csv", buffer: Buffer.from(csv.replace(/,10,1,,$/, ",10abc,1,,")) });
       await expect(dialog.getByText(tr("budgetError"))).toBeVisible();
       await expect(dialog.getByRole("button", { name: tr("create", { count: 1 }) })).toBeDisabled();
-      await dialog.getByLabel(tr("upload")).setInputFiles({ name: "users.csv", mimeType: "text/csv", buffer: Buffer.from(csv.replace(/,1$/, ",32")) });
+      await dialog.getByLabel(tr("upload")).setInputFiles({ name: "users.csv", mimeType: "text/csv", buffer: Buffer.from(csv.replace(/,1,,$/, ",32,,")) });
       await expect(dialog.getByText(tr("resetDayError"))).toBeVisible();
       await expect(dialog.getByRole("button", { name: tr("create", { count: 1 }) })).toBeDisabled();
       await dialog
