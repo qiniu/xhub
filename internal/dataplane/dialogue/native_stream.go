@@ -157,12 +157,7 @@ func pipeNativeDialogue(w http.ResponseWriter, resp *http.Response, start time.T
 		err = fmt.Errorf("upstream stream ended without completion")
 	}
 	if err != nil && wrote {
-		payload := map[string]any{"type": "error", "error": map[string]any{"type": "upstream_error", "message": "upstream stream failed"}}
-		event := "error"
-		if protocol == "openai-responses" {
-			event = "response.failed"
-			payload = map[string]any{"type": event, "response": map[string]any{"id": state.id, "status": "failed", "error": map[string]any{"code": "upstream_error", "message": "upstream stream failed"}}}
-		}
+		event, payload := streamFailureEvent(err, protocol, state.id)
 		raw, _ := json.Marshal(payload)
 		_ = write(event, raw)
 	}

@@ -668,6 +668,20 @@ func Serve(h dpcontract.Adapted, w http.ResponseWriter, r *http.Request, op stri
 		}
 		return
 	}
+	// 供应商流内错误已有结构，不能再次压成 upstream_error 字符串；HTTP 200 仅代表流握手成功。
+	var upstreamFailure *dpdiagnostics.UpstreamError
+	if errors.As(lastErr, &upstreamFailure) {
+		envelope := dpdiagnostics.ErrorEnvelope(upstreamFailure)
+		if dpdialogue.CallerProtocol(op) == "anthropic-messages" {
+			envelope["type"] = "error"
+		}
+		rawError, _ := json.Marshal(envelope)
+		h.RememberExchange(callID, r, raw, rawError)
+		h.RecordSpend(w, p, callID, alias, op, nil, start, false, http.StatusBadGateway, "")
+		util.WriteJSON(w, http.StatusBadGateway, envelope)
+		return
+	}
+
 	if lastStatus > 0 {
 		util.Error("dataplane path=%s status=502 code=upstream_error detail=upstream %d", r.URL.Path, lastStatus)
 		if len(lastResponse) == 0 {

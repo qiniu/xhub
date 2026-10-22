@@ -51,7 +51,7 @@ func TestNativeMessagesStreamHistory(t *testing.T) {
 				if content[0].(map[string]any)["signature"] != "native-signature" || content[1].(map[string]any)["data"] != "native-cipher" || content[2].(map[string]any)["input"].(map[string]any)["path"] != "a" {
 					t.Fatalf("快照拼接改变内容: %v", content)
 				}
-			} else if strings.Contains(string(capture), "message_stop") {
+			} else if strings.Contains(string(capture), `"type":"message_stop"`) {
 				t.Fatal("坏流仍发布成功终态")
 			}
 		})

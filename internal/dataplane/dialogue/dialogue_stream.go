@@ -14,6 +14,7 @@ import (
 	"time"
 
 	"github.com/openai/openai-go/v3/packages/ssestream"
+	dpdiagnostics "github.com/sunqirui1987/xhub/internal/dataplane/diagnostics"
 	llmdialogue "github.com/sunqirui1987/xhub/internal/llm/dialogue"
 	"github.com/sunqirui1987/xhub/internal/util"
 )
@@ -623,8 +624,8 @@ func (s *dialogueStream) consume(protocol string, data string) error {
 	if err := json.Unmarshal([]byte(data), &m); err != nil {
 		return err
 	}
-	if m["error"] != nil {
-		return fmt.Errorf("upstream stream error")
+	if upstreamErr := dpdiagnostics.ExtractUpstreamError(m); upstreamErr != nil {
+		return upstreamErr
 	}
 	if id := streamString(m["id"]); id != "" {
 		s.id = id
@@ -984,12 +985,7 @@ func PipeDialogueWithPreparation(w http.ResponseWriter, resp *http.Response, sta
 		err = s.finish()
 	}
 	if err != nil && s.wrote { // 已输出后发送明确失败事件，不能生成完成事件或改用另一个部署。
-		event := "error"
-		payload := map[string]any{"type": "error", "error": map[string]any{"type": "upstream_error", "message": err.Error()}}
-		if caller == "openai-responses" {
-			event = "response.failed"
-			payload = map[string]any{"type": event, "response": map[string]any{"id": s.id, "status": "failed", "error": map[string]any{"code": "upstream_error", "message": err.Error()}}}
-		}
+		event, payload := streamFailureEvent(err, caller, s.id)
 		_ = s.emit(event, payload)
 	}
 	return s.wrote, s.usage, ttft, s.capture.Bytes(), err

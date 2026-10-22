@@ -16,6 +16,8 @@ import (
 // Headers/Trailers 是原始多值头，并未在此结构里脱敏；写日志或向客户端输出时由消费方另行过滤。
 // 正文读取过程中原地更新共享对象，消费方应在读取完成后使用；原始 Usage 与 BillingUsage 分开，避免估算覆盖原厂统计。
 type UpstreamDiagnostics struct {
+	// 供应商明确失败的完整错误及关联信息；与 HTTP 状态分开保存，避免流捕获上限丢失尾部错误。
+	Error map[string]any `json:"error,omitempty"`
 	// 实际出站路径，不含用户信息和查询参数，用于安全关联部署端点。
 	Endpoint string `json:"endpoint"`
 	// 当前出站尝试根据部署策略移除的能力；持久化原因固定为部署不支持该能力。
@@ -178,7 +180,7 @@ func (o *upstreamObserver) line(line []byte) {
 	}
 }
 
-// document 对完整 JSON 正文或 SSE data 事件提取原始用量。
+// document 对完整 JSON 正文或 SSE data 事件提取原始用量及错误，错误独立于正文捕获上限保存。
 // 参数 raw 为事件/正文；返回值无，由 line 或 Read 的 EOF 分支调用。
 // 忽略空数据和 DONE，用 UseNumber 保留大整数及供应商数值文本，非法 JSON 标记诊断错误。
 // 有效但无用量的事件不构造假统计；仅更新诊断，不转换客户端协议或计价。
@@ -193,6 +195,9 @@ func (o *upstreamObserver) document(raw []byte) {
 	if err := decoder.Decode(&doc); err != nil {
 		o.diagnostics.ParseError = "upstream response is not valid JSON"
 		return
+	}
+	if failure := ExtractUpstreamError(doc); failure != nil {
+		o.diagnostics.Error = failure.Envelope
 	}
 	o.usage(doc)
 }

@@ -40,3 +40,17 @@ func diagnosticHeaders(headers http.Header) http.Header {
 	}
 	return result
 }
+
+// FailureJSON 优先返回 HTTP 成功后流内明确失败的独立错误快照，避免 2 MiB 正文捕获上限吞掉尾部错误。
+// 参数 upstream 为观测事实、fallback 为原失败正文；recordSpend 调用，返回日志错误详情；不改客户端或响应正文。
+// 非流内供应商错误或序列化失败沿用原文，不能用 HTTP 成功握手替换最终失败状态。
+func FailureJSON(upstream *dpdiagnostics.UpstreamDiagnostics, fallback string) string {
+	if upstream == nil || upstream.StatusCode >= 400 || upstream.Error == nil {
+		return fallback
+	}
+	raw, err := json.Marshal(upstream.Error)
+	if err != nil {
+		return fallback
+	}
+	return string(raw)
+}
