@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
-import { clearTokenCookies } from "@/utils/cookieUtils";
+import { clearTokenCookies, getCookie } from "@/utils/cookieUtils";
 import * as Networking from "./networking";
 import { uiHref } from "@/utils/uiHref";
 
@@ -73,25 +73,24 @@ describe("networking - expired session handling", () => {
     global.fetch = originalFetch;
   });
 
-  it("should call clearTokenCookies on expired session", async () => {
-    const errorData = "Authentication Error - Expired Key";
-    const { toast } = await import("@/lib/toast");
-
-    if (errorData.includes("Authentication Error - Expired Key")) {
-      toast.info("UI Session Expired. Logging out.");
-      clearTokenCookies();
-    }
-
-    expect(clearTokenCookies).toHaveBeenCalledOnce();
+  /** 使用真实全局处理器；自定义Key报错后用登录Cookie核验，只有401清理；每例恢复fetch及Cookie替身。 */
+  it.each([200, 401, 403, 502])("核验登录身份后处理错误：%s", async (status) => {
+    const token = `e30.${btoa(JSON.stringify({ key: "login-session" }))}.signature`;
+    vi.mocked(getCookie).mockReturnValue(token);
+    global.fetch = vi.fn().mockResolvedValue({ status });
+    await Networking.handleError("Authentication Error, No api key passed in.");
+    expect(global.fetch).toHaveBeenCalledWith(expect.stringContaining("/auth/me"), expect.objectContaining({
+      headers: { Authorization: "Bearer login-session" },
+    }));
+    expect(clearTokenCookies).toHaveBeenCalledTimes(status === 401 ? 1 : 0);
+    vi.mocked(getCookie).mockReset();
   });
 
-  it("should not clear cookies for non-authentication errors", () => {
-    const errorData = "Some other error";
-
-    if (errorData.includes("Authentication Error - Expired Key")) {
-      clearTokenCookies();
-    }
-
+  /** 非鉴权错误不核验或删除会话；纯替身，无外部资源，afterEach恢复fetch。 */
+  it("普通错误不触发登录核验", async () => {
+    global.fetch = vi.fn();
+    await Networking.handleError("Some other error");
+    expect(global.fetch).not.toHaveBeenCalled();
     expect(clearTokenCookies).not.toHaveBeenCalled();
   });
 
