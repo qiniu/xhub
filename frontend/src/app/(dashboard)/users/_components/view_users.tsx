@@ -8,7 +8,7 @@ import { CreateUserButton } from "@/components/CreateUserButton";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 
-import { getProxyBaseUrl, userListCall, UserListResponse } from "@/components/networking";
+import { getProxyBaseUrl, userListCall } from "@/components/networking";
 import SetPasswordModal from "@/components/SetPasswordModal";
 
 import { DEBOUNCE_WAIT_MS } from "@/utils/debounceConstants";
@@ -30,7 +30,7 @@ import { modelAvailableCall, userDeleteCall } from "@/components/networking";
 
 import { UsersTable } from "./view_users/UsersTable";
 import UserInfoView from "./view_users/user_info_view";
-import { UserInfo } from "@/components/networking";
+import { UserInfo, UserListResponse } from "@/components/networking";
 
 interface ViewUserDashboardProps {
   accessToken: string | null;
@@ -167,14 +167,22 @@ const ViewUserDashboard: React.FC<ViewUserDashboardProps> = ({
         setIsDeletingUser(true);
         await userDeleteCall(accessToken, userToDelete.user_id);
 
-        // Update the user list after deletion
-        queryClient.setQueriesData<UserListResponse>({ queryKey: ["userList"] }, (previousData) => {
-          if (previousData === undefined) return previousData;
-          const updatedUsers = previousData.users.filter((user) => user.user_id !== userToDelete.user_id);
-          return { ...previousData, users: updatedUsers };
+        // 删除已由后台确认，先移除缓存中确实存在的行；未命中筛选缓存不能盲目减总数。
+        await queryClient.cancelQueries({ queryKey: ["userList"] });
+        queryClient.setQueriesData<UserListResponse>({ queryKey: ["userList"] }, (cached) => {
+          if (!cached?.users.some((user) => user.user_id === userToDelete.user_id)) return cached;
+          const total = Math.max(0, cached.total - 1);
+          return { ...cached, users: cached.users.filter((user) => user.user_id !== userToDelete.user_id),
+            total, total_pages: Math.max(1, Math.ceil(total / cached.page_size)) };
         });
-
-        toast.success(t("User deleted successfully"));
+        setRowSelection({});
+        try {
+          // 仍从服务端补齐跨页行；刷新失败与删除失败分别反馈，不能重新显示已删除的账号。
+          await queryClient.invalidateQueries({ queryKey: ["userList"] }, { throwOnError: true });
+          toast.success(t("User deleted successfully"));
+        } catch {
+          toast.warning(t("consoleDirectory.userDeleteRefreshFailed"));
+        }
       } catch (error) {
         console.error("Error deleting user:", error);
         toast.fromError(t("Failed to delete user"));
@@ -261,6 +269,15 @@ const ViewUserDashboard: React.FC<ViewUserDashboardProps> = ({
 
   const users = useMemo<UserInfo[]>(() => userListQuery.data?.users ?? [], [userListQuery.data]);
   const totalUserCount = userListQuery.data?.total ?? 0;
+
+  // 删除最后一页的最后一行后回到实际末页；占位数据和进行中的请求不能触发页码回退。
+  useEffect(() => {
+    if (!userListQuery.data || userListQuery.isPlaceholderData || userListQuery.isFetching) return;
+    const lastPage = Math.max(0, Math.ceil(userListQuery.data.total / pagination.pageSize) - 1);
+    if (pagination.pageIndex > lastPage) {
+      setPagination((previous) => ({ ...previous, pageIndex: lastPage }));
+    }
+  }, [userListQuery.data, userListQuery.isPlaceholderData, userListQuery.isFetching, pagination.pageSize, pagination.pageIndex]);
 
   const selectedUsers = useMemo(() => users.filter((user) => rowSelection[user.user_id]), [users, rowSelection]);
 

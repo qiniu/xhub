@@ -15,7 +15,7 @@ async function filterModel(page: Page, model: string): Promise<void> {
 /** 在真实表格切换每页条数；参数指定浏览器与条数，返回选择完成状态。
  * 用于验证共享控件回到第一页，不拦截后台请求，无额外数据需要清理。 */
 async function changeSize(page: Page, size: number): Promise<void> {
-  await page.getByRole("combobox", { name: t("Rows per page"), exact: true }).click();
+  await page.getByRole("combobox", { name: t("consoleDirectory.pagination.rows"), exact: true }).click();
   await page.getByRole("option", { name: String(size), exact: true }).click();
 }
 
@@ -98,7 +98,7 @@ test("日志分页完整流程：会话合并后翻页", async ({ page }) => {
       await expect(page.getByTestId("pagination-first")).toBeDisabled();
       await expect(page.getByRole("row").filter({ hasText: model })).toHaveCount(total);
       await page.getByTestId("datatable-search").fill("pagination-missing-request");
-      await expect(page.getByTestId("pagination-range")).toHaveText(t("No results"));
+      await expect(page.getByTestId("pagination-range")).toHaveText(t("consoleDirectory.pagination.empty"));
       await expect(page.getByTestId("pagination-next")).toBeDisabled();
       await page.getByTestId("datatable-search").fill("");
       await expect(page.getByRole("row").filter({ hasText: model })).toHaveCount(total);
@@ -197,7 +197,7 @@ test("日志分页完整流程：失败请求逐条翻页", async ({ page }) => 
       await expect(page.getByTestId("pagination-first")).toBeDisabled();
       await expect(page.getByRole("row").filter({ hasText: model })).toHaveCount(total);
       await page.getByTestId("datatable-search").fill("pagination-missing-request");
-      await expect(page.getByTestId("pagination-range")).toHaveText(t("No results"));
+      await expect(page.getByTestId("pagination-range")).toHaveText(t("consoleDirectory.pagination.empty"));
       await expect(page.getByTestId("pagination-next")).toBeDisabled();
       await page.getByTestId("datatable-search").fill("");
       await expect(page.getByRole("row").filter({ hasText: model })).toHaveCount(total);
@@ -302,7 +302,7 @@ test("共享分页覆盖密钥、项目、项目密钥和审计", async ({ page 
     await changeSize(page, 100);
     await expect(page.getByTestId("pagination-prev")).toBeDisabled();
     await page.getByPlaceholder(t("audit.search")).fill("pagination-no-audit-match");
-    await expect(page.getByTestId("pagination-range")).toHaveText(t("No results"));
+    await expect(page.getByTestId("pagination-range")).toHaveText(t("consoleDirectory.pagination.empty"));
     await expect(page.getByTestId("pagination-next")).toBeDisabled();
   } finally {
     if (keys.length) {

@@ -1,7 +1,7 @@
 import { expect, test, type APIRequestContext, type Page } from "@playwright/test";
 
 import { translate } from "../src/i18n/translate";
-import { GATEWAY, UPSTREAM, loginAdmin, sessionBearer, stableGoto } from "./helpers";
+import { GATEWAY, UPSTREAM, loginAdmin, sessionBearer, stableGoto, t } from "./helpers";
 
 
 const JSON_DIAGNOSTIC =
@@ -90,7 +90,7 @@ async function verifyUpstreamCollapse(page: Page, headers: Record<string, string
   expect(stored.credential_name, "内联部署应使用脱敏地址标识连接").toBe(UPSTREAM);
   await expect(page.getByRole("dialog").getByText(UPSTREAM, { exact: true })).toHaveCount(2);
   await expect(page.getByRole("dialog").getByText(/^(凭证名称|Credential Name)$/)).toBeVisible();
-  await expect(page.getByRole("dialog").getByText(/^(API 基础|API Base)$/)).toBeVisible();
+  await expect(page.getByRole("dialog").getByText(translate("zh-CN", "API Base"), { exact: true }).or(page.getByRole("dialog").getByText(translate("en", "API Base"), { exact: true }))).toBeVisible();
   const upstream = stored.metadata.upstream_response;
   expect(upstream.status_code, "后台应保存真实上游 HTTP 状态").toBe(status);
   const region = page.getByRole("dialog").getByRole("region", { name: /^(上游响应|Upstream Response)$/ });
@@ -164,11 +164,11 @@ test("错误日志详情完整显示上游正文并可返回普通日志", async
     const search = page.getByPlaceholder(/按 ID 搜索日志|Search logs by ID/);
     await search.fill(failedCallId);
     await expect(page.getByRole("row").filter({ hasText: failedCallId })).toHaveCount(0);
-    await expect(page.getByText(/没有结果|No results/)).toBeVisible();
+    await expect(page.getByTestId("pagination-range")).toHaveText(t("consoleDirectory.pagination.empty"));
     await page.getByRole("tab", { name: /错误日志|Error Logs/, exact: true }).click();
     await search.fill(successCallId);
     await expect(page.getByRole("row").filter({ hasText: successCallId })).toHaveCount(0);
-    await expect(page.getByText(/没有结果|No results/)).toBeVisible();
+    await expect(page.getByTestId("pagination-range")).toHaveText(t("consoleDirectory.pagination.empty"));
     await openLogDetails(page, failedCallId);
     const failedDialog = page.getByRole("dialog");
     await verifyUpstreamCollapse(page, headers, failedCallId, 502);
@@ -257,7 +257,7 @@ test("退役接口不进入模型日志且真实推理错误继续可见", async
       const detail = await page.request.get(GATEWAY + "/spend/logs/ui/" + id, { headers });
       expect(detail.status(), "退役请求不得写入真实日志存储").toBe(404);
       await search.fill(id);
-      await expect(page.getByText(/没有结果|No results/)).toBeVisible();
+      await expect(page.getByTestId("pagination-range")).toHaveText(t("consoleDirectory.pagination.empty"));
       await expect(page.getByRole("row").filter({ hasText: id })).toHaveCount(0);
     }
   }
@@ -289,7 +289,7 @@ test("错误日志独立记录并显示诊断：text", async ({ page }) => {
       await waitForStoredLog(page, headers, callId);
       await stableGoto(page, "/logs");
       await page.getByPlaceholder(/按 ID 搜索日志|Search logs by ID/).fill(callId);
-      await expect(page.getByText(/没有结果|No results/)).toBeVisible();
+      await expect(page.getByTestId("pagination-range")).toHaveText(t("consoleDirectory.pagination.empty"));
       await expect(page.getByRole("row").filter({ hasText: callId })).toHaveCount(0);
       await page.getByRole("tab", { name: /错误日志|Error Logs/, exact: true }).click();
       await openLogDetails(page, callId);
@@ -332,7 +332,7 @@ test("错误日志独立记录并显示诊断：network", async ({ page }) => {
       await waitForStoredLog(page, headers, callId);
       await stableGoto(page, "/logs");
       await page.getByPlaceholder(/按 ID 搜索日志|Search logs by ID/).fill(callId);
-      await expect(page.getByText(/没有结果|No results/)).toBeVisible();
+      await expect(page.getByTestId("pagination-range")).toHaveText(t("consoleDirectory.pagination.empty"));
       await expect(page.getByRole("row").filter({ hasText: callId })).toHaveCount(0);
       await page.getByRole("tab", { name: /错误日志|Error Logs/, exact: true }).click();
       await openLogDetails(page, callId);
@@ -375,7 +375,7 @@ test("错误日志独立记录并显示诊断：rejected", async ({ page }) => {
       await waitForStoredLog(page, headers, callId);
       await stableGoto(page, "/logs");
       await page.getByPlaceholder(/按 ID 搜索日志|Search logs by ID/).fill(callId);
-      await expect(page.getByText(/没有结果|No results/)).toBeVisible();
+      await expect(page.getByTestId("pagination-range")).toHaveText(t("consoleDirectory.pagination.empty"));
       await expect(page.getByRole("row").filter({ hasText: callId })).toHaveCount(0);
       await page.getByRole("tab", { name: /错误日志|Error Logs/, exact: true }).click();
       await openLogDetails(page, callId);

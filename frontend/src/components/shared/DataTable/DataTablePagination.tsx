@@ -42,7 +42,7 @@ export function DataTablePagination({
   return (
     <div className={cn("flex flex-wrap items-center justify-between gap-4 px-4 py-2.5", className)}>
       <div className="flex items-center gap-2 text-sm text-muted-foreground">
-        <span>{t("Rows per page")}</span>
+        <span>{t("consoleDirectory.pagination.rows")}</span>
         <Select
           disabled={isLoading}
           value={String(pageSize)}
@@ -52,7 +52,7 @@ export function DataTablePagination({
             }
           }}
         >
-          <SelectTrigger size="sm" aria-label={t("Rows per page")} data-testid="pagination-page-size" className="w-[4.5rem]">
+          <SelectTrigger size="sm" aria-label={t("consoleDirectory.pagination.rows")} data-testid="pagination-page-size" className="w-[4.5rem]">
             <SelectValue />
           </SelectTrigger>
           <SelectContent>
@@ -68,18 +68,18 @@ export function DataTablePagination({
       <div className="flex items-center gap-4">
         <span data-testid="pagination-range" className="text-sm text-muted-foreground tabular-nums">
           {rowCount === 0
-            ? t("No results")
-            : t("Showing {start}-{end} of {count}", { start, end, count: rowCount })}
+            ? t("consoleDirectory.pagination.empty")
+            : t("consoleDirectory.pagination.range", { start, end, count: rowCount })}
         </span>
         <span data-testid="pagination-page" className="text-sm text-muted-foreground tabular-nums">
-          {t("Page {value0} of {value1}", { value0: (page + 1), value1: (Math.max(pageCount, 1)) })}
+          {t("consoleDirectory.pagination.page", { page: page + 1, total: Math.max(pageCount, 1) })}
         </span>
         <div className="flex items-center gap-1">
           <Button
             variant="outline"
             size="icon-sm"
             data-testid="pagination-first"
-            aria-label={t("Go to first page")}
+            aria-label={t("consoleDirectory.pagination.first")}
             disabled={!canPrev}
             onClick={() => onPageChange(0)}
           >
@@ -89,7 +89,7 @@ export function DataTablePagination({
             variant="outline"
             size="icon-sm"
             data-testid="pagination-prev"
-            aria-label={t("Go to previous page")}
+            aria-label={t("consoleDirectory.pagination.previous")}
             disabled={!canPrev}
             onClick={() => onPageChange(page - 1)}
           >
@@ -99,7 +99,7 @@ export function DataTablePagination({
             variant="outline"
             size="icon-sm"
             data-testid="pagination-next"
-            aria-label={t("Go to next page")}
+            aria-label={t("consoleDirectory.pagination.next")}
             disabled={!canNext}
             onClick={() => onPageChange(page + 1)}
           >
@@ -109,7 +109,7 @@ export function DataTablePagination({
             variant="outline"
             size="icon-sm"
             data-testid="pagination-last"
-            aria-label={t("Go to last page")}
+            aria-label={t("consoleDirectory.pagination.last")}
             disabled={!canNext}
             onClick={() => onPageChange(lastPage)}
           >

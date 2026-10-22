@@ -5,6 +5,24 @@ import { pageDescriptionsEn } from "./pageDescriptions.en";
 import { routeTemplatesEn } from "./routeTemplates.en";
 
 export const en = {
+  consoleDirectory: {
+    "userDeleteRefreshFailed": "User deleted, but the list could not be refreshed. Refresh the page to reload the remaining users.",
+    "noTeams": "No teams found",
+    "pagination": {
+      "rows": "Rows per page",
+      "empty": "No results",
+      "range": "Showing {start}-{end} of {count}",
+      "page": "Page {page} of {total}",
+      "first": "Go to first page",
+      "previous": "Go to previous page",
+      "next": "Go to next page",
+      "last": "Go to last page"
+    },
+    "teamDelete": {
+      "confirm": "Are you sure you want to delete this team? Team membership and team settings will be removed. This action cannot be undone.",
+      "warning": "Members and their personal API keys will be retained. Requests will no longer use this team’s permissions or limits; personal permissions and limits still apply."
+    }
+  },
   userBudgetReset: {"label": "Budget reset date", "keep": "Keep unchanged", "none": "No automatic reset", "day": "Day {day} of each month", "help": "Reset spending at 00:00 Beijing time (UTC+8). Short months use their last day. Changing this setting does not reset spending immediately or change other budget scopes.", "next": "Next reset: {date} (Beijing time)"},
   userCsv: {
  "resetDay": "Reset date",

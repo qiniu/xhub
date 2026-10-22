@@ -45,6 +45,7 @@ const FILTER_LABELS: Record<string, string> = {
   team_id: "Team ID",
 };
 
+/** 团队目录表格：参数提供身份及操作回调，返回受控搜索/分页界面；请求通过 useTeamsTable 发往真实后台，错误由查询层展示。 */
 export function TeamsTable({ userRole, userID, onSelectTeam, onEditTeam, onDeleteTeam }: TeamsTableProps) {
   const t = useT();
   const { data: fetchedOrganizations } = useOrganizations();
@@ -166,7 +167,7 @@ export function TeamsTable({ userRole, userID, onSelectTeam, onEditTeam, onDelet
       columnResizeMode="onChange"
       isLoading={isPending || isPlaceholderData}
       loadingMessage={t("Loading teams...")}
-      noDataMessage="No teams found"
+      noDataMessage={t("consoleDirectory.noTeams")}
       fillHeight
       size="compact"
       toolbar={(table) => (
