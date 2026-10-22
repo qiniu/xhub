@@ -24,6 +24,7 @@ export const getCallbackConfigsCall = async (accessToken: string) => {
 import { toast } from "@/lib/toast";
 import { clearTokenCookies, getCookie, storeLoginToken } from "@/utils/cookieUtils";
 import { decodeToken } from "@/utils/jwtUtils";
+import { createSessionFailureCheck } from "@/lib/http/sessionFailure";
 import { TagNewRequest, TagUpdateRequest, TagListResponse, TagInfoResponse } from "./tag_management/types";
 import { Team } from "./key_team_helpers/key_list";
 import type { SkillRegisterRequest } from "./claude_code_plugins/types";
@@ -312,28 +313,31 @@ export interface CredentialsResponse {
   credentials: CredentialItem[];
 }
 
-let lastErrorTime = 0;
+const sessionIsRejected = createSessionFailureCheck({
+  getSessionToken: () => getCookie("token"),
+  getSessionKey: (token) => decodeToken(token)?.key ?? null,
+  getBaseUrl: () => getProxyBaseUrl(),
+  getHeaderName: () => getGlobalLitellmHeaderName(),
+});
 
+/** 处理共享接口错误中的鉴权提示；参数为原始错误，无返回数据，必要时提示并退出。
+ * API 客户端及旧调用点共用；先核验当前登录身份，不能因调试台自定义 Key 或上游错误注销有效会话。
+ * 核验失败、身份仍有效及核验期间重新登录时保留 Cookie，原请求错误继续由页面显示。
+ */
 export const handleError = async (errorData: string | any) => {
-  const currentTime = Date.now();
-  if (currentTime - lastErrorTime > 60000) {
-    // 60000 milliseconds = 60 seconds
-    // Convert errorData to string if it isn't already
-    const errorString = typeof errorData === "string" ? errorData : JSON.stringify(errorData);
-    const sessionEnded =
-      errorString.includes("Authentication Error - Expired Key") ||
-      errorString.includes("Authentication Error, No api key passed in.") ||
-      errorString.includes("Your session has ended");
-    if (sessionEnded) {
-      toast.info(t("UI Session Expired. Logging out."));
-      lastErrorTime = currentTime;
-      clearTokenCookies();
-      const browserLocation = getWindowLocation();
-      if (browserLocation && !browserLocation.pathname.startsWith("/login")) {
-        window.location.href = "/login";
-      }
-    }
-    lastErrorTime = currentTime;
+  const errorString = typeof errorData === "string" ? errorData : JSON.stringify(errorData);
+  const authFailure =
+    errorString?.includes("Authentication Error - Expired Key") ||
+    errorString?.includes("Authentication Error, No api key passed in.") ||
+    errorString?.includes("Your session has ended");
+  if (!authFailure || !(await sessionIsRejected())) return;
+  // 并发核验共享 Promise，第一位调用方清理后，其余调用方不能重复通知或跳转。
+  if (!getCookie("token")) return;
+  toast.info(t("UI Session Expired. Logging out."));
+  clearTokenCookies();
+  const browserLocation = getWindowLocation();
+  if (browserLocation && !browserLocation.pathname.endsWith("/login")) {
+    window.location.href = "/login";
   }
 };
 
