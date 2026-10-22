@@ -59,7 +59,7 @@ class LimitsCases:
                 self.call(subject, "budget-" + scope + "-restored-" + self.run)
             self.report["checks"].append({"name": "budget-" + scope + "-no-egress", "passed": True})
             self.action_ok(key["call_model"], "identity-budget", scope + " 预算链",
-                           "预算设为零后 HTTP=429 且上游增量=0；恢复后模型响应、usage、五级账单及资源清理均通过", record=False)
+                           "预算设为零后 HTTP=403 且上游增量=0；恢复后模型响应、usage、五级账单及资源清理均通过", record=False)
         for scenario in self.data["limit_scenarios"]["budgets"]:
             scope = scenario["scope"]
             if scope == "project":

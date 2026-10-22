@@ -70,7 +70,7 @@ class AcceptanceTests(unittest.TestCase):
 
 
     def test_allocated_limits_cover_all_scopes_and_record_only_complete_checks(self):
-        """目的：五预算及四层 RPM/TPM 每项必须拒绝、恢复调用和清理完成才记通过；前置模拟临时归属链，覆盖成功、恢复失败及已有检查点跳过；临时报告自动清理，不写数据库。"""
+        """目的：五预算以 403、四层 RPM/TPM 以 429 拒绝，且每项恢复调用和清理完成才记通过；前置模拟临时归属链，覆盖成功、恢复失败及已有检查点跳过；临时报告自动清理，不写数据库。"""
         for fail in (False, True):
             with self.subTest(fail=fail), tempfile.TemporaryDirectory() as directory:
                 dataset = Dataset("http://127.0.0.1:1", directory, load_manifest(), logger=lambda _: None)
@@ -92,6 +92,11 @@ class AcceptanceTests(unittest.TestCase):
                 dataset.verify_allocated_limits({"call_model": "unit-model"})
                 self.assertEqual(dataset.call.call_count, 13)
                 self.assertEqual(dataset.refuse.call_count, 13)
+                for refusal in dataset.refuse.call_args_list:
+                    reason = refusal.args[3]
+                    expected = 403 if reason == "budget" else 429
+                    self.assertEqual(refusal.args[2], expected,
+                                     f"{reason} 拒绝状态应为 {expected}，不能混用预算和限流状态")
                 self.assertEqual(context.__exit__.call_count, 13)
                 writes = [call.args[1] for call in dataset.api.call_args_list]
                 for index, scenario in enumerate(dataset.data["limit_scenarios"]["budgets"]):
