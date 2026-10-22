@@ -954,7 +954,7 @@ func TeamListV2(g Gate, w http.ResponseWriter, r *http.Request) {
 // 参数 g（Gate）：带当前操作者的鉴权守卫。允许时返回 nil，拒绝时返回禁止或未找到；w（http.ResponseWriter）：调用方的 HTTP 响应，状态和正文写在这里；r（*http.Request）：入站 HTTP 请求。
 // 返回 []map[string]any（[]map[string]any）：一组map[string]any。没有匹配时为空切片，不是 nil 分页；bool（bool）：调用方还有权限看见的团队、查询可以继续时返回真。无权时响应已写好并返回假。
 // 调用：仅在 handlers.go 内使用
-// 测试：无直接单测
+// 测试：TestTeamSearch 与 TestTeamSearchContract 验证解析、权限、过滤及分页。
 func loadTeamList(g Gate, w http.ResponseWriter, r *http.Request) ([]map[string]any, bool) {
 	util.SetCallID(w, util.CallID())
 	p := g.RequireUser(w, r)
@@ -967,12 +967,16 @@ func loadTeamList(g Gate, w http.ResponseWriter, r *http.Request) ([]map[string]
 		util.WriteError(w, 403, "forbidden", "this credential cannot list teams")
 		return nil, false
 	}
+	search, err := parseTeamSearch(r.URL.Query())
+	if err != nil {
+		g.WriteIAMError(w, r, err)
+		return nil, false
+	}
 	if r.URL.Query().Get("status") == "deleted" {
 		return []map[string]any{}, true
 	}
 	orgFilter := r.URL.Query().Get("organization_id")
 	var rows []iam.TeamWithRole
-	var err error
 	if p.PlatformAdmin() {
 		rows, err = g.Identity().ListTeams(r.Context(), r.URL.Query().Get("user_id"), orgFilter)
 	} else {
@@ -990,6 +994,10 @@ func loadTeamList(g Gate, w http.ResponseWriter, r *http.Request) ([]map[string]
 			continue
 		}
 		if alias != "" && !strings.Contains(strings.ToLower(rows[i].Name), alias) {
+			continue
+		}
+		// 名称或 ID 搜索必须在权限范围内过滤，并在 V2 分页统计之前执行。
+		if !search.matches(rows[i].ID, rows[i].Name) {
 			continue
 		}
 		pub := teamPublic(&rows[i].Team, rows[i].Role)

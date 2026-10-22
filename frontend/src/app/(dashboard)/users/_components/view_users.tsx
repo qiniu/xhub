@@ -8,7 +8,7 @@ import { CreateUserButton } from "@/components/CreateUserButton";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 
-import { getProxyBaseUrl, userListCall, UserListResponse } from "@/components/networking";
+import { getProxyBaseUrl, userListCall } from "@/components/networking";
 import SetPasswordModal from "@/components/SetPasswordModal";
 
 import { DEBOUNCE_WAIT_MS } from "@/utils/debounceConstants";
@@ -167,12 +167,10 @@ const ViewUserDashboard: React.FC<ViewUserDashboardProps> = ({
         setIsDeletingUser(true);
         await userDeleteCall(accessToken, userToDelete.user_id);
 
-        // Update the user list after deletion
-        queryClient.setQueriesData<UserListResponse>({ queryKey: ["userList"] }, (previousData) => {
-          if (previousData === undefined) return previousData;
-          const updatedUsers = previousData.users.filter((user) => user.user_id !== userToDelete.user_id);
-          return { ...previousData, users: updatedUsers };
-        });
+        // 服务端总数、跨页补位和筛选结果必须一起刷新，不能只从当前页删除一行。
+        await queryClient.cancelQueries({ queryKey: ["userList"] });
+        await queryClient.invalidateQueries({ queryKey: ["userList"] });
+        setRowSelection({});
 
         toast.success(t("User deleted successfully"));
       } catch (error) {
@@ -261,6 +259,15 @@ const ViewUserDashboard: React.FC<ViewUserDashboardProps> = ({
 
   const users = useMemo<UserInfo[]>(() => userListQuery.data?.users ?? [], [userListQuery.data]);
   const totalUserCount = userListQuery.data?.total ?? 0;
+
+  // 删除最后一页的最后一行后回到实际末页；占位数据和进行中的请求不能触发页码回退。
+  useEffect(() => {
+    if (!userListQuery.data || userListQuery.isPlaceholderData || userListQuery.isFetching || userListQuery.isError) return;
+    const lastPage = Math.max(0, Math.ceil(userListQuery.data.total / pagination.pageSize) - 1);
+    if (pagination.pageIndex > lastPage) {
+      setPagination((previous) => ({ ...previous, pageIndex: lastPage }));
+    }
+  }, [userListQuery.data, userListQuery.isPlaceholderData, userListQuery.isFetching, userListQuery.isError, pagination.pageSize, pagination.pageIndex]);
 
   const selectedUsers = useMemo(() => users.filter((user) => rowSelection[user.user_id]), [users, rowSelection]);
 

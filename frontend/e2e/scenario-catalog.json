@@ -2923,5 +2923,19 @@
     "title": "页面路由预览只读及保存文案 en",
     "kind": "implemented",
     "environment": "default offline"
+  },
+  {
+    "id": "SC-DIRECTORY-FIXES-EN",
+    "file": "e2e/scenarios/regression/directory-fixes-en.test.ts",
+    "title": "directory search pagination and translations en",
+    "kind": "implemented",
+    "environment": "default offline"
+  },
+  {
+    "id": "SC-DIRECTORY-FIXES-ZH-CN",
+    "file": "e2e/scenarios/regression/directory-fixes-zh-CN.test.ts",
+    "title": "directory search pagination and translations zh-CN",
+    "kind": "implemented",
+    "environment": "default offline"
   }
 ]

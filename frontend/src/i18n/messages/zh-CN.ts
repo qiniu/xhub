@@ -6,6 +6,23 @@ import { pageDescriptionsZhCN } from "./pageDescriptions.zh-CN";
 import { routeTemplatesZhCN } from "./routeTemplates.zh-CN";
 
 export const zhCN = {
+  consoleDirectory: {
+    "noTeams": "未找到团队",
+    "pagination": {
+      "rows": "每页条数",
+      "empty": "无结果",
+      "range": "显示 {start}-{end}，共 {count} 条",
+      "page": "第 {page} 页，共 {total} 页",
+      "first": "前往第一页",
+      "previous": "前往上一页",
+      "next": "前往下一页",
+      "last": "前往最后一页"
+    },
+    "teamDelete": {
+      "confirm": "确定要删除此团队、团队关联的所有密钥以及为该团队创建的模型吗？此操作无法撤销。",
+      "warning": "警告：此团队关联了 {count} 个密钥。删除团队也会删除这些密钥及为该团队创建的模型，此操作无法撤销。"
+    }
+  },
   userBudgetReset: {"label": "预算刷新日期", "keep": "保持原值", "none": "不自动刷新", "day": "每月 {day} 日", "help": "北京时间 00:00 刷新已消费额度。短月份取当月最后一天；修改设置不会立即清零消费，不影响其他层级额度。", "next": "下次刷新：{date}（北京时间）"},
   userCsv: {
  "resetDay": "刷新日期",

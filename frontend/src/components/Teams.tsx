@@ -198,7 +198,8 @@ const getAdminOrganizations = (
   return [];
 };
 
-// @deprecated
+/** 团队管理入口：参数为会话、用户身份及权限；返回列表、编辑和删除弹窗，确认后调用真实接口，错误保留提示。
+ * @deprecated */
 const Teams: React.FC<TeamProps> = ({ accessToken, userID, userRole, premiumUser = false }) => {
   const t = useT();
   const { data: organizationsData } = useOrganizations();
@@ -509,9 +510,9 @@ const Teams: React.FC<TeamProps> = ({ accessToken, userID, userRole, premiumUser
               const deleteKeyCount = teamToDelete?.keys_count ?? teamToDelete?.keys?.length ?? 0;
               return deleteKeyCount === 0
                 ? undefined
-                : t("Warning: This team has {deleteKeyCount} keys associated with it. Deleting the team will also delete all associated keys, along with any models created for this team. This action is irreversible.", { deleteKeyCount });
+                : t("consoleDirectory.teamDelete.warning", { count: deleteKeyCount });
             })()}
-            message={t("Are you sure you want to delete this team, all its keys, and any models created for it? This action cannot be undone.")}
+            message={t("consoleDirectory.teamDelete.confirm")}
             resourceInformationTitle={t("Team Information")}
             resourceInformation={[
               { label: t("Team ID"), value: teamToDelete?.team_id, code: true },

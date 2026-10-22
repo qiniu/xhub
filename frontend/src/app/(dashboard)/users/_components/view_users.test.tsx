@@ -8,6 +8,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { renderWithProviders } from "../../../../../tests/test-utils";
 import { translate } from "@/i18n/translate";
 import ViewUserDashboard from "./view_users";
+import { userDeleteCall } from "@/components/networking";
 
 const userListCall = vi.fn();
 
@@ -90,6 +91,7 @@ const renderDashboard = (overrides: Partial<typeof defaultProps> = {}) =>
 describe("ViewUserDashboard", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    vi.mocked(userDeleteCall).mockResolvedValue({});
     userListCall.mockResolvedValue({
       users: [makeUser("user-1", "test@example.com")],
       total: 1,
@@ -206,6 +208,59 @@ describe("ViewUserDashboard", () => {
 
     await user.click(screen.getByTestId("user-actions-user-1"));
     expect(screen.queryByTestId("user-action-edit")).not.toBeInTheDocument();
+  });
+
+
+  /** 删除后重新读取真实列表形状；前置两行，连续删除后总数变为空；模拟查询和 DOM 由框架清理。 */
+  it("refreshes the total after consecutive deletions", async () => {
+    const user = userEvent.setup();
+    let rows = [makeUser("user-1", "one@example.com"), makeUser("user-2", "two@example.com")];
+    userListCall.mockImplementation(async () => ({ users: [...rows], total: rows.length, page: 1, page_size: 25, total_pages: 1 }));
+    vi.mocked(userDeleteCall).mockImplementation(async (_token, id) => { rows = rows.filter(row => row.user_id !== id); return {}; });
+    renderDashboard();
+    for (const [id, email, count] of [["user-1", "one@example.com", 1], ["user-2", "two@example.com", 0]] as const) {
+      await screen.findByText(email);
+      await user.click(screen.getByTestId("user-actions-" + id));
+      await user.click(await screen.findByTestId("user-action-delete"));
+      await user.click(screen.getByRole("button", { name: "Delete", exact: true }));
+      await waitFor(() => expect(screen.queryByText(email)).not.toBeInTheDocument());
+      expect(screen.getByTestId("pagination-range")).toHaveTextContent(count ? "Showing 1-1 of 1" : "No results");
+    }
+  });
+
+  /** 最后一页仅一行时删除后回前页；前置26条分页响应，验证重新请求第1页并显示25条，不修改外部数据。 */
+  it("returns to the last remaining page after deleting its only row", async () => {
+    const user = userEvent.setup();
+    let deleted = false;
+    userListCall.mockImplementation(async (_token, _ids, page) => ({
+      users: page === 2 ? (deleted ? [] : [makeUser("last", "last@example.com")]) : [makeUser("first", "first@example.com")],
+      total: deleted ? 25 : 26, page, page_size: 25, total_pages: deleted ? 1 : 2,
+    }));
+    vi.mocked(userDeleteCall).mockImplementation(async () => { deleted = true; return {}; });
+    renderDashboard();
+    await screen.findByText("first@example.com");
+    await user.click(screen.getByTestId("pagination-next"));
+    await screen.findByText("last@example.com");
+    await user.click(screen.getByTestId("user-actions-last"));
+    await user.click(await screen.findByTestId("user-action-delete"));
+    await user.click(screen.getByRole("button", { name: "Delete", exact: true }));
+    await screen.findByText("first@example.com");
+    await waitFor(() => expect(screen.getByTestId("pagination-range")).toHaveTextContent("Showing 1-25 of 25"));
+    expect(screen.getByTestId("pagination-next")).toBeDisabled();
+  });
+
+  /** 删除接口失败时保留行和总数；前置一行及拒绝响应，验证失败不会伪装已删，模拟数据自动清理。 */
+  it("keeps rows and total when deletion fails", async () => {
+    const user = userEvent.setup();
+    vi.mocked(userDeleteCall).mockRejectedValue(new Error("Deletion rejected"));
+    renderDashboard();
+    await screen.findByText("test@example.com");
+    await user.click(screen.getByTestId("user-actions-user-1"));
+    await user.click(await screen.findByTestId("user-action-delete"));
+    await user.click(screen.getByRole("button", { name: "Delete", exact: true }));
+    await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
+    expect(screen.getByText("test@example.com")).toBeInTheDocument();
+    expect(screen.getByTestId("pagination-range")).toHaveTextContent("Showing 1-1 of 1");
   });
 
   describe("bulk edit selection", () => {
