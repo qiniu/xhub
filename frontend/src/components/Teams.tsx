@@ -503,15 +503,11 @@ const Teams: React.FC<TeamProps> = ({ accessToken, userID, userRole, premiumUser
             onDeleteTeam={handleDelete}
           />
 
+          {/* 个人密钥不随团队删除；提示始终展示，不依赖列表未提供的 keys_count。 */}
           <DeleteResourceModal
             isOpen={isDeleteModalOpen}
             title={t("Delete Team?")}
-            alertMessage={(() => {
-              const deleteKeyCount = teamToDelete?.keys_count ?? teamToDelete?.keys?.length ?? 0;
-              return deleteKeyCount === 0
-                ? undefined
-                : t("consoleDirectory.teamDelete.warning", { count: deleteKeyCount });
-            })()}
+            alertMessage={t("consoleDirectory.teamDelete.warning")}
             message={t("consoleDirectory.teamDelete.confirm")}
             resourceInformationTitle={t("Team Information")}
             resourceInformation={[

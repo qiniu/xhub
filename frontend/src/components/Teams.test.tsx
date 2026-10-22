@@ -634,25 +634,13 @@ describe("Teams - delete team warning copy", () => {
     expect(screen.getByText("Delete Team?")).toBeInTheDocument();
   };
 
-  it("warns that the team's models are deleted when the team has keys", async () => {
-    await openDeleteModal({ ...baseTableTeam, keys: [], keys_count: 5 });
-
-    expect(screen.getByText(/Warning: This team has 5 keys associated with it/i)).toHaveTextContent(
-      /along with any models created for this team/i,
-    );
-    expect(screen.getByText(/Are you sure you want to delete this team/i)).toHaveTextContent(
-      /any models created for it/i,
-    );
+  /** 前置旧接口缺少计数或返回零/非零计数；真实弹窗均说明个人密钥保留，组件由框架清理。 */
+  it.each([undefined, 0, 5])("explains retained personal keys regardless of key count %s", async (keys_count) => {
+    await openDeleteModal({ ...baseTableTeam, keys: [], keys_count });
+    expect(screen.getByText(/Members and their personal API keys will be retained/)).toBeInTheDocument();
+    expect(screen.getByText(/Are you sure you want to delete this team/)).toHaveTextContent(/Team membership and team settings will be removed/);
   });
 
-  it("still warns about model deletion in the confirmation message when the team has no keys", async () => {
-    await openDeleteModal({ ...baseTableTeam, keys: [], keys_count: 0 });
-
-    expect(screen.queryByText(/Warning: This team has/i)).not.toBeInTheDocument();
-    expect(screen.getByText(/Are you sure you want to delete this team/i)).toHaveTextContent(
-      /any models created for it/i,
-    );
-  });
 });
 
 describe("Teams - LIT-2530 organization stays optional for proxy admin with a single org", () => {

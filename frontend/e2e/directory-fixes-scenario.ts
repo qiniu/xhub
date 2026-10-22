@@ -83,6 +83,23 @@ export function registerDirectoryFixesScenario(locale: "en" | "zh-CN") {
       await expect(page.getByTestId("pagination-range")).toHaveText(
         tr("consoleDirectory.pagination.range", { start: 1, end: 24, count: 24 }),
       );
+      // 后台真实删除成功，仅故障注入后续列表刷新；必须移除已删行并准确区分刷新失败。
+      await stableGoto(page, "/users");
+      await page.getByPlaceholder(tr("pages.users.searchByEmailOrId")).fill(prefix);
+      await expect(page.getByTestId("pagination-range")).toHaveText(tr("consoleDirectory.pagination.range", { start: 1, end: 23, count: 23 }));
+      const confirmedRow = page.getByRole("row").filter({ hasText: prefix }).first();
+      const confirmedActions = confirmedRow.getByRole("button", { name: tr("pages.users.openUserActions") });
+      const confirmedID = (await confirmedActions.getAttribute("data-testid"))!.replace("user-actions-", "");
+      await page.route("**/user/list?**", route => route.fulfill({ status: 503, contentType: "application/json", body: '{"error":{"message":"List temporarily unavailable"}}' }));
+      await confirmedActions.click();
+      await page.getByRole("menuitem", { name: tr("pages.users.deleteUser"), exact: true }).click();
+      await page.getByRole("dialog").getByRole("button", { name: tr("common.delete"), exact: true }).click();
+      await expect(page.getByText(tr("consoleDirectory.userDeleteRefreshFailed"), { exact: true })).toBeVisible();
+      users.splice(users.indexOf(confirmedID), 1);
+      await expect(page.getByTestId("user-actions-" + confirmedID)).toHaveCount(0);
+      await expect(page.getByTestId("pagination-range")).toHaveText(tr("consoleDirectory.pagination.range", { start: 1, end: 22, count: 22 }));
+      expect((await page.request.get(GATEWAY + "/user/info?user_id=" + confirmedID, { headers })).status()).toBe(404);
+      await page.unroute("**/user/list?**");
       const createdOrg = await page.request.post(GATEWAY + "/organization/new", {
         headers,
         data: { organization_alias: prefix },
@@ -98,6 +115,16 @@ export function registerDirectoryFixesScenario(locale: "en" | "zh-CN") {
         expect(result.status()).toBe(200);
         teams.push((await result.json()).team_id);
       }
+      // 有成员和个人密钥的真实团队，验证弹窗语义及删除后凭证保留；用户删除会级联清理测试密钥。
+      const member = await page.request.post(GATEWAY + "/user/new", { headers, data: {
+        user_email: `${prefix}-member@example.invalid`, password: "Directory-test-pass123!", user_role: "user", team_id: teams[0],
+      } });
+      expect(member.status(), await member.text()).toBe(200);
+      const memberID = (await member.json()).user_id;
+      users.push(memberID);
+      const generated = await page.request.post(GATEWAY + "/key/generate", { headers, data: { user_id: memberID, key_alias: prefix } });
+      expect(generated.status(), await generated.text()).toBe(200);
+      const memberKey = await generated.json();
       await stableGoto(page, "/teams");
       const search = page.getByPlaceholder(tr("Search teams by name or ID…"));
       await search.fill(prefix);
@@ -138,6 +165,7 @@ export function registerDirectoryFixesScenario(locale: "en" | "zh-CN") {
         await page.getByRole("menuitem", { name: tr("Delete team"), exact: true }).click();
         const dialog = page.getByRole("dialog");
         await expect(dialog.getByText(tr("consoleDirectory.teamDelete.confirm"), { exact: true })).toBeVisible();
+        await expect(dialog.getByText(tr("consoleDirectory.teamDelete.warning"), { exact: true })).toBeVisible();
         await expect(dialog.getByText(names[0], { exact: true }).first()).toBeVisible();
         if (!confirm) {
           await dialog.getByRole("button", { name: tr("common.cancel"), exact: true }).click();
@@ -151,6 +179,15 @@ export function registerDirectoryFixesScenario(locale: "en" | "zh-CN") {
           expect((await deleted).status()).toBe(200);
           await expect(page.getByRole("row").filter({ hasText: names[0] })).toHaveCount(0);
           teams.shift();
+          expect((await page.request.get(GATEWAY + "/user/info?user_id=" + memberID, { headers })).status()).toBe(200);
+          const retained = await page.request.get(GATEWAY + "/key/info?key=" + memberKey.token_id, { headers });
+          expect(retained.status(), await retained.text()).toBe(200);
+          expect((await retained.json()).info.team_id).toBeFalsy();
+          const completion = await page.request.post(GATEWAY + "/v1/chat/completions", {
+            headers: { Authorization: "Bearer " + memberKey.key }, data: { model: "gpt-4o-mini", messages: [{ role: "user", content: "Verify retained personal key." }] },
+          });
+          expect(completion.status(), await completion.text()).toBe(200);
+          expect((await completion.json()).choices[0].message.content).toBe("e2e-ok");
         }
         await expect(dialog).toBeHidden();
       }

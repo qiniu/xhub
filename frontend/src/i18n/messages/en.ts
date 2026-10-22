@@ -6,6 +6,7 @@ import { routeTemplatesEn } from "./routeTemplates.en";
 
 export const en = {
   consoleDirectory: {
+    "userDeleteRefreshFailed": "User deleted, but the list could not be refreshed. Refresh the page to reload the remaining users.",
     "noTeams": "No teams found",
     "pagination": {
       "rows": "Rows per page",
@@ -18,8 +19,8 @@ export const en = {
       "last": "Go to last page"
     },
     "teamDelete": {
-      "confirm": "Are you sure you want to delete this team, all its keys, and any models created for it? This action cannot be undone.",
-      "warning": "Warning: This team has {count} keys associated with it. Deleting the team will also delete all associated keys, along with any models created for this team. This action is irreversible."
+      "confirm": "Are you sure you want to delete this team? Team membership and team settings will be removed. This action cannot be undone.",
+      "warning": "Members and their personal API keys will be retained. Requests will no longer use this team’s permissions or limits; personal permissions and limits still apply."
     }
   },
   userBudgetReset: {"label": "Budget reset date", "keep": "Keep unchanged", "none": "No automatic reset", "day": "Day {day} of each month", "help": "Reset spending at 00:00 Beijing time (UTC+8). Short months use their last day. Changing this setting does not reset spending immediately or change other budget scopes.", "next": "Next reset: {date} (Beijing time)"},

@@ -30,7 +30,7 @@ import { modelAvailableCall, userDeleteCall } from "@/components/networking";
 
 import { UsersTable } from "./view_users/UsersTable";
 import UserInfoView from "./view_users/user_info_view";
-import { UserInfo } from "@/components/networking";
+import { UserInfo, UserListResponse } from "@/components/networking";
 
 interface ViewUserDashboardProps {
   accessToken: string | null;
@@ -167,12 +167,22 @@ const ViewUserDashboard: React.FC<ViewUserDashboardProps> = ({
         setIsDeletingUser(true);
         await userDeleteCall(accessToken, userToDelete.user_id);
 
-        // 服务端总数、跨页补位和筛选结果必须一起刷新，不能只从当前页删除一行。
+        // 删除已由后台确认，先移除缓存中确实存在的行；未命中筛选缓存不能盲目减总数。
         await queryClient.cancelQueries({ queryKey: ["userList"] });
-        await queryClient.invalidateQueries({ queryKey: ["userList"] });
+        queryClient.setQueriesData<UserListResponse>({ queryKey: ["userList"] }, (cached) => {
+          if (!cached?.users.some((user) => user.user_id === userToDelete.user_id)) return cached;
+          const total = Math.max(0, cached.total - 1);
+          return { ...cached, users: cached.users.filter((user) => user.user_id !== userToDelete.user_id),
+            total, total_pages: Math.max(1, Math.ceil(total / cached.page_size)) };
+        });
         setRowSelection({});
-
-        toast.success(t("User deleted successfully"));
+        try {
+          // 仍从服务端补齐跨页行；刷新失败与删除失败分别反馈，不能重新显示已删除的账号。
+          await queryClient.invalidateQueries({ queryKey: ["userList"] }, { throwOnError: true });
+          toast.success(t("User deleted successfully"));
+        } catch {
+          toast.warning(t("consoleDirectory.userDeleteRefreshFailed"));
+        }
       } catch (error) {
         console.error("Error deleting user:", error);
         toast.fromError(t("Failed to delete user"));
@@ -262,12 +272,12 @@ const ViewUserDashboard: React.FC<ViewUserDashboardProps> = ({
 
   // 删除最后一页的最后一行后回到实际末页；占位数据和进行中的请求不能触发页码回退。
   useEffect(() => {
-    if (!userListQuery.data || userListQuery.isPlaceholderData || userListQuery.isFetching || userListQuery.isError) return;
+    if (!userListQuery.data || userListQuery.isPlaceholderData || userListQuery.isFetching) return;
     const lastPage = Math.max(0, Math.ceil(userListQuery.data.total / pagination.pageSize) - 1);
     if (pagination.pageIndex > lastPage) {
       setPagination((previous) => ({ ...previous, pageIndex: lastPage }));
     }
-  }, [userListQuery.data, userListQuery.isPlaceholderData, userListQuery.isFetching, userListQuery.isError, pagination.pageSize, pagination.pageIndex]);
+  }, [userListQuery.data, userListQuery.isPlaceholderData, userListQuery.isFetching, pagination.pageSize, pagination.pageIndex]);
 
   const selectedUsers = useMemo(() => users.filter((user) => rowSelection[user.user_id]), [users, rowSelection]);
 

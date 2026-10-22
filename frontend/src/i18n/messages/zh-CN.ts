@@ -7,6 +7,7 @@ import { routeTemplatesZhCN } from "./routeTemplates.zh-CN";
 
 export const zhCN = {
   consoleDirectory: {
+    "userDeleteRefreshFailed": "用户已删除，但列表刷新失败。请刷新页面重新加载其余用户。",
     "noTeams": "未找到团队",
     "pagination": {
       "rows": "每页条数",
@@ -19,8 +20,8 @@ export const zhCN = {
       "last": "前往最后一页"
     },
     "teamDelete": {
-      "confirm": "确定要删除此团队、团队关联的所有密钥以及为该团队创建的模型吗？此操作无法撤销。",
-      "warning": "警告：此团队关联了 {count} 个密钥。删除团队也会删除这些密钥及为该团队创建的模型，此操作无法撤销。"
+      "confirm": "确定要删除此团队吗？团队成员关系和团队配置将被移除，此操作无法撤销。",
+      "warning": "成员账号及其个人 API 密钥会保留。后续请求不再使用此团队的权限和限额，仍受个人权限和限额约束。"
     }
   },
   userBudgetReset: {"label": "预算刷新日期", "keep": "保持原值", "none": "不自动刷新", "day": "每月 {day} 日", "help": "北京时间 00:00 刷新已消费额度。短月份取当月最后一天；修改设置不会立即清零消费，不影响其他层级额度。", "next": "下次刷新：{date}（北京时间）"},
