@@ -55,6 +55,11 @@ func UserNew(g Gate, w http.ResponseWriter, r *http.Request) {
 		util.WriteError(w, 400, "invalid_request", "budget_reset_day must be an integer from 0 to 31")
 		return
 	}
+	identity, identityErr := enterpriseIdentityInput(body)
+	if identityErr != nil {
+		util.WriteError(w, 400, "invalid_request", "sso_connection_id and sso_external_id must be provided together")
+		return
+	}
 	in := iam.UserInput{
 		BudgetResetDay: resetDay,
 		Email:          str(body["user_email"]),
@@ -63,8 +68,9 @@ func UserNew(g Gate, w http.ResponseWriter, r *http.Request) {
 		Role:           iam.StoreRole(str(body["user_role"])),
 		MaxBudget:      floatPtr(body["max_budget"]),
 		RPMLimit:       util.Rate(body, "rpm_limit"), TPMLimit: util.Rate(body, "tpm_limit"),
-		TeamID:      str(body["team_id"]),
-		AdminOrgIDs: stringList(body["admin_organization_ids"]),
+		TeamID:             str(body["team_id"]),
+		AdminOrgIDs:        stringList(body["admin_organization_ids"]),
+		EnterpriseIdentity: identity,
 	}
 	// A team role is read whenever the caller sent one, including alongside no
 	// team. Reading it only next to a team would silently drop the field, and a
@@ -91,7 +97,12 @@ func UserNew(g Gate, w http.ResponseWriter, r *http.Request) {
 		g.WriteIAMError(w, r, err)
 		return
 	}
-	util.WriteJSON(w, 200, userPublic(u, nil))
+	public := userPublic(u, nil)
+	if identity != nil {
+		public["sso_connection_id"] = identity.ConnectionID
+		public["sso_external_id"] = identity.ExternalID
+	}
+	util.WriteJSON(w, 200, public)
 }
 
 // UserList lists accounts the caller may see. A platform administrator sees every account. An organization administrator sees the people in that organization's teams. A team administrator sees the people in the teams they administer. Everyone else sees only themselves.
@@ -278,7 +289,16 @@ func UserInfo(g Gate, w http.ResponseWriter, r *http.Request) {
 		g.WriteIAMError(w, r, err)
 		return
 	}
-	util.WriteJSON(w, 200, map[string]any{"user_info": userPublic(u, roles[u.ID])})
+	public := userPublic(u, roles[u.ID])
+	if p.PlatformAdmin() {
+		identity, err := g.Identity().EnterpriseIdentityForUser(r.Context(), target)
+		if err != nil {
+			g.WriteIAMError(w, r, err)
+			return
+		}
+		applyEnterpriseIdentity(public, identity)
+	}
+	util.WriteJSON(w, 200, map[string]any{"user_info": public})
 }
 
 // UserUpdate 修改账户名称、角色、状态、预算和邮箱；管理员可修改任意账户，普通用户仅可修改自己的名称和密码。
@@ -311,6 +331,15 @@ func UserUpdate(g Gate, w http.ResponseWriter, r *http.Request) {
 	resetDay, resetErr := userResetDay(body)
 	if resetErr != nil {
 		util.WriteError(w, 400, "invalid_request", "budget_reset_day must be an integer from 0 to 31")
+		return
+	}
+	if !p.PlatformAdmin() && (has(body, "sso_connection_id") || has(body, "sso_external_id")) {
+		util.WriteError(w, 403, "access_denied", "only platform administrators can manage enterprise identity bindings")
+		return
+	}
+	identity, identityErr := enterpriseIdentityInput(body)
+	if identityErr != nil {
+		util.WriteError(w, 400, "invalid_request", "sso_connection_id and sso_external_id must be provided together")
 		return
 	}
 	target := r.PathValue("user_id")
@@ -370,8 +399,9 @@ func UserUpdate(g Gate, w http.ResponseWriter, r *http.Request) {
 			Email:     stringPtr(body, "user_email"),
 			MaxBudget: optionalFloat(body, "max_budget"),
 			RPMLimit:  util.OptionalRate(body, "rpm_limit"), TPMLimit: util.OptionalRate(body, "tpm_limit"),
+			EnterpriseIdentity: identity,
 		}
-		if in.BudgetResetDay == nil && in.Name == nil && in.Role == nil && in.Status == nil && in.Email == nil && in.MaxBudget == nil && in.RPMLimit == nil && in.TPMLimit == nil {
+		if in.BudgetResetDay == nil && in.Name == nil && in.Role == nil && in.Status == nil && in.Email == nil && in.MaxBudget == nil && in.RPMLimit == nil && in.TPMLimit == nil && in.EnterpriseIdentity == nil {
 			if !self {
 				util.WriteError(w, 400, "invalid_request", "no supported field to update")
 				return
@@ -386,7 +416,16 @@ func UserUpdate(g Gate, w http.ResponseWriter, r *http.Request) {
 		g.WriteIAMError(w, r, err)
 		return
 	}
-	util.WriteJSON(w, 200, map[string]any{"user_info": userPublic(u, nil)})
+	public := userPublic(u, nil)
+	if p.PlatformAdmin() {
+		identity, err := g.Identity().EnterpriseIdentityForUser(r.Context(), target)
+		if err != nil {
+			g.WriteIAMError(w, r, err)
+			return
+		}
+		applyEnterpriseIdentity(public, identity)
+	}
+	util.WriteJSON(w, 200, map[string]any{"user_info": public})
 }
 
 // storedRolePtr reads the console role and maps it onto the stored spelling. A missing field stays nil so an update that does not mention the role leaves it alone.
@@ -417,6 +456,38 @@ func statusPtr(body map[string]any) *string {
 		return &s
 	}
 	return stringPtr(body, "status")
+}
+
+// enterpriseIdentityInput 读取成对提交的企业绑定字段；未提交时返回 nil，两个空值表示解除。
+// body 是已校验的 JSON 对象；返回完整的目录连接和企业账号 ID，两项都缺省时保留关联，单项缺失或非字符串时返回 ErrInvalid，无写入副作用。
+func enterpriseIdentityInput(body map[string]any) (*iam.EnterpriseIdentityInput, error) {
+	connection, hasConnection := body["sso_connection_id"]
+	external, hasExternal := body["sso_external_id"]
+	if !hasConnection && !hasExternal {
+		return nil, nil
+	}
+	connectionID, connectionOK := connection.(string)
+	externalID, externalOK := external.(string)
+	if !connectionOK || !externalOK || (strings.TrimSpace(connectionID) == "") != (strings.TrimSpace(externalID) == "") {
+		return nil, iam.ErrInvalid
+	}
+	return &iam.EnterpriseIdentityInput{ConnectionID: strings.TrimSpace(connectionID), ExternalID: strings.TrimSpace(externalID)}, nil
+}
+
+// applyEnterpriseIdentity 将仅管理员可见的绑定视图加入用户响应；未绑定时用空值表示可创建新绑定。
+// target 是即将返回的公开用户对象，identity 是数据库读取的脱密绑定；无返回值或持久化副作用。
+func applyEnterpriseIdentity(target map[string]any, identity *iam.EnterpriseUserIdentity) {
+	if identity == nil {
+		target["sso_connection_id"] = ""
+		target["sso_connection_name"] = ""
+		target["sso_external_id"] = ""
+		target["sso_binding_managed"] = false
+		return
+	}
+	target["sso_connection_id"] = identity.ConnectionID
+	target["sso_connection_name"] = identity.ConnectionName
+	target["sso_external_id"] = identity.ExternalID
+	target["sso_binding_managed"] = identity.Managed
 }
 
 // updateProfile applies the two fields a person owns.

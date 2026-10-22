@@ -165,10 +165,12 @@ type UserInput struct {
 	// AdminOrgIDs makes the new account an organization administrator. It is
 	// the same relationship /organization/member_add grants, so an account that
 	// runs an organization can be set up without a second round trip.
-	AdminOrgIDs []string
+	AdminOrgIDs        []string
+	EnterpriseIdentity *EnterpriseIdentityInput
 }
 
-// CreateUser inserts a platform account together with the memberships the caller asked for, in one transaction. The memberships are written only after the account row exists, and a failure to write anyof them rolls the whole thing back: an account that came out of a failed create would be one nobody intended to make. 额度为空表示共享唯一团队的余额；零表示禁止消费。固定额度占用团队的可分配金额。
+// CreateUser 在同一事务中创建平台账户、团队归属和可选企业身份；任一步失败全部回滚。
+// 额度为空表示共享唯一团队余额，零表示禁止消费；固定额度占用团队可分配金额。
 //
 // 参数 ctx（context.Context）：上下文，取消时停止；by（Actor）：执行这次修改的操作者。审计日志记这个人的 id 和角色；in（UserInput）：调用方提交的UserInput。字段为空表示这项不改。
 // 返回 *User（*User）：新建的平台账户。成员关系在同一事务里写入。失败时为 nil；error（error）：密码、唯一约束或事务失败。nil 表示账户和成员都已写入。
@@ -203,6 +205,11 @@ func (db *DB) CreateUser(ctx context.Context, by Actor, in UserInput) (*User, er
 		if _, err := s.Insert(&u); err != nil {
 			return err
 		}
+		if in.EnterpriseIdentity != nil {
+			if _, err := setEnterpriseIdentity(s, u.ID, in.EnterpriseIdentity); err != nil {
+				return err
+			}
+		}
 		if in.TeamID != "" {
 			if err := lockTeam(ctx, s, in.TeamID); err != nil {
 				return err
@@ -232,7 +239,7 @@ func (db *DB) CreateUser(ctx context.Context, by Actor, in UserInput) (*User, er
 		out = &u
 		return writeAudit(s, by, Audit{Action: "user.create", ObjectType: "user", ObjectID: u.ID,
 			Detail: map[string]any{"role": u.Role, "team_id": in.TeamID, "team_role": in.TeamRole,
-				"admin_organizations": len(in.AdminOrgIDs)}})
+				"admin_organizations": len(in.AdminOrgIDs), "sso_connection_id": enterpriseConnectionID(in.EnterpriseIdentity)}})
 	})
 	return out, err
 }
@@ -462,14 +469,15 @@ func (db *DB) SetPassword(ctx context.Context, by Actor, id, password string) er
 // UserUpdate 是管理员修改账户时的增量字段；nil 保留原值，Name 的空字符串用于清空显示名称。
 type UserUpdate struct {
 	// BudgetResetDay缺省保持，0取消，1至31按北京时间月度刷新。
-	BudgetResetDay *int
-	RPMLimit       **int
-	TPMLimit       **int
-	Name           *string
-	Role           *string
-	Status         *string
-	MaxBudget      **float64
-	Email          *string
+	BudgetResetDay     *int
+	RPMLimit           **int
+	TPMLimit           **int
+	Name               *string
+	Role               *string
+	Status             *string
+	MaxBudget          **float64
+	Email              *string
+	EnterpriseIdentity *EnterpriseIdentityInput
 }
 
 // AdminUpdateUser 在同一事务中修改名称、角色、状态、邮箱和预算；供用户更新接口调用。
@@ -480,6 +488,11 @@ type UserUpdate struct {
 func (db *DB) AdminUpdateUser(ctx context.Context, by Actor, id string, in UserUpdate) (*User, error) {
 	var out *User
 	err := db.tx(ctx, func(s *xorm.Session) error {
+		// 人工用户写入按账号串行化，避免并发改绑读取旧值或丢失会话版本。
+		if _, err := s.Exec("SELECT pg_advisory_xact_lock(hashtextextended(?, 0))", "user-enterprise-identity:"+id); err != nil {
+			return err
+		}
+
 		cur, err := getUser(ctx, s, id)
 		if err != nil {
 			return err
@@ -525,7 +538,24 @@ func (db *DB) AdminUpdateUser(ctx context.Context, by Actor, id string, in UserU
 				return err
 			}
 		}
-		if next.Role != cur.Role || next.Status != cur.Status {
+		identityChanged := false
+		if in.EnterpriseIdentity != nil {
+			identityChanged, err = setEnterpriseIdentity(s, id, in.EnterpriseIdentity)
+			if err != nil {
+				return err
+			}
+		}
+		// 企业登录仅支持普通用户；提升角色前必须显式解绑，避免意外删除身份。
+		if next.Role != RoleUser {
+			bound, err := s.Where("user_id = ?", id).Exist(new(DirectoryUser))
+			if err != nil {
+				return err
+			}
+			if bound {
+				return ErrInvalid
+			}
+		}
+		if next.Role != cur.Role || next.Status != cur.Status || identityChanged {
 			next.SessionVersion = cur.SessionVersion + 1
 		}
 		if _, err := s.ID(id).Cols("name", "role", "status", "max_budget", "email", "session_version", "rpm_limit", "tpm_limit", "budget_reset_day", "budget_reset_at").Update(&next); err != nil {
@@ -545,7 +575,8 @@ func (db *DB) AdminUpdateUser(ctx context.Context, by Actor, id string, in UserU
 			}
 		}
 		return writeAudit(s, by, Audit{Action: "user.update", ObjectType: "user", ObjectID: id,
-			Detail: map[string]any{"role": next.Role, "status": next.Status, "previous_budget_reset_day": cur.BudgetResetDay, "budget_reset_day": next.BudgetResetDay}})
+			Detail: map[string]any{"role": next.Role, "status": next.Status, "previous_budget_reset_day": cur.BudgetResetDay, "budget_reset_day": next.BudgetResetDay,
+				"sso_binding_changed": identityChanged, "sso_connection_id": enterpriseConnectionID(in.EnterpriseIdentity)}})
 	})
 	return out, err
 }
@@ -557,6 +588,11 @@ func (db *DB) AdminUpdateUser(ctx context.Context, by Actor, id string, in UserU
 // 测试：无直接单测
 func (db *DB) DeleteUser(ctx context.Context, by Actor, id string) error {
 	return db.tx(ctx, func(s *xorm.Session) error {
+		// 人工用户写入按账号串行化，避免并发改绑读取旧值或丢失会话版本。
+		if _, err := s.Exec("SELECT pg_advisory_xact_lock(hashtextextended(?, 0))", "user-enterprise-identity:"+id); err != nil {
+			return err
+		}
+
 		cur, err := getUser(ctx, s, id)
 		if err != nil {
 			return err
@@ -579,11 +615,23 @@ func (db *DB) DeleteUser(ctx context.Context, by Actor, id string) error {
 				return err
 			}
 		}
+		if _, err := setEnterpriseIdentity(s, id, &EnterpriseIdentityInput{}); err != nil {
+			return err
+		}
 		if err := affected(s.ID(id).Delete(&User{})); err != nil {
 			return err
 		}
 		return writeAudit(s, by, Audit{Action: "user.delete", ObjectType: "user", ObjectID: id, Detail: map[string]any{"teams": adminOf}})
 	})
+}
+
+// enterpriseConnectionID 提取审计和创建结果所需的连接标识；未设置绑定时返回空字符串。
+// in 是用户输入；返回非敏感连接 ID，不触发数据库或日志副作用。
+func enterpriseConnectionID(in *EnterpriseIdentityInput) string {
+	if in == nil {
+		return ""
+	}
+	return in.ConnectionID
 }
 
 // 在当前事务里按 id 锁住用户行。

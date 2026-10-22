@@ -9,6 +9,7 @@ import { userUpdateUserCall, type UserInfoV2Response } from "@/components/networ
 import { normalizeAccountRole, type IamRole } from "@/utils/iamRoles";
 import { toast } from "@/lib/toast";
 import { useT } from "@/i18n";
+import { EnterpriseIdentityFields, useEnterpriseConnections } from "@/components/EnterpriseIdentityFields";
 
 /** 管理员账户编辑表单。参数 user 为已加载账户、accessToken 为会话、onSaved/onCancel 为保存/取消回调；返回表单。
  * 供用户详情调用，仅提交后台支持的字段；预算留空共享唯一团队余额，无团队时留空不限额，填写预算限制个人累计消费。
@@ -29,17 +30,30 @@ export default function UserAccountEditor({ user, accessToken, onSaved, onCancel
   const [tpm, setTpm] = useState(user.tpm_limit == null ? "" : String(user.tpm_limit));
   const [resetDay, setResetDay] = useState(String(user.budget_reset_day ?? 0));
   const [blocked, setBlocked] = useState(user.blocked ?? false);
+  const [connectionID, setConnectionID] = useState(user.sso_connection_id ?? "");
+  const [externalID, setExternalID] = useState(user.sso_external_id ?? "");
   const [saving, setSaving] = useState(false);
+  const enterprise = useEnterpriseConnections();
   const roles = [{ value: "admin", label: t("Platform administrator") }, { value: "user", label: t("Regular user") }];
 
   /** 接收浏览器提交事件，保存增量账户字段后刷新详情；返回异步完成状态，错误通过提示展示且保留编辑器。 */
   const save = async (event: React.FormEvent) => {
     event.preventDefault();
     if (saving) return;
+    if (!user.sso_binding_managed && Boolean(connectionID.trim()) !== Boolean(externalID.trim())) {
+      toast.error(t("enterpriseUserIdentity.pairRequired")); return;
+    }
+    if (role !== "user" && connectionID) { toast.error(t("enterpriseUserIdentity.roleError")); return; }
     setSaving(true);
     try {
-      await userUpdateUserCall(accessToken, { user_id: user.user_id, user_email: email.trim(), user_alias: alias,
-        budget_reset_day: Number(resetDay), user_role: role, max_budget: budget === "" ? null : Number(budget), rpm_limit: rpm === "" ? null : Number(rpm), tpm_limit: tpm === "" ? null : Number(tpm), blocked }, null);
+      const update: Record<string, unknown> = { user_id: user.user_id, user_email: email.trim(), user_alias: alias,
+        budget_reset_day: Number(resetDay), user_role: role, max_budget: budget === "" ? null : Number(budget), rpm_limit: rpm === "" ? null : Number(rpm), tpm_limit: tpm === "" ? null : Number(tpm), blocked,
+      };
+      if (!user.sso_binding_managed && (connectionID !== (user.sso_connection_id ?? "") || externalID !== (user.sso_external_id ?? ""))) {
+        update.sso_connection_id = connectionID;
+        update.sso_external_id = externalID;
+      }
+      await userUpdateUserCall(accessToken, update, null);
       await onSaved();
       toast.success(t("User updated successfully"));
     } catch (error) {
@@ -74,6 +88,9 @@ export default function UserAccountEditor({ user, accessToken, onSaved, onCancel
           <Input id="edit-user-tpm" type="number" min="0" max="2147483647" step="1" placeholder={t("quotaGuide.rateBlank")} value={tpm} onChange={(event) => setTpm(event.target.value)} /></Field>
         <Field orientation="horizontal"><Checkbox id="edit-user-blocked" checked={blocked} onCheckedChange={(value) => setBlocked(value === true)} />
           <FieldLabel htmlFor="edit-user-blocked">{t("Blocked")}</FieldLabel></Field>
+        <EnterpriseIdentityFields connections={enterprise.connections} connectionID={connectionID} externalID={externalID}
+          onConnectionChange={(value) => { setConnectionID(value); if (!value) setExternalID(""); }} onExternalChange={setExternalID}
+          managed={user.sso_binding_managed} loading={enterprise.loading} error={enterprise.error} />
       </FieldGroup>
       <div className="mt-6 flex justify-end gap-2">
         <Button type="button" variant="secondary" onClick={onCancel}>{t("common.cancel")}</Button>

@@ -40,6 +40,17 @@ describe("user CSV contract", () => {
     expect(parsed.rows[0].errors).toEqual([]);
     expect(parsed.rows[1].errors).toEqual(["emailError", "roleError", "passwordError", "teamError"]);
   });
+
+  /** 企业身份 CSV 回归：前置真实模板字段和一个已配置连接；验证身份列解析、重复 ID、缺项和未知连接，无持久数据。 */
+  it("parses and validates enterprise identity bindings", () => {
+    const headers = "user_email,user_role,password,sso_connection_id,sso_external_id";
+    const parsed = parseUserCsv(headers + "\na@example.com,user,password1,connection-1,ldap-1\nb@example.com,user,password2,connection-1,ldap-1", [], ["connection-1"]);
+    expect(parsed.rows[0].user).toMatchObject({ sso_connection_id: "connection-1", sso_external_id: "ldap-1" });
+    expect(parsed.rows[1].errors).toContain("enterpriseIdentityDuplicateError");
+    expect(parseUserCsv(headers + "\na@example.com,admin,password1,connection-1,ldap-admin", [], ["connection-1"]).rows[0].errors).toContain("enterpriseIdentityRoleError");
+    expect(parseUserCsv(headers + "\na@example.com,user,password1,connection-1,", [], ["connection-1"]).rows[0].errors).toContain("enterpriseIdentityPairError");
+    expect(parseUserCsv(headers + "\na@example.com,user,password1,missing,ldap-1", [], ["connection-1"]).rows[0].errors).toContain("enterpriseIdentityConnectionError");
+  });
 });
 
 /** 日期解析兼容旧CSV；合法边界、缺省和错误输入均不修改原文，无持久资源。 */

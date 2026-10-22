@@ -22,6 +22,7 @@ import {
   validateCreateUser,
   type CreateUserFormValues,
 } from "./create_user_payload";
+import { EnterpriseIdentityFields, useEnterpriseConnections } from "./EnterpriseIdentityFields";
 
 interface CreateuserProps {
   userID: string;
@@ -75,12 +76,16 @@ export const CreateUserButton: React.FC<CreateuserProps> = ({
   const t = useT();
   const queryClient = useQueryClient();
   const form = useForm<CreateUserFormValues>({ defaultValues: EMPTY_CREATE_USER_FORM });
+  const identityRole = form.watch("user_role");
+  // 切换到管理员时清除不适用的企业身份，避免隐藏字段被提交。
+  React.useEffect(() => { if (identityRole !== iamRoles.RoleUser) { form.setValue("sso_connection_id", ""); form.setValue("sso_external_id", ""); } }, [identityRole, form]);
   const [open, setOpen] = useState(false);
   const [saving, setSaving] = useState(false);
   const teamId = form.watch("team_id");
   const unlimitedBudget = form.watch("unlimited_budget");
   const roles = accountRoles();
   const membershipRoles = teamRoles();
+  const enterprise = useEnterpriseConnections();
 
   const close = () => {
     setOpen(false);
@@ -104,6 +109,10 @@ export const CreateUserButton: React.FC<CreateuserProps> = ({
     }
     if (problem === "rate") {
       toast.fromError(t("Must be a non-negative whole number"));
+      return;
+    }
+    if (problem === "enterpriseIdentity") {
+      toast.fromError(t("enterpriseUserIdentity.pairRequired"));
       return;
     }
     setSaving(true);
@@ -196,6 +205,15 @@ export const CreateUserButton: React.FC<CreateuserProps> = ({
           )}
         </FormField>
       ) : null}
+      {identityRole === iamRoles.RoleUser ? <EnterpriseIdentityFields
+        connections={enterprise.connections}
+        connectionID={form.watch("sso_connection_id")}
+        externalID={form.watch("sso_external_id")}
+        onConnectionChange={(value) => { form.setValue("sso_connection_id", value); if (!value) form.setValue("sso_external_id", ""); }}
+        onExternalChange={(value) => form.setValue("sso_external_id", value)}
+        loading={enterprise.loading}
+        error={enterprise.error}
+      /> : null}
       {(["rpm_limit", "tpm_limit"] as const).map((name) => (
         <FormField key={name} control={form.control} name={name}
           label={t(name === "rpm_limit" ? "Requests per minute Limit (RPM)" : "Tokens per minute Limit (TPM)")}

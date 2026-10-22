@@ -1,3 +1,4 @@
+vi.mock("@/lib/http/enterprise", () => ({ listSSO: vi.fn().mockResolvedValue([]) }));
 import { fireEvent, render, screen, waitFor, cleanup } from "@testing-library/react";
 import { afterEach, describe, it, expect, vi } from "vitest";
 import { I18nProvider, translate, useI18n } from "@/i18n";

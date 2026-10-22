@@ -80,6 +80,15 @@ describe("buildCreateUserPayload", () => {
     expect(payload.user_role).toBe("user");
     expect(payload.auto_create_key).toBe(false);
   });
+
+  /** 企业绑定成对校验：前置有效普通用户，验证 ID 随创建请求传递并拒绝缺项；纯函数测试无数据写入。 */
+  it("sends a complete SSO identity and refuses a partial binding", () => {
+    const values = form({ sso_connection_id: "connection-1", sso_external_id: "ldap-user-1" });
+    expect(validateCreateUser(values)).toBeNull();
+    expect(buildCreateUserPayload(values)).toMatchObject({ sso_connection_id: "connection-1", sso_external_id: "ldap-user-1" });
+    expect(validateCreateUser(form({ sso_connection_id: "connection-1" }))).toBe("enterpriseIdentity");
+    expect(validateCreateUser(form({ user_role: "admin", sso_connection_id: "connection-1", sso_external_id: "ldap-admin" }))).toBe("enterpriseIdentity");
+  });
 });
 
 /** 新建配额纯函数测试：正常、边界和失败输入，验证共享与 0 区分；不写入数据，无需清理。 */

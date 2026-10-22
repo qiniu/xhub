@@ -12,6 +12,8 @@ export interface CreateUserFormValues {
   unlimited_budget: boolean;
   team_id: string | null;
   team_role: string;
+  sso_connection_id: string;
+  sso_external_id: string;
 }
 
 export const EMPTY_CREATE_USER_FORM: CreateUserFormValues = {
@@ -25,6 +27,8 @@ export const EMPTY_CREATE_USER_FORM: CreateUserFormValues = {
   unlimited_budget: true,
   team_id: null,
   team_role: "user",
+  sso_connection_id: "",
+  sso_external_id: "",
 };
 
 /** The payload POST /user/new accepts, built from the form values. */
@@ -39,10 +43,12 @@ export interface CreateUserPayload {
   tpm_limit?: number;
   team_id?: string;
   team_role?: string;
+  sso_connection_id?: string;
+  sso_external_id?: string;
 }
 
 /** The field that stopped the form, or null when every value is usable. */
-export type CreateUserProblem = "email" | "password" | "budget" | "rate" | null;
+export type CreateUserProblem = "email" | "password" | "budget" | "rate" | "enterpriseIdentity" | null;
 
 /** 校验个人创建参数，返回首个错误字段或 null；供提交前使用，拒绝空固定预算和非法速率，无写入副作用。 */
 export function validateCreateUser(values: CreateUserFormValues): CreateUserProblem {
@@ -53,6 +59,8 @@ export function validateCreateUser(values: CreateUserFormValues): CreateUserProb
     if (!values.max_budget.trim() || !Number.isFinite(budget) || budget < 0) return "budget";
   }
   if (!isValidRateAllocation(values.rpm_limit) || !isValidRateAllocation(values.tpm_limit)) return "rate";
+  if (values.user_role !== iamRoles.RoleUser && (values.sso_connection_id.trim() || values.sso_external_id.trim())) return "enterpriseIdentity";
+  if (Boolean(values.sso_connection_id.trim()) !== Boolean(values.sso_external_id.trim())) return "enterpriseIdentity";
   return null;
 }
 
@@ -71,6 +79,10 @@ export function buildCreateUserPayload(values: CreateUserFormValues): CreateUser
   if (values.team_id) {
     payload.team_id = values.team_id;
     payload.team_role = values.team_role === "admin" ? "admin" : "user";
+  }
+  if (values.sso_connection_id.trim() && values.sso_external_id.trim()) {
+    payload.sso_connection_id = values.sso_connection_id.trim();
+    payload.sso_external_id = values.sso_external_id.trim();
   }
   for (const field of ["rpm_limit", "tpm_limit"] as const) {
     if (values[field].trim()) payload[field] = Number(values[field]);

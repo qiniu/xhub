@@ -1,9 +1,10 @@
-import React, { useRef, useState } from "react";
+import React, { useRef, useState, useEffect } from "react";
 import Papa from "papaparse";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { useT } from "@/i18n";
 import { userCreateCall } from "./networking";
+import { listSSO, type SSOConfiguration } from "@/lib/http/enterprise";
 import { downloadUserCsv, parseUserCsv, userCsvTemplate, type CsvParse, type CsvRow } from "./user_csv";
 
 /** 用户页面传入的管理员凭据、团队范围和刷新回调；保留角色参数以兼容现有调用方。 */
@@ -23,10 +24,21 @@ export default function BulkCreateUsersButton({ accessToken, teams, onUsersCreat
   const [busy, setBusy] = useState(false);
   const [done, setDone] = useState(false);
   const [page, setPage] = useState(0);
+  const [connections, setConnections] = useState<SSOConfiguration[]>([]);
+  const [connectionsLoading, setConnectionsLoading] = useState(false);
+  const [connectionsError, setConnectionsError] = useState(false);
   const generation = useRef(0);
   const submitting = useRef(false);
   const inputID = React.useId();
   const tr = (key: string, vars?: Record<string, string | number>) => t(`userCsv.${key}`, vars);
+  // 弹窗关闭后忽略连接请求结果，避免旧请求覆盖下一次打开的状态。
+  useEffect(() => {
+    if (!open) return;
+    let alive = true;
+    setConnectionsLoading(true); setConnectionsError(false);
+    listSSO().then((rows) => { if (alive) setConnections(rows); }).catch(() => { if (alive) { setConnections([]); setConnectionsError(true); } }).finally(() => { if (alive) setConnectionsLoading(false); });
+    return () => { alive = false; };
+  }, [open]);
   /** 重置导入状态并使未完成读取失效；无参数/返回值，仅清除当前弹窗数据。 */
   const reset = () => {
     generation.current++;
@@ -45,7 +57,7 @@ export default function BulkCreateUsersButton({ accessToken, teams, onUsersCreat
     }
     try {
       const text = await file.text();
-      if (version === generation.current) setParsed(parseUserCsv(text, teams?.map((team) => team.team_id) ?? []));
+      if (version === generation.current) setParsed(parseUserCsv(text, teams?.map((team) => team.team_id) ?? [], connections.map((connection) => connection.connection_id)));
     } catch {
       if (version === generation.current) setParsed({ rows: [], error: "structure" });
     }
@@ -99,6 +111,7 @@ export default function BulkCreateUsersButton({ accessToken, teams, onUsersCreat
         onClick={() => {
           reset();
           setOpen(true);
+
         }}
       >
         {tr("title")}
@@ -118,6 +131,7 @@ export default function BulkCreateUsersButton({ accessToken, teams, onUsersCreat
           </DialogHeader>
           <p>{tr("help")}</p>
           <p>{tr("privacy")}</p>
+          {connectionsError ? <p role="alert">{tr("enterpriseIdentityLoadError")}</p> : <p>{tr("enterpriseIdentityHelp", { connections: connectionsLoading ? tr("enterpriseIdentityLoading") : connections.map((item) => item.name + " (" + item.connection_id + ")").join(", ") || tr("enterpriseIdentityNone") })}</p>}
           <Button disabled={busy} onClick={() => downloadUserCsv(userCsvTemplate(), "users-template.csv")}>
             {tr("template")}
           </Button>
@@ -126,7 +140,7 @@ export default function BulkCreateUsersButton({ accessToken, teams, onUsersCreat
             onDragOver={(event) => event.preventDefault()}
             onDrop={(event) => {
               event.preventDefault();
-              if (!busy) void upload(event.dataTransfer.files?.[0]);
+              if (!busy && !connectionsLoading) void upload(event.dataTransfer.files?.[0]);
             }}
           >
             {tr("upload")}
@@ -135,7 +149,7 @@ export default function BulkCreateUsersButton({ accessToken, teams, onUsersCreat
             id={inputID}
             type="file"
             accept=".csv"
-            disabled={busy}
+            disabled={busy || connectionsLoading}
             onChange={(event) => {
               void upload(event.target.files?.[0]);
               event.target.value = "";
@@ -148,7 +162,7 @@ export default function BulkCreateUsersButton({ accessToken, teams, onUsersCreat
               <table className="w-full text-sm">
                 <thead>
                   <tr>
-                    {["row", "email", "role", "budget", "resetDay", "status"].map((key) => (
+                    {["row", "email", "role", "budget", "resetDay", "enterpriseIdentity", "status"].map((key) => (
                       <th key={key}>{tr(key)}</th>
                     ))}
                   </tr>
@@ -161,6 +175,7 @@ export default function BulkCreateUsersButton({ accessToken, teams, onUsersCreat
                       <td>{row.user.user_role}</td>
                       <td>{row.user.max_budget ?? "—"}</td>
                       <td>{row.user.budget_reset_day ? t("userBudgetReset.day", { day: row.user.budget_reset_day }) : t("userBudgetReset.none")}</td>
+                      <td>{row.user.sso_external_id ? t("userCsv.enterpriseIdentityValue", { connection: row.user.sso_connection_id ?? "", externalID: row.user.sso_external_id }) : "—"}</td>
                       <td>
                         {row.errors.length ? row.errors.map((key) => tr(key)).join("; ") : tr(row.status ?? "pending")}
                         {row.status === "failed" && <p>{tr("requestError")}</p>}
@@ -179,7 +194,7 @@ export default function BulkCreateUsersButton({ accessToken, teams, onUsersCreat
                 </Button>
               </div>
               {!done && (
-                <Button disabled={busy || invalid} onClick={create}>
+                <Button disabled={busy || invalid || connectionsLoading} onClick={create}>
                   {busy ? tr("busy") : tr("create", { count: parsed.rows.length })}
                 </Button>
               )}
