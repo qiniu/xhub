@@ -1,3 +1,3 @@
-/** 目的：独立验证 search-tools 删除；真实页面后台和隔离数据；finally 或脚本回收测试数据。 */
-import { registerColumnScenario } from "../../column-scenario";
-registerColumnScenario("/search-tools", "删除", true);
+/** 验证真实配置操作与执行结果；本机协议上游、隔离数据库，辅助流程负责finally清理。 */
+import { registerProbeColumn } from "../../probe-scenario";
+registerProbeColumn("/search-tools", "删除");

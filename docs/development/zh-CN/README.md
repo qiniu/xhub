@@ -32,3 +32,5 @@
 - 不手改 schema.d.ts：当前缺少 Go OpenAPI 生成源，gen:api 会明确失败。用真实 HTTP regression 和前端消费者测试核对契约。
 
 [请求链](architecture.md) · [代码地图](implementation.md) · [操作指南](../../user-guide.zh-CN.md)
+
+- [提示词与搜索测试契约](real-probe-contracts.md)

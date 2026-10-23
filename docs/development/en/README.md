@@ -30,3 +30,5 @@ Read the applicable AGENTS.md, CLAUDE.md and package README. Product changes nee
 - Do not edit schema.d.ts manually. Go OpenAPI generation is not available; gen:api fails explicitly. Verify contracts through real HTTP regression and frontend consumer tests.
 
 [Request lifecycle](architecture.md) · [Source map](implementation.md) · [User guide](../../user-guide.md)
+
+- [Prompt and search test contracts](real-probe-contracts.md)

@@ -67,7 +67,7 @@ func writeCatalogStore(st catalogRecordStore, w http.ResponseWriter, r *http.Req
 		for i := range list {
 			Freeze(kind, list[i])
 		}
-		util.WriteJSON(w, 200, catalogListBody(kind, path, redactCredentialList(kind, list, true)))
+		util.WriteJSON(w, 200, catalogListBody(kind, path, redactCatalogList(kind, list, true)))
 	case "info":
 		if id == "" {
 			util.WriteJSON(w, 200, map[string]any{"object": "list", "data": []any{}})
@@ -83,7 +83,7 @@ func writeCatalogStore(st catalogRecordStore, w http.ResponseWriter, r *http.Req
 			return
 		}
 		Freeze(kind, m)
-		util.WriteJSON(w, 200, redactCredentialObject(kind, m, true))
+		util.WriteJSON(w, 200, redactCatalogObject(kind, m, true))
 	case "delete":
 		ids := idsFrom(body, kind+"s", idField(kind))
 		if id != "" {
@@ -116,6 +116,8 @@ func writeCatalogStore(st catalogRecordStore, w http.ResponseWriter, r *http.Req
 		}
 		if kind == "credentials" || kind == "credential" {
 			mergeCredentialPatch(m, body)
+		} else if kind == "search_tools" || kind == "search_tool" || kind == "search-tools" {
+			mergeSearchToolPatch(m, body)
 		} else {
 			for k, v := range body {
 				if k == "password" {
@@ -130,7 +132,7 @@ func writeCatalogStore(st catalogRecordStore, w http.ResponseWriter, r *http.Req
 		if !persistCatalogObject(st, w, kind, id, m) {
 			return
 		}
-		util.WriteJSON(w, 200, redactCredentialObject(kind, m, true))
+		util.WriteJSON(w, 200, redactCatalogObject(kind, m, true))
 	default:
 		if id == "" && kind == "memory" {
 			if k := str(body["key"]); k != "" {
@@ -172,7 +174,7 @@ func writeCatalogStore(st catalogRecordStore, w http.ResponseWriter, r *http.Req
 		if !persistCatalogObject(st, w, kind, id, obj) {
 			return
 		}
-		util.WriteJSON(w, 200, redactCredentialObject(kind, obj, false))
+		util.WriteJSON(w, 200, redactCatalogObject(kind, obj, false))
 	}
 }
 

@@ -1,4 +1,5 @@
 import { budgetReconciliationZhCN } from "./budgetReconciliation.zh-CN";
+import { probesZhCN } from "./probes.zh-CN";
 import { docsZhCN } from "./docs.zh-CN";
 import { playgroundZhCN } from "./playground.zh-CN";
 import { zhPhrases } from "./phrases.zh-CN";
@@ -6,6 +7,7 @@ import { pageDescriptionsZhCN } from "./pageDescriptions.zh-CN";
 import { routeTemplatesZhCN } from "./routeTemplates.zh-CN";
 
 export const zhCN = {
+  probes: probesZhCN,
   consoleDirectory: {
     "userDeleteRefreshFailed": "用户已删除，但列表刷新失败。请刷新页面重新加载其余用户。",
     "noTeams": "未找到团队",

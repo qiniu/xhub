@@ -2965,5 +2965,19 @@
     "title": "catalog persistence survives reload and rejects invalid updates zh-CN",
     "kind": "implemented",
     "environment": "default offline"
+  },
+  {
+    "id": "REG-prompts-probe-en",
+    "file": "e2e/scenarios/regression/prompts-probe-en.test.ts",
+    "title": "real prompts probe and upstream failure en",
+    "kind": "implemented",
+    "environment": "default offline"
+  },
+  {
+    "id": "REG-search_tools-probe-en",
+    "file": "e2e/scenarios/regression/search_tools-probe-en.test.ts",
+    "title": "real search_tools probe and upstream failure en",
+    "kind": "implemented",
+    "environment": "default offline"
   }
 ]
