@@ -41,7 +41,15 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          files=$(gofmt -l -- $(git ls-files '*.go'))
+          base='${{ github.event.pull_request.base.sha || github.event.before }}'
+          if [[ -z "$base" || "$base" =~ ^0+$ ]] || ! git cat-file -e "$base^{commit}"; then
+            base=$(git rev-parse HEAD^)
+          fi
+          mapfile -t changed_go_files < <(git diff --name-only --diff-filter=ACMR "$base" HEAD -- '*.go')
+          if (( ${#changed_go_files[@]} == 0 )); then
+            exit 0
+          fi
+          files=$(gofmt -l -- "${changed_go_files[@]}")
           if [[ -n "$files" ]]; then
             echo 'The following Go files need gofmt:' >&2
             echo "$files" >&2
@@ -109,6 +117,13 @@ jobs:
           node scripts/check-eslint-error-budget.mjs eslint-report.json 289
       - name: Run frontend tests with coverage
         run: npm run test:quality
+      - name: Upload ESLint report
+        if: ${{ always() && hashFiles('frontend/eslint-report.json') != '' }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: frontend-eslint-report
+          path: frontend/eslint-report.json
+          if-no-files-found: error
       - name: Upload frontend coverage
         if: ${{ !cancelled() && hashFiles('frontend/coverage/lcov.info') != '' }}
         uses: codecov/codecov-action@v5

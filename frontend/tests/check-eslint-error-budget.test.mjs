@@ -12,9 +12,17 @@ test("ESLint error budget accepts the baseline and rejects regressions", () => {
   const directory = mkdtempSync(join(tmpdir(), "xhub-eslint-budget-"));
   try {
     const report = join(directory, "eslint.json");
-    writeFileSync(report, JSON.stringify([{ messages: [{ severity: 2 }, { severity: 1 }] }]));
+    writeFileSync(report, JSON.stringify([{
+      filePath: "src/example.ts",
+      messages: [
+        { severity: 2, line: 4, column: 2, ruleId: "example-rule", message: "example failure" },
+        { severity: 1 },
+      ],
+    }]));
     assert.match(execFileSync(process.execPath, [script.pathname, report, "1"], { encoding: "utf8" }), /errors: 1/);
-    assert.equal(spawnSync(process.execPath, [script.pathname, report, "0"]).status, 1);
+    const exceeded = spawnSync(process.execPath, [script.pathname, report, "0"], { encoding: "utf8" });
+    assert.equal(exceeded.status, 1);
+    assert.match(exceeded.stderr, /src\/example\.ts:4:2 \[example-rule\] example failure/);
     assert.equal(spawnSync(process.execPath, [script.pathname, report, "invalid"]).status, 2);
   } finally {
     rmSync(directory, { recursive: true, force: true });

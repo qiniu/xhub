@@ -30,7 +30,9 @@ test('quality workflow runs for pull requests and maintained branches', () => {
 test('Go gate produces atomic backend coverage and runs race checks', () => {
   const job = workflow.jobs.go;
   assert.equal(job['timeout-minutes'], 45);
-  assert.match(step('go', 'Check Go formatting').run, /gofmt -l/);
+  const formatting = step('go', 'Check Go formatting').run;
+  assert.match(formatting, /git diff --name-only --diff-filter=ACMR/);
+  assert.match(formatting, /gofmt -l/);
   assert.equal(step('go', 'Run Go vet').run, 'go vet ./...');
   assert.match(step('go', 'Prepare Go test dependencies').run, /docker compose up -d --wait postgres redis/);
   const tests = step('go', 'Run Go tests with coverage');
@@ -58,6 +60,9 @@ test('frontend gate ratchets existing debt and uploads Vitest coverage', () => {
   assert.match(lint, /eslint . --quiet --format json/);
   assert.match(lint, /--pass-on-unpruned-suppressions/);
   assert.match(lint, /check-eslint-error-budget.mjs eslint-report.json 289/);
+  const lintArtifact = step('frontend', 'Upload ESLint report');
+  assert.equal(lintArtifact.with.name, 'frontend-eslint-report');
+  assert.equal(lintArtifact.with.path, 'frontend/eslint-report.json');
   assert.equal(step('frontend', 'Run frontend tests with coverage').run, 'npm run test:quality');
   const upload = step('frontend', 'Upload frontend coverage');
   assert.equal(upload.with.files, 'frontend/coverage/lcov.info');

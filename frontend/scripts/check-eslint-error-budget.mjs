@@ -14,13 +14,19 @@ if (!reportPath || !Number.isInteger(maximum) || maximum < 0) {
 }
 
 const report = JSON.parse(readFileSync(reportPath, "utf8"));
-const errors = report.reduce(
-  (total, file) => total + file.messages.filter((message) => message.severity === 2).length,
-  0,
+const diagnostics = report.flatMap((file) =>
+  file.messages
+    .filter((message) => message.severity === 2)
+    .map((message) => ({ filePath: file.filePath, ...message })),
 );
+const errors = diagnostics.length;
 
 console.log(`ESLint errors: ${errors} | baseline maximum: ${maximum}`);
 if (errors > maximum) {
   console.error(`::error::ESLint error budget exceeded (${errors} > ${maximum}). Fix new errors; do not raise the baseline.`);
+  for (const diagnostic of diagnostics) {
+    const location = `${diagnostic.filePath || "unknown"}:${diagnostic.line || 0}:${diagnostic.column || 0}`;
+    console.error(`${location} [${diagnostic.ruleId || "unknown-rule"}] ${diagnostic.message || "ESLint error"}`);
+  }
   process.exit(1);
 }
