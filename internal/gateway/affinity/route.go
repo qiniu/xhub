@@ -156,6 +156,11 @@ func (s *State) PlanRoute(r *http.Request, alias string, body map[string]any, p 
 	key := sessionPinKey(alias, plan.Caller, plan.SessionID, endpoint)
 	// 加密推理依赖生成它的供应商连接，不能按普通会话偏好切换账户或降级读本机缓存。
 	opaque := requiresHistoryOwnership(body, endpoint == "messages")
+	// Codex 旧会话可携带完整的原厂压缩历史，它不是读取 XHub 存储的游标。
+	// 由原生 Responses 上游验签；共享解析器禁止跨协议转换，网关私有引用仍须验证归属。
+	if endpoint == "responses" && hasExternalCompaction(body) && !hasGatewayHistoryReference(body) {
+		opaque = false
+	}
 	if endpoint == "bypass:anthropic-messages" || endpoint == "bypass:openai-responses" || endpoint == "bypass:openai-chat" {
 		// 原生完整历史来自当前请求，不读取网关私有历史；供应商签名由上游校验，不能因本地别名改动阻断。
 		// previous_response_id 已在前面绑定原响应；XHub封装不能当作原厂密文直接发送。

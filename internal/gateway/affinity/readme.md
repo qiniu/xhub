@@ -19,7 +19,7 @@ The public API is for other Go packages within this repository. Go's internal im
 
 Affinity does not authenticate callers, schedule candidates, validate deployment eligibility, or calculate charges. A cached target never grants permission.
 
-Full encrypted Responses history also requires caller-scoped session deployment ownership and a required target. Shared-cache failures, disabled origins or changed weights must not move encrypted history to another account. Unknown ownership requires a new conversation.
+Encrypted reasoning history requires caller-scoped session deployment ownership and a required target. Full vendor `compaction` input is self-contained and can enter the unified Responses endpoint without a local first-turn record; it remains intact and native Responses-only, with the upstream validating the ciphertext. This does not authorize a `previous_response_id` or an XHub private history reference, which still require caller-scoped ownership. A different upstream may reject the ciphertext; XHub never reconstructs or silently drops compacted context.
 
 ## Exported API
 
