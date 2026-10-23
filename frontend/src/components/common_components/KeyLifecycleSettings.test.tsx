@@ -1,6 +1,6 @@
 import React, { useState } from "react";
 import { Controller, useForm } from "react-hook-form";
-import userEvent, { PointerEventsCheckLevel } from "@testing-library/user-event";
+import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi, beforeEach } from "vitest";
 import { fireEvent, renderWithProviders, screen, waitFor } from "../../../tests/test-utils";
 import { I18nProvider, translate } from "@/i18n";

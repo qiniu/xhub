@@ -1,4 +1,4 @@
-import { chooseKeyTeam, chooseOrganization } from "./helpers";
+import { chooseOrganization } from "./helpers";
 
 import { GATEWAY, UPSTREAM } from "./helpers";
 
