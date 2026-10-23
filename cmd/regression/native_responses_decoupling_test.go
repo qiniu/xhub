@@ -9,7 +9,7 @@ import (
 	"testing"
 )
 
-// TestNativeResponsesDecoupling 验证真实路由的默认关闭、账号灰度、部署开关、原生扩展、SSE及历史回退。
+// TestNativeResponsesDecoupling 验证真实路由的默认关闭、账号灰度、全量开关、原生扩展、SSE及历史回退。
 // 隔离PG和本地上游统计外发，既有账号及账务由harness清理；所有断言均经过真实HTTP边界。
 func TestNativeResponsesDecoupling(t *testing.T) {
 	var calls atomic.Int32
@@ -40,17 +40,12 @@ func TestNativeResponsesDecoupling(t *testing.T) {
 		}
 		writeAgentResponse(w, response, body["stream"] == true)
 	}))
-	// setMode 仅更新隔离部署模式，验证公开管理接口持久化并即时影响下一请求。
-	setMode := func(mode string) {
-		t.Helper()
-		h.ok("POST", "/model/update", admin, map[string]any{"id": id, "model_info": map[string]any{"transport": "bypass_openai_responses", "endpoint_types": []string{"responses"}, "native_responses_mode": mode}})
-	}
 	// setGlobal 通过配置接口设置总开关和真实身份名单，关闭后不删除历史。
 	setGlobal := func(enabled bool, user string) {
 		t.Helper()
 		h.ok("POST", "/config/update", admin, map[string]any{"general_settings": map[string]any{"native_responses": map[string]any{"enabled": enabled, "user_ids": []string{user}}}})
 	}
-	setMode("enabled")
+	h.ok("POST", "/model/update", admin, map[string]any{"id": id, "model_info": map[string]any{"transport": "bypass_openai_responses", "endpoint_types": []string{"responses"}}})
 	body := map[string]any{"model": "history-model", "input": []any{map[string]any{"type": "future_item", "payload": map[string]any{"x": "keep"}}}}
 	extended.Store(true)
 	if got := h.do("POST", "/v1/responses", owner.key, body); got.status != 400 || calls.Load() != 0 {
@@ -79,11 +74,12 @@ func TestNativeResponsesDecoupling(t *testing.T) {
 	if calls.Load() != 2 {
 		t.Fatal("重复外发")
 	}
-	setMode("observe")
-	if got := h.do("POST", "/v1/responses", owner.key, body); got.status != 400 || calls.Load() != 2 {
-		t.Fatal("观察模式改变旧行为/产生外发")
+	// 显式全量无需名单，已授权的其他账号也能使用原生路径；仍由 harness 清理。
+	h.ok("POST", "/config/update", admin, map[string]any{"general_settings": map[string]any{"native_responses": map[string]any{"enabled": true, "all_users": true}}})
+	otherAll := h.openScope(t, admin, "all-users")
+	if got := h.do("POST", "/v1/responses", otherAll.key, body); got.status != 200 || got.header("x-xhub-responses-path") != "native" {
+		t.Fatalf("全量未生效: %s", got.describe())
 	}
-	setMode("enabled")
 	extended.Store(false)
 	first := h.ok("POST", "/v1/responses", owner.key, map[string]any{"model": "history-model", "input": "Hello"})
 	parent := first.json()["id"]
@@ -121,7 +117,7 @@ func TestNativeResponsesGovernance(t *testing.T) {
 		}
 		writeJSON(w, nativeAgentResponse("resp_guard", "Safe reply", false, nil))
 	}))
-	h.ok("POST", "/model/update", admin, map[string]any{"id": id, "model_info": map[string]any{"transport": "bypass_openai_responses", "endpoint_types": []string{"responses"}, "native_responses_mode": "enabled"}})
+	h.ok("POST", "/model/update", admin, map[string]any{"id": id, "model_info": map[string]any{"transport": "bypass_openai_responses", "endpoint_types": []string{"responses"}}})
 	h.ok("POST", "/config/update", admin, map[string]any{"general_settings": map[string]any{"native_responses": map[string]any{"enabled": true, "user_ids": []string{owner.userID}}}})
 	body := map[string]any{"model": "history-model", "input": "Hello"}
 	if got := h.do("POST", "/v1/responses", "invalid", body); got.status != 401 {
@@ -182,7 +178,7 @@ func TestNativeResponsesFailureNoReplay(t *testing.T) {
 				}
 				fmt.Fprint(w, "data: {\"type\":\"response.output_text.delta\",\"delta\":\"Partial\"}\n\n")
 			}))
-			h.ok("POST", "/model/update", admin, map[string]any{"id": id, "model_info": map[string]any{"transport": "bypass_openai_responses", "endpoint_types": []string{"responses"}, "native_responses_mode": "enabled"}})
+			h.ok("POST", "/model/update", admin, map[string]any{"id": id, "model_info": map[string]any{"transport": "bypass_openai_responses", "endpoint_types": []string{"responses"}}})
 			h.ok("POST", "/config/update", admin, map[string]any{"general_settings": map[string]any{"native_responses": map[string]any{"enabled": true, "user_ids": []string{owner.userID}}}})
 			got := h.do("POST", "/v1/responses", owner.key, map[string]any{"model": "history-model", "input": "Hello", "stream": strings.HasPrefix(kind, "stream-")})
 			if calls.Load() != 1 {
@@ -230,7 +226,7 @@ func TestNativeResponsesKnownHistory(t *testing.T) {
 		}
 		writeAgentResponse(w, nativeAgentResponse("resp_known", "Known history retained", true, nil), body["stream"] == true)
 	}))
-	h.ok("POST", "/model/update", admin, map[string]any{"id": id, "model_info": map[string]any{"transport": "bypass_openai_responses", "endpoint_types": []string{"responses"}, "native_responses_mode": "enabled"}})
+	h.ok("POST", "/model/update", admin, map[string]any{"id": id, "model_info": map[string]any{"transport": "bypass_openai_responses", "endpoint_types": []string{"responses"}}})
 	h.ok("POST", "/config/update", admin, map[string]any{"general_settings": map[string]any{"native_responses": map[string]any{"enabled": true, "user_ids": []string{owner.userID}}}})
 	body := map[string]any{"model": "history-model", "input": input, "stream_options": options}
 	for _, stream := range []bool{false, true} {
@@ -247,5 +243,94 @@ func TestNativeResponsesKnownHistory(t *testing.T) {
 		if got.status != int(code) || !strings.Contains(got.text(), "Vendor rejection preserved") {
 			t.Fatalf("上游状态/正文丢失: %s", got.describe())
 		}
+	}
+}
+
+// TestNativeResponsesBypassBoundary 验证标准与透传入口使用同一部署时，账号灰度仅改变标准入口。
+// 本地上游返回扩展内容；覆盖鉴权、原生JSON/SSE、错误正文及日志，harness自动清理隔离数据库。
+func TestNativeResponsesBypassBoundary(t *testing.T) {
+	var code atomic.Int32
+	h, owner, admin, id := historyHarness(t, "responses", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		var body map[string]any
+		_ = json.NewDecoder(r.Body).Decode(&body)
+		if r.URL.Path != "/v1/responses" {
+			t.Errorf("同协议错误转换到 %s", r.URL.Path)
+		}
+		if code.Load() != 0 {
+			w.WriteHeader(int(code.Load()))
+			writeJSON(w, map[string]any{"error": map[string]any{"type": "vendor_reject", "message": "Upstream denied"}})
+			return
+		}
+		writeAgentResponse(w, nativeAgentResponse("resp_boundary", "Boundary reply", false, nil), body["stream"] == true)
+	}))
+	h.ok("POST", "/model/update", admin, map[string]any{"id": id, "model_info": map[string]any{"transport": "bypass_openai_responses", "endpoint_types": []string{"responses", "bypass:openai-responses"}}})
+	for _, enabled := range []bool{false, true} {
+		h.ok("POST", "/config/update", admin, map[string]any{"general_settings": map[string]any{"native_responses": map[string]any{"enabled": enabled, "user_ids": []string{owner.userID}}}})
+		for _, path := range []string{"/v1/responses", "/bypass/openai/v1/responses"} {
+			body := map[string]any{"model": "history-model", "input": "Hello"}
+			if got := h.do("POST", path, "invalid", body); got.status != 401 {
+				t.Fatal("入口鉴权失效", path)
+			}
+			for _, streaming := range []bool{false, true} {
+				body["stream"] = streaming
+				got := h.do("POST", path, owner.key, body)
+				if got.status != 200 || !strings.Contains(got.text(), "Boundary reply") {
+					t.Fatalf("入口失败 %s: %s", path, got.describe())
+				}
+				if path == "/v1/responses" {
+					want := "legacy"
+					if enabled {
+						want = "native"
+					}
+					if got.header("x-xhub-responses-path") != want {
+						t.Fatal("标准路径灰度错误")
+					}
+				}
+				h.flushSpend()
+				log := h.ok("GET", "/spend/logs/ui/"+got.header("x-litellm-call-id"), admin, nil).json()
+				if log["status"] != "success" {
+					t.Fatal("入口成功日志丢失", path)
+				}
+			}
+			body["stream"] = false
+			for _, status := range []int32{402, 403, 429, 503} {
+				code.Store(status)
+				got := h.do("POST", path, owner.key, body)
+				if got.status != int(status) || !strings.Contains(got.text(), "Upstream denied") {
+					t.Fatalf("入口错误失真 %s: %s", path, got.describe())
+				}
+				h.flushSpend()
+				log := h.ok("GET", "/spend/logs/ui/"+got.header("x-litellm-call-id"), admin, nil).json()
+				if log["status"] != "error" {
+					t.Fatal("入口错误日志丢失", path)
+				}
+			}
+			code.Store(0)
+		}
+	}
+}
+
+// TestNativeResponsesCrossProtocolHTTP 验证灰度账号遇 Chat 上游仍转换，未知扩展不静默丢弃。
+// 真实HTTP验证出站messages和入站Responses，harness清理。
+func TestNativeResponsesCrossProtocolHTTP(t *testing.T) {
+	var calls atomic.Int32
+	h, owner, admin, id := historyHarness(t, "responses", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		calls.Add(1)
+		var body map[string]any
+		_ = json.NewDecoder(r.Body).Decode(&body)
+		if r.URL.Path != "/v1/chat/completions" || body["messages"] == nil || body["input"] != nil {
+			t.Errorf("跨协议出站错误: %s %v", r.URL.Path, body)
+		}
+		writeJSON(w, map[string]any{"id": "chat_cross", "choices": []any{map[string]any{"index": 0, "message": map[string]any{"role": "assistant", "content": "Bridge reply"}, "finish_reason": "stop"}}, "usage": openAIUsage(nil)})
+	}))
+	h.ok("POST", "/model/update", admin, map[string]any{"id": id, "model_info": map[string]any{"transport": "bypass_openai_chat", "endpoint_types": []string{"responses"}}})
+	h.ok("POST", "/config/update", admin, map[string]any{"general_settings": map[string]any{"native_responses": map[string]any{"enabled": true, "all_users": true}}})
+	got := h.do("POST", "/v1/responses", owner.key, map[string]any{"model": "history-model", "input": "Hello"})
+	if got.status != 200 || !strings.Contains(got.text(), "Bridge reply") || got.header("x-xhub-responses-path") != "legacy" {
+		t.Fatalf("跨协议响应错误: %s", got.describe())
+	}
+	got = h.do("POST", "/v1/responses", owner.key, map[string]any{"model": "history-model", "input": []any{map[string]any{"type": "future_item", "payload": "Keep"}}})
+	if got.status != 400 || calls.Load() != 1 {
+		t.Fatalf("跨协议扩展被丢弃: %s calls=%d", got.describe(), calls.Load())
 	}
 }

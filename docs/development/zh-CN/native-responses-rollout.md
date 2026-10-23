@@ -4,30 +4,31 @@
 
 ## 开启条件
 
-三个条件同时满足：
-
-1. `general_settings.native_responses.enabled` 是布尔 `true`。
-2. 已认证用户 ID 位于 `general_settings.native_responses.user_ids`。同一用户的会话与 Key 使用同一名单，不接受客户端自报身份。
-3. 候选部署的 `model_info.native_responses_mode` 为 `enabled`，且 transport 的实际执行协议是 `openai-responses`。
-
-启动配置示例（保持关闭）：
+账号灰度只使用一组配置；部署不再有单独开关或观察模式。同协议原生转发，跨协议才转换，选择依据是部署登记的实际 transport，不依据模型名称猜测。
 
 ```yaml
 general_settings:
   native_responses:
     enabled: false
+    all_users: false
     user_ids: []
 ```
 
-管理员可通过现有 `POST /config/update` 更新：
+管理员通过 `POST /config/update` 更新。先在用户管理中核实 `tianyukun` 对应的真实用户 ID（不是昵称或 LDAP ID），仅开放该用户：
 
 ```json
-{"general_settings":{"native_responses":{"enabled":true,"user_ids":["test-user-id"]}}}
+{"general_settings":{"native_responses":{"enabled":true,"all_users":false,"user_ids":["VERIFIED_XHUB_USER_ID"]}}}
 ```
 
-部署通过现有 `POST /model/update` 设置 `model_info.native_responses_mode`：`legacy`（缺省）、`observe`、`enabled`。非原生 Responses transport 不能配置后两项。配置读取失败、空名单或总开关类型错误都不启用。数据库配置覆盖 YAML；没有灰度部署时不增加数据库查询；有灰度部署时总开关每个 Responses 请求读取一次，在途请求不受后续变更影响。
+同一用户的 UI 会话与个人 Key 使用同一名单，不接受客户端自报身份。其他用户保留旧路径。测试通过后显式全量开放：
 
-`observe` 对命中账号且公开模型名直接匹配的部署记录本地新旧解析是否成功，实际请求仍走旧路径。不外发影子请求，不重复写历史/计费；组别名没有直接匹配时不记录对照。记录仅含调用 ID 与布尔结果，不含正文和凭据。此阶段不是完整的选路性能对照系统。
+```json
+{"general_settings":{"native_responses":{"enabled":true,"all_users":true,"user_ids":[]}}}
+```
+
+空名单不会隐式全量；`all_users` 必须为布尔 true，且总开关必须开启。灰度账号的 Responses 请求在实际候选为 `openai-responses` 时原生处理，跨协议仍使用既有转换。请求前后仍执行网关管控，非逐字节透传。没有新增管理界面，也不在代码中硬编码生产账号。
+
+数据库配置覆盖 YAML；配置读取失败则关闭。有 Responses 原生传输时每个标准 Responses 请求读取当前配置；后续请求即时生效，在途请求保持原路径。此开关不改变 `/bypass/openai/v1/responses`，也不改 Chat 或 Claude 入口。Bypass 保留原生协议和自身历史规则，不执行标准调用前文本护栏链，但仍执行鉴权、预算与日志。
 
 ## 执行边界
 
@@ -35,7 +36,7 @@ general_settings:
 
 鉴权、预算、并发、搜索能力策略、护栏、日志及历史归属仍在公共链执行。启用请求前护栏时，如果旧投影不能理解新增内容，保守返回策略不兼容错误，不忽略护栏。已支持内容继续拦截/脱敏。后续若要扩大护栏支持范围，须独立验证提取与改写语义。
 
-同一请求的所有候选独立决定执行器；非灰度部署和跨协议候选使用旧解析器，不能把原生扩展静默丢弃。Messages 签名引用历史仍使用原有专用桥接，不进入新执行器。
+同一请求的所有候选独立决定执行器；非灰度账号和跨协议候选使用旧解析器，不能把原生扩展静默丢弃。Messages 签名引用历史仍使用原有专用桥接，不进入新执行器。
 
 现有标准入口的 portable history 规则保持：客户端公开推理清理、服务端保存授权历史、不解密、不重写数据库格式。原生解耦不等于开放跨供应商加密历史。既有模型权限、父响应归属和部署绑定继续有效。
 
@@ -43,7 +44,7 @@ general_settings:
 
 ## 灰度和回退操作
 
-先只开放测试用户及部署，完成 JSON/SSE、工具图片、压缩历史、护栏、预算、日志和旧会话续接验证，再分批扩大名单。发布前自行确定基线错误率/延迟阈值；鉴权、重复计费或历史归属异常应立即停灰度。没有自动全量切换。
+先只开放测试用户，完成 JSON/SSE、工具图片、压缩历史、护栏、预算、日志和旧会话续接验证，再分批扩大名单。发布前自行确定基线错误率/延迟阈值；鉴权、重复计费或历史归属异常应立即停灰度。没有自动全量切换。
 
 紧急关闭使用：
 
@@ -57,4 +58,4 @@ general_settings:
 
 ## 验证边界
 
-单测覆盖信封/终态、开关、部署选择与护栏；后台 regression 覆盖真实 HTTP、隔离 PostgreSQL、错误与结算；双语 E2E 覆盖真实调试台发送、配置切换、日志与旧会话。上游使用本地合成协议夹具，不证明每家供应商都支持未知字段；真实供应商须在获准的测试账号上单独验收。本次不支持 WebSocket/后台异步任务，不更换 Python 服务或 Go 转换库。
+单测覆盖信封/终态、开关、部署选择与护栏；后台 regression 覆盖真实 HTTP、隔离 PostgreSQL、错误与结算；双语 E2E 覆盖真实调试台发送、账号名单、全量及关闭切换、日志与旧会话。上游使用本地合成协议夹具，不证明每家供应商都支持未知字段；真实供应商须在获准的测试账号上单独验收。本次不支持 WebSocket/后台异步任务，不更换 Python 服务或 Go 转换库。

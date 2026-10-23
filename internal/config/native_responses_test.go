@@ -9,7 +9,11 @@ func TestNativeResponsesAllowed(t *testing.T) {
 		user   string
 		want   bool
 	}{
-		{nil, "u", false}, {map[string]any{"enabled": true}, "u", false},
+		{nil, "u", false},
+		{map[string]any{"enabled": true, "all_users": true}, "u", true},
+		{map[string]any{"enabled": false, "all_users": true}, "u", false},
+		{map[string]any{"enabled": true, "all_users": "true"}, "u", false},
+		{map[string]any{"enabled": true, "all_users": true}, "", false}, {map[string]any{"enabled": true}, "u", false},
 		{map[string]any{"enabled": "true", "user_ids": []any{"u"}}, "u", false},
 		{map[string]any{"enabled": false, "user_ids": []any{"u"}}, "u", false},
 		{map[string]any{"enabled": true, "user_ids": []any{"u"}}, "u", true},

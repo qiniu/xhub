@@ -82,17 +82,6 @@ func Serve(h dpcontract.Adapted, w http.ResponseWriter, r *http.Request, op stri
 	}
 	cfg := h.GatewayConfig()
 	nativeEligible := op == "responses" && providerdeployment.NativeResponsesConfigured(cfg.ModelList) && h.NativeResponsesAllowed(p.UserID)
-	if nativeEligible {
-		for _, dep := range cfg.ModelList {
-			if dep.ModelName == alias && dep.ModelInfo["native_responses_mode"] == "observe" {
-				clean := dpdialogue.DialogueRequestBody(body)
-				_, legacyErr := llmdialogue.ParseDialogue("openai-responses", clean)
-				_, nativeErr := llmdialogue.ParseNativeResponses(clean)
-				util.Debug("responses observe call_id=%s legacy_valid=%t native_valid=%t", callID, legacyErr == nil, nativeErr == nil)
-				break
-			}
-		}
-	}
 	// 会话计划先于调度生成；这里只读偏好或父响应归属，最终候选仍要按当前配置重新验证。
 	if op == "responses" {
 		// 统一入口的完整客户端历史允许跨模型迁移；不把未知来源的账户密文当作访问旧会话的凭据。

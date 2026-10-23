@@ -2,7 +2,7 @@ import { expect, test } from "@playwright/test";
 import { GATEWAY, UPSTREAM, loginAdmin, sessionBearer, stableGoto } from "./helpers";
 import { translate } from "../src/i18n/translate";
 
-// 双语真实浏览器验证默认关闭、开启后的调试台SSE、未知扩展、账单和关闭后旧会话续接。
+// 双语真实浏览器验证默认关闭、账号灰度、显式全量、开启后的调试台SSE、未知扩展、账单和关闭后旧会话续接。
 // 隔离数据库及严格本地上游；请求仅补合成扩展而不mock响应，finally恢复配置并删除部署/凭据。
 for (const locale of ["en", "zh-CN"] as const) test("native Responses rollout " + locale, async ({ page }) => {
   test.setTimeout(120000);
@@ -22,13 +22,20 @@ for (const locale of ["en", "zh-CN"] as const) test("native Responses rollout " 
   };
   expect((await page.request.post(GATEWAY + "/credentials", { headers, data: { credential_name: credential, credential_info: { custom_llm_provider: "openai" }, credential_values: { api_base: UPSTREAM + "/v1", api_key: "sk-fake" } } })).status()).toBe(200);
   try {
-    const created = await page.request.post(GATEWAY + "/model/new", { headers, data: { model_name: name, litellm_params: { model: "e2e-native-decoupled", custom_llm_provider: "openai", litellm_credential_name: credential, input_cost_per_token: 0.000001, output_cost_per_token: 0.000002 }, model_info: { transport: "bypass_openai_responses", endpoint_types: ["responses"], pricing_source: "manual", native_responses_mode: "enabled" } } });
+    const created = await page.request.post(GATEWAY + "/model/new", { headers, data: { model_name: name, litellm_params: { model: "e2e-native-decoupled", custom_llm_provider: "openai", litellm_credential_name: credential, input_cost_per_token: 0.000001, output_cost_per_token: 0.000002 }, model_info: { transport: "bypass_openai_responses", endpoint_types: ["responses"], pricing_source: "manual" } } });
     expect(created.status(), await created.text()).toBe(200);
     id = (await created.json()).model_info.id;
     const extension = { type: "future_item", payload: { value: "keep" } };
     const body = { model: name, input: [extension, { role: "user", content: "Hello" }] };
     await globalSwitch(false);
     expect((await page.request.post(GATEWAY + "/v1/responses", { headers, data: body })).status()).toBe(400);
+    // 非名单身份不启用；显式全量不依赖名单，随后恢复当前账号灰度验证浏览器路径。
+    expect((await page.request.post(GATEWAY + "/config/update", { headers, data: { general_settings: { native_responses: { enabled: true, user_ids: ["not-current-user"] } } } })).status()).toBe(200);
+    expect((await page.request.post(GATEWAY + "/v1/responses", { headers, data: body })).status()).toBe(400);
+    expect((await page.request.post(GATEWAY + "/config/update", { headers, data: { general_settings: { native_responses: { enabled: true, all_users: true } } } })).status()).toBe(200);
+    const allUsers = await page.request.post(GATEWAY + "/v1/responses", { headers, data: body });
+    expect(allUsers.status(), await allUsers.text()).toBe(200);
+    expect(allUsers.headers()["x-xhub-responses-path"]).toBe("native");
     await globalSwitch(true);
     const json = await page.request.post(GATEWAY + "/v1/responses", { headers, data: body });
     expect(json.status(), await json.text()).toBe(200);
