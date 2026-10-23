@@ -175,10 +175,14 @@ func Serve(h dpcontract.Adapted, w http.ResponseWriter, r *http.Request, op stri
 		return
 	}
 	ck := util.CacheKey(tenant, op, alias, string(raw), string(cacheScope))
+	// 内部诊断必须探测当前上游；空缓存键也会令响应写入器跳过存储，普通推理请求仍沿用原键和策略。
+	if responseCacheDisabled(r.Context()) {
+		ck = ""
+	}
 	stream, _ := body["stream"].(bool)
 	// 路由与回退配置已经进入缓存键，不再用配置是否存在决定缓存读取。
 	// Responses 的响应 ID 必须对应本次执行和上下文，不能复用已过期的响应缓存 ID。
-	if op != "responses" && !stream {
+	if ck != "" && op != "responses" && !stream {
 		if hit, ok := h.ResponseCache().Get(ck); ok {
 			// 缓存记录实际执行模型和组；复用成功正文前仍检查当前权限和预算，
 			// 与首次调用检查同一范围，不能靠禁用整个回退功能来代替授权。

@@ -5,7 +5,6 @@ import (
 	"net/http"
 	"strings"
 	"sync"
-	"time"
 
 	"github.com/sunqirui1987/xhub/internal/util"
 )
@@ -68,53 +67,4 @@ func (s *Server) loadTheme() map[string]any {
 		out["logo_url"] = logo
 	}
 	return out
-}
-
-// promptTest runs a prompt check and says whether it succeeded. It does not call a model provider.
-// 参数 w（http.ResponseWriter）：调用方的 HTTP 响应，状态码和正文写在这里；r（*http.Request）：入站 HTTP 请求，用来读路径、头和正文。
-// 调用：仅在 theme_settings.go 内使用
-// 测试：无直接单测
-// 返回：无。状态码和正文写进调用方的响应。
-func (s *Server) promptTest(w http.ResponseWriter, r *http.Request) {
-	if s.requireManage(w, r) == nil {
-		return
-	}
-	body := readMap(r)
-	id := str(body["prompt_id"])
-	message := "prompt test succeeded"
-	if id == "" {
-		message = "prompt test failed: prompt_id required"
-	}
-	util.WriteJSON(w, 200, map[string]any{
-		"prompt_id":  id,
-		"version":    1,
-		"created_at": time.Now().UTC().Format(time.RFC3339),
-		"message":    message,
-	})
-}
-
-// searchToolTest reports whether the named search tool can be reached. It does not dial an external search service.
-// 参数 w（http.ResponseWriter）：调用方的 HTTP 响应，状态码和正文写在这里；r（*http.Request）：入站 HTTP 请求，用来读路径、头和正文。
-// 调用：仅在 theme_settings.go 内使用
-// 测试：无直接单测
-// 返回：无。状态码和正文写进调用方的响应。
-func (s *Server) searchToolTest(w http.ResponseWriter, r *http.Request) {
-	if s.requireManage(w, r) == nil {
-		return
-	}
-	body := readMap(r)
-	id := str(body["search_tool_id"])
-	name := str(body["search_tool_name"])
-	if name == "" {
-		name = str(body["name"])
-	}
-	message := "search tool connection succeeded"
-	if name == "" && id == "" {
-		message = "search tool connection failed: search_tool_name required"
-	}
-	util.WriteJSON(w, 200, map[string]any{
-		"search_tool_id":   id,
-		"search_tool_name": name,
-		"message":          message,
-	})
 }

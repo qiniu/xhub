@@ -1,10 +1,12 @@
 import { budgetReconciliationEn } from "./budgetReconciliation.en";
+import { probesEn } from "./probes.en";
 import { docsEn } from "./docs.en";
 import { enPhrases } from "./phrases.en";
 import { pageDescriptionsEn } from "./pageDescriptions.en";
 import { routeTemplatesEn } from "./routeTemplates.en";
 
 export const en = {
+  probes: probesEn,
   consoleDirectory: {
     "userDeleteRefreshFailed": "User deleted, but the list could not be refreshed. Refresh the page to reload the remaining users.",
     "noTeams": "No teams found",

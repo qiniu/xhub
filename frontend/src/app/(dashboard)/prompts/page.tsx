@@ -1,14 +1,8 @@
 "use client";
 
-import { ColumnWriteSurface } from "@/components/column_write_surface";
+import { ProbeCatalog } from "@/components/probe_catalog/ProbeCatalog";
 
+/** 提示词管理入口；渲染真实保存与模型测试流程，使用登录会话，不执行静态成功占位。 */
 export default function Page() {
-  return (
-    <ColumnWriteSurface title="提示词" emptyText="还没有提示词" listPath="/prompts/list" actions={[
-      { label: "创建", method: "POST", path: "/prompts", body: ({ name }) => ({ prompt_id: name, name }) },
-      { label: "更新", method: "PATCH", needsId: true, path: ({ id }) => `/prompts/${id}`, body: ({ name, id }) => ({ prompt_id: id, name }) },
-      { label: "测试", method: "POST", path: "/prompts/test", body: ({ id, name }) => ({ prompt_id: id || name }) },
-      { label: "删除", method: "DELETE", needsId: true, path: ({ id }) => `/prompts/${id}` },
-    ]} />
-  );
+  return <ProbeCatalog kind="prompts" />;
 }
