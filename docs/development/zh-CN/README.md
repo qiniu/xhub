@@ -10,6 +10,7 @@
 | 修改费用 / 护栏 | [计价](pricing.md)、[XGo 示例](guardrails.md) |
 | 查 HTTP 入口 | [接口与源码](api-reference.md) |
 | 运行验证 | [测试命令](testing.md)、[后台回归](regression.md)、[浏览器 E2E](e2e-regression.md) |
+| 保持功能并改善完整性 | [接口契约与渐进解耦实施计划](interface-integrity-roadmap.md)、[接口和测试基线](interface-integrity-baseline.md) |
 
 ## 一次修改
 

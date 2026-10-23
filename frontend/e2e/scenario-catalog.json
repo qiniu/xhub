@@ -2951,5 +2951,19 @@
     "title": "directory search pagination and translations zh-CN",
     "kind": "implemented",
     "environment": "default offline"
+  },
+  {
+    "id": "REG-catalog-persistence-en",
+    "file": "e2e/scenarios/regression/catalog-persistence-en.test.ts",
+    "title": "catalog persistence survives reload and rejects invalid updates en",
+    "kind": "implemented",
+    "environment": "default offline"
+  },
+  {
+    "id": "REG-catalog-persistence-zh-CN",
+    "file": "e2e/scenarios/regression/catalog-persistence-zh-CN.test.ts",
+    "title": "catalog persistence survives reload and rejects invalid updates zh-CN",
+    "kind": "implemented",
+    "environment": "default offline"
   }
 ]

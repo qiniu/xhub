@@ -2,7 +2,9 @@
 package family
 
 import (
+	"bytes"
 	"encoding/json"
+	"errors"
 	"io"
 	"net/http"
 	"sync"
@@ -11,6 +13,27 @@ import (
 )
 
 var logTraceOnceCodec sync.Once
+
+// readCatalogBody 读取通用管理目录正文；reader 可为空，返回空对象或严格解析的完整 JSON 对象及错误。
+// 由 ServeMgmt 调用，保留原有空正文与合法大对象的兼容性；完整读取后解码，失败不保留部分字段。
+// 只消耗 reader，不读取推理请求或修改持久化；读取错误、null、数组及尾随 JSON 均拒绝，不在此引入新的大小限制。
+func readCatalogBody(reader io.Reader) (map[string]any, error) {
+	if reader == nil {
+		return map[string]any{}, nil
+	}
+	raw, err := io.ReadAll(reader)
+	if err != nil {
+		return nil, errors.New("invalid catalog request body")
+	}
+	if len(bytes.TrimSpace(raw)) == 0 {
+		return map[string]any{}, nil
+	}
+	var body map[string]any
+	if err := json.Unmarshal(raw, &body); err != nil || body == nil {
+		return nil, errors.New("invalid catalog request body")
+	}
+	return body, nil
+}
 
 // readMap reads a JSON object. An empty body or a parse failure returns an empty map.
 // 参数 r（*http.Request）：入站 HTTP 请求，用来读路径、头和正文。

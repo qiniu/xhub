@@ -1,0 +1,152 @@
+import { expect, test } from "@playwright/test";
+
+import { translate, type Locale } from "../src/i18n/translate";
+import { GATEWAY, UPSTREAM, loginAdmin, sessionBearer, stableGoto } from "./helpers";
+
+/**
+ * 注册供应商目录持久化的双语完整流程；locale 为页面语言，无返回值。
+ * 前置隔离数据库、真实网关、生产构建控制台和本地上游；页面创建/编辑/删除供应商，
+ * 接口回读后经调试台验证配置真实用于推理，并验证非法 JSON 不覆盖已保存配置。
+ * 不拦截或伪造后台响应；finally 清理部署和凭据，运行器另行回收专属 schema。
+ */
+export function registerCatalogPersistence(locale: Locale) {
+  test("catalog persistence survives reload and rejects invalid updates " + locale, async ({ page }) => {
+    test.setTimeout(120_000);
+    const tr = (key: string) => translate(locale, key);
+    const name = "e2e-catalog-integrity-" + locale;
+    const modelName = name + "-model";
+    let credentialExists = false;
+    let modelID = "";
+    await loginAdmin(page);
+    await page.getByRole("button", { name: locale === "en" ? "English" : "中文", exact: true }).click();
+    const headers = { Authorization: "Bearer " + await sessionBearer(page) };
+    try {
+      await stableGoto(page, "/model-providers");
+      await page.getByRole("button", { name: tr("modelProviders.add"), exact: true }).click();
+      const create = page.getByRole("dialog", { name: tr("Add model provider"), exact: true });
+      await create.getByRole("combobox", { name: tr("Provider type") }).fill("OpenAI");
+      await page.getByRole("option").filter({ has: page.getByText("OpenAI", { exact: true }) }).click();
+      await create.getByLabel(tr("Provider name")).fill(name);
+      await create.getByLabel("API Base", { exact: true }).fill(UPSTREAM);
+      await create.getByLabel("OpenAI API Key", { exact: true }).fill("sk-fake");
+      const creation = page.waitForResponse(response => new URL(response.url()).pathname === "/credentials" && response.request().method() === "POST");
+      await create.getByRole("button", { name: tr("Add model provider"), exact: true }).click();
+      const created = await creation;
+      expect(created.status(), "页面创建供应商必须由真实后台成功持久化").toBe(200);
+      credentialExists = true;
+      expect(created.request().postDataJSON()).toMatchObject({
+        credential_name: name,
+        credential_info: { custom_llm_provider: "openai" },
+        credential_values: { api_base: UPSTREAM, api_key: "sk-fake" },
+      });
+      await expect(create).toHaveCount(0);
+      await page.reload();
+      await page.getByTestId("credential-actions-" + name).click();
+      await page.getByTestId("credential-action-edit").click();
+      const edit = page.getByRole("dialog", { name: tr("Edit model provider"), exact: true });
+      await expect(edit.getByLabel("API Base", { exact: true })).toHaveValue(UPSTREAM);
+      await expect(edit.getByLabel("OpenAI API Key", { exact: true })).toHaveValue("sk***ke");
+      await edit.getByLabel("API Base", { exact: true }).fill(UPSTREAM + "/v1");
+      const update = page.waitForResponse(response => new URL(response.url()).pathname === "/credentials/" + name && response.request().method() === "PATCH");
+      await edit.getByRole("button", { name: tr("Save model provider"), exact: true }).click();
+      expect((await update).status(), "编辑后的供应商地址必须保存成功").toBe(200);
+      await expect(edit).toHaveCount(0);
+
+      const stored = await page.request.get(GATEWAY + "/credentials/by_name/" + name, { headers });
+      expect(stored.status(), "刷新后的供应商应能通过独立接口回读").toBe(200);
+      expect(await stored.json()).toMatchObject({
+        credential_name: name,
+        credential_values: { api_base: UPSTREAM + "/v1", api_key: "sk***ke" },
+      });
+      // 截断 JSON 是 HTTP 契约失败，不能被当作空补丁返回成功或清空现有地址。
+      const invalid = await page.request.patch(GATEWAY + "/credentials/" + name, {
+        headers: { ...headers, "Content-Type": "application/json" },
+        data: '{"credential_values":{"api_base":',
+      });
+      expect(invalid.status(), "非法 JSON 更新必须明确拒绝，不能伪报保存成功").toBe(400);
+      expect((await invalid.json()).error, "失败响应应包含明确的错误对象").toBeTruthy();
+      await page.reload();
+      await page.getByTestId("credential-actions-" + name).click();
+      await page.getByTestId("credential-action-edit").click();
+      await expect(edit.getByLabel("API Base", { exact: true })).toHaveValue(UPSTREAM + "/v1");
+      await expect(edit.getByLabel("OpenAI API Key", { exact: true })).toHaveValue("sk***ke");
+      await edit.getByRole("button", { name: tr("Cancel"), exact: true }).click();
+
+      // 部署仅引用命名凭据，不另填 api_base/api_key，随后实际调用才能证明持久化配置被执行链读取。
+      const deployment = await page.request.post(GATEWAY + "/model/new", { headers, data: {
+        model_name: modelName,
+        litellm_params: {
+          model: "e2e-item-id-chat", custom_llm_provider: "openai", litellm_credential_name: name,
+          input_cost_per_token: 0.000001, output_cost_per_token: 0.000002,
+        },
+        model_info: { transport: "bypass_openai_chat", endpoint_types: ["chat"], pricing_source: "manual" },
+      } });
+      expect(deployment.status(), "引用真实供应商配置的部署必须可创建").toBe(200);
+      modelID = (await deployment.json()).model_info.id;
+      const model = await page.request.get(GATEWAY + "/v2/model/info?modelId=" + encodeURIComponent(modelID), { headers });
+      expect(model.status(), "部署保存后应可独立回读").toBe(200);
+      expect((await model.json()).data[0].litellm_params.litellm_credential_name).toBe(name);
+
+      await stableGoto(page, "/playground");
+      await page.getByPlaceholder(tr("Select a Model"), { exact: true }).click();
+      await page.getByRole("option", { name: modelName, exact: true }).click();
+      await page.getByPlaceholder(tr("Select an endpoint"), { exact: true }).click();
+      await page.getByRole("option").filter({ hasText: /\/v1\/chat\/completions$/ }).click();
+      const before = await page.request.get(UPSTREAM + "/e2e/request-count");
+      expect(before.status()).toBe(200);
+      const count = (await before.json()).requests;
+      const prompt = "Verify the saved provider is used without changing this prompt.";
+      await page.getByTestId("chat-composer-input").fill(prompt);
+      const inference = page.waitForResponse(response => new URL(response.url()).pathname.endsWith("/chat/completions") && response.request().method() === "POST");
+      await page.getByTestId("chat-send-button").click();
+      const answer = await inference;
+      expect(answer.status(), "浏览器推理必须由本地上游实际响应").toBe(200);
+      expect(answer.request().postDataJSON().model).toBe(modelName);
+      await expect(page.getByTestId("message-surface").filter({ hasText: "e2e-source" })).toBeVisible();
+      await expect(page.getByTestId("message-surface").filter({ hasText: prompt })).toBeVisible();
+      const after = await page.request.get(UPSTREAM + "/e2e/request-count");
+      expect(after.status()).toBe(200);
+      expect((await after.json()).requests, "一次页面推理必须真实抵达上游一次").toBe(count + 1);
+      // 专属上游型号同时校验 Bearer sk-fake；编辑时回传的脱敏值不能覆盖真实凭据。
+      const callID = answer.headers()["x-litellm-call-id"];
+      expect(callID, "页面调用必须可追踪至真实用量记录").toBeTruthy();
+      await expect.poll(async () => {
+        const usage = await page.request.get(GATEWAY + "/spend/logs/ui/" + callID, { headers });
+        if (usage.status() !== 200) return null;
+        const row = await usage.json();
+        return { model: row.model, prompt: row.prompt_tokens, completion: row.completion_tokens, spend: Number(row.spend) };
+      }).toEqual({ model: modelName, prompt: 8, completion: 2, spend: 0.000012 });
+
+      const deletedModel = await page.request.post(GATEWAY + "/model/delete", { headers, data: { id: modelID } });
+      expect(deletedModel.status(), "删除测试部署应成功").toBe(200);
+      modelID = "";
+      await stableGoto(page, "/model-providers");
+      await page.getByTestId("credential-actions-" + name).click();
+      await page.getByTestId("credential-action-delete").click();
+      const remove = page.getByRole("dialog");
+      await remove.getByPlaceholder(name, { exact: true }).fill(name);
+      const deletion = page.waitForResponse(response => new URL(response.url()).pathname === "/credentials/" + name && response.request().method() === "DELETE");
+      await remove.getByRole("button", { name: tr("Delete"), exact: true }).click();
+      const deleted = await deletion;
+      expect(deleted.status(), "页面删除供应商必须成功").toBe(200);
+      expect((await deleted.json()).deleted, "删除应报告实际删除一条记录").toBe(1);
+      credentialExists = false;
+      await expect(page.getByTestId("credential-actions-" + name)).toHaveCount(0);
+      await page.reload();
+      await expect(page.getByTestId("credential-actions-" + name)).toHaveCount(0);
+      const missing = await page.request.get(GATEWAY + "/credentials/by_name/" + name, { headers });
+      expect(missing.status(), "删除后详情不能合成一个伪造的成功资源").toBe(404);
+    } finally {
+      // 独立记录清理错误并继续清理下一资源，避免一次断言失败导致凭据残留。
+      test.setTimeout(150_000);
+      if (modelID) {
+        const deleted = await page.request.post(GATEWAY + "/model/delete", { headers, data: { id: modelID } });
+        expect.soft(deleted.status(), "finally 清理测试部署").toBe(200);
+      }
+      if (credentialExists) {
+        const deleted = await page.request.delete(GATEWAY + "/credentials/" + name, { headers });
+        expect.soft(deleted.status(), "finally 清理测试供应商").toBe(200);
+      }
+    }
+  });
+}
