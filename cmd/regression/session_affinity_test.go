@@ -98,7 +98,7 @@ func TestSessionAffinityRoutingContract(t *testing.T) {
 	req := chatRequest("session-shared", "Disabled fallback round")
 	req["disable_fallbacks"] = true
 	r := h.doHeaders("POST", "/v1/chat/completions", owner.key, req, map[string]string{"X-Session-Id": "session-contract"})
-	if r.status != 502 || strings.Contains(strings.Join(h.upstreamSince(0), ","), "session-backup") {
+	if r.status != 500 || strings.Contains(strings.Join(h.upstreamSince(0), ","), "session-backup") {
 		t.Fatalf("禁用回退仍复用缓存: %s", r.describe())
 	}
 	h.flushSpend()

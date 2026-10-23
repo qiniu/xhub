@@ -133,7 +133,7 @@ test("per-model fallback editor and data plane", async ({ page }) => {
         headers: { Authorization: "Bearer " + key },
         data: { model: names[0], messages: [{ role: "user", content: "request-disable" }], disable_fallbacks: true },
       });
-      expect(disabled.status()).toBe(path.startsWith("/bypass") ? 500 : 502);
+      expect(disabled.status()).toBe(500);
     }
     await call("/v1/chat/completions", 1);
     for (const [kind, target] of [
@@ -236,7 +236,7 @@ test("per-model fallback editor and data plane", async ({ page }) => {
         headers: { Authorization: "Bearer " + key },
         data: { model: names[0], messages: [{ role: "user", content: "cleared-policy" }] },
       });
-      expect(clearedCall.status()).toBe(path.startsWith("/bypass") ? 500 : 502);
+      expect(clearedCall.status()).toBe(500);
     }
   } finally {
     for (const name of names)

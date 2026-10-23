@@ -99,7 +99,7 @@ test("acceptance fallback excludes both shared-model healthy deployments", async
     expect(denied.status(), await denied.text()).toBe(401);
     expect(await denied.text()).toContain("model not in allowed model list");
     const disabled = await page.request.post(GATEWAY + "/v1/chat/completions", { headers: { Authorization: "Bearer " + keys[0] }, data: { ...request, disable_fallbacks: true } });
-    expect(disabled.status(), await disabled.text()).toBe(502);
+    expect(disabled.status(), await disabled.text()).toBe(429);
     const deletedKeys = await page.request.post(GATEWAY + "/key/delete", { headers, data: { keys } });
     expect(deletedKeys.status(), await deletedKeys.text()).toBe(200);
     keys.length = 0;

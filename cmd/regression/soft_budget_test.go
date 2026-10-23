@@ -156,7 +156,7 @@ func TestSoftBudgetRetry(t *testing.T) {
 	routeID := routeTemplate(t, h, admin, "two soft attempts", routeTemplateBody([]any{}, 2, 60, 0, 0))
 	bindTemplate(t, h, admin, "key", c.keyID, routeID)
 	got := h.do("POST", "/v1/chat/completions", c.key, chatRequest(dep.ModelName, "Retry without reservations."))
-	if got.status != 502 || len(h.upstreamCalls()) != 2 {
+	if got.status != 503 || len(h.upstreamCalls()) != 2 {
 		t.Fatalf("重试被错误预算策略中断: %s calls=%d", got.describe(), len(h.upstreamCalls()))
 	}
 	key, err := h.db.GetKey(t.Context(), c.keyID)

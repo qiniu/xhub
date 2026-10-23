@@ -37,8 +37,8 @@ func TestErrorLogsAreSeparateAndComplete(t *testing.T) {
 			failed := h.do(http.MethodPost, "/v1/chat/completions", tn.key, map[string]any{
 				"model": dep.ModelName, "messages": []any{map[string]any{"role": "user", "content": "private prompt"}},
 			})
-			if failed.status != 502 {
-				t.Fatalf("上游 503 应返回 502: %s", failed.describe())
+			if failed.status != 503 {
+				t.Fatalf("上游 503 应返回 503: %s", failed.describe())
 			}
 			id := failed.header("x-litellm-call-id")
 			detail := logDetail(t, h, admin, id)

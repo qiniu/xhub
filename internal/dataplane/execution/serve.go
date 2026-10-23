@@ -463,6 +463,7 @@ func Serve(h dpcontract.Adapted, w http.ResponseWriter, r *http.Request, op stri
 						cancelAttempt()
 						h.DecBusy(did)
 						lastStatus = resp.StatusCode
+						lastResponse = errorBody
 						lastErr = errUpstreamStatus
 						kind = errorKind
 						goto nextFallbackModel
@@ -682,16 +683,25 @@ func Serve(h dpcontract.Adapted, w http.ResponseWriter, r *http.Request, op stri
 		return
 	}
 
-	if lastStatus > 0 {
-		util.Error("dataplane path=%s status=502 code=upstream_error detail=upstream %d", r.URL.Path, lastStatus)
-		if len(lastResponse) == 0 {
-			lastResponse = []byte("upstream " + strconv.Itoa(lastStatus))
+	if lastStatus >= 400 && errors.Is(lastErr, errUpstreamStatus) {
+		// HTTP 失败重试耗尽后保留真实状态与结构化错误；不能把限流或上游不可用统一改成 502。
+		// 后续尝试若改为网络/流内失败，不复用更早一次 HTTP 状态。
+		rawError := lastResponse
+		contentType := "application/json"
+		if len(rawError) == 0 {
+			rawError, _ = json.Marshal(map[string]any{"error": map[string]any{"type": "upstream_error", "message": "upstream " + strconv.Itoa(lastStatus)}})
+		} else if !json.Valid(rawError) {
+			contentType = "text/plain; charset=utf-8"
 		}
-		h.RememberExchange(callID, r, raw, lastResponse)
-		h.RecordSpend(w, p, callID, alias, op, nil, start, false, http.StatusBadGateway, "")
-		util.WriteTypedError(w, r.URL.Path, 502, "upstream_error", "upstream "+strconv.Itoa(lastStatus))
+		util.Error("dataplane path=%s status=%d code=upstream_error detail=upstream %d", r.URL.Path, lastStatus, lastStatus)
+		h.RememberExchange(callID, r, raw, rawError)
+		h.RecordSpend(w, p, callID, alias, op, nil, start, false, lastStatus, "")
+		w.Header().Set("Content-Type", contentType)
+		w.WriteHeader(lastStatus)
+		_, _ = w.Write(rawError)
 		return
 	}
+
 	if lastErr != nil {
 		detail := dpdiagnostics.SafeErr(lastErr)
 		util.Error("dataplane path=%s status=502 code=upstream_error detail=%s", r.URL.Path, detail)

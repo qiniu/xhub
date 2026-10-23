@@ -224,13 +224,10 @@ func TestModelFallbackLifecycle(t *testing.T) {
 					wantCalls = "fail-server,good-third"
 				}
 				if tc.disabled {
-					wantStatus, wantCalls = 502, "fail-server"
+					wantStatus, wantCalls = 500, "fail-server"
 				}
 				if tc.exhausted {
-					wantStatus, wantCalls = 502, "fail-server,fail-server,fail-server"
-				}
-				if path != "/v1/chat/completions" && wantStatus == 502 {
-					wantStatus = 500
+					wantStatus, wantCalls = 500, "fail-server,fail-server,fail-server"
 				}
 				mu.Lock()
 				got := strings.Join(calls, ",")
@@ -251,7 +248,7 @@ func TestModelFallbackLifecycle(t *testing.T) {
 		})
 	}
 	h.ok("PUT", "/model/fallback", admin, map[string]any{"model_name": "primary", "policy": map[string]any{}})
-	if r := h.do("POST", "/v1/chat/completions", owner.key, chatRequest("primary", "cleared")); r.status != 502 {
+	if r := h.do("POST", "/v1/chat/completions", owner.key, chatRequest("primary", "cleared")); r.status != 500 {
 		t.Fatalf("清空后仍回退: %s", r.describe())
 	}
 }
@@ -471,10 +468,7 @@ func TestModelFallbackTemplatePrecedence(t *testing.T) {
 						t.Fatalf("模板覆盖错误: %s calls=%s", result.describe(), calls)
 					}
 				} else {
-					want := 502
-					if strings.HasPrefix(path, "/bypass") {
-						want = 500
-					}
+					want := 500
 					if result.status != want || calls != "template-primary" {
 						t.Fatalf("显式空链未禁用: %s calls=%s", result.describe(), calls)
 					}
