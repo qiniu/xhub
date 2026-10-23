@@ -165,16 +165,31 @@ class ChatCases:
         # 网关日志记录经过历史恢复与护栏处理的请求，因此必须验证完整历史；
         # 客户端增量输入另外保存在本轮检查点，不把两种正文混为同一协议。
         inputs = body.get("input", [])
-        if (not isinstance(inputs, list) or len(inputs) != 2 * turn["turn"] - 1
+        if (not isinstance(inputs, list) or not inputs
                 or inputs[-1] != request["input"][0] or "previous_response_id" in body
                 or "store" in body or body.get("model") != key["call_model"]
                 or body.get("instructions") != request["instructions"]):
             raise AssertionError("Codex 持久化请求未恢复完整历史或泄漏代理字段")
-        for index, prior in enumerate(conversation["turns"][:turn["turn"] - 1]):
-            if (inputs[index * 2] != {"role": "user", "content": prior["prompt"]}
-                    or inputs[index * 2 + 1].get("role") != "assistant"
-                    or conversation["marker"] not in json.dumps(inputs[index * 2 + 1].get("content", ""))):
+        # Responses 助手输出可同时包含 reasoning、message 和工具项，不能按每轮固定两项计数。
+        # 逐轮以用户项划分助手输出，既允许合法公开推理，又拒绝历史缺轮、乱序或夹入额外用户项。
+        history = inputs[:-1]
+        position = 0
+        for prior in conversation["turns"][:turn["turn"] - 1]:
+            expected_user = {"role": "user", "content": prior["prompt"]}
+            if position >= len(history) or history[position] != expected_user:
                 raise AssertionError("Codex 持久化请求丢失前轮上下文")
+            position += 1
+            assistant_found = False
+            while position < len(history) and history[position].get("role") != "user":
+                item = history[position]
+                if (item.get("role") == "assistant"
+                        and conversation["marker"] in json.dumps(item.get("content", ""))):
+                    assistant_found = True
+                position += 1
+            if not assistant_found:
+                raise AssertionError("Codex 持久化请求丢失前轮上下文")
+        if position != len(history):
+            raise AssertionError("Codex 持久化请求丢失前轮上下文")
         for stored, native in (("prompt_tokens", "input_tokens"), ("completion_tokens", "output_tokens")):
             if int(bill.get(stored, 0)) != int(usage.get(native, -1)) or bill.get(stored) != turn[stored]:
                 raise AssertionError("Codex 逐轮 usage 与持久化账单不一致")

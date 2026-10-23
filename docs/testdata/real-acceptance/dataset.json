@@ -237,7 +237,7 @@
       "primary_failure_status": 429,
       "repeat_requests": 2,
       "same_session": true,
-      "identical_request_bodies": true,
+      "different_request_bodies": true,
       "reuse_successful_target": true
     }
   },

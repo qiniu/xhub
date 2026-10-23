@@ -6,6 +6,14 @@ import time
 import threading
 
 
+class CaseBlocked(Exception):
+    """用途：声明用例因外部前置条件缺失而未执行；参数为可公开原因，无额外返回值。
+
+    仅供真实验收场景在任何资源创建或外部调用前抛出；Checklist 会记录为 blocked 并继续后续用例，
+    runner 最终仍返回非零，避免把未验证能力误报为通过。
+    """
+
+
 class Checklist:
     """由真实验收 runner 持有，用例只有完成全部断言后才能通过。"""
 
@@ -35,16 +43,22 @@ class Checklist:
     def _save_locked(self):
         """用途：持锁写入清单快照；无参数和返回值，仅由 save 调用，防止并行用例报告相互截断。"""
         counts = {status: sum(row["status"] == status for row in self.rows)
-                  for status in ("passed", "failed", "pending", "running", "revalidated", "reused")}
+                  for status in ("passed", "failed", "blocked", "pending", "running", "revalidated", "reused")}
         (self.directory / "cases.json").write_text(json.dumps(
             dict(counts=counts, cases=self.rows), ensure_ascii=False, indent=2) + "\n")
-        labels = dict(passed="通过", failed="失败", pending="未执行", running="执行中",
+        labels = dict(passed="通过", failed="失败", blocked="外部前置条件未满足", pending="未执行", running="执行中",
                       revalidated="检查点已复验", reused="沿用历史证据，本轮未执行")
         lines = ["# 本轮 E2E 核对清单", "", " | ".join(f"{labels[key]}={value}" for key, value in counts.items()),
                  "", "| 编号 | 用例 | 状态 | 耗时(s) |", "| --- | --- | --- | --- |"]
         for index, row in enumerate(self.rows, 1):
             name = row['name'].replace('|', '\\|').replace('\n', ' ')
             lines.append(f"| {index:03d} {row['id']} | {name} | {labels[row['status']]} | {row.get('seconds', '')} |")
+        blocked = [row for row in self.rows if row["status"] == "blocked"]
+        if blocked:
+            lines.extend(("", "## 外部前置条件未满足", ""))
+            for row in blocked:
+                reason = row.get("reason", "未提供原因").replace("\n", " ")
+                lines.append(f"- {row['id']}：{reason}")
         for row in self.rows:
             if "example" in row:
                 lines.extend(("", "## " + row["id"] + "：" + row["name"], "",
@@ -67,6 +81,9 @@ class Checklist:
             self.logger("    [判断依据] " + row["logic"])
         try:
             yield row
+        except CaseBlocked as error:
+            row.update(status="blocked", reason=str(error))
+            self.logger("ℹ️ 用例结果：[阻塞 " + label + "] 外部前置条件未满足：" + str(error))
         except BaseException as error:
             row.update(status="failed", error_type=type(error).__name__)
             self.logger("❌ 用例失败：[失败 " + label + "] 异常类型=" + type(error).__name__ + "；具体失败步骤请查看上方接口及动作日志")
@@ -74,7 +91,8 @@ class Checklist:
         else:
             if row["status"] == "running":
                 row["status"] = "passed"
-            names = dict(passed="通过", revalidated="检查点已复验", reused="沿用历史证据，本轮未执行")
+            names = dict(passed="通过", blocked="外部前置条件未满足",
+                         revalidated="检查点已复验", reused="沿用历史证据，本轮未执行")
             # 复验和历史沿用不能显示本轮完整用例通过，保留各自的明确语义。
             prefix = "✅ 用例通过：" if row["status"] == "passed" else "ℹ️ 用例结果："
             self.logger(prefix + "[结果 " + label + "] " + names[row["status"]])
@@ -86,6 +104,7 @@ class Checklist:
         """用途：输出当前真实状态汇总和报告路径；无参数/返回，由 runner 在清理阶段调用；失败时也保留待测项，不序列化业务凭据。"""
         self.save()
         counts = json.loads((self.directory / "cases.json").read_text())["counts"]
-        names = dict(passed="通过", failed="失败", pending="未执行", running="执行中", revalidated="检查点已复验", reused="沿用历史")
+        names = dict(passed="通过", failed="失败", blocked="外部前置条件未满足", pending="未执行",
+                     running="执行中", revalidated="检查点已复验", reused="沿用历史")
         self.logger("[用例汇总] " + "，".join(f"{names[key]}={value}" for key, value in counts.items()))
         self.logger("[核对报告] " + str(self.directory / "cases.md"))

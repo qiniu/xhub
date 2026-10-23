@@ -143,7 +143,15 @@ def verify_running_gateway(args, data):
             with dataset.case("browser"):
                 command_stream(["node", str(ROOT / "e2e/real_dataset_browser.cjs")], logger, env=env)
                 dataset.report["browser"] = json.loads((directory / "browser-report.json").read_text())
+        checklist_rows = getattr(getattr(dataset, "checklist", None), "rows", None)
+        blocked = [row for row in checklist_rows if row.get("status") == "blocked"] if isinstance(checklist_rows, list) else []
+        if blocked:
+            dataset.report.update(status="blocked", external_boundaries=[
+                {"case": row["id"], "reason": row.get("reason", "外部前置条件未满足")} for row in blocked])
+            logger.log("真实网关验收未完成：" + "，".join(row["id"] for row in blocked) + " 缺少外部前置条件")
+            return 1
         dataset.report["status"] = "passed"
+        dataset.report.pop("external_boundaries", None)
         return 0
     except Exception as error:
         if dataset:

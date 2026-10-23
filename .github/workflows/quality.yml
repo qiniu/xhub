@@ -1,0 +1,168 @@
+name: Code Quality
+
+on:
+  push:
+    branches: [main, dev]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  id-token: write
+
+# 同一分支的新提交取代旧的质量检查，避免过期结果占用 runner。
+concurrency:
+  group: code-quality-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  go:
+    name: Go tests and coverage
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          # Go 格式门禁要比较 PR 基线与当前提交，必须保留完整提交历史。
+          fetch-depth: 0
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          cache: true
+      # 多个测试会启动临时 Redis；网关和 IAM 套件使用 Compose PostgreSQL 的隔离 schema。
+      - name: Prepare Go test dependencies
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends redis-server
+          if [[ ! -f configs/config.yaml ]]; then
+            cp configs/config.example.yaml configs/config.yaml
+          fi
+          docker compose up -d --wait postgres redis
+      - name: Check Go formatting
+        shell: bash
+        run: |
+          set -euo pipefail
+          base='${{ github.event.pull_request.base.sha || github.event.before }}'
+          if [[ -z "$base" || "$base" =~ ^0+$ ]] || ! git cat-file -e "$base^{commit}"; then
+            base=$(git rev-parse HEAD^)
+          fi
+          mapfile -t changed_go_files < <(git diff --name-only --diff-filter=ACMR "$base" HEAD -- '*.go')
+          if (( ${#changed_go_files[@]} == 0 )); then
+            exit 0
+          fi
+          files=$(gofmt -l -- "${changed_go_files[@]}")
+          if [[ -n "$files" ]]; then
+            echo 'The following Go files need gofmt:' >&2
+            echo "$files" >&2
+            exit 1
+          fi
+      - name: Run Go vet
+        run: go vet ./...
+      - name: Run Go tests with coverage
+        shell: bash
+        env:
+          XHUB_REGRESSION_STRICT: "1"
+          XHUB_TEST_DATABASE_URL: postgres://xhub:xhub_dev_password@127.0.0.1:5433/xhub?sslmode=disable
+        run: |
+          set -euo pipefail
+          mkdir -p coverage
+          # cmd/regression 是由现有 Docker and Release/verify 作业单独执行的长时后台回归套件。
+          # 这里覆盖所有 Go 单元包，同时排除被 npm 带入的第三方 Go 源码。
+          mapfile -t packages < <(go list ./... | grep -vE '/cmd/regression$|/frontend/node_modules/')
+          go test -race -timeout=25m -covermode=atomic -coverprofile=coverage/go.out "${packages[@]}"
+      - name: Print Go coverage summary
+        if: ${{ !cancelled() && hashFiles('coverage/go.out') != '' }}
+        run: go tool cover -func=coverage/go.out | tail -1
+      - name: Upload Go coverage
+        if: ${{ !cancelled() && hashFiles('coverage/go.out') != '' }}
+        uses: codecov/codecov-action@v5
+        with:
+          files: coverage/go.out
+          flags: backend
+          name: backend
+          fail_ci_if_error: true
+          use_oidc: true
+      - uses: actions/upload-artifact@v4
+        if: ${{ !cancelled() && hashFiles('coverage/go.out') != '' }}
+        with:
+          name: backend-coverage
+          path: coverage/go.out
+          if-no-files-found: error
+      - run: docker compose down -v
+        if: always()
+
+  frontend:
+    name: Frontend tests and coverage
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - run: npm ci
+      # ESLint 已有 289 个历史 error；先阻止错误数增长，后续随修复收紧基线。
+      - name: Check ESLint error budget
+        shell: bash
+        run: |
+          set -euo pipefail
+          # ESLint 发现规则错误时返回 1；由预算脚本根据历史基线决定是否阻断。
+          # 配置错误等返回 2 及以上时仍立即失败。
+          set +e
+          npx eslint . --quiet --format json --output-file eslint-report.json --pass-on-unpruned-suppressions
+          lint_status=$?
+          set -e
+          if (( lint_status > 1 )); then
+            exit "$lint_status"
+          fi
+          node scripts/check-eslint-error-budget.mjs eslint-report.json 289
+      - name: Run frontend tests with coverage
+        run: npm run test:quality
+      - name: Upload ESLint report
+        if: ${{ always() && hashFiles('frontend/eslint-report.json') != '' }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: frontend-eslint-report
+          path: frontend/eslint-report.json
+          if-no-files-found: error
+      - name: Upload frontend coverage
+        if: ${{ !cancelled() && hashFiles('frontend/coverage/lcov.info') != '' }}
+        uses: codecov/codecov-action@v5
+        with:
+          files: frontend/coverage/lcov.info
+          flags: frontend
+          name: frontend
+          fail_ci_if_error: true
+          use_oidc: true
+      - uses: actions/upload-artifact@v4
+        if: ${{ !cancelled() && hashFiles('frontend/coverage/lcov.info') != '' }}
+        with:
+          name: frontend-coverage
+          path: frontend/coverage/
+          if-no-files-found: error
+      - name: Remove generated lint report
+        if: always()
+        run: rm -f eslint-report.json
+
+  workflow-regression:
+    name: Workflow regression
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - run: npm ci
+        working-directory: frontend
+      - run: node --test scripts/test_quality_workflow.cjs scripts/test_release_workflow.cjs scripts/test_dependabot.cjs frontend/tests/check-eslint-error-budget.test.mjs
+      - run: python3 -m unittest scripts.test_deploy_build scripts.test_regression_output scripts.test_makefile -v

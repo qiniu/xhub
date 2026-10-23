@@ -3,6 +3,7 @@ import json
 import os
 import re
 
+from checklist import CaseBlocked
 from .runner_runtime import sql
 
 from .support import fallback_acceptance_deployments, fallback_acceptance_route, weighted_acceptance_route, response_cache_hit, cache_bill_check, bill_check
@@ -152,12 +153,16 @@ class RoutingCases:
     def verify_fallback_policy_chain(self, key):
         """用途：真实供应商错误触发跨模型回退并验证逐轮调用、目标权限及禁用回退；参数为基线密钥，无返回。
 
-        默认不存在的临时上游型号产生真实拒绝，环境 E2E_FALLBACK_UPSTREAM_MODEL 可指定故障型号；
-        不模拟 429，记录实际错误码；若不是 429/5xx，明确失败而不声称验证回退。finally 清理临时资源。
+        隔离模式由观察器注入可控 429；共享模式要求 E2E_FALLBACK_UPSTREAM_MODEL 明确指定会真实返回
+        429/5xx 的型号，缺失时在创建资源前记为外部前置条件未满足；显式型号返回其他状态仍失败。
+        每次记录实际错误码，finally 清理临时资源。
         """
         model = self.state["chat_models"]["fennoai"]
-        upstream = os.environ.get("E2E_FALLBACK_UPSTREAM_MODEL", "xhub-nonexistent-" + self.run)
         definition = next(row for row in self.data["models"] if row["id"] == "fenno-chat")
+        isolated_fault = bool(getattr(self, "isolated_upstreams", False) and self.observer)
+        upstream = definition["upstream_model"] if isolated_fault else os.environ.get("E2E_FALLBACK_UPSTREAM_MODEL", "").strip()
+        if not upstream:
+            raise CaseBlocked("共享真实供应商回退需要设置 E2E_FALLBACK_UPSTREAM_MODEL，且该型号须稳定返回 429/5xx；本轮未创建临时资源、未调用供应商")
         provider = self.state["selected"]["fennoai"]["provider"]
         target = next(row for row in self.data["models"] if row["id"] == "qiniu-glm")
         fallback_model = target["public_name"]
@@ -167,7 +172,8 @@ class RoutingCases:
                     if r["public_name"] == fallback_model and r["id"] != fallback_id]
         deployment_id, route_id, subjects = None, None, []
         try:
-            deployment_id = self.deployment(definition, provider, upstream, public_name=model, temporary=True)
+            deployment_id = self.deployment(definition, provider, upstream, public_name=model,
+                                            fault=isolated_fault, temporary=True)
             route, _ = self.api("/route_template/new", {"name": "real-fallback-" + self.run, "body": fallback_acceptance_route(
                 model, deployment_id, [r["id"] for r in self.state["deployments"] if r["public_name"] == model and r["id"] != deployment_id], fallback_model, fallback_id, self.data["routing"]["timeout_seconds"], excluded)})
             route_id = route["id"]

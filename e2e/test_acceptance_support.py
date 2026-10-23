@@ -100,7 +100,7 @@ class AcceptanceTests(unittest.TestCase):
 
 
     def test_manifest_rejects_incomplete_logic_chains(self):
-        """目的：真实组合链配置不能弱化缓存、权重或回退断言；前置完整清单副本，逐项破坏重复次数、隔离、失效、零费用、权重、429、同会话同正文及成功复用要求，验证加载失败，临时文件自动清理。"""
+        """目的：真实组合链配置不能弱化缓存、权重或回退断言；前置完整清单副本，逐项破坏重复次数、隔离、失效、零费用、权重、429、同会话不同正文及成功复用要求，验证加载失败，临时文件自动清理。"""
         mutations = {
             "missing": lambda data: data.pop("logic_chains"),
             "replays": lambda data: data["logic_chains"]["cache_consistency"].update(identical_replays=1),
@@ -111,7 +111,7 @@ class AcceptanceTests(unittest.TestCase):
             "status": lambda data: data["logic_chains"]["fallback_cache"].update(primary_failure_status=500),
             "fallback_replays": lambda data: data["logic_chains"]["fallback_cache"].update(repeat_requests=1),
             "fallback_session": lambda data: data["logic_chains"]["fallback_cache"].update(same_session=False),
-            "fallback_bodies": lambda data: data["logic_chains"]["fallback_cache"].update(identical_request_bodies=False),
+            "fallback_bodies": lambda data: data["logic_chains"]["fallback_cache"].update(different_request_bodies=False),
             "fallback_preference": lambda data: data["logic_chains"]["fallback_cache"].update(reuse_successful_target=False),
             "fallback_legacy": lambda data: data["logic_chains"]["fallback_cache"].pop("reuse_successful_target"),
         }

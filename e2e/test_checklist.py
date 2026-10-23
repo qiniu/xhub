@@ -11,7 +11,7 @@ import unittest
 import threading
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from unittest import mock
-from checklist import Checklist
+from checklist import CaseBlocked, Checklist
 from acceptance import Dataset, load_manifest
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -112,11 +112,12 @@ class ChecklistTests(unittest.TestCase):
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertIn('--shared-target', result.stdout)
 
-    def test_results_failure_pending_and_duplicate(self):
-        """目的：通过、复验、异常和未执行分别报告；前置四项清单，验证编号/耗时/失败不泄漏正文及重复拒绝，目录自动清理。"""
+    def test_results_failure_blocked_pending_and_duplicate(self):
+        """目的：通过、复验、异常、外部前置缺失和未执行分别报告；前置五项清单，验证编号、耗时、阻塞原因、失败不泄漏正文及重复拒绝，目录自动清理。"""
         with tempfile.TemporaryDirectory() as directory:
             lines = []
-            checklist = Checklist(directory, lines.append, [('a', '普通'), ('b', '复验'), ('c', '失败'), ('d', '未执行')])
+            checklist = Checklist(directory, lines.append,
+                                  [('a', '普通'), ('b', '复验'), ('c', '失败'), ('d', '外部前置'), ('e', '未执行')])
             with checklist.case('a'):
                 pass
             with checklist.case('b') as row:
@@ -124,17 +125,25 @@ class ChecklistTests(unittest.TestCase):
             with self.assertRaisesRegex(RuntimeError, 'secret'):
                 with checklist.case('c'):
                     raise RuntimeError('secret')
+            with checklist.case('d'):
+                raise CaseBlocked('需要受控供应商错误')
             checklist.summary()
             result = json.loads((Path(directory) / 'cases.json').read_text())
-            self.assertEqual([row['status'] for row in result['cases']], ['passed', 'revalidated', 'failed', 'pending'])
+            self.assertEqual([row['status'] for row in result['cases']],
+                             ['passed', 'revalidated', 'failed', 'blocked', 'pending'])
             self.assertEqual(result['counts']['passed'], 1)
+            self.assertEqual(result['counts']['blocked'], 1)
+            self.assertEqual(result['cases'][3]['reason'], '需要受控供应商错误')
             self.assertNotIn('secret', (Path(directory) / 'cases.json').read_text())
-            self.assertIn('[开始 001/004', '\n'.join(lines))
-            self.assertIn('✅ 用例通过：[结果 001/004 a 普通] 通过', '\n'.join(lines))
-            self.assertIn('ℹ️ 用例结果：[结果 002/004 b 复验] 检查点已复验', '\n'.join(lines))
-            self.assertIn('❌ 用例失败：[失败 003/004 c 失败] 异常类型=RuntimeError', '\n'.join(lines))
+            self.assertIn('[开始 001/005', '\n'.join(lines))
+            self.assertIn('✅ 用例通过：[结果 001/005 a 普通] 通过', '\n'.join(lines))
+            self.assertIn('ℹ️ 用例结果：[结果 002/005 b 复验] 检查点已复验', '\n'.join(lines))
+            self.assertIn('❌ 用例失败：[失败 003/005 c 失败] 异常类型=RuntimeError', '\n'.join(lines))
+            self.assertIn('ℹ️ 用例结果：[阻塞 004/005 d 外部前置] 外部前置条件未满足：需要受控供应商错误', '\n'.join(lines))
             self.assertNotIn('secret', '\n'.join(lines))
-            self.assertTrue((Path(directory) / 'cases.md').exists())
+            markdown = (Path(directory) / 'cases.md').read_text()
+            self.assertIn('外部前置条件未满足=1', markdown)
+            self.assertIn('- d：需要受控供应商错误', markdown)
             with self.assertRaises(ValueError):
                 with checklist.case('a'):
                     pass
@@ -238,7 +247,9 @@ class ChecklistTests(unittest.TestCase):
             dataset.call_checkpoint = mock.Mock(return_value=dict(call_id='saved'))
             dataset.call = mock.Mock(return_value=dict(error='guardrail_failed'))
             helpers = ['verify_acceptance_models', 'verify_permissions', 'verify_xgo', 'verify_limits',
-                       'verify_model_lifecycle', 'verify_guardrail_lifecycle']
+                       'verify_model_lifecycle', 'verify_guardrail_lifecycle',
+                       'verify_profile_route_isolation', 'verify_cache_weight_chain',
+                       'verify_affinity_chain', 'verify_fallback_policy_chain']
             for name in helpers:
                 setattr(dataset, name, mock.Mock())
             dataset.start_checklist(False)

@@ -18,6 +18,7 @@
     "test:compare-litellm": "node scripts/compare-vitest-fails.mjs --xhub-dir \"$VITEST_JSON_DIR\" --snapshot tests/litellm-1.102.0-vitest-fails.json",
     "test:watch": "vitest -w",
     "test:coverage": "vitest run --coverage",
+    "test:quality": "XHUB_QUALITY_GATE=1 vitest run --coverage --coverage.reporter=text-summary --coverage.reporter=lcov",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
     "knip": "knip",
