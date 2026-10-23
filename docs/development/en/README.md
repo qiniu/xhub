@@ -9,6 +9,7 @@
 | Change billing / guardrails | [Pricing](pricing.md), [XGo example](guardrails.md) |
 | Find HTTP handlers | [API and source](api-reference.md) |
 | Verify changes | [Commands](testing.md), [Regression](regression.md), [Browser E2E](e2e-regression.md) |
+| Improve integrity while preserving features | [API contracts and incremental decoupling plan](interface-integrity-roadmap.md), [Interface and test baseline](interface-integrity-baseline.md) |
 
 ## Make a change
 

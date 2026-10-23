@@ -553,11 +553,9 @@ func ServeMixed(s Host, w http.ResponseWriter, r *http.Request) {
 	util.WriteError(w, http.StatusGone, "removed", "this endpoint was removed and is not available")
 }
 
-// ServeMgmt handles management catalog paths. It requires a management identity, then reads or writes by resource kind.
-// 参数 s（Host）：处理Mgmt使用的数据面宿主；w（http.ResponseWriter）：调用方的 HTTP 响应，状态和正文写在这里；r（*http.Request）：入站 HTTP 请求。
-// 返回：无。状态码和正文写进调用方的响应。
-// 调用：gateway/catalog.go
-// 测试：无直接单测
+// ServeMgmt 先鉴权再执行管理目录操作；s 为宿主，w/r 为 HTTP 响应和请求，由 gateway/catalog.go 调用。
+// 返回结果直接写入 w；护栏仍使用自己的处理器，通用目录仅接受空正文或一个完整 JSON 对象，解析失败不触碰存储。
+// 测试：catalog_persistence_test.go；不放宽任何权限，不改变空 GET/DELETE 正文语义。
 func ServeMgmt(s Host, w http.ResponseWriter, r *http.Request) {
 	if s.RequireManage(w, r) == nil {
 		return
@@ -565,139 +563,22 @@ func ServeMgmt(s Host, w http.ResponseWriter, r *http.Request) {
 	if guard.Manage(s, w, r) {
 		return
 	}
-	writeCatalogPersist(s, w, r, readMap(r))
+	body, err := readCatalogBody(r.Body)
+	if err != nil {
+		util.WriteError(w, http.StatusBadRequest, "invalid_request", "request body must be a valid JSON object")
+		return
+	}
+	writeCatalogPersist(s, w, r, body)
 }
 
-// writeCatalogPersist lists, reads, and writes catalog rows in the key-value table. Credential secrets are masked, and JSON-RPC or token paths return their own JSON.
-// 参数 s（Host）：写入目录Persist使用的数据面宿主；w（http.ResponseWriter）：调用方的 HTTP 响应，状态和正文写在这里；r（*http.Request）：入站 HTTP 请求；body（map[string]any）：已解析或原始的 JSON。
-// 返回：无。状态码和正文写进调用方的响应。
-// 调用：仅在 handlers.go 内使用
-// 测试：无直接单测
+// writeCatalogPersist 将通用目录请求交给窄存储接口；s 提供已授权上下文，w/r 为 HTTP 响应和请求，body 为已解析对象。
+// 由 ServeMgmt 调用，返回值写入 w；不更改 Host、鉴权或资源路径语义，无存储时由处理器返回 503。
 func writeCatalogPersist(s Host, w http.ResponseWriter, r *http.Request, body map[string]any) {
-	path := r.URL.Path
-	if _, ok := body["jsonrpc"]; ok {
-		util.WriteJSON(w, 200, map[string]any{
-			"jsonrpc": "2.0",
-			"id":      body["id"],
-			"result":  map[string]any{"tools": []any{}},
-		})
-		return
+	var st catalogRecordStore
+	if recordStore := s.RecordStore(); recordStore != nil {
+		st = recordStore
 	}
-	if (strings.Contains(path, "/oauth/token") || strings.HasSuffix(path, "/token")) && !strings.Contains(path, "count") {
-		util.WriteJSON(w, 200, map[string]any{
-			"access_token": "at-" + util.CallID()[:12],
-			"token_type":   "Bearer",
-			"expires_in":   3600,
-		})
-		return
-	}
-	kind, action, id := parseMgmt(r.Method, path, body)
-	if id == "" || ((action == "update" || action == "delete") && (id == kind || id == singular(kind))) {
-		if alt := str(body[idField(kind)]); alt != "" {
-			id = alt
-		} else if alt := str(body["id"]); alt != "" && id == "" {
-			id = alt
-		}
-	}
-	switch action {
-	case "list":
-		list, _ := s.RecordStore().ListKV(kind)
-		if list == nil {
-			list = []map[string]any{}
-		}
-		for i := range list {
-			Freeze(kind, list[i])
-		}
-		util.WriteJSON(w, 200, catalogListBody(kind, path, redactCredentialList(kind, list, true)))
-	case "info":
-		if id == "" {
-			util.WriteJSON(w, 200, map[string]any{"object": "list", "data": []any{}})
-			return
-		}
-		m, err := s.RecordStore().GetKV(kind, id)
-		if err != nil {
-			m = map[string]any{"id": id, idField(kind): id, "object": singular(kind)}
-		}
-		Freeze(kind, m)
-		util.WriteJSON(w, 200, redactCredentialObject(kind, m, true))
-	case "delete":
-		ids := idsFrom(body, kind+"s", idField(kind))
-		if id != "" {
-			ids = append(ids, id)
-		}
-		n := 0
-		for _, x := range ids {
-			if s.RecordStore().DeleteKV(kind, x) == nil {
-				n++
-			}
-		}
-		util.WriteJSON(w, 200, map[string]any{"deleted": n, idField(kind): id, "id": id})
-	case "update":
-		if id == "" {
-			id = singular(kind) + "_" + util.CallID()[:12]
-		}
-		m, err := s.RecordStore().GetKV(kind, id)
-		if err != nil {
-			m = map[string]any{"id": id, idField(kind): id, "created_at": time.Now().UTC().Format(time.RFC3339)}
-		}
-		if kind == "credentials" || kind == "credential" {
-			mergeCredentialPatch(m, body)
-		} else {
-			for k, v := range body {
-				if k == "password" {
-					continue
-				}
-				m[k] = v
-			}
-		}
-		m["id"] = id
-		m[idField(kind)] = id
-		Freeze(kind, m)
-		b, _ := json.Marshal(m)
-		_ = s.RecordStore().PutKV(kind, id, string(b))
-		util.WriteJSON(w, 200, redactCredentialObject(kind, m, true))
-	default:
-		if id == "" && kind == "memory" {
-			if k := str(body["key"]); k != "" {
-				id = k
-			}
-		}
-		if id == "" {
-			id = singular(kind) + "_" + util.CallID()[:12]
-		}
-		obj := map[string]any{}
-		for k, v := range body {
-			if k == "password" {
-				continue
-			}
-			obj[k] = v
-		}
-		for _, nest := range []string{"search_tool", "prompt", "guardrail", "policy", "skill", "vector_store"} {
-			inner, ok := obj[nest].(map[string]any)
-			if !ok {
-				continue
-			}
-			for ik, iv := range inner {
-				if obj[ik] == nil {
-					obj[ik] = iv
-				}
-			}
-		}
-		obj["id"] = id
-		obj[idField(kind)] = id
-		if obj["created_at"] == nil {
-			obj["created_at"] = time.Now().UTC().Format(time.RFC3339)
-		}
-		if alias := aliasField(kind); str(obj[alias]) == "" {
-			if n := str(body["name"]); n != "" {
-				obj[alias] = n
-			}
-		}
-		Freeze(kind, obj)
-		b, _ := json.Marshal(obj)
-		_ = s.RecordStore().PutKV(kind, id, string(b))
-		util.WriteJSON(w, 200, redactCredentialObject(kind, obj, false))
-	}
+	writeCatalogStore(st, w, r, body)
 }
 
 // mergeCredentialPatch merges a credential the way LiteLLM update_db_credential does. Incoming credential_values overlay the existing fields. A masked secret that contains a run of * does not overwritethe original, or an edit form that sends the mask back would store the real secret as asterisks.
