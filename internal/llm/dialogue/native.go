@@ -163,6 +163,15 @@ func ParseDialogue(protocol string, body map[string]any) (Dialogue, error) {
 
 			}
 		}
+		if protocol == "openai-responses" {
+			boundary, err := projectResponsesToolImages(cp)
+			if err != nil {
+				return Dialogue{}, err
+			}
+			if boundary != "" {
+				bridgeError = boundary
+			}
+		}
 		for _, key := range []string{"phase", "namespace"} {
 			if cp[key] != nil {
 				bridgeError = "input " + key

@@ -647,6 +647,20 @@ class Handler(BaseHTTPRequestHandler):
             else:
                 self._json(payload)
             return
+        if "responses" in path and model == "e2e-tool-images-native":
+            # 专属工具图片夹具断言完整内容与关联ID；仅本地合成输入，运行器结束清理。
+            items = req.get("input", [])
+            outputs = [item for item in items if item.get("type") == "function_call_output"]
+            expected = [{"type": "input_text", "text": "Image:"}, {"type": "input_image", "image_url": "data:image/png;base64,AQID"}]
+            if len(outputs) != 1 or outputs[0].get("call_id") != "call_1" or outputs[0].get("output") != expected:
+                self.send_error(400, "tool image history lost")
+                return
+            if any(item.get("content") == "Simulate upstream unavailable." for item in items):
+                self.send_response(503)
+                self.send_header("Content-Type", "application/json")
+                self.end_headers()
+                self.wfile.write(json.dumps({"error": {"type": "api_error", "message": "Service temporarily unavailable"}}).encode())
+                return
         if "responses" in path and model == "e2e-agent-native":
             # 专属 Agent 夹具检查字段和完整历史，网关仍是真实实现；不连接任何外部服务。
             advanced = "reasoning" in req or "include" in req

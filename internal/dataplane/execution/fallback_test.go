@@ -151,7 +151,7 @@ func TestServeModelFallback(t *testing.T) {
 		disable, required bool
 		want              int
 		calls             int
-	}{{"enabled", "", false, false, 200, 2}, {"disabled", "", true, false, 502, 1}, {"continuation", "", false, true, 502, 1}, {"denied", "b", false, false, 403, 1}} {
+	}{{"enabled", "", false, false, 200, 2}, {"disabled", "", true, false, 500, 1}, {"continuation", "", false, true, 500, 1}, {"denied", "b", false, false, 403, 1}} {
 		t.Run(tc.name, func(t *testing.T) {
 			calls := []string{}
 			up := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {

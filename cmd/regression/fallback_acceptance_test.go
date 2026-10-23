@@ -89,7 +89,7 @@ func TestFallbackAcceptanceSharedModel(t *testing.T) {
 	request["disable_fallbacks"] = true
 	mark = len(h.upstreamCalls())
 	disabled := h.do(http.MethodPost, "/v1/chat/completions", owner.key, request)
-	if disabled.status != 502 || strings.Join(h.upstreamSince(mark), ",") != upstreams[0] {
+	if disabled.status != 429 || strings.Join(h.upstreamSince(mark), ",") != upstreams[0] {
 		t.Fatalf("禁用回退只能调用故障部署: %s calls=%v", disabled.describe(), h.upstreamSince(mark))
 	}
 }

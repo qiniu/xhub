@@ -6,6 +6,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"io"
 	"log"
 	"net/http"
@@ -301,7 +302,7 @@ func assertNoSecrets(t *testing.T, line string) {
 }
 
 // TestServePersistsCompleteUpstreamFailure 验证重试耗尽后保留上游完整 500 正文。
-// 前置条件是本地假上游固定失败；结果应记录客户端 502 和原始 JSON；本地服务由 Cleanup 关闭。
+// 前置条件是本地假上游固定失败；结果应记录客户端 500 和完整错误字段；本地服务由 Cleanup 关闭。
 // 参数 t 为 Go 测试上下文；返回值无，断言失败时终止当前测试。
 func TestServePersistsCompleteUpstreamFailure(t *testing.T) {
 	rawError := []byte("{\"error\":{\"message\":\"complete upstream failure\",\"detail\":\"原始正文\"}}")
@@ -315,7 +316,7 @@ func TestServePersistsCompleteUpstreamFailure(t *testing.T) {
 	}}), up.Client())
 	rec := httptest.NewRecorder()
 	Serve(h, rec, chatRequest(t, "failed-model", false), "chat")
-	if rec.Code != http.StatusBadGateway || len(h.spends) != 1 || h.spends[0].status != http.StatusBadGateway {
+	if rec.Code != http.StatusInternalServerError || len(h.spends) != 1 || h.spends[0].status != http.StatusInternalServerError {
 		t.Fatalf("失败日志状态不完整: http=%d spends=%+v", rec.Code, h.spends)
 	}
 	if note := h.upstreamNotes[h.spends[0].callID]; note.APIBase != up.URL+"/v1" || note.Supplier != up.URL+"/v1" || note.UpstreamModel != "openai/failed-model" {
@@ -489,7 +490,7 @@ func TestServeLogsEmptyStreamAndUpstreamStatus(t *testing.T) {
 		}), failed.Client())
 		rec := httptest.NewRecorder()
 		Serve(h, rec, chatRequest(t, "gpt-4o-mini", false), "chat")
-		if rec.Code != http.StatusBadGateway {
+		if rec.Code != http.StatusInternalServerError {
 			t.Fatalf("status %d body %s", rec.Code, rec.Body.String())
 		}
 		line := buf.String()
@@ -498,7 +499,7 @@ func TestServeLogsEmptyStreamAndUpstreamStatus(t *testing.T) {
 			"trace dataplane hop path=/v1/chat/completions",
 			"error upstream status path=/v1/chat/completions provider=custom-test model=openai/gpt-4o-mini",
 			"status=500",
-			"error dataplane path=/v1/chat/completions status=502 code=upstream_error detail=upstream 500",
+			"error dataplane path=/v1/chat/completions status=500 code=upstream_error detail=upstream 500",
 		} {
 			if !strings.Contains(line, want) {
 				t.Fatalf("log missing %q\n%s", want, line)
@@ -611,4 +612,24 @@ func (h *logHost) OfficialContext(string) providercontract.TaskContext {
 // 执行器测试调用；不维护分钟窗口，无需清理。
 func (h *logHost) AdmitRequest(w http.ResponseWriter, path string, p *auth.Principal, alias string, est int) bool {
 	return h.EnforceIdentityLimits(w, path, p, alias, est)
+}
+
+// TestServePreservesRetryableHTTPStatus 验证重试耗尽后客户端和账单保留上游状态及错误；本地上游和内存host结束清理。
+// 参数t为上下文；覆盖限流、服务不可用、网关失败，避免把HTTP错误与流内错误混淆。
+func TestServePreservesRetryableHTTPStatus(t *testing.T) {
+	for _, code := range []int{429, 500, 502, 503, 504} {
+		t.Run(fmt.Sprint(code), func(t *testing.T) {
+			up := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				w.WriteHeader(code)
+				io.WriteString(w, `{"error":{"type":"api_error","message":"Service temporarily unavailable"},"request_id":"fixture"}`)
+			}))
+			defer up.Close()
+			h := newLogHost(chatConfig(config.ModelEntry{ModelName: "gpt-4o-mini", LiteLLMParams: map[string]any{"model": "openai/gpt-4o-mini", "api_key": "sk-local-master", "api_base": up.URL + "/v1"}}), up.Client())
+			rec := httptest.NewRecorder()
+			Serve(h, rec, chatRequest(t, "gpt-4o-mini", false), "chat")
+			if rec.Code != code || len(h.spends) != 1 || h.spends[0].status != code || !strings.Contains(rec.Body.String(), "Service temporarily unavailable") || !strings.Contains(rec.Body.String(), "fixture") {
+				t.Fatalf("上游状态/错误丢失: %d %s %+v", rec.Code, rec.Body.String(), h.spends)
+			}
+		})
+	}
 }

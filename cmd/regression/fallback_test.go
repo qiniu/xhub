@@ -8,7 +8,7 @@ import (
 )
 
 // TestFallbackChain 把同一对外名下的部署回退走完：
-// 5xx 换下一条且只记成功那笔 → 4xx 直接返回、不再往下试 → 全部失败是 502 且不扣费 →
+// 5xx 换下一条且只记成功那笔 → 4xx 直接返回、不再往下试 → 全部失败是 500 且不扣费 →
 // 换部署前重新查额度，第二条不会被拨到 → 停用一条就走剩下那条，都停用则 model_disabled →
 // 护栏在选部署之前拦住，两条都不拨。
 func TestFallbackChain(t *testing.T) { runSimulated(t, fallbackSimulated) }
@@ -56,11 +56,11 @@ func fallbackSimulated(t *testing.T) {
 	h.scriptStatus("fail-b", http.StatusInternalServerError)
 	before = h.moneyOf(t, c)
 	failed := h.do(http.MethodPost, "/v1/chat/completions", c.key, chatRequest(public, "both fail"))
-	if failed.status != http.StatusBadGateway {
-		t.Fatalf("both deployments failing answered %d, want 502: %s", failed.status, failed.describe())
+	if failed.status != http.StatusInternalServerError {
+		t.Fatalf("both deployments failing answered %d, want 500: %s", failed.status, failed.describe())
 	}
 	if after := h.moneyOf(t, c); !after.same(before) {
-		t.Fatalf("a 502 was charged: %+v -> %+v", before, after)
+		t.Fatalf("a 500 was charged: %+v -> %+v", before, after)
 	}
 	h.flushSpend()
 	logs := h.do(http.MethodGet, "/spend/logs/ui?page=1&page_size=200", admin, nil)

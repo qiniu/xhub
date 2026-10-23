@@ -456,6 +456,8 @@ func TestMultiSupplierModelRulesAndScopeIsolation(t *testing.T) {
 	f.runCounts(t, admin, a, sol.ModelName, "clear to platform", 4, map[string]float64{"sol-a": 1, "sol-b": 0})
 }
 
+// TestMultiSupplierRetryAndBilling 验证多供应商重试、终止错误及失败不扣费，HTTP状态保留上游值。
+// 参数t为上下文；使用隔离数据库和本地供应商夹具，fixture负责清理全部测试数据。
 func TestMultiSupplierRetryAndBilling(t *testing.T) {
 	for _, status := range []int{500, 429, 400} {
 		t.Run(fmt.Sprint(status), func(t *testing.T) {
@@ -494,7 +496,7 @@ func TestMultiSupplierRetryAndBilling(t *testing.T) {
 			f.fail("SUPPLIER_B", 500)
 			before = f.h.moneyOf(t, c)
 			r = f.h.do(http.MethodPost, "/v1/chat/completions", c.key, chatRequest(s.ModelName, "all suppliers fail"))
-			if r.status != 502 || len(f.attempts()) != 4 || !f.h.moneyOf(t, c).same(before) {
+			if r.status != 500 || len(f.attempts()) != 4 || !f.h.moneyOf(t, c).same(before) {
 				t.Fatalf("all failed: %s attempts=%v", r.describe(), f.attempts())
 			}
 			row := logDetail(t, f.h, admin, r.header("x-litellm-call-id"))
@@ -505,6 +507,8 @@ func TestMultiSupplierRetryAndBilling(t *testing.T) {
 	}
 }
 
+// TestMultiSupplierZeroWeightExcludesFailover 验证零权重供应商不参与救援且失败不扣费，保留真实500。
+// 参数t为上下文；隔离fixture清理数据库及上游，不使用生产凭据。
 func TestMultiSupplierZeroWeightExcludesFailover(t *testing.T) {
 	s := supplierConfig(t).WeightedScenarios[3]
 	f := newSupplierFixture(t, true, s)
@@ -516,7 +520,7 @@ func TestMultiSupplierZeroWeightExcludesFailover(t *testing.T) {
 	})
 	f.fail("SUPPLIER_A", 500)
 	r := f.h.do(http.MethodPost, "/v1/chat/completions", c.key, chatRequest(s.ModelName, "zero cannot rescue failed supplier"))
-	if r.status != 502 || !reflect.DeepEqual(f.attempts(), []supplierAttempt{{"SUPPLIER_A", s.ModelName, 500}}) || !f.h.moneyOf(t, c).same(scopeMoney{}) {
+	if r.status != 500 || !reflect.DeepEqual(f.attempts(), []supplierAttempt{{"SUPPLIER_A", s.ModelName, 500}}) || !f.h.moneyOf(t, c).same(scopeMoney{}) {
 		t.Fatalf("zero-weight supplier received retry or charge: %s %v", r.describe(), f.attempts())
 	}
 }
