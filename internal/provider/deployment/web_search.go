@@ -37,6 +37,11 @@ func ValidateWebSearch(m config.ModelEntry) error {
 // EncodeDialogue 应用当前部署搜索策略后复用原有协议编码；参数为部署和不可变请求，返回正文、降级能力列表或错误。
 // 候选筛选、预览及真实执行共用，避免预览可选但执行失败；不跨部署共享降级结果，不改凭据或发送请求。
 func EncodeDialogue(m config.ModelEntry, d llmdialogue.Dialogue) (map[string]any, []string, error) {
+	var err error
+	d, err = PrepareDialogue(m, d)
+	if err != nil {
+		return nil, nil, err
+	}
 	if err := ValidateWebSearch(m); err != nil {
 		return nil, nil, err
 	}

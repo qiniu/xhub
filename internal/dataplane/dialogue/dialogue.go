@@ -127,9 +127,10 @@ func ProbeDialogue(ctx context.Context, client *http.Client, dep config.ModelEnt
 // ResponsesRequestBody 将已授权的临时历史与本轮 Responses 输入组合成统一对话正文。
 // 参数 body 为当前请求，history 为按身份/模型/入口校验过的历史；返回独立浅拷贝正文或能力/输入错误。
 // Serve 在预算与护栏之前调用，使恢复的历史同样接受限额与内容检查；先验证当前输入，避免历史掩盖非法字段。
+// 可选 native 只供可信灰度执行器选择独立信封校验，缺省保留旧解析；不改变历史恢复格式。
 // previous_response_id、store 在网关消费，不发给上游；instructions 仅属于当前请求，不继承上一轮指令。
 // 保留护栏、跟踪及回退开关供执行链继续消费；嵌套映射并非深拷贝，不持久化历史或自行授权。
-func ResponsesRequestBody(body map[string]any, history []llmdialogue.Turn) (map[string]any, error) {
+func ResponsesRequestBody(body map[string]any, history []llmdialogue.Turn, native ...bool) (map[string]any, error) {
 	out := DialogueRequestBody(body)
 	if value, ok := out["previous_response_id"]; ok && value != nil {
 		if id, valid := value.(string); !valid || strings.TrimSpace(id) == "" {
@@ -144,7 +145,13 @@ func ResponsesRequestBody(body map[string]any, history []llmdialogue.Turn) (map[
 	delete(out, "previous_response_id")
 	delete(out, "store")
 	// 先验证本轮输入，不能让恢复的历史掩盖缺失或不支持的输入。
-	if _, err := llmdialogue.ParseDialogue("openai-responses", out); err != nil {
+	parse := func(body map[string]any) (llmdialogue.Dialogue, error) {
+		return llmdialogue.ParseDialogue("openai-responses", body)
+	}
+	if len(native) > 0 && native[0] {
+		parse = llmdialogue.ParseNativeResponses
+	}
+	if _, err := parse(out); err != nil {
 		return nil, err
 	}
 	if len(history) > 0 {

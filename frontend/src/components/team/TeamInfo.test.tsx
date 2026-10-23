@@ -11,7 +11,6 @@ import TeamInfoView, {
   grantedMcpServerIds,
   type McpGrantInput,
   retainedMcpToolPermissions,
-  standingToolPermissionServerIds,
 } from "./TeamInfo";
 
 const authState = vi.hoisted(() => ({ userRole: "Admin" }));

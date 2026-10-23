@@ -306,7 +306,7 @@ func (h *logicHost) RouteState() router.State { return router.State{} }
 // GuardrailBlocks 是 logicHost 的测试接口实现。
 // 接受但忽略调用 ID 和请求正文，返回 false 及空消息，保证本测试只关注执行链；不验证生产护栏。
 // 调用方为本文件或同包的执行测试；仅模拟所述边界，不能据此推断生产宿主的行为。
-func (h *logicHost) GuardrailBlocks(string, map[string]any) (bool, string) {
+func (h *logicHost) GuardrailBlocks(string, map[string]any, ...bool) (bool, string) {
 	return false, ""
 }
 
@@ -459,3 +459,6 @@ func (h *logicHost) OfficialContext(scope string) providercontract.TaskContext {
 func (h *logicHost) AdmitRequest(w http.ResponseWriter, path string, p *auth.Principal, alias string, est int) bool {
 	return h.EnforceIdentityLimits(w, path, p, alias, est)
 }
+
+// NativeResponsesAllowed 保持测试宿主默认关闭，不读外部配置。
+func (h *logicHost) NativeResponsesAllowed(string) bool { return false }

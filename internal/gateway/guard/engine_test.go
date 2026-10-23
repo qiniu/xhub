@@ -2,6 +2,7 @@ package guard
 
 import (
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -248,5 +249,23 @@ func TestDuplicateNamesAcrossYAMLAndStoreFailClosed(t *testing.T) {
 	h := &configHost{savedHost: savedHost{store: st}, cfg: &config.Config{Guardrails: []map[string]any{localRule("same", "redact", false, 2)}}}
 	if blocked, _, _ := Evaluate(h, map[string]any{"text": "hello"}); !blocked {
 		t.Fatal("ambiguous configuration allowed")
+	}
+}
+
+// TestNativeResponsesGuardrailBoundary 验证原生新内容无规则时放行，有规则时失败关闭，已知文本仍按规则脱敏。
+// 前置纯内存配置宿主；不读数据库或外部供应商，无需清理。
+func TestNativeResponsesGuardrailBoundary(t *testing.T) {
+	h := &configHost{cfg: &config.Config{}}
+	body := map[string]any{"input": []any{map[string]any{"type": "future_item", "payload": "secret"}}}
+	if blocked, _, _ := Evaluate(h, body, true); blocked {
+		t.Fatal("无护栏误拒绝原生扩展")
+	}
+	h.cfg.Guardrails = []map[string]any{localRule("mask", "redact", true, 1)}
+	if blocked, msg, _ := Evaluate(h, body, true); !blocked || !strings.Contains(msg, "active guardrail") {
+		t.Fatal("未知内容没有失败关闭")
+	}
+	known := map[string]any{"input": "secret"}
+	if blocked, _, _ := Evaluate(h, known, true); blocked || strings.Contains(fmt.Sprint(known["input"]), "secret") {
+		t.Fatal("原生已知文本未正确脱敏")
 	}
 }

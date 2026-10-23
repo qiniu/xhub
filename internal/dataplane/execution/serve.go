@@ -80,6 +80,8 @@ func Serve(h dpcontract.Adapted, w http.ResponseWriter, r *http.Request, op stri
 		util.WriteTypedError(w, r.URL.Path, 400, "invalid_request", "model required")
 		return
 	}
+	cfg := h.GatewayConfig()
+	nativeEligible := op == "responses" && providerdeployment.NativeResponsesConfigured(cfg.ModelList) && h.NativeResponsesAllowed(p.UserID)
 	// 会话计划先于调度生成；这里只读偏好或父响应归属，最终候选仍要按当前配置重新验证。
 	if op == "responses" {
 		// 统一入口的完整客户端历史允许跨模型迁移；不把未知来源的账户密文当作访问旧会话的凭据。
@@ -96,7 +98,9 @@ func Serve(h dpcontract.Adapted, w http.ResponseWriter, r *http.Request, op stri
 	}
 	// 恢复经过授权的历史后才检查输入额度和护栏，避免只检查本轮短输入而漏掉真实出站上下文。
 	if op == "responses" {
-		body, err = dpdialogue.ResponsesRequestBody(body, plan.History)
+		// Messages 签名引用仍交给既有专用桥接，不进入原生灰度。
+		nativeEligible = nativeEligible && len(plan.MessagesHistory) == 0
+		body, err = dpdialogue.ResponsesRequestBody(body, plan.History, nativeEligible)
 		if err != nil {
 			util.WriteTypedError(w, r.URL.Path, 400, "unsupported_capability", err.Error())
 			return
@@ -108,7 +112,7 @@ func Serve(h dpcontract.Adapted, w http.ResponseWriter, r *http.Request, op stri
 		return
 	}
 	if op == "chat" || op == "responses" || op == "messages" || op == "gemini" || op == "vertex" || op == "" {
-		if blocked, msg := h.GuardrailBlocks(callID, body); blocked {
+		if blocked, msg := h.GuardrailBlocks(callID, body, nativeEligible); blocked {
 			util.Error("process path=%s step=guardrail blocked model=%s", r.URL.Path, alias)
 			// 护栏拒绝也属于一次真实请求：保存交互并记零费用失败行，控制台才能定位拦截原因。
 			h.RememberExchange(callID, r, raw, nil)
@@ -124,7 +128,6 @@ func Serve(h dpcontract.Adapted, w http.ResponseWriter, r *http.Request, op stri
 		}
 	}
 
-	cfg := h.GatewayConfig()
 	// 第二阶段：读取身份链选中的请求级路由模板，再应用模型默认设置。
 	// 策略、重试、超时与冷却都从这个快照读取，不能混入进程 cfg.RouterSettings。
 	// 保留未套用模型的 baseRouteCfg，跨模型回退时重新解析目标的默认设置。
@@ -145,7 +148,10 @@ func Serve(h dpcontract.Adapted, w http.ResponseWriter, r *http.Request, op stri
 	}
 	var dialogue llmdialogue.Dialogue
 	if dpdialogue.CallerProtocol(op) != "" {
-		if op == "responses" && len(plan.MessagesHistory) > 0 {
+		if nativeEligible {
+			dialogue, err = llmdialogue.ParseNativeResponses(dpdialogue.DialogueRequestBody(body))
+			dialogue.DeferredResponses = true
+		} else if op == "responses" && len(plan.MessagesHistory) > 0 {
 			dialogue, err = llmdialogue.ParseResponsesWithMessagesHistory(dpdialogue.DialogueRequestBody(body), plan.MessagesHistory)
 		} else {
 			dialogue, err = llmdialogue.ParseDialogue(dpdialogue.CallerProtocol(op), dpdialogue.DialogueRequestBody(body))
@@ -327,7 +333,20 @@ func Serve(h dpcontract.Adapted, w http.ResponseWriter, r *http.Request, op stri
 			realModel := upstreamModel
 			lastProvider = supplier
 			var built dptransport.Upstream
-			var err error
+			// 每个候选独立选择执行器，不能把前一候选的转换结果复用于回退部署。
+			dialogue, err := providerdeployment.PrepareDialogue(dep, dialogue)
+			if err != nil {
+				lastErr = err
+				continue
+			}
+			if op == "responses" {
+				path := "legacy"
+				if dialogue.NativeResponses {
+					path = "native"
+				}
+				w.Header().Set("X-XHub-Responses-Path", path)
+				util.Debug("responses execution call_id=%s path=%s", callID, path)
+			}
 			apiBase := dep.ParamString("api_base", "")
 			did := router.CooldownID(rawDep)
 			// 在执行时保存已解析凭证的连接身份，最终失败可能没有 depID，且配置可能随后改变。
@@ -430,6 +449,13 @@ func Serve(h dpcontract.Adapted, w http.ResponseWriter, r *http.Request, op stri
 					}
 					h.NoteFailure(router.CooldownID(rawDep), routeCfg)
 					util.Error("upstream dial path=%s provider=%s model=%s base_host=%s err=%s", r.URL.Path, supplier, realModel, dpdiagnostics.BaseHost(apiBase), dpdiagnostics.SafeErr(err))
+					if dialogue.NativeResponses {
+						// 提交后网络错误不能证明供应商未执行，原生灰度不自动重放生成。
+						h.RememberExchange(callID, r, raw, nil)
+						h.RecordSpend(w, p, callID, alias, op, nil, start, false, http.StatusBadGateway, did)
+						util.WriteTypedError(w, r.URL.Path, http.StatusBadGateway, "upstream_error", dpdiagnostics.SafeErr(err))
+						return
+					}
 					continue
 				}
 				// 先观察原始响应，再执行错误重试和协议转换。
@@ -491,7 +517,7 @@ func Serve(h dpcontract.Adapted, w http.ResponseWriter, r *http.Request, op stri
 							}
 						}
 						if op == "responses" && execution.Protocol == "openai-responses" {
-							wrote, usage, ttft, streamed, streamErr = dpdialogue.PipePortableResponses(w, resp, start, alias, commit)
+							wrote, usage, ttft, streamed, streamErr = dpdialogue.PipePortableResponsesMode(w, resp, start, alias, dialogue.NativeResponses, commit)
 						} else if op == "responses" && execution.Protocol == "anthropic-messages" && plan.PrepareMessages != nil {
 							// 引用必须在 output_item.done 之前持久化；工具增量可以先发送，完成项不能先于归属。
 							prepare := func(result llmdialogue.DialogueResult) (llmdialogue.DialogueResult, error) {
@@ -519,13 +545,17 @@ func Serve(h dpcontract.Adapted, w http.ResponseWriter, r *http.Request, op stri
 						}
 						h.NoteFailure(did, routeCfg)
 						util.Error("upstream stream path=%s provider=%s model=%s base_host=%s err=%s", r.URL.Path, supplier, realModel, dpdiagnostics.BaseHost(apiBase), dpdiagnostics.SafeErr(streamErr))
-						if wrote || preparationFailed {
+						if wrote || preparationFailed || dialogue.NativeResponses {
 							// 客户端已收到部分回复，不能重试或换模型；记录已有用量和 502 事实后结束。
 							h.RememberExchange(callID, r, raw, streamed)
 							h.AnnotateCall(callID, dpcontract.CallNote{Streamed: true, TTFTMs: dpusage.TtftMillis(ttft), Provider: supplier, CacheKey: ck, SessionID: plan.SessionID})
 							h.RecordSpend(w, p, callID, alias, op, usage, start, false, http.StatusBadGateway, did)
 							if !wrote {
-								util.WriteTypedError(w, r.URL.Path, http.StatusBadGateway, "history_unavailable", dpdiagnostics.SafeErr(streamErr))
+								kind := "history_unavailable"
+								if dialogue.NativeResponses {
+									kind = "upstream_error"
+								}
+								util.WriteTypedError(w, r.URL.Path, http.StatusBadGateway, kind, dpdiagnostics.SafeErr(streamErr))
 							}
 							return
 						}
@@ -566,12 +596,35 @@ func Serve(h dpcontract.Adapted, w http.ResponseWriter, r *http.Request, op stri
 						return
 					}
 					h.NoteFailure(did, routeCfg)
+					if dialogue.NativeResponses {
+						h.RememberExchange(callID, r, raw, respBody)
+						h.RecordSpend(w, p, callID, alias, op, nil, start, false, http.StatusBadGateway, did)
+						util.WriteTypedError(w, r.URL.Path, http.StatusBadGateway, "upstream_error", dpdiagnostics.SafeErr(readErr))
+						return
+					}
 					continue
 				}
 				if dpdialogue.CallerProtocol(op) != "" && resp.StatusCode < 400 {
 					execution, _ := providerdeployment.Execution(dep)
-					result, conversionErr := llmdialogue.ParseDialogueResult(execution.Protocol, respBody)
+					var result llmdialogue.DialogueResult
+					var conversionErr error
+					if dialogue.NativeResponses {
+						result, conversionErr = llmdialogue.ParseNativeResponsesResult(respBody)
+					} else {
+						result, conversionErr = llmdialogue.ParseDialogueResult(execution.Protocol, respBody)
+					}
 					if conversionErr != nil {
+						if dialogue.NativeResponses {
+							// 上游已返回成功HTTP，原生终态损坏不能再次生成；保留失败和已有用量供对账。
+							h.NoteFailure(did, routeCfg)
+							h.RememberExchange(callID, r, raw, respBody)
+							var observed map[string]any
+							_ = json.Unmarshal(respBody, &observed)
+							usage, _ := observed["usage"].(map[string]any)
+							h.RecordSpend(w, p, callID, alias, op, llmdialogue.NormalizeDialogueUsage(usage), start, false, http.StatusBadGateway, did)
+							util.WriteTypedError(w, r.URL.Path, http.StatusBadGateway, "upstream_error", dpdiagnostics.SafeErr(conversionErr))
+							return
+						}
 						lastErr = conversionErr
 						// HTTP 200 只说明传输成功；无法解析的供应商正文仍是部署失败，
 						// 必须进入与网络错误、5xx 和流式转换错误相同的冷却链。

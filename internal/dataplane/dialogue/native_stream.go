@@ -19,22 +19,22 @@ import (
 // Responses 校验完成对象；Messages 校验原生内容块/签名/工具快照，终态可见前提交归属；Chat 必须同时看到 finish_reason 与 DONE。
 // 截断、供应商失败、写入错误均返回失败，已写出时不能重试；关闭上游正文，捕获最多 2 MiB，不修改不透明推理项。
 func PipeNativeDialogue(w http.ResponseWriter, resp *http.Response, start time.Time, alias, protocol string, beforeComplete ...func(llmdialogue.DialogueResult)) (bool, map[string]any, time.Duration, []byte, error) {
-	return pipeNativeDialogue(w, resp, start, alias, protocol, false, beforeComplete...)
+	return pipeNativeDialogue(w, resp, start, alias, protocol, false, false, beforeComplete...)
 }
 
 // PipePortableResponses 在统一 Responses 流发布前清理账户绑定推理，参数、返回及错误策略与 PipeNativeDialogue 相同。
 // Serve 调用；终态回调收到完整原生对象，客户端只收到无密文、无来源推理 ID 的历史；不影响 bypass、工具 ID、用量或失败事件。
 func PipePortableResponses(w http.ResponseWriter, resp *http.Response, start time.Time, alias string, beforeComplete ...func(llmdialogue.DialogueResult)) (bool, map[string]any, time.Duration, []byte, error) {
-	return pipeNativeDialogue(w, resp, start, alias, "openai-responses", true, beforeComplete...)
+	return pipeNativeDialogue(w, resp, start, alias, "openai-responses", true, false, beforeComplete...)
 }
 
 // pipeNativeDialogue 共享原生 SSE 验证和输出，portable 决定是否只发布公开推理，其余参数和返回与公开入口相同。
 // 两个流入口调用；每帧及最终快照都清理，防止 added/done 帧泄漏密文；读取和记账仍使用原始数据。
-func pipeNativeDialogue(w http.ResponseWriter, resp *http.Response, start time.Time, alias, protocol string, portable bool, beforeComplete ...func(llmdialogue.DialogueResult)) (bool, map[string]any, time.Duration, []byte, error) {
+func pipeNativeDialogue(w http.ResponseWriter, resp *http.Response, start time.Time, alias, protocol string, portable, native bool, beforeComplete ...func(llmdialogue.DialogueResult)) (bool, map[string]any, time.Duration, []byte, error) {
 	defer resp.Body.Close()
 	w.Header().Set("Content-Type", "text/event-stream")
 	util.PreventSSETransform(w.Header())
-	state := dialogueStream{observeOnly: true, protocol: protocol, model: alias, calls: map[int]*llmdialogue.Turn{}, blocks: map[int]int{}, usage: map[string]any{}, textBlock: -1, toolIndices: map[int]int{}}
+	state := dialogueStream{observeOnly: true, nativeResponses: native, protocol: protocol, model: alias, calls: map[int]*llmdialogue.Turn{}, blocks: map[int]int{}, usage: map[string]any{}, textBlock: -1, toolIndices: map[int]int{}}
 	var nativeMessages nativeMessagesStream
 	var capture bytes.Buffer
 	var wrote, completed bool
@@ -113,7 +113,11 @@ func pipeNativeDialogue(w http.ResponseWriter, resp *http.Response, start time.T
 		if protocol == "openai-responses" && (payload["type"] == "response.completed" || payload["type"] == "response.incomplete") {
 			raw, _ := json.Marshal(payload["response"])
 			var result llmdialogue.DialogueResult
-			result, err = llmdialogue.ParseDialogueResult(protocol, raw)
+			if native {
+				result, err = llmdialogue.ParseNativeResponsesResult(raw)
+			} else {
+				result, err = llmdialogue.ParseDialogueResult(protocol, raw)
+			}
 			if err != nil {
 				break
 			}
@@ -162,4 +166,10 @@ func pipeNativeDialogue(w http.ResponseWriter, resp *http.Response, start time.T
 		_ = write(event, raw)
 	}
 	return wrote, llmdialogue.NormalizeDialogueUsage(state.usage), ttft, capture.Bytes(), err
+}
+
+// PipePortableResponsesMode 在灰度原生路径使用独立终态观测；参数 native 来自可信候选选择，其余同 PipePortableResponses。
+// 返回写出/用量/首帧/捕获/错误，执行器调用；保持公开历史清理、提交顺序和断流行为，关闭开关仍走旧校验。
+func PipePortableResponsesMode(w http.ResponseWriter, resp *http.Response, start time.Time, alias string, native bool, beforeComplete ...func(llmdialogue.DialogueResult)) (bool, map[string]any, time.Duration, []byte, error) {
+	return pipeNativeDialogue(w, resp, start, alias, "openai-responses", true, native, beforeComplete...)
 }

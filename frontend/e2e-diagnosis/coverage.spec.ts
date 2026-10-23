@@ -1,4 +1,4 @@
-import { chooseKeyTeam, chooseOrganization } from "./helpers";
+import { chooseKeyTeam } from "./helpers";
 import { GATEWAY } from "./helpers";
 import { execFileSync } from "child_process";
 import path from "path";

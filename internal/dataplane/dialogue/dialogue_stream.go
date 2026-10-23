@@ -33,6 +33,8 @@ type dialogueStream struct {
 	messagesReasoning bool
 	// observeOnly 只复用增量校验和用量累计，原生输出由 PipeNativeDialogue 保留完整事件。
 	observeOnly bool
+	// nativeResponses 仅用于灰度原生 SSE 终态观测，不改变跨协议转换。
+	nativeResponses bool
 	// reasoning 保存公开推理文本；索引用于 Responses 的推理输出生命周期。
 	reasoning        string
 	reasoningStarted bool
@@ -770,7 +772,13 @@ func (s *dialogueStream) consume(protocol string, data string) error {
 				return fmt.Errorf("invalid upstream response terminal")
 			}
 			raw, _ := json.Marshal(response)
-			result, err := llmdialogue.ParseDialogueResult(protocol, raw)
+			var result llmdialogue.DialogueResult
+			var err error
+			if s.nativeResponses {
+				result, err = llmdialogue.ParseNativeResponsesResult(raw)
+			} else {
+				result, err = llmdialogue.ParseDialogueResult(protocol, raw)
+			}
 			if err != nil {
 				return err
 			}
