@@ -84,6 +84,12 @@ func ParseDialogue(protocol string, body map[string]any) (Dialogue, error) {
 		return Dialogue{}, fmt.Errorf("nonempty conversation is required")
 	}
 	var bridgeError string
+	if protocol == "openai-responses" {
+		bridgeError, err = projectResponsesStreamOptions(native, projected)
+		if err != nil {
+			return Dialogue{}, err
+		}
+	}
 	var turns []any
 	responseTools := append([]any(nil), dialogueList(native["tools"])...)
 	for _, item := range items {

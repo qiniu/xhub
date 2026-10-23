@@ -88,3 +88,11 @@ model 定义统一表示，request/response 编解码，validation 校验字段�
 后续请求中，本桥接生成的单一标准 Chat/Responses 公开拒绝会投影为助手历史文本，原样保留说明。这样用户改问正常问题时，可以继续同一 Messages 上游或切换模型，公开拒绝不会被当作依赖原连接的密文。本轮响应仍保留显式拒绝标记；同协议请求原文不变。合法混合拒绝/其他输出或空拒绝历史仍可原生重放，仅拒绝跨协议转换。拒绝块含未知字段、字段类型非法或非助手角色的拒绝历史则在解析时明确报错。
 
 依据：[Anthropic 拒绝文档](https://platform.claude.com/docs/en/build-with-claude/refusals-and-fallback)、[OpenAI 流事件规范](https://developers.openai.com/api/reference/resources/responses/streaming-events)。适配层保留上游报告的 token 用量，不根据拒绝类别推测上游发票费用。
+
+## Responses 原生流参数
+
+Responses 的 `stream_options` 不使用 Chat 的字段白名单，也不要求 `include_usage`。
+原生请求保留 `reasoning_summary_delivery`（例如 `sequential_cutoff`）及上游扩展字段；
+网关只校验选项对象、已知字段的基础类型，不替上游承诺扩展能力。
+包含非 `include_usage` 选项时，只允许原生 Responses；跨协议明确拒绝，不能静默丢弃交付语义。
+Chat 入口继续使用原有 `include_usage` 校验。验证覆盖原生同步/流式、错误类型、上游拒绝和跨协议边界。

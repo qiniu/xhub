@@ -647,6 +647,11 @@ class Handler(BaseHTTPRequestHandler):
             else:
                 self._json(payload)
             return
+        if "responses" in path and model == "e2e-stream-options-native":
+            # 原生流选项必须完整保留且不注入Chat的include_usage；仅用于隔离E2E，不调用外部服务。
+            if req.get("stream_options") != {"reasoning_summary_delivery": "sequential_cutoff", "include_obfuscation": False}:
+                self.send_error(400, "native stream options lost")
+                return
         if "responses" in path and model == "e2e-tool-images-native":
             # 专属工具图片夹具断言完整内容与关联ID；仅本地合成输入，运行器结束清理。
             items = req.get("input", [])
