@@ -8,6 +8,7 @@ import (
 	"sync"
 	"time"
 
+	llmdialogue "github.com/sunqirui1987/xhub/internal/llm/dialogue"
 	"github.com/sunqirui1987/xhub/internal/util"
 )
 
@@ -73,7 +74,8 @@ func PreCall(s Host, body map[string]any) (bool, string) {
 // 返回：blocked：是否拦截；message：拦截原因；findings：已执行结果及耗时，Flag 附加元数据随结果记录。
 // 调用：gateway/wire.go 的数据面宿主；普通 chat/responses 在上游请求前调用。
 // 测试：guard_test.go、engine_test.go、external_test.go、gateway/guardrail_block_test.go。
-func Evaluate(s Host, body map[string]any) (blocked bool, message string, findings []map[string]any) {
+// 可选 native 表示原生灰度请求；所选请求前规则无法处理该内容时拒绝，不忽略规则。
+func Evaluate(s Host, body map[string]any, native ...bool) (blocked bool, message string, findings []map[string]any) {
 	requested, err := requestedRules(body["guardrails"])
 	if err != nil {
 		return true, err.Error(), nil
@@ -115,6 +117,17 @@ func Evaluate(s Host, body map[string]any) (blocked bool, message string, findin
 		}
 		if !preCallMode(params["mode"]) {
 			continue
+		}
+
+		// 新原生能力不应悄悄绕过已选的护栏。暂以既有投影能否理解正文作为保守边界，
+		// 仅新增内容不兼容且启用请求前规则时拒绝；无规则时允许上游自行校验扩展。
+		if len(native) > 0 && native[0] {
+			if _, err := llmdialogue.ParseDialogue("openai-responses", body); err != nil {
+				reason := "Native Responses content is incompatible with the active guardrail"
+				finding := findingJSON(g, "block", false)
+				finding["reason"] = reason
+				return true, reason, append(findings, finding)
+			}
 		}
 		started := time.Now()
 		action, reason, metadata, err := runRuleDetailed(g, body)

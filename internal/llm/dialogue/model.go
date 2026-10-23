@@ -16,10 +16,14 @@ type Turn struct {
 
 // Dialogue 保存统一对话请求；Options 只保存已实现协议可表达的已验证参数。
 type Dialogue struct {
-	Turns   []Turn
-	Tools   []map[string]any
-	Options map[string]any
-	Stream  bool
+	// DeferredResponses 仅由可信灰度选择设置，延迟到候选协议明确后才做转换投影。
+	DeferredResponses bool
+	// NativeResponses 标记已选中的独立原生执行器，控制响应终态观测；不从请求正文读取。
+	NativeResponses bool
+	Turns           []Turn
+	Tools           []map[string]any
+	Options         map[string]any
+	Stream          bool
 	// Source/Native 是护栏处理后的原协议正文；只在同协议编码时使用。
 	Source string
 	Native map[string]any

@@ -76,13 +76,14 @@ func (s *Server) ResponseCache() *util.DualCache { return s.Cache }
 // 返回 router.State（router.State）：这一刻的冷却、延迟、用量和并发，交给路由器排序。
 func (s *Server) RouteState() router.State { return s.routerState() }
 
+// native 可选参数来自可信执行器；新原生内容无法被现有护栏安全理解时失败关闭。
 // GuardrailBlocks runs guardrails before a chat request is sent. When blocked is true, msg is the reason shown to the caller. The findings are kept against callID until the spend row is written.
 // 参数 callID（string）：这一次调用的 id，用来把请求、响应和用量记在同一行；body（map[string]any）：已经解析的 JSON 对象。缺字段表示上游或调用方没有给这项。
 // 返回 bool（bool）：护栏拦截了这次聊天时返回真。未拦截时返回假；string（string）：给调用方看的拦截说明。未拦截时为空串。
 // 调用：dataplane/contract/host.go、dataplane/execution/serve.go
 // 测试：bypass_logic_test.go、failure_log_test.go
-func (s *Server) GuardrailBlocks(callID string, body map[string]any) (bool, string) {
-	blocked, message, findings := guard.Evaluate(s, body)
+func (s *Server) GuardrailBlocks(callID string, body map[string]any, native ...bool) (bool, string) {
+	blocked, message, findings := guard.Evaluate(s, body, native...)
 	if len(findings) > 0 && callID != "" {
 		if raw, err := json.Marshal(findings); err == nil {
 			s.noteGuardrail(callID, string(raw))

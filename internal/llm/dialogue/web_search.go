@@ -70,7 +70,13 @@ func PrepareWebSearch(d Dialogue, native, drop bool) (Dialogue, bool, error) {
 		return d, false, err
 	}
 	visitTools(body, func(container map[string]any) { filter(container, true) })
-	prepared, err := ParseDialogue(d.Source, body)
+	var prepared Dialogue
+	if d.NativeResponses {
+		prepared, err = ParseNativeResponses(body)
+		prepared.NativeResponses = true
+	} else {
+		prepared, err = ParseDialogue(d.Source, body)
+	}
 	if err != nil {
 		return d, false, err
 	}

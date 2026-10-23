@@ -128,6 +128,8 @@ type RequestHost interface {
 // 在 RequestHost 上增加护栏、响应缓存和响应写入；同时嵌入 SpendLog 统一结算。
 // 不提供原生任务归属，防止统一对话执行器意外耦合供应商任务生命周期。
 type Adapted interface {
+	// NativeResponsesAllowed 根据可信用户读取默认关闭的灰度快照；配置读取失败返回 false。
+	NativeResponsesAllowed(userID string) bool
 	// 嵌入 RequestHost 的公共能力；执行器通过同一宿主消费，不能省略其中的鉴权或记账约定。
 	RequestHost
 
@@ -135,7 +137,8 @@ type Adapted interface {
 	// 参数 callID 关联本轮调用，body 为已恢复授权历史的请求对象；返回 blocked 和说明 msg。
 	// Serve 对 chat/responses/messages/gemini/vertex/空操作调用，blocked 时由 Serve 写拒绝响应并记账，本方法不表示已经写出 HTTP。
 	// 允许时仍须重新序列化 body，让缓存、日志和编码器消费同一份脱敏后输入。
-	GuardrailBlocks(callID string, body map[string]any) (bool, string)
+	// native 可选参数来自可信灰度选择，要求未知护栏内容失败关闭。
+	GuardrailBlocks(callID string, body map[string]any, native ...bool) (bool, string)
 
 	// ResponseCache 返回进程内 LRU 响应缓存，正文及实际授权模型/组存放在同一条目，不访问 Redis。
 	// 参数：无。
