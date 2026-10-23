@@ -22,6 +22,9 @@ jobs:
     timeout-minutes: 45
     steps:
       - uses: actions/checkout@v4
+        with:
+          # Go 格式门禁要比较 PR 基线与当前提交，必须保留完整提交历史。
+          fetch-depth: 0
       - uses: actions/setup-go@v5
         with:
           go-version-file: go.mod
@@ -110,8 +113,13 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          npx eslint . --quiet --format json --output-file eslint-report.json --pass-on-unpruned-suppressions || lint_status=$?
-          if [[ ${lint_status:-0} -gt 1 ]]; then
+          # ESLint 发现规则错误时返回 1；由预算脚本根据历史基线决定是否阻断。
+          # 配置错误等返回 2 及以上时仍立即失败。
+          set +e
+          npx eslint . --quiet --format json --output-file eslint-report.json --pass-on-unpruned-suppressions
+          lint_status=$?
+          set -e
+          if (( lint_status > 1 )); then
             exit "$lint_status"
           fi
           node scripts/check-eslint-error-budget.mjs eslint-report.json 289

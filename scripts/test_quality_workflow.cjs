@@ -30,6 +30,9 @@ test('quality workflow runs for pull requests and maintained branches', () => {
 test('Go gate produces atomic backend coverage and runs race checks', () => {
   const job = workflow.jobs.go;
   assert.equal(job['timeout-minutes'], 45);
+  const checkout = job.steps.find((item) => item.uses === 'actions/checkout@v4');
+  assert.ok(checkout, 'Go 作业必须检出源码');
+  assert.equal(checkout.with['fetch-depth'], 0, '格式检查需要完整历史来读取 PR 基线');
   const formatting = step('go', 'Check Go formatting').run;
   assert.match(formatting, /git diff --name-only --diff-filter=ACMR/);
   assert.match(formatting, /gofmt -l/);
@@ -59,6 +62,8 @@ test('frontend gate ratchets existing debt and uploads Vitest coverage', () => {
   const lint = step('frontend', 'Check ESLint error budget').run;
   assert.match(lint, /eslint . --quiet --format json/);
   assert.match(lint, /--pass-on-unpruned-suppressions/);
+  assert.match(lint, /set \+e[\s\S]*lint_status=\$\?[\s\S]*set -e/);
+  assert.match(lint, /lint_status > 1/);
   assert.match(lint, /check-eslint-error-budget.mjs eslint-report.json 289/);
   const lintArtifact = step('frontend', 'Upload ESLint report');
   assert.equal(lintArtifact.with.name, 'frontend-eslint-report');
