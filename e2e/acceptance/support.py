@@ -193,8 +193,8 @@ def load_manifest(path=MANIFEST):
         raise ValueError("权重切换链必须固定为 100:0 到 0:100")
     if fallback_chain.get("primary_failure_status") != 429 or fallback_chain.get("repeat_requests", 0) < 2 \
             or any(fallback_chain.get(field) is not True for field in (
-                "same_session", "identical_request_bodies", "reuse_successful_target")):
-        raise ValueError("回退链必须验证 429、同会话同正文的成功响应缓存")
+                "same_session", "different_request_bodies", "reuse_successful_target")):
+        raise ValueError("回退链必须验证 429、同会话不同正文的成功目标复用")
     required_roles = {"platform_admin", "organization_admin", "team_admin", "member"}
     if {p["role"] for p in data.get("personas", [])} != required_roles:
         raise ValueError("必须包含四类可登录身份")

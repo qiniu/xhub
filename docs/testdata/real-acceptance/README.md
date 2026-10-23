@@ -88,6 +88,18 @@ make testdata
 make e2e
 ```
 
+共享网关的 fallback 分类还需要一个可控的真实故障型号。运行前设置
+E2E_FALLBACK_UPSTREAM_MODEL，该型号必须由 Fenno 真实返回 429 或 5xx。
+未设置或只填空白时，用例会在创建临时部署、路由、密钥和调用供应商前标记为
+“外部前置条件未满足”；后续分类继续执行，最终命令返回非零，且不会把该项计为通过、
+复验或历史沿用。显式型号返回 404 等不可回退错误时仍记为失败。隔离验收由 Observer
+注入可控 429，不依赖此环境变量。
+
+```bash
+export E2E_FALLBACK_UPSTREAM_MODEL='供应商提供的真实故障型号'
+make e2e fallback
+```
+
 固定目标是：
 
 ```text

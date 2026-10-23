@@ -509,3 +509,22 @@ class AcceptanceTests(unittest.TestCase):
                         self.assertEqual(failed_report["status"], "failed")
                         self.assertIn("ConnectionRefusedError", failed_report["error"])
                     self.assertFalse(any(call.args[0] == "/model/update" for call in dataset.api.call_args_list))
+
+    def test_running_gateway_returns_nonzero_for_blocked_external_case(self):
+        """目的：外部前置条件缺失不能把共享验收报为通过；前置最小共享报告与 blocked 清单，验证后续编排返回后状态、外部边界和非零退出码；临时目录自动清理。"""
+        with tempfile.TemporaryDirectory() as directory:
+            Path(directory, "access.json").write_text(json.dumps({"admin": "saved-session", "keys": []}))
+            Path(directory, "report.json").write_text(json.dumps({"checks": []}))
+            dataset = mock.Mock()
+            dataset.report = {}
+            dataset.case_enabled.return_value = False
+            dataset.checklist.rows = [{"id": "fallback", "status": "blocked", "reason": "需要受控 429"}]
+            args = type("Args", (), {"phase": "verify", "directory": directory, "category": ["fallback"]})()
+            with mock.patch.object(SHARED, "local_admin_credentials", return_value={}), \
+                 mock.patch.object(SHARED, "http", return_value=(200, {}, {})), \
+                 mock.patch.object(SHARED.module, "Dataset", return_value=dataset), \
+                 mock.patch.dict(os.environ, {}, clear=True), redirect_stdout(io.StringIO()):
+                self.assertEqual(SHARED.verify_running_gateway(args, load_manifest()), 1)
+            self.assertEqual(dataset.report["status"], "blocked")
+            self.assertEqual(dataset.report["external_boundaries"], [
+                {"case": "fallback", "reason": "需要受控 429"}])

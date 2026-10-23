@@ -4,6 +4,7 @@ import json
 import threading
 import unittest
 from unittest import mock
+from checklist import CaseBlocked
 from acceptance import Dataset, fallback_acceptance_deployments, fallback_acceptance_route, load_manifest, weighted_acceptance_route
 
 
@@ -122,9 +123,9 @@ class AcceptanceTests(unittest.TestCase):
                     dataset.verify_profile_route_isolation()
 
     def test_real_cache_and_fallback_chains_clean_resources_on_success_and_failure(self):
-        """目的：真实路由链不依赖观察器且错误时清理资源；前置管理接口与真实响应契约夹具，覆盖缓存切换和回退成功、错误缓存、主模型无故障及真实 404 不满足回退条件；临时目录自动清理。"""
+        """目的：真实路由链不依赖观察器且错误时清理资源；前置管理接口与真实响应契约夹具，覆盖缓存切换、429/5xx 回退成功、错误缓存、主模型无故障及真实 404 不满足回退条件；临时目录自动清理。"""
         for chain in ("cache", "fallback"):
-            for invalid in ((False, True, "ineligible-404") if chain == "fallback" else (False, True)):
+            for invalid in ((False, "eligible-5xx", True, "ineligible-404") if chain == "fallback" else (False, True)):
                 with self.subTest(chain=chain, invalid=invalid), tempfile.TemporaryDirectory() as directory:
                     dataset = Dataset("http://localhost:1", directory, load_manifest())
                     dataset.logger = mock.Mock()
@@ -162,13 +163,16 @@ class AcceptanceTests(unittest.TestCase):
                         """返回当前主模型及明确会话账单；参数为请求 ID，返回账单，避免历史身份替代当前请求。"""
                         model = "gpt-5.6-sol"
                         return {"model": model, "session_id": "real-fallback-" + dataset.run}
-                    with mock.patch.object(dataset, "deployment", side_effect=deployment), mock.patch.object(dataset, "api", side_effect=api), \
+                    fallback_env = {"E2E_FALLBACK_UPSTREAM_MODEL": "fault-model"} if chain == "fallback" else {}
+                    with mock.patch.dict("os.environ", fallback_env, clear=True), \
+                         mock.patch.object(dataset, "deployment", side_effect=deployment), mock.patch.object(dataset, "api", side_effect=api), \
                          mock.patch.object(dataset, "chat_request", side_effect=responses), mock.patch.object(dataset, "wait_bill", side_effect=bill), \
-                         mock.patch.object(dataset, "wait_log", return_value={"metadata": {"upstream_response": {"status_code": 404 if invalid == "ineligible-404" else 429}}}), \
+                         mock.patch.object(dataset, "wait_log", return_value={"metadata": {"upstream_response": {
+                             "status_code": 404 if invalid == "ineligible-404" else 503 if invalid == "eligible-5xx" else 429}}}), \
                          mock.patch.object(dataset, "route_evidence", return_value={"status": "success" if invalid is True else "error"}) as evidence, \
                          mock.patch("acceptance.routing.bill_check", return_value=0.1), mock.patch("acceptance.routing.cache_bill_check"):
                         callback = dataset.verify_cache_weight_chain if chain == "cache" else dataset.verify_fallback_policy_chain
-                        if invalid:
+                        if invalid is True or invalid == "ineligible-404":
                             with self.assertRaisesRegex(AssertionError, "前置条件未满足" if invalid == "ineligible-404" else "."):
                                 callback({"user_id": "u", "team_id": "t", "project_id": "p"})
                         else:
@@ -179,6 +183,70 @@ class AcceptanceTests(unittest.TestCase):
                     self.assertIn(("/route_template/route/delete", {}), requests)
                     for ident in created:
                         self.assertIn(("/model/delete", {"id": ident}), requests)
+
+    def test_shared_fallback_without_explicit_fault_model_blocks_before_writes(self):
+        """目的：共享回退缺少可控 429/5xx 型号时不得制造 404；前置未设置或空白环境变量，验证明确阻塞且部署、管理接口和供应商请求均未调用；临时目录自动清理。"""
+        for value in (None, "", "   "):
+            with self.subTest(value=value), tempfile.TemporaryDirectory() as directory:
+                dataset = Dataset("http://localhost:1", directory, load_manifest())
+                dataset.state["chat_models"] = {"fennoai": "gpt-5.6-sol"}
+                deployment = mock.Mock(side_effect=AssertionError("不得创建部署"))
+                api = mock.Mock(side_effect=AssertionError("不得创建管理资源"))
+                request = mock.Mock(side_effect=AssertionError("不得调用供应商"))
+                environment = {} if value is None else {"E2E_FALLBACK_UPSTREAM_MODEL": value}
+                with mock.patch.dict("os.environ", environment, clear=True), \
+                     mock.patch.object(dataset, "deployment", deployment), \
+                     mock.patch.object(dataset, "api", api), \
+                     mock.patch.object(dataset, "chat_request", request), \
+                     self.assertRaisesRegex(CaseBlocked, "E2E_FALLBACK_UPSTREAM_MODEL"):
+                    dataset.verify_fallback_policy_chain({"user_id": "u", "team_id": "t", "project_id": "p"})
+                deployment.assert_not_called()
+                api.assert_not_called()
+                request.assert_not_called()
+
+    def test_isolated_fallback_uses_observer_fault_without_environment_model(self):
+        """目的：隔离验收继续使用 Observer 的受控 429；前置隔离标记与观察器，验证默认清单型号和 fault 参数传入部署，不依赖环境变量；不创建真实资源。"""
+        with tempfile.TemporaryDirectory() as directory:
+            dataset = Dataset("http://localhost:1", directory, load_manifest(), observer=object())
+            dataset.isolated_upstreams = True
+            dataset.state.update(chat_models={"fennoai": "gpt-5.6-sol"}, selected={
+                "fennoai": {"provider": {"id": "fennoai"}}, "qiniu": {"provider": {"id": "qiniu"}}})
+            target = next(row for row in dataset.data["models"] if row["id"] == "qiniu-glm")
+            dataset.state["deployments"] = [
+                {"id": "healthy", "public_name": "gpt-5.6-sol", "provider": "fennoai"},
+                {"id": "fallback", "public_name": target["public_name"], "provider": "qiniu"},
+            ]
+            captured = {}
+            def deployment(definition, provider, upstream, **kwargs):
+                """记录隔离故障部署参数；参数同生产方法，返回临时 ID；只修改内存状态供 finally 清理。"""
+                captured.update(upstream=upstream, kwargs=kwargs)
+                dataset.state["deployments"].append({"id": "temporary", "public_name": kwargs["public_name"]})
+                return "temporary"
+            requests = []
+            def api(route, body):
+                """模拟临时路由、密钥与删除接口；参数为路径和正文，返回契约夹具；记录清理但不访问服务。"""
+                requests.append((route, body))
+                if route == "/key/generate":
+                    return {"key": str(len(requests))}, {}
+                return {"id": "route"}, {}
+            answer = {"choices": [{}], "usage": {"prompt_tokens": 2, "completion_tokens": 1}}
+            responses = [({"error": "rate limited"}, {}, 429, "fault")]
+            responses += [(answer, {}, 200, "turn-" + str(index))
+                          for index in range(dataset.data["logic_chains"]["fallback_cache"]["repeat_requests"])]
+            responses += [({"error": "model not in allowed model list"}, {}, 401, "denied")]
+            with mock.patch.dict("os.environ", {}, clear=True), \
+                 mock.patch.object(dataset, "deployment", side_effect=deployment), \
+                 mock.patch.object(dataset, "api", side_effect=api), \
+                 mock.patch.object(dataset, "chat_request", side_effect=responses), \
+                 mock.patch.object(dataset, "wait_log", return_value={"metadata": {"upstream_response": {"status_code": 429}}}), \
+                 mock.patch.object(dataset, "wait_bill", return_value={"model": "gpt-5.6-sol", "session_id": "real-fallback-" + dataset.run}), \
+                 mock.patch.object(dataset, "route_evidence", return_value={"status": "error"}), \
+                 mock.patch("acceptance.routing.bill_check", return_value=0.1):
+                dataset.verify_fallback_policy_chain({"user_id": "u", "team_id": "t", "project_id": "p"})
+            definition = next(row for row in dataset.data["models"] if row["id"] == "fenno-chat")
+            self.assertEqual(captured["upstream"], definition["upstream_model"])
+            self.assertTrue(captured["kwargs"]["fault"])
+            self.assertNotIn("temporary", {row["id"] for row in dataset.state["deployments"]})
 
     def test_deployment_route_tag_builds_distinct_observer_address(self):
         """目的：同模型临时部署必须生成可观察的独立地址；前置模拟观察器和模型创建接口，验证 weight-b 写入 api_base、状态保存标签及临时资源标记，不创建真实部署。"""

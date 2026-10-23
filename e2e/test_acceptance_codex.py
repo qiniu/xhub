@@ -133,6 +133,28 @@ class CodexSessionTests(unittest.TestCase):
             with mock.patch.object(dataset, "api", side_effect=[(bill, {}, 200) for bill in bills]):
                 self.assertEqual(dataset.codex_conversation(key, revalidate=True), saved)
 
+    def test_persisted_history_accepts_reasoning_items_and_rejects_broken_turns(self):
+        """目的：Responses 跨协议续接允许助手公开推理项但仍严格核对完整轮次；前置第二轮合法账单，验证 reasoning 边界、缺助手和额外用户项，均为内存副本无需清理。"""
+        with tempfile.TemporaryDirectory() as directory:
+            dataset, key, conversation, bills = codex_fixture(directory)
+            turn = conversation["turns"][1]
+            reasoning = {"type": "reasoning", "summary": [{"type": "summary_text", "text": "Recall the marker."}]}
+            bills[1]["proxy_server_request"]["body"]["input"].insert(1, reasoning)
+            dataset.check_codex_turn(key, conversation, turn, bills[1])
+
+            missing_assistant = copy.deepcopy(bills[1])
+            missing_assistant["proxy_server_request"]["body"]["input"] = [
+                conversation["turns"][0]["request_body"]["input"][0],
+                turn["request_body"]["input"][0],
+            ]
+            with self.assertRaisesRegex(AssertionError, "丢失前轮上下文"):
+                dataset.check_codex_turn(key, conversation, turn, missing_assistant)
+
+            extra_user = copy.deepcopy(bills[1])
+            extra_user["proxy_server_request"]["body"]["input"].insert(2, {"role": "user", "content": "unexpected"})
+            with self.assertRaisesRegex(AssertionError, "丢失前轮上下文"):
+                dataset.check_codex_turn(key, conversation, turn, extra_user)
+
     def test_missing_or_wrong_response_session_header_rejects_checkpoint(self):
         """目的：缺失或错误响应头不能算成功；前置 HTTP 成功响应，验证核账前失败且无检查点，临时目录自动清理。"""
         for actual in (None, "prompt:v1:wrong"):
