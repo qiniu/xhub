@@ -5,6 +5,7 @@ package dialogue
 import (
 	"encoding/json"
 	"fmt"
+	"strings"
 )
 
 // cloneObject 复制 JSON 对象供协议投影与模型改名使用；参数为原始正文，返回独立对象或编码错误。
@@ -147,7 +148,14 @@ func ParseDialogue(protocol string, body map[string]any) (Dialogue, error) {
 				}
 				// 官方客户端会为公开推理补 encrypted_content:null；共享投影移除空占位，原生正文仍保留原值。
 				delete(cp, "encrypted_content")
-			case "item_reference", "compaction":
+			case "compaction":
+				// 压缩历史承载不可重建的上下文，必须保留完整密文且只交原生 Responses 校验。
+				if cipher, ok := cp["encrypted_content"].(string); !ok || strings.TrimSpace(cipher) == "" {
+					return Dialogue{}, fmt.Errorf("compaction requires nonempty encrypted_content")
+				}
+				bridgeError = "input item compaction"
+				continue
+			case "item_reference":
 				bridgeError = "input item " + dialogueString(cp["type"])
 				continue
 			default:
