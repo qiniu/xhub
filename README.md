@@ -14,6 +14,8 @@ Manage models, access, cost, security, routing, and operations on your own infra
 [![OpenAI compatible](https://img.shields.io/badge/API-OpenAI%20compatible-412991)](#connect-your-applications)
 [![Go](https://img.shields.io/badge/Go-1.25-00ADD8?logo=go&logoColor=white)](go.mod)
 [![Docker Compose](https://img.shields.io/badge/Deploy-Docker%20Compose-2496ED?logo=docker&logoColor=white)](docker-compose.yml)
+[![Code Quality](https://github.com/qiniu/xhub/actions/workflows/quality.yml/badge.svg)](https://github.com/qiniu/xhub/actions/workflows/quality.yml)
+[![Coverage Status](https://codecov.io/gh/qiniu/xhub/branch/main/graph/badge.svg)](https://codecov.io/gh/qiniu/xhub)
 
 **English** | [简体中文](README.zh-CN.md)
 
