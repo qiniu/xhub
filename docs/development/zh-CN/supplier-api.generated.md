@@ -24,7 +24,7 @@
 ```json
 {
   "required": false,
-  "description": "空正文沿用空对象语义；正文存在时必须是 JSON 对象。 / Empty body acts as an empty object; nonempty body must be a JSON object.",
+  "description": "空正文沿用空对象语义；正文存在时必须是 JSON 对象。",
   "content": {
     "application/json": {
       "schema": {
@@ -74,7 +74,7 @@
 ```json
 {
   "required": false,
-  "description": "空正文沿用空对象语义；正文存在时必须是 JSON 对象。 / Empty body acts as an empty object; nonempty body must be a JSON object.",
+  "description": "空正文沿用空对象语义；正文存在时必须是 JSON 对象。",
   "content": {
     "application/json": {
       "schema": {
@@ -111,7 +111,7 @@
 ```json
 {
   "required": false,
-  "description": "空正文沿用空对象语义；正文存在时必须是 JSON 对象。 / Empty body acts as an empty object; nonempty body must be a JSON object.",
+  "description": "空正文沿用空对象语义；正文存在时必须是 JSON 对象。",
   "content": {
     "application/json": {
       "schema": {

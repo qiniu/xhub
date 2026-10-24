@@ -47,3 +47,19 @@ test("user generation rejects invalid source and domain", async () => {
     await assert.rejects(generate(root), /Undeclared gateway route/);
   } finally { rmSync(root, {recursive:true, force:true}); }
 });
+
+/** 嵌套参数/请求体/Schema说明随语言切换，示例和默认值中的用户内容保持；纯内存输入，无外部数据清理。 */
+test("nested operation documentation is localized without changing examples", () => {
+  const schema = {type:"object", description:"对象 / Object", properties:{value:{type:"string",description:"值 / Value",default:"原始 / Original"}}, example:{description:"用户 / User"}};
+  const spec = {paths:{"/example":{post:{summary:"提交 / Submit",parameters:[{name:"value",description:"参数 / Parameter",schema}],requestBody:{description:"正文 / Body",content:{"application/json":{schema,examples:{sample:{value:{description:"原始 / Original"}}}}}},responses:{200:{description:"成功 / Success"}}}}},components:{schemas:{Example:schema}}};
+  const before = JSON.stringify(spec);
+  for (const locale of ["en", "zh-CN"]) {
+    const doc = renderReference(spec, locale);
+    for (const text of ["对象 / Object","值 / Value","参数 / Parameter","正文 / Body"]) assert.ok(!doc.includes(text), text);
+    assert.ok(doc.includes(locale === "en" ? '"description": "Body"' : '"description": "正文"'));
+    assert.ok(doc.includes('"description": "用户 / User"'));
+    assert.ok(doc.includes('"description": "原始 / Original"'));
+    assert.ok(doc.includes('"default": "原始 / Original"'));
+  }
+  assert.equal(JSON.stringify(spec),before);
+});
