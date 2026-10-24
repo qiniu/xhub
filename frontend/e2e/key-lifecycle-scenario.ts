@@ -3,7 +3,7 @@ import { translate } from "../src/i18n/translate";
 import { GATEWAY, UPSTREAM, loginAdmin, sessionBearer, stableGoto } from "./helpers";
 
 /** 注册 Key 生命周期双语闭环；locale 为界面语言，无返回值。
- * 前置私有数据库、真实网关与本地模型上游；浏览器创建、编辑到期、轮换恢复、回读限额、调用模型和删除。
+ * 前置私有数据库、真实网关与本地模型上游；浏览器创建、禁用/恢复、编辑到期、轮换恢复、回读限额、调用模型和删除。
  * 不支持的管理类型、自动轮换、宽限期必须可见且真实 API 拒绝；finally 删除仅本场景创建的 Key，运行器回收 schema。 */
 export function registerKeyLifecycleScenario(locale: "en" | "zh-CN") {
   test("key lifecycle settings and atomic rotation " + locale, async ({ page }) => {
@@ -84,6 +84,29 @@ export function registerKeyLifecycleScenario(locale: "en" | "zh-CN") {
       await stableGoto(page, "/api-keys?key=" + id);
       await expect(page.getByLabel(tr("Key Alias"))).toHaveValue(alias);
       await expect(page.getByText(tr("keyEditor.apiOnly"))).toBeVisible();
+      // 浏览器禁用/恢复后核验真实推理入口，避免仅根据UI乐观状态认定保存成功。
+      for (const blocked of [true, false]) {
+        await page.getByRole("button", { name: tr("More key actions"), exact: true }).click();
+        await page.getByRole("menuitem", { name: tr(blocked ? "Block Key" : "Unblock Key"), exact: true }).click();
+        const toggle = page.waitForResponse(r => r.url().endsWith(blocked ? "/key/block" : "/key/unblock") && r.request().method() === "POST");
+        await page.getByRole("dialog").getByRole("button", { name: tr(blocked ? "Block" : "Unblock"), exact: true }).click();
+        const saved = await toggle;
+        expect(saved.status(), await saved.text()).toBe(200);
+        expect(await saved.json()).toEqual({ blocked });
+        await expect(page.getByRole("dialog")).toHaveCount(0);
+        const detailResponse = await page.request.get(GATEWAY + "/key/info?key=" + id, { headers });
+        expect(detailResponse.status()).toBe(200);
+        const detail = (await detailResponse.json()).info;
+        expect(detail.blocked).toBe(blocked);
+        expect(detail.key).toBeUndefined();
+        expect(detail.token).not.toBe(original.key);
+        const inference = await page.request.post(GATEWAY + "/v1/chat/completions", {
+          headers: { Authorization: "Bearer " + original.key }, data: body,
+        });
+        expect(inference.status(), await inference.text()).toBe(blocked ? 401 : 200);
+        if (!blocked) expect((await inference.json()).choices[0].message.content).toMatch(/e2e-ok/);
+      }
+
       await page.getByRole("textbox", { name: tr("keyEditor.expire"), exact: true }).fill("1s");
       const updatedPromise = page.waitForResponse(
         (r) => r.url().includes("/key/update") && r.request().method() === "POST",

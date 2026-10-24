@@ -31,6 +31,7 @@ import type { SkillRegisterRequest } from "./claude_code_plugins/types";
 import type { ModelBudgetUsage, ModelMaxBudget } from "./key_team_helpers/ModelMaxBudgetEditor";
 import type { ObjectPermission } from "./object_permission_types";
 import type { components } from "@/lib/http/schema";
+import type { components as KeyContract } from "@/lib/http/contracts/keys";
 import type { components as UserContract } from "@/lib/http/contracts/users";
 import type { MCPUserEnvVarsStatus } from "./mcp_tools/types";
 import type {
@@ -721,11 +722,12 @@ export const alertingSettingsCall = async (accessToken: string) => {
   }
 };
 
+/** 创建个人Key；会话、用户ID和原表单按现有逻辑提交，返回仅本次含明文的契约对象；失败抛出，不改变预算与字段默认值。 */
 export const keyCreateCall = async (
   accessToken: string,
   userID: string,
   formValues: Record<string, any>, // Assuming formValues is an object
-) => {
+): Promise<KeyContract["schemas"]["CreatedKey"]> => {
   try {
     // check if formValues.description is not undefined, make it a string and add it to formValues.metadata
     if (formValues.description) {
@@ -878,9 +880,10 @@ export const userCreateCall = async (
   }
 };
 
+/** 删除指定Key；会话及记录标识沿原路径提交，返回实际删除数量，错误原样抛出，不做成功兜底。 */
 export const keyDeleteCall = async (accessToken: string, user_key: string) => {
   try {
-    return await apiClient.post(`/key/delete`, { accessToken, body: { keys: [user_key] } });
+    return await apiClient.post<KeyContract["schemas"]["DeletedKeys"]>(`/key/delete`, { accessToken, body: { keys: [user_key] } });
   } catch (error) {
     console.error("Failed to create key:", error);
     throw error;
@@ -2606,10 +2609,11 @@ export const credentialUpdateCall = async (
   }
 };
 
+/** 更新Key；会话及部分表单保持原有序列化，返回不含明文的契约对象；缺省/null/0不互相替换，失败抛出。 */
 export const keyUpdateCall = async (
   accessToken: string,
   formValues: Record<string, any>, // Assuming formValues is an object
-) => {
+): Promise<KeyContract["schemas"]["KeyRecord"]> => {
   try {
     if (formValues.model_tpm_limit) {
       // if there's an exception JSON.parse, show it in the message
