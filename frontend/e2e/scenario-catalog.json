@@ -2979,5 +2979,19 @@
     "title": "real search_tools probe and upstream failure en",
     "kind": "implemented",
     "environment": "default offline"
+  },
+  {
+    "id": "REG-key-state-confirmation-en",
+    "file": "e2e/scenarios/regression/key-state-confirmation-en.test.ts",
+    "title": "key state requires explicit confirmation en",
+    "kind": "implemented",
+    "environment": "default offline"
+  },
+  {
+    "id": "REG-key-state-confirmation-zh-CN",
+    "file": "e2e/scenarios/regression/key-state-confirmation-zh-CN.test.ts",
+    "title": "key state requires explicit confirmation zh-CN",
+    "kind": "implemented",
+    "environment": "default offline"
   }
 ]

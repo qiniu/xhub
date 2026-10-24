@@ -37,8 +37,8 @@
 ## 不隐藏的缺口
 
 1. 未使用的旧 `keyInfoCall` 发送 `{keys:[...]}`，而 `/v2/key/info` 实际要求单个 `key`。真实回归确认前者400；本批不因旧函数存在就声明批量能力，也不改变该函数。
-2. `setKeyBlockedState` 对缺失 `blocked` 的200响应按请求目标兜底，已有单测也期待该结果。已在 [#154](https://github.com/qiniu/xhub/issues/154) 单独跟踪，正常真实后台与浏览器路径已验证；本批不将该替身测试作为后台生效证据。
-3. `organization_id/status/expand/return_full_object/include_team_keys/include_created_by_keys` 等旧列表参数当前被忽略，未声明为有效过滤能力。
+2. [#154](https://github.com/qiniu/xhub/issues/154) 已由后续修复移除状态兜底：仅接受与目标一致的明确布尔确认。空、缺字段、类型错误或相反状态显示“无法确认，请刷新核对”；不能把未知结果当成功，也不宣称后台未写入。详见下方追加验证。
+3. `organization_id/status/expand/return_full_object/include_team_keys/include_created_by_keys` 等旧列表参数当前被忽略，未声明为有效过滤能力。组织筛选已有可见页面入口，真实请求复现后记为 [#156](https://github.com/qiniu/xhub/issues/156)，留待独立修复；未发现启用中的已删除 Key 页面入口。
 4. 创建及部分删除/详情解析是宽松旧实现；契约支持单个 JSON 对象，不承诺所有未声明/畸形输入都会被旧 handler 拒绝。严格更新畸形 JSON 已做真实400及数据保持测试。
 
 ## 验证与维护
@@ -87,3 +87,34 @@ node scripts/check-eslint-error-budget.mjs ../.verification/key-contract/eslint.
 ```
 
 本地报告：`.verification/key-contract/frontend-unit.json`、`unit-go.log`、`generator-tests.log`、`workflow-final.log`、`full-typecheck.log`、`vet.log`、`eslint-budget.log`；后台 `.e2e/runs/regression-J1Uxq05D/regression.log`；浏览器 `.e2e/key-contract-final/html/index.html`、`results.json`、`cleanup-status.json`。原始运行产物不入Git，CI重跑并上传报告。
+
+## 状态确认修复追加验证（#154，2026-10-24）
+
+仅修改 `useSetKeyBlockedState` 的响应确认与双语提示，权限、预算、后台状态写入和数据库结构不变。只有与目标一致的布尔 `blocked` 才触发成功回调；未知结果保留确认框并提示刷新核对。自动化 E2E 已加入场景目录。
+
+- 先补复现单测：旧实现50项中43失败、7通过；修复后该文件50项及详情组件13项，共63通过、0失败。
+- 真实后台5项通过、0跳过；新增状态写失败用PG约束注入，验证500、持久状态保持、恢复后明确确认，以及禁用401/恢复200的真实模型准入。首轮测试复用提示词命中缓存，已改为逐次不同英文提示词以验证真实上游调用，未放宽断言。
+- EN/zh E2E 4项通过、0失败/跳过，测试与清理退出码均为0：新场景分别覆盖未提交写入的坏响应、真实写入后回复被丢弃、刷新回读、正常禁用恢复及数据面；已有场景覆盖创建、编辑、到期、轮换、删除。故障响应仅在浏览器边界注入，不冒充真实后台会返回坏200；持久状态与推理均走真实网关/PG。
+- 前端类型检查、Go vet、报告器单测8项通过、0失败。ESLint217个历史错误，未增加，既有预算289未变。
+- 独立筛选审计：组织不匹配、`status=deleted` 两个预期为空的真实请求均返回有效Key，2项失败作为缺陷证据，未算通过。临时失败测试保存在本地报告目录，不混入本修复的绿灯测试；组织问题见#156。
+
+实际命令（从仓库根执行；`npx` 三条在 frontend 下执行）：
+
+```bash
+npx vitest run 'src/app/(dashboard)/hooks/keys/useSetKeyBlockedState.test.ts' src/components/templates/key_info_view.test.tsx --reporter=json --outputFile=../.verification/key-state/unit.json
+npx tsc --noEmit
+npx eslint . --quiet --format json --output-file ../.verification/key-state/eslint-final.json --pass-on-unpruned-suppressions
+node frontend/scripts/check-eslint-error-budget.mjs .verification/key-state/eslint-final.json 289
+node --test frontend/e2e/checklist-reporter.test.cjs
+go vet ./cmd/regression
+bash scripts/regression.sh '^TestKeyContract'
+E2E_RUN_DIR="$PWD/.e2e/key-state-registered" bash scripts/e2e.sh \
+  scenarios/regression/key-state-confirmation-en.test.ts \
+  scenarios/regression/key-state-confirmation-zh-CN.test.ts \
+  scenarios/regression/key-lifecycle-en.test.ts \
+  scenarios/regression/key-lifecycle-zh-CN.test.ts
+```
+
+报告：`.verification/key-state/repro.json`、`unit.json`、`typecheck.log`、`eslint-final.json`、`vet.log`、`reporter-final.log`；后台 `.e2e/runs/regression-iUEW1nLJ/regression.log`；浏览器 `.e2e/key-state-registered/results.json`、`html/index.html`、`cleanup-status.json`。独立缺陷证据在 `.e2e/runs/regression-fAFBzhat/regression.log`；复现源码 `.verification/key-state/key_filter_audit_test.go.txt`。产物不入Git，CI执行实际测试。
+
+边界：本地受控模型上游，未调用真实供应商、未验证生产网络丢包发生频率；本批没有线上操作、合并或部署。回退撤销前端确认校验即可，无数据库迁移。
