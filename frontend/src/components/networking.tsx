@@ -1,3 +1,6 @@
+import type { components as ModelContractComponents } from "@/lib/http/contracts/models";
+// 本批仅给部署补丁和删除接入生成响应类型；其他旧客户端保持原行为。
+type ModelContract = ModelContractComponents["schemas"];
 // Shared date formatter for daily activity endpoints
 export const formatDate = (date: Date) => {
   const year = date.getFullYear();
@@ -616,7 +619,8 @@ export const modelCreateCall = async (accessToken: string, formValues: Model) =>
   }
 };
 
-export const modelDeleteCall = async (accessToken: string, model_id: string) => {
+/** 删除指定数据库部署，返回含deleted标记的真实部署对象；沿用现有错误和清理语义。 */
+export const modelDeleteCall = async (accessToken: string, model_id: string): Promise<ModelContract["DeletedDeployment"]> => {
   try {
     const data = await apiClient.post(`/model/delete`, {
       accessToken,
@@ -2692,18 +2696,13 @@ export const teamUpdateCall = async (
   }
 };
 
-/**
- * Patch update a model
- *
- * @param accessToken
- * @param formValues
- * @returns
- */
+/** 按部署ID合并现有表单并返回契约响应；参数为登录凭据、补丁和ID，供编辑/启停调用。
+ * 保持原序列化与HTTP错误传播，不修改预算或权限；失败不由客户端伪造成功结果。 */
 export const modelPatchUpdateCall = async (
   accessToken: string,
   formValues: Record<string, any>, // Assuming formValues is an object
   modelId: string,
-) => {
+): Promise<ModelContract["Deployment"]> => {
   try {
     // Intentionally not logging the payload: it can contain freshly-entered
     // provider secrets (api_key, vertex_credentials, AWS creds).

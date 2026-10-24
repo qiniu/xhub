@@ -31,7 +31,9 @@
     "gen:api:users": "node scripts/gen-user-contract.mjs",
     "check:api:users": "node scripts/gen-user-contract.mjs --check && tsc --noEmit --strict --skipLibCheck tests/contracts/users.typecheck.ts",
     "gen:api:keys": "node scripts/gen-key-contract.mjs",
-    "check:api:keys": "node scripts/gen-key-contract.mjs --check && tsc --noEmit --strict --skipLibCheck tests/contracts/keys.typecheck.ts"
+    "check:api:keys": "node scripts/gen-key-contract.mjs --check && tsc --noEmit --strict --skipLibCheck tests/contracts/keys.typecheck.ts",
+    "gen:api:models": "node scripts/gen-model-contract.mjs",
+    "check:api:models": "node scripts/gen-model-contract.mjs --check && tsc --noEmit --strict --skipLibCheck tests/contracts/models.typecheck.ts"
   },
   "dependencies": {
     "@base-ui/react": "^1.6.0",
