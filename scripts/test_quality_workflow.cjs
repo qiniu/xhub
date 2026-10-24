@@ -127,3 +127,23 @@ test('supplier pilot requires generation, schema validation and real HTTP regres
   assert.equal(artifact.if, 'always()');
   assert.equal(artifact.with['if-no-files-found'], 'error');
 });
+
+/** 前置真实质量工作流；契约漂移和真实数据库回归必须独立阻断，不能 continue-on-error，产物与清理必须保留；只读无清理。 */
+test('user contract requires generation, permissions and real budget regression', () => {
+  const job = workflow.jobs['user-contract'];
+  assert.ok(job, '必须注册用户契约作业');
+  assert.equal(step('user-contract', 'Check generated contract and TypeScript types').run,
+    'npm --prefix frontend run check:api:users');
+  assert.equal(step('user-contract', 'Test generator drift rejection').run,
+    'node --test frontend/scripts/gen-user-contract.test.mjs');
+  assert.equal(step('user-contract', 'Validate OpenAPI and Go types').run, 'go test -race ./contracts/users');
+  assert.match(step('user-contract', 'Prepare contract database').run, /docker compose up -d --wait postgres redis/);
+  assert.equal(step('user-contract', 'Run real user contract regression').run,
+    "bash scripts/regression.sh '^Test(UserContract|UserBulkBudget|UserMonthlyBudget|UserEnterpriseIdentity|SoftBudgetAllocationHTTP)'");
+  assert.ok(job.steps.every(item => !item['continue-on-error']), '门禁不得忽略失败');
+  const cleanup = job.steps.find(item => item.run === 'docker compose down -v');
+  assert.equal(cleanup.if, 'always()');
+  const artifact = job.steps.find(item => item.uses === 'actions/upload-artifact@v4');
+  assert.equal(artifact.if, 'always()');
+  assert.equal(artifact.with['if-no-files-found'], 'error');
+});

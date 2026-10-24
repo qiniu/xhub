@@ -12,6 +12,127 @@
 | `PATCH /credentials/{credential_name}` | 合并补丁；不存在则创建。 | 200, 400, 401, 403, 500, 503 |
 | `DELETE /credentials/{credential_name}` | 删除供应商；重复删除返回 deleted=0。 | 200, 400, 401, 403, 500, 503 |
 
+### GET /credentials
+
+列出供应商（两个等价列表字段）。
+
+
+### POST /credentials
+
+保存供应商，同名创建覆盖已有配置。
+
+```json
+{
+  "required": false,
+  "description": "空正文沿用空对象语义；正文存在时必须是 JSON 对象。",
+  "content": {
+    "application/json": {
+      "schema": {
+        "$ref": "#/components/schemas/CredentialInput"
+      },
+      "example": {
+        "credential_name": "example-provider",
+        "credential_info": {
+          "custom_llm_provider": "openai"
+        },
+        "credential_values": {
+          "api_base": "https://provider.example/v1",
+          "api_key": "example-not-a-secret"
+        }
+      }
+    }
+  }
+}
+```
+
+
+### GET /credentials/by_name/{credential_name}
+
+读取供应商，敏感字符串脱敏。
+
+```json
+[
+  {
+    "$ref": "#/components/parameters/CredentialName"
+  }
+]
+```
+
+
+### PATCH /credentials/{credential_name}
+
+合并补丁；不存在则创建。
+
+```json
+[
+  {
+    "$ref": "#/components/parameters/CredentialName"
+  }
+]
+```
+
+```json
+{
+  "required": false,
+  "description": "空正文沿用空对象语义；正文存在时必须是 JSON 对象。",
+  "content": {
+    "application/json": {
+      "schema": {
+        "$ref": "#/components/schemas/CredentialInput"
+      },
+      "example": {
+        "credential_name": "example-provider",
+        "credential_info": {
+          "custom_llm_provider": "openai"
+        },
+        "credential_values": {
+          "api_base": "https://provider.example/v1",
+          "api_key": "example-not-a-secret"
+        }
+      }
+    }
+  }
+}
+```
+
+
+### DELETE /credentials/{credential_name}
+
+删除供应商；重复删除返回 deleted=0。
+
+```json
+[
+  {
+    "$ref": "#/components/parameters/CredentialName"
+  }
+]
+```
+
+```json
+{
+  "required": false,
+  "description": "空正文沿用空对象语义；正文存在时必须是 JSON 对象。",
+  "content": {
+    "application/json": {
+      "schema": {
+        "$ref": "#/components/schemas/CredentialInput"
+      },
+      "example": {
+        "credential_name": "example-provider",
+        "credential_info": {
+          "custom_llm_provider": "openai"
+        },
+        "credential_values": {
+          "api_base": "https://provider.example/v1",
+          "api_key": "example-not-a-secret"
+        }
+      }
+    }
+  }
+}
+```
+
+
 ## 数据结构
 
 ### CredentialInput

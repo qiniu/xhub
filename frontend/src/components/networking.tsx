@@ -31,6 +31,7 @@ import type { SkillRegisterRequest } from "./claude_code_plugins/types";
 import type { ModelBudgetUsage, ModelMaxBudget } from "./key_team_helpers/ModelMaxBudgetEditor";
 import type { ObjectPermission } from "./object_permission_types";
 import type { components } from "@/lib/http/schema";
+import type { components as UserContract } from "@/lib/http/contracts/users";
 import type { MCPUserEnvVarsStatus } from "./mcp_tools/types";
 import type {
   CoordinationRedisSettings,
@@ -817,11 +818,12 @@ export const keyCreateForAgentCall = async (
   return response.json();
 };
 
+/** 创建用户；参数为会话、兼容用户ID及表单，返回裸用户快照；保留原有表单序列化和失败行为，不自动创建密钥。 */
 export const userCreateCall = async (
   accessToken: string,
   userID: string | null,
   formValues: Record<string, any>, // Assuming formValues is an object
-) => {
+): Promise<UserContract["schemas"]["User"]> => {
   try {
     // check if formValues.description is not undefined, make it a string and add it to formValues.metadata
     if (formValues.description) {
@@ -888,7 +890,7 @@ export const keyDeleteCall = async (accessToken: string, user_key: string) => {
 /** 删除一个用户；供列表及详情调用，传入会话和用户ID，返回后台结果，鉴权及删除失败原样抛出。 */
 export const userDeleteCall = async (accessToken: string, userId: string) => {
   try {
-    return await apiClient.post(`/user/delete`, { accessToken, body: { user_id: userId } });
+    return await apiClient.post<UserContract["schemas"]["DeletedUser"]>(`/user/delete`, { accessToken, body: { user_id: userId } });
   } catch (error) {
     console.error("Failed to delete user(s):", error);
     throw error;
@@ -932,6 +934,7 @@ export type UserListResponse = {
   users: UserInfo[];
 };
 
+/** 按调用者权限分页读取账户；参数保留原筛选约定，返回契约列表的兼容视图，网络/权限错误抛出，无写入。 */
 export const userListCall = async (
   accessToken: string,
   userIDs: string[] | null = null,
@@ -950,7 +953,7 @@ export const userListCall = async (
    * Get all available teams on proxy
    */
   try {
-    const data = (await apiClient.get(`/user/list`, {
+    const data = (await apiClient.get<UserContract["schemas"]["UserList"]>(`/user/list`, {
       accessToken,
       query: {
         user_ids: userIDs && userIDs.length > 0 ? userIDs.join(",") : undefined,
@@ -997,7 +1000,7 @@ export interface UserInfoV2Response {
   created_at: string | null;
   updated_at: string | null;
   sso_user_id: string | null;
-  teams: string[];
+  teams: UserContract["schemas"]["User"]["teams"];
   object_permission?: ObjectPermission | null;
   model_max_budget?: ModelMaxBudget | null;
   model_max_budget_usage?: Record<string, ModelBudgetUsage> | null;
@@ -1008,7 +1011,7 @@ export interface UserInfoV2Response {
 export const userGetInfoV2 = async (accessToken: string, userId?: string): Promise<UserInfoV2Response> => {
   try {
     // 网关的两个用户详情路由都使用 user_info 包装；调用方始终接收用户本身。
-    const result = await apiClient.get<{ user_info: UserInfoV2Response }>(`/v2/user/info`, { accessToken, query: { user_id: userId || undefined } });
+    const result = await apiClient.get<UserContract["schemas"]["UserDetail"]>(`/v2/user/info`, { accessToken, query: { user_id: userId || undefined } });
     if (!result.user_info) throw new Error(t("quotaGuide.personalUnavailable"));
     return result.user_info;
   } catch (error) {
@@ -3002,6 +3005,7 @@ export const organizationMemberUpdateCall = async (
   }
 };
 
+/** 更新账户并返回 user_info 信封；参数为会话、原表单及可选角色，保持现有权限和空值语义，失败抛出不伪造成功。 */
 export const userUpdateUserCall = async (
   accessToken: string,
   formValues: any, // Assuming formValues is an object
@@ -3012,10 +3016,7 @@ export const userUpdateUserCall = async (
     if (userRole !== null) {
       response_body["user_role"] = userRole;
     }
-    const data = (await apiClient.post(`/user/update`, { accessToken, body: response_body })) as {
-      user_id: string;
-      data: UserInfo;
-    };
+    const data = await apiClient.post<UserContract["schemas"]["UserDetail"]>(`/user/update`, { accessToken, body: response_body });
     return data;
     // Handle success - you might want to update some state or UI based on the created key
   } catch (error) {
@@ -3057,20 +3058,7 @@ export const userBulkUpdateUserCall = async (
       throw new Error(t("Must provide either userIds or set allUsers=true"));
     }
 
-    const data = (await apiClient.post(`/user/bulk_update`, { accessToken, body: request_body })) as {
-      atomic: boolean;
-      batch_id: string;
-      results: Array<{
-        user_id?: string;
-        user_email?: string;
-        success: boolean;
-        error?: string;
-        updated_user?: any;
-      }>;
-      total_requested: number;
-      successful_updates: number;
-      failed_updates: number;
-    };
+    const data = await apiClient.post<UserContract["schemas"]["BulkBudgetResult"]>(`/user/bulk_update`, { accessToken, body: request_body });
     return data;
   } catch (error) {
     console.error("Failed to update user budgets:", error);

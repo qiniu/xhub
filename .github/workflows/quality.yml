@@ -207,3 +207,41 @@ jobs:
           if-no-files-found: error
       - run: docker compose down -v
         if: always()
+
+  user-contract:
+    name: User API contract
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - run: npm ci
+        working-directory: frontend
+      - name: Check generated contract and TypeScript types
+        run: npm --prefix frontend run check:api:users
+      - name: Test generator drift rejection
+        run: node --test frontend/scripts/gen-user-contract.test.mjs
+      - name: Validate OpenAPI and Go types
+        run: go test -race ./contracts/users
+      # 真实 HTTP/PG 契约回归不可由仅检查文件的生成器测试代替。
+      - name: Prepare contract database
+        run: |
+          cp configs/config.example.yaml configs/config.yaml
+          docker compose up -d --wait postgres redis
+      - name: Run real user contract regression
+        run: bash scripts/regression.sh '^Test(UserContract|UserBulkBudget|UserMonthlyBudget|UserEnterpriseIdentity|SoftBudgetAllocationHTTP)'
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: user-contract-regression
+          path: .e2e/runs/
+          if-no-files-found: error
+      - run: docker compose down -v
+        if: always()

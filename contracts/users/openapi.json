@@ -1,0 +1,1492 @@
+{
+  "openapi": "3.0.3",
+  "info": {
+    "title": "XHub User Management Contract",
+    "version": "1.0.0",
+    "description": "现有行为快照；开发期校验，不替换运行时。 / Snapshot of existing behavior; development validation, no runtime replacement."
+  },
+  "security": [
+    {
+      "bearerAuth": []
+    }
+  ],
+  "paths": {
+    "/user/list": {
+      "get": {
+        "operationId": "listUsers",
+        "summary": "按权限分页列出用户 / List users within permission scope",
+        "responses": {
+          "200": {
+            "description": "真实业务结果 / Actual business result",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UserList"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Error401"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error403"
+          },
+          "404": {
+            "$ref": "#/components/responses/Error404"
+          },
+          "500": {
+            "$ref": "#/components/responses/Error500"
+          },
+          "503": {
+            "$ref": "#/components/responses/Error503"
+          }
+        },
+        "parameters": [
+          {
+            "name": "page",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            },
+            "description": "按当前解析：无效/小于1的page回退1，page_size超出1..500回退100。 / Current parsing: invalid/page below 1 defaults to 1; page_size outside 1..500 defaults to 100."
+          },
+          {
+            "name": "page_size",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            },
+            "description": "按当前解析：无效/小于1的page回退1，page_size超出1..500回退100。 / Current parsing: invalid/page below 1 defaults to 1; page_size outside 1..500 defaults to 100."
+          },
+          {
+            "name": "search",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            },
+            "description": "兼容查询字符串；授权及字段组合由服务执行。 / Compatibility query string; authorization and combinations checked by service."
+          },
+          {
+            "name": "user_email",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            },
+            "description": "兼容查询字符串；授权及字段组合由服务执行。 / Compatibility query string; authorization and combinations checked by service."
+          },
+          {
+            "name": "user_ids",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            },
+            "description": "兼容查询字符串；授权及字段组合由服务执行。 / Compatibility query string; authorization and combinations checked by service."
+          },
+          {
+            "name": "role",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            },
+            "description": "兼容查询字符串；授权及字段组合由服务执行。 / Compatibility query string; authorization and combinations checked by service."
+          },
+          {
+            "name": "team",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            },
+            "description": "兼容查询字符串；授权及字段组合由服务执行。 / Compatibility query string; authorization and combinations checked by service."
+          },
+          {
+            "name": "sso_user_ids",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            },
+            "description": "兼容查询字符串；授权及字段组合由服务执行。 / Compatibility query string; authorization and combinations checked by service."
+          },
+          {
+            "name": "organization_ids",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            },
+            "description": "兼容查询字符串；授权及字段组合由服务执行。 / Compatibility query string; authorization and combinations checked by service."
+          },
+          {
+            "name": "sort_by",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            },
+            "description": "兼容查询字符串；授权及字段组合由服务执行。 / Compatibility query string; authorization and combinations checked by service."
+          },
+          {
+            "name": "sort_order",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            },
+            "description": "兼容查询字符串；授权及字段组合由服务执行。 / Compatibility query string; authorization and combinations checked by service."
+          }
+        ]
+      }
+    },
+    "/user/info": {
+      "get": {
+        "operationId": "getUser",
+        "summary": "读取自己或可见用户 / Read self or visible user",
+        "responses": {
+          "200": {
+            "description": "真实业务结果 / Actual business result",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UserDetail"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/Error400"
+          },
+          "401": {
+            "$ref": "#/components/responses/Error401"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error403"
+          },
+          "404": {
+            "$ref": "#/components/responses/Error404"
+          },
+          "500": {
+            "$ref": "#/components/responses/Error500"
+          },
+          "503": {
+            "$ref": "#/components/responses/Error503"
+          }
+        },
+        "parameters": [
+          {
+            "name": "user_id",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            },
+            "description": "兼容查询字符串；授权及字段组合由服务执行。 / Compatibility query string; authorization and combinations checked by service."
+          }
+        ],
+        "description": "兼容GET对象正文中的user_id优先于query；建议使用query，普通用户只返回授权范围字段。 / Legacy GET object-body user_id overrides query; prefer query. Members receive authorized fields only."
+      }
+    },
+    "/v2/user/info": {
+      "get": {
+        "operationId": "getUserV2",
+        "summary": "用户详情兼容别名 / User detail alias",
+        "responses": {
+          "200": {
+            "description": "真实业务结果 / Actual business result",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UserDetail"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/Error400"
+          },
+          "401": {
+            "$ref": "#/components/responses/Error401"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error403"
+          },
+          "404": {
+            "$ref": "#/components/responses/Error404"
+          },
+          "500": {
+            "$ref": "#/components/responses/Error500"
+          },
+          "503": {
+            "$ref": "#/components/responses/Error503"
+          }
+        },
+        "parameters": [
+          {
+            "name": "user_id",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            },
+            "description": "兼容查询字符串；授权及字段组合由服务执行。 / Compatibility query string; authorization and combinations checked by service."
+          }
+        ],
+        "description": "兼容GET对象正文中的user_id优先于query；建议使用query，普通用户只返回授权范围字段。 / Legacy GET object-body user_id overrides query; prefer query. Members receive authorized fields only."
+      }
+    },
+    "/user/filter/ui": {
+      "get": {
+        "operationId": "filterUsers",
+        "summary": "管理员选择器最多500项 / Admin picker up to 500 users",
+        "responses": {
+          "200": {
+            "description": "真实业务结果 / Actual business result",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UserPicker"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Error401"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error403"
+          },
+          "404": {
+            "$ref": "#/components/responses/Error404"
+          },
+          "500": {
+            "$ref": "#/components/responses/Error500"
+          },
+          "503": {
+            "$ref": "#/components/responses/Error503"
+          }
+        },
+        "parameters": [
+          {
+            "name": "user_id",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            },
+            "description": "兼容查询字符串；授权及字段组合由服务执行。 / Compatibility query string; authorization and combinations checked by service."
+          },
+          {
+            "name": "user_email",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            },
+            "description": "兼容查询字符串；授权及字段组合由服务执行。 / Compatibility query string; authorization and combinations checked by service."
+          }
+        ]
+      }
+    },
+    "/user/available_users": {
+      "get": {
+        "operationId": "availableUsers",
+        "summary": "管理员选择器兼容别名 / Admin picker alias",
+        "responses": {
+          "200": {
+            "description": "真实业务结果 / Actual business result",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UserPicker"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Error401"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error403"
+          },
+          "404": {
+            "$ref": "#/components/responses/Error404"
+          },
+          "500": {
+            "$ref": "#/components/responses/Error500"
+          },
+          "503": {
+            "$ref": "#/components/responses/Error503"
+          }
+        },
+        "parameters": [
+          {
+            "name": "user_id",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            },
+            "description": "兼容查询字符串；授权及字段组合由服务执行。 / Compatibility query string; authorization and combinations checked by service."
+          },
+          {
+            "name": "user_email",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            },
+            "description": "兼容查询字符串；授权及字段组合由服务执行。 / Compatibility query string; authorization and combinations checked by service."
+          }
+        ]
+      }
+    },
+    "/user/new": {
+      "post": {
+        "operationId": "createUser",
+        "summary": "创建用户并可绑定企业身份 / Create user with optional enterprise identity",
+        "responses": {
+          "200": {
+            "description": "真实业务结果 / Actual business result",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/User"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/Error400"
+          },
+          "401": {
+            "$ref": "#/components/responses/Error401"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error403"
+          },
+          "404": {
+            "$ref": "#/components/responses/Error404"
+          },
+          "409": {
+            "$ref": "#/components/responses/Error409"
+          },
+          "500": {
+            "$ref": "#/components/responses/Error500"
+          },
+          "503": {
+            "$ref": "#/components/responses/Error503"
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateUser"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/user/update": {
+      "post": {
+        "operationId": "updateUser",
+        "summary": "按现有权限更新用户 / Update user with existing authorization",
+        "responses": {
+          "200": {
+            "description": "真实业务结果 / Actual business result",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UserDetail"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/Error400"
+          },
+          "401": {
+            "$ref": "#/components/responses/Error401"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error403"
+          },
+          "404": {
+            "$ref": "#/components/responses/Error404"
+          },
+          "409": {
+            "$ref": "#/components/responses/Error409"
+          },
+          "500": {
+            "$ref": "#/components/responses/Error500"
+          },
+          "503": {
+            "$ref": "#/components/responses/Error503"
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateUser"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/user/bulk_update": {
+      "post": {
+        "operationId": "bulkUpdateUserBudget",
+        "summary": "原子修改用户预算和刷新日 / Atomically update budgets and reset days",
+        "responses": {
+          "200": {
+            "description": "真实业务结果 / Actual business result",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BulkBudgetResult"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/Error400"
+          },
+          "401": {
+            "$ref": "#/components/responses/Error401"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error403"
+          },
+          "404": {
+            "$ref": "#/components/responses/Error404"
+          },
+          "409": {
+            "$ref": "#/components/responses/Error409"
+          },
+          "500": {
+            "$ref": "#/components/responses/Error500"
+          },
+          "503": {
+            "$ref": "#/components/responses/Error503"
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/BulkBudgetInput"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/user/delete": {
+      "post": {
+        "operationId": "deleteUser",
+        "summary": "删除用户，不允许删除自己 / Delete user except self",
+        "responses": {
+          "200": {
+            "description": "真实业务结果 / Actual business result",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DeletedUser"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/Error400"
+          },
+          "401": {
+            "$ref": "#/components/responses/Error401"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error403"
+          },
+          "404": {
+            "$ref": "#/components/responses/Error404"
+          },
+          "409": {
+            "$ref": "#/components/responses/Error409"
+          },
+          "500": {
+            "$ref": "#/components/responses/Error500"
+          },
+          "503": {
+            "$ref": "#/components/responses/Error503"
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DeleteUser"
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "User": {
+        "type": "object",
+        "properties": {
+          "user_id": {
+            "type": "string"
+          },
+          "user_email": {
+            "type": "string"
+          },
+          "user_alias": {
+            "type": "string"
+          },
+          "user_name": {
+            "type": "string"
+          },
+          "user_role": {
+            "type": "string"
+          },
+          "role": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string"
+          },
+          "blocked": {
+            "type": "boolean"
+          },
+          "max_budget": {
+            "type": "number",
+            "nullable": true,
+            "format": "double"
+          },
+          "spend": {
+            "type": "number",
+            "format": "double"
+          },
+          "teams": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/UserTeam"
+            }
+          },
+          "organizations": {
+            "type": "array",
+            "items": {},
+            "description": "当前空占位，不是组织权限。 / Currently empty placeholder, not organization permissions."
+          },
+          "models": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "当前空占位，不是可用模型列表。 / Currently empty placeholder, not available models."
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "updated_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "key_count": {
+            "type": "integer",
+            "description": "当前固定0占位，不是实际密钥数。 / Currently zero placeholder, not actual key count."
+          },
+          "sso_user_id": {
+            "type": "string",
+            "nullable": true
+          },
+          "tpm_limit": {
+            "type": "number",
+            "nullable": true,
+            "format": "double"
+          },
+          "rpm_limit": {
+            "type": "number",
+            "nullable": true,
+            "format": "double"
+          },
+          "budget_reset_day": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 31
+          },
+          "budget_reset_at": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "budget_duration": {
+            "type": "string",
+            "nullable": true
+          },
+          "metadata": {
+            "type": "object",
+            "additionalProperties": true
+          },
+          "sso_connection_id": {
+            "type": "string"
+          },
+          "sso_connection_name": {
+            "type": "string"
+          },
+          "sso_external_id": {
+            "type": "string"
+          },
+          "sso_binding_managed": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "user_id",
+          "user_email",
+          "user_alias",
+          "user_name",
+          "user_role",
+          "role",
+          "status",
+          "blocked",
+          "max_budget",
+          "spend",
+          "teams",
+          "organizations",
+          "models",
+          "created_at",
+          "updated_at",
+          "key_count",
+          "sso_user_id",
+          "tpm_limit",
+          "rpm_limit",
+          "budget_reset_day",
+          "budget_reset_at",
+          "budget_duration",
+          "metadata"
+        ]
+      },
+      "UserTeam": {
+        "type": "object",
+        "properties": {
+          "team_id": {
+            "type": "string"
+          },
+          "team_alias": {
+            "type": "string"
+          },
+          "user_role": {
+            "type": "string"
+          },
+          "organization_id": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "team_id",
+          "team_alias",
+          "user_role",
+          "organization_id"
+        ]
+      },
+      "UserDetail": {
+        "type": "object",
+        "properties": {
+          "user_info": {
+            "$ref": "#/components/schemas/User"
+          }
+        },
+        "required": [
+          "user_info"
+        ]
+      },
+      "LegacyBudget": {
+        "oneOf": [
+          {
+            "type": "number",
+            "minimum": 0,
+            "nullable": true,
+            "format": "double"
+          },
+          {
+            "type": "string"
+          }
+        ],
+        "description": "单人兼容有限非负数字字符串；空字符串/null清空，省略保留（创建时不限额），0禁止消费；字符串的语义由服务校验。 / Single-user compatibility: finite nonnegative numeric strings; empty string/null clears, omission preserves (uncapped on create), zero denies spend. String semantics are checked by the service.",
+        "x-go-type": "json.RawMessage"
+      },
+      "LegacyRate": {
+        "oneOf": [
+          {
+            "type": "number",
+            "minimum": 0,
+            "nullable": true,
+            "format": "double"
+          },
+          {
+            "type": "string"
+          }
+        ],
+        "description": "非负整数至2147483647，可用数字字符串，null/空字符串清空。 / Nonnegative integer up to 2147483647, numeric strings accepted; null/empty string clears.",
+        "x-go-type": "json.RawMessage"
+      },
+      "UserList": {
+        "type": "object",
+        "properties": {
+          "total": {
+            "type": "integer"
+          },
+          "total_count": {
+            "type": "integer"
+          },
+          "page": {
+            "type": "integer"
+          },
+          "current_page": {
+            "type": "integer"
+          },
+          "total_pages": {
+            "type": "integer"
+          },
+          "page_size": {
+            "type": "integer"
+          },
+          "size": {
+            "type": "integer"
+          },
+          "users": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/User"
+            }
+          }
+        },
+        "required": [
+          "total",
+          "total_count",
+          "page",
+          "current_page",
+          "total_pages",
+          "page_size",
+          "size",
+          "users"
+        ]
+      },
+      "UserPicker": {
+        "type": "object",
+        "properties": {
+          "users": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "user_id": {
+                  "type": "string"
+                },
+                "user_email": {
+                  "type": "string"
+                },
+                "user_alias": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "user_id",
+                "user_email",
+                "user_alias"
+              ]
+            }
+          }
+        },
+        "required": [
+          "users"
+        ]
+      },
+      "CreateUser": {
+        "type": "object",
+        "properties": {
+          "max_budget": {
+            "$ref": "#/components/schemas/LegacyBudget"
+          },
+          "max_budget_in_team": {
+            "$ref": "#/components/schemas/LegacyBudget",
+            "description": "兼容校验但不写入；不用于设置团队成员预算。 / Validated compatibility field, not persisted; does not set team member budget."
+          },
+          "rpm_limit": {
+            "$ref": "#/components/schemas/LegacyRate"
+          },
+          "tpm_limit": {
+            "$ref": "#/components/schemas/LegacyRate"
+          },
+          "budget_reset_day": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 31,
+            "description": "0关闭；1至31按北京时间00:00刷新，短月取末日；省略保留，null非法。 / Zero disables; 1–31 resets at Beijing midnight, clamped to month end; omission preserves, null invalid."
+          },
+          "sso_connection_id": {
+            "type": "string"
+          },
+          "sso_external_id": {
+            "type": "string"
+          },
+          "user_email": {
+            "type": "string",
+            "description": "邮箱按既有规则去除首尾空白并转小写。 / Email is trimmed and lowercased by existing rules."
+          },
+          "password": {
+            "type": "string",
+            "description": "8至72 UTF-8字节，不是字符数。 / 8–72 UTF-8 bytes, not characters.",
+            "writeOnly": true
+          },
+          "user_role": {
+            "type": "string"
+          },
+          "user_alias": {
+            "type": "string"
+          },
+          "user_name": {
+            "type": "string"
+          },
+          "team_id": {
+            "type": "string"
+          },
+          "team_role": {
+            "type": "string"
+          },
+          "admin_organization_ids": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "organization_id": {
+            "type": "string",
+            "description": "设置组织管理员身份，不是普通组织归属。 / Assigns organization administration, not ordinary affiliation."
+          }
+        },
+        "required": [
+          "user_email",
+          "password"
+        ],
+        "additionalProperties": true,
+        "description": "平台管理员创建，不自动生成密钥；角色省略为user，兼容internal_user/proxy_admin；SSO两字段须同时提供；额外字段可能被忽略。 / Platform admin creates without a key; default role user, internal_user/proxy_admin aliases accepted; SSO pair must be supplied together; extra fields may be ignored.",
+        "x-go-type": "map[string]json.RawMessage"
+      },
+      "UpdateUser": {
+        "type": "object",
+        "properties": {
+          "max_budget": {
+            "$ref": "#/components/schemas/LegacyBudget"
+          },
+          "max_budget_in_team": {
+            "$ref": "#/components/schemas/LegacyBudget",
+            "description": "兼容校验但不写入；不用于设置团队成员预算。 / Validated compatibility field, not persisted; does not set team member budget."
+          },
+          "rpm_limit": {
+            "$ref": "#/components/schemas/LegacyRate"
+          },
+          "tpm_limit": {
+            "$ref": "#/components/schemas/LegacyRate"
+          },
+          "budget_reset_day": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 31,
+            "description": "0关闭；1至31按北京时间00:00刷新，短月取末日；省略保留，null非法。 / Zero disables; 1–31 resets at Beijing midnight, clamped to month end; omission preserves, null invalid."
+          },
+          "sso_connection_id": {
+            "type": "string"
+          },
+          "sso_external_id": {
+            "type": "string"
+          },
+          "user_id": {
+            "type": "string"
+          },
+          "user_email": {
+            "type": "string"
+          },
+          "user_alias": {
+            "type": "string"
+          },
+          "user_role": {
+            "type": "string"
+          },
+          "blocked": {
+            "type": "boolean"
+          },
+          "password": {
+            "type": "string",
+            "writeOnly": true
+          }
+        },
+        "required": [],
+        "additionalProperties": true,
+        "description": "完整单个JSON对象。目标省略为自己；普通用户只能改自己资料，管理字段不代表授予权限；预算写入单独授权。管理员密码与其他字段不是同一事务。 / Single complete JSON object. Target defaults to self; members edit own profile only, management fields do not grant privileges; budget writes separately authorized. Admin password and other fields are not one transaction.",
+        "x-go-type": "map[string]json.RawMessage"
+      },
+      "BudgetChanges": {
+        "anyOf": [
+          {
+            "type": "object",
+            "properties": {
+              "max_budget": {
+                "type": "number",
+                "nullable": true,
+                "minimum": 0,
+                "format": "double"
+              },
+              "budget_reset_day": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 31
+              }
+            },
+            "required": [
+              "max_budget"
+            ],
+            "additionalProperties": false
+          },
+          {
+            "type": "object",
+            "properties": {
+              "max_budget": {
+                "type": "number",
+                "nullable": true,
+                "minimum": 0,
+                "format": "double"
+              },
+              "budget_reset_day": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 31
+              }
+            },
+            "required": [
+              "budget_reset_day"
+            ],
+            "additionalProperties": false
+          }
+        ],
+        "x-go-type": "map[string]json.RawMessage"
+      },
+      "SelectedBudgetChange": {
+        "anyOf": [
+          {
+            "type": "object",
+            "properties": {
+              "max_budget": {
+                "type": "number",
+                "nullable": true,
+                "minimum": 0,
+                "format": "double"
+              },
+              "budget_reset_day": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 31
+              },
+              "user_id": {
+                "type": "string",
+                "minLength": 1
+              }
+            },
+            "required": [
+              "user_id",
+              "max_budget"
+            ],
+            "additionalProperties": false
+          },
+          {
+            "type": "object",
+            "properties": {
+              "max_budget": {
+                "type": "number",
+                "nullable": true,
+                "minimum": 0,
+                "format": "double"
+              },
+              "budget_reset_day": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 31
+              },
+              "user_id": {
+                "type": "string",
+                "minLength": 1
+              }
+            },
+            "required": [
+              "user_id",
+              "budget_reset_day"
+            ],
+            "additionalProperties": false
+          }
+        ],
+        "x-go-type": "map[string]json.RawMessage"
+      },
+      "SelectedBudgetBatch": {
+        "type": "object",
+        "properties": {
+          "all_users": {
+            "type": "boolean",
+            "enum": [
+              false
+            ]
+          },
+          "users": {
+            "type": "array",
+            "minItems": 1,
+            "maxItems": 1000,
+            "items": {
+              "$ref": "#/components/schemas/SelectedBudgetChange"
+            }
+          }
+        },
+        "required": [
+          "users"
+        ],
+        "additionalProperties": false
+      },
+      "AllBudgetBatch": {
+        "type": "object",
+        "properties": {
+          "all_users": {
+            "type": "boolean",
+            "enum": [
+              true
+            ]
+          },
+          "user_updates": {
+            "$ref": "#/components/schemas/BudgetChanges"
+          }
+        },
+        "required": [
+          "all_users",
+          "user_updates"
+        ],
+        "additionalProperties": false
+      },
+      "BulkBudgetInput": {
+        "oneOf": [
+          {
+            "$ref": "#/components/schemas/SelectedBudgetBatch"
+          },
+          {
+            "$ref": "#/components/schemas/AllBudgetBatch"
+          }
+        ],
+        "description": "平台管理员专用；最多1000用户、1MiB正文；ID不得重复，all_users包含禁用及管理员用户；原子失败不改变消费。 / Platform admin only; at most 1000 users and 1MiB body; unique IDs, all_users includes disabled/admin users; atomic failures do not change spend.",
+        "x-go-type": "map[string]json.RawMessage"
+      },
+      "BulkBudgetResult": {
+        "type": "object",
+        "properties": {
+          "atomic": {
+            "type": "boolean",
+            "enum": [
+              true
+            ]
+          },
+          "batch_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "total_requested": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "successful_updates": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "failed_updates": {
+            "type": "integer",
+            "enum": [
+              0
+            ]
+          },
+          "results": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "user_id": {
+                  "type": "string"
+                },
+                "user_email": {
+                  "type": "string"
+                },
+                "success": {
+                  "type": "boolean",
+                  "enum": [
+                    true
+                  ]
+                },
+                "updated_user": {
+                  "$ref": "#/components/schemas/User"
+                }
+              },
+              "required": [
+                "user_id",
+                "user_email",
+                "success",
+                "updated_user"
+              ],
+              "additionalProperties": false
+            }
+          }
+        },
+        "required": [
+          "atomic",
+          "batch_id",
+          "total_requested",
+          "successful_updates",
+          "failed_updates",
+          "results"
+        ]
+      },
+      "DeleteUser": {
+        "type": "object",
+        "properties": {
+          "user_id": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "required": [
+          "user_id"
+        ]
+      },
+      "DeletedUser": {
+        "type": "object",
+        "properties": {
+          "deleted": {
+            "type": "boolean",
+            "enum": [
+              true
+            ]
+          }
+        },
+        "required": [
+          "deleted"
+        ]
+      },
+      "Error": {
+        "type": "object",
+        "required": [
+          "error"
+        ],
+        "properties": {
+          "error": {
+            "$ref": "#/components/schemas/ErrorDetail"
+          }
+        },
+        "description": "管理接口错误信封；HTTP 状态与 code 一致，不用成功对象代替失败。 / Management error envelope; code matches HTTP status and failures never use a success object."
+      },
+      "Error401": {
+        "type": "object",
+        "required": [
+          "error"
+        ],
+        "properties": {
+          "error": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/ErrorDetail"
+              },
+              {
+                "type": "object",
+                "required": [
+                  "code"
+                ],
+                "properties": {
+                  "code": {
+                    "type": "string",
+                    "pattern": "^401$"
+                  }
+                }
+              }
+            ]
+          }
+        },
+        "description": "完整错误字段在同一对象层合并，避免生成器覆盖嵌套 error。 / Error fields are combined at the same object level to avoid replacing the nested error."
+      },
+      "Error403": {
+        "type": "object",
+        "required": [
+          "error"
+        ],
+        "properties": {
+          "error": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/ErrorDetail"
+              },
+              {
+                "type": "object",
+                "required": [
+                  "code"
+                ],
+                "properties": {
+                  "code": {
+                    "type": "string",
+                    "pattern": "^403$"
+                  }
+                }
+              }
+            ]
+          }
+        },
+        "description": "完整错误字段在同一对象层合并，避免生成器覆盖嵌套 error。 / Error fields are combined at the same object level to avoid replacing the nested error."
+      },
+      "Error500": {
+        "type": "object",
+        "required": [
+          "error"
+        ],
+        "properties": {
+          "error": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/ErrorDetail"
+              },
+              {
+                "type": "object",
+                "required": [
+                  "code"
+                ],
+                "properties": {
+                  "code": {
+                    "type": "string",
+                    "pattern": "^500$"
+                  }
+                }
+              }
+            ]
+          }
+        },
+        "description": "完整错误字段在同一对象层合并，避免生成器覆盖嵌套 error。 / Error fields are combined at the same object level to avoid replacing the nested error."
+      },
+      "Error503": {
+        "type": "object",
+        "required": [
+          "error"
+        ],
+        "properties": {
+          "error": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/ErrorDetail"
+              },
+              {
+                "type": "object",
+                "required": [
+                  "code"
+                ],
+                "properties": {
+                  "code": {
+                    "type": "string",
+                    "pattern": "^503$"
+                  }
+                }
+              }
+            ]
+          }
+        },
+        "description": "完整错误字段在同一对象层合并，避免生成器覆盖嵌套 error。 / Error fields are combined at the same object level to avoid replacing the nested error."
+      },
+      "Error400": {
+        "type": "object",
+        "required": [
+          "error"
+        ],
+        "properties": {
+          "error": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/ErrorDetail"
+              },
+              {
+                "type": "object",
+                "required": [
+                  "code"
+                ],
+                "properties": {
+                  "code": {
+                    "type": "string",
+                    "pattern": "^400$"
+                  }
+                }
+              }
+            ]
+          }
+        },
+        "description": "完整错误字段在同一对象层合并，避免生成器覆盖嵌套 error。 / Error fields are combined at the same object level to avoid replacing the nested error."
+      },
+      "Error404": {
+        "type": "object",
+        "required": [
+          "error"
+        ],
+        "properties": {
+          "error": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/ErrorDetail"
+              },
+              {
+                "type": "object",
+                "required": [
+                  "code"
+                ],
+                "properties": {
+                  "code": {
+                    "type": "string",
+                    "pattern": "^404$"
+                  }
+                }
+              }
+            ]
+          }
+        },
+        "description": "完整错误字段在同一对象层合并，避免生成器覆盖嵌套 error。 / Error fields are combined at the same object level to avoid replacing the nested error."
+      },
+      "ErrorDetail": {
+        "type": "object",
+        "required": [
+          "code",
+          "message",
+          "type",
+          "param"
+        ],
+        "properties": {
+          "code": {
+            "type": "string",
+            "pattern": "^[45][0-9]{2}$"
+          },
+          "message": {
+            "type": "string"
+          },
+          "type": {
+            "type": "string"
+          },
+          "param": {
+            "nullable": true,
+            "x-go-type": "json.RawMessage",
+            "x-go-type-skip-optional-pointer": true,
+            "description": "当前为 null。 / Currently null."
+          }
+        }
+      },
+      "Error409": {
+        "type": "object",
+        "required": [
+          "error"
+        ],
+        "properties": {
+          "error": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/ErrorDetail"
+              },
+              {
+                "type": "object",
+                "required": [
+                  "code"
+                ],
+                "properties": {
+                  "code": {
+                    "type": "string",
+                    "pattern": "^409$"
+                  }
+                }
+              }
+            ]
+          }
+        },
+        "description": "完整错误字段在同一对象层合并，避免生成器覆盖嵌套 error。 / Error fields are combined at the same object level to avoid replacing the nested error."
+      }
+    },
+    "securitySchemes": {
+      "bearerAuth": {
+        "type": "http",
+        "scheme": "bearer",
+        "description": "XHub 管理员会话或允许管理的凭据。 / XHub administrator credentials."
+      }
+    },
+    "responses": {
+      "Error400": {
+        "description": "失败HTTP 400，不得当成功。 / Failure HTTP 400, never success.",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/Error400"
+            }
+          }
+        }
+      },
+      "Error401": {
+        "description": "失败HTTP 401，不得当成功。 / Failure HTTP 401, never success.",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/Error401"
+            }
+          }
+        }
+      },
+      "Error403": {
+        "description": "失败HTTP 403，不得当成功。 / Failure HTTP 403, never success.",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/Error403"
+            }
+          }
+        }
+      },
+      "Error404": {
+        "description": "失败HTTP 404，不得当成功。 / Failure HTTP 404, never success.",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/Error404"
+            }
+          }
+        }
+      },
+      "Error409": {
+        "description": "失败HTTP 409，不得当成功。 / Failure HTTP 409, never success.",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/Error409"
+            }
+          }
+        }
+      },
+      "Error500": {
+        "description": "失败HTTP 500，不得当成功。 / Failure HTTP 500, never success.",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/Error500"
+            }
+          }
+        }
+      },
+      "Error503": {
+        "description": "失败HTTP 503，不得当成功。 / Failure HTTP 503, never success.",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/Error503"
+            }
+          }
+        }
+      }
+    }
+  }
+}
