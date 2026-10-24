@@ -158,6 +158,46 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/user/set_password": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * 按现有权限重置密码并撤销旧会话；不返回密码，不撤销API Key / Reset password under existing authorization and revoke sessions; no password returned, API keys retained
+         * @description 按现有权限重置密码并撤销旧会话；不返回密码，不撤销API Key / Reset password under existing authorization and revoke sessions; no password returned, API keys retained
+         */
+        post: operations["setUserPassword"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/user/{user_id}/password": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * 按现有权限重置密码并撤销旧会话；不返回密码，不撤销API Key / Reset password under existing authorization and revoke sessions; no password returned, API keys retained
+         * @description 按现有权限重置密码并撤销旧会话；不返回密码，不撤销API Key / Reset password under existing authorization and revoke sessions; no password returned, API keys retained
+         */
+        post: operations["setUserPasswordByPath"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -386,6 +426,21 @@ export interface components {
             error: components["schemas"]["ErrorDetail"] & {
                 code: string;
             };
+        };
+        SetPassword: {
+            user_id?: string;
+            /** @description 8–72 UTF-8字节，由服务校验 / 8–72 UTF-8 bytes, validated by server */
+            password: string;
+        };
+        SetPasswordByBody: {
+            user_id: string;
+            /** @description 8–72 UTF-8字节，由服务校验 / 8–72 UTF-8 bytes, validated by server */
+            password: string;
+        };
+        PasswordUpdated: {
+            user_id: string;
+            /** @enum {boolean} */
+            password_updated: true;
         };
     };
     responses: {
@@ -739,6 +794,70 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["DeletedUser"];
+                };
+            };
+            400: components["responses"]["Error400"];
+            401: components["responses"]["Error401"];
+            403: components["responses"]["Error403"];
+            404: components["responses"]["Error404"];
+            409: components["responses"]["Error409"];
+            500: components["responses"]["Error500"];
+            503: components["responses"]["Error503"];
+        };
+    };
+    setUserPassword: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SetPasswordByBody"];
+            };
+        };
+        responses: {
+            /** @description 实际结果 / Actual result */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PasswordUpdated"];
+                };
+            };
+            400: components["responses"]["Error400"];
+            401: components["responses"]["Error401"];
+            403: components["responses"]["Error403"];
+            404: components["responses"]["Error404"];
+            409: components["responses"]["Error409"];
+            500: components["responses"]["Error500"];
+            503: components["responses"]["Error503"];
+        };
+    };
+    setUserPasswordByPath: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                user_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SetPassword"];
+            };
+        };
+        responses: {
+            /** @description 实际结果 / Actual result */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PasswordUpdated"];
                 };
             };
             400: components["responses"]["Error400"];

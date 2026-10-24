@@ -525,6 +525,116 @@
           }
         }
       }
+    },
+    "/user/set_password": {
+      "post": {
+        "operationId": "setUserPassword",
+        "summary": "按现有权限重置密码并撤销旧会话；不返回密码，不撤销API Key / Reset password under existing authorization and revoke sessions; no password returned, API keys retained",
+        "description": "按现有权限重置密码并撤销旧会话；不返回密码，不撤销API Key / Reset password under existing authorization and revoke sessions; no password returned, API keys retained",
+        "responses": {
+          "200": {
+            "description": "实际结果 / Actual result",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PasswordUpdated"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/Error400"
+          },
+          "401": {
+            "$ref": "#/components/responses/Error401"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error403"
+          },
+          "404": {
+            "$ref": "#/components/responses/Error404"
+          },
+          "409": {
+            "$ref": "#/components/responses/Error409"
+          },
+          "500": {
+            "$ref": "#/components/responses/Error500"
+          },
+          "503": {
+            "$ref": "#/components/responses/Error503"
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SetPasswordByBody"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/user/{user_id}/password": {
+      "post": {
+        "operationId": "setUserPasswordByPath",
+        "summary": "按现有权限重置密码并撤销旧会话；不返回密码，不撤销API Key / Reset password under existing authorization and revoke sessions; no password returned, API keys retained",
+        "description": "按现有权限重置密码并撤销旧会话；不返回密码，不撤销API Key / Reset password under existing authorization and revoke sessions; no password returned, API keys retained",
+        "responses": {
+          "200": {
+            "description": "实际结果 / Actual result",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PasswordUpdated"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/Error400"
+          },
+          "401": {
+            "$ref": "#/components/responses/Error401"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error403"
+          },
+          "404": {
+            "$ref": "#/components/responses/Error404"
+          },
+          "409": {
+            "$ref": "#/components/responses/Error409"
+          },
+          "500": {
+            "$ref": "#/components/responses/Error500"
+          },
+          "503": {
+            "$ref": "#/components/responses/Error503"
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SetPassword"
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "in": "path",
+            "name": "user_id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ]
+      }
     }
   },
   "components": {
@@ -1407,6 +1517,58 @@
           }
         },
         "description": "完整错误字段在同一对象层合并，避免生成器覆盖嵌套 error。 / Error fields are combined at the same object level to avoid replacing the nested error."
+      },
+      "SetPassword": {
+        "type": "object",
+        "properties": {
+          "user_id": {
+            "type": "string"
+          },
+          "password": {
+            "type": "string",
+            "description": "8–72 UTF-8字节，由服务校验 / 8–72 UTF-8 bytes, validated by server"
+          }
+        },
+        "required": [
+          "password"
+        ],
+        "additionalProperties": false
+      },
+      "SetPasswordByBody": {
+        "type": "object",
+        "properties": {
+          "user_id": {
+            "type": "string"
+          },
+          "password": {
+            "type": "string",
+            "description": "8–72 UTF-8字节，由服务校验 / 8–72 UTF-8 bytes, validated by server"
+          }
+        },
+        "required": [
+          "password",
+          "user_id"
+        ],
+        "additionalProperties": false
+      },
+      "PasswordUpdated": {
+        "type": "object",
+        "properties": {
+          "user_id": {
+            "type": "string"
+          },
+          "password_updated": {
+            "type": "boolean",
+            "enum": [
+              true
+            ]
+          }
+        },
+        "required": [
+          "user_id",
+          "password_updated"
+        ],
+        "additionalProperties": false
       }
     },
     "securitySchemes": {

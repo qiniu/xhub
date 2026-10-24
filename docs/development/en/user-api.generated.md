@@ -15,6 +15,8 @@ Generated from OpenAPI; no production handler is replaced. See user-contract.md 
 | `POST /user/update` | Update user with existing authorization | 200, 400, 401, 403, 404, 409, 500, 503 |
 | `POST /user/bulk_update` | Atomically update budgets and reset days | 200, 400, 401, 403, 404, 409, 500, 503 |
 | `POST /user/delete` | Delete user except self | 200, 400, 401, 403, 404, 409, 500, 503 |
+| `POST /user/set_password` | Reset password under existing authorization and revoke sessions; no password returned, API keys retained | 200, 400, 401, 403, 404, 409, 500, 503 |
+| `POST /user/{user_id}/password` | Reset password under existing authorization and revoke sessions; no password returned, API keys retained | 200, 400, 401, 403, 404, 409, 500, 503 |
 
 ### GET /user/list
 
@@ -267,6 +269,55 @@ Delete user except self
     "application/json": {
       "schema": {
         "$ref": "#/components/schemas/DeleteUser"
+      }
+    }
+  }
+}
+```
+
+
+### POST /user/set_password
+
+Reset password under existing authorization and revoke sessions; no password returned, API keys retained
+
+```json
+{
+  "required": true,
+  "content": {
+    "application/json": {
+      "schema": {
+        "$ref": "#/components/schemas/SetPasswordByBody"
+      }
+    }
+  }
+}
+```
+
+
+### POST /user/{user_id}/password
+
+Reset password under existing authorization and revoke sessions; no password returned, API keys retained
+
+```json
+[
+  {
+    "in": "path",
+    "name": "user_id",
+    "required": true,
+    "schema": {
+      "type": "string"
+    }
+  }
+]
+```
+
+```json
+{
+  "required": true,
+  "content": {
+    "application/json": {
+      "schema": {
+        "$ref": "#/components/schemas/SetPassword"
       }
     }
   }
@@ -1282,5 +1333,72 @@ Delete user except self
     }
   },
   "description": "Error fields are combined at the same object level to avoid replacing the nested error."
+}
+```
+
+### SetPassword
+
+```json
+{
+  "type": "object",
+  "properties": {
+    "user_id": {
+      "type": "string"
+    },
+    "password": {
+      "type": "string",
+      "description": "8–72 UTF-8 bytes, validated by server"
+    }
+  },
+  "required": [
+    "password"
+  ],
+  "additionalProperties": false
+}
+```
+
+### SetPasswordByBody
+
+```json
+{
+  "type": "object",
+  "properties": {
+    "user_id": {
+      "type": "string"
+    },
+    "password": {
+      "type": "string",
+      "description": "8–72 UTF-8 bytes, validated by server"
+    }
+  },
+  "required": [
+    "password",
+    "user_id"
+  ],
+  "additionalProperties": false
+}
+```
+
+### PasswordUpdated
+
+```json
+{
+  "type": "object",
+  "properties": {
+    "user_id": {
+      "type": "string"
+    },
+    "password_updated": {
+      "type": "boolean",
+      "enum": [
+        true
+      ]
+    }
+  },
+  "required": [
+    "user_id",
+    "password_updated"
+  ],
+  "additionalProperties": false
 }
 ```
