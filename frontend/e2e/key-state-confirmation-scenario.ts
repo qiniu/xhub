@@ -1,3 +1,4 @@
+import { randomUUID } from "node:crypto";
 import { expect, test } from "@playwright/test";
 import { GATEWAY, loginAdmin, sessionBearer, stableGoto } from "./helpers";
 import { translate } from "../src/i18n/translate";
@@ -11,11 +12,15 @@ export function registerKeyStateConfirmation(locale: "en" | "zh-CN") {
     await loginAdmin(page);
     await page.getByRole("button", { name: locale === "en" ? "English" : "中文", exact: true }).click();
     const headers = { Authorization: "Bearer " + await sessionBearer(page) };
-    const alias = "Confirmation 用户 " + locale;
-    const created = await page.request.post(GATEWAY + "/key/generate", { headers, data: { key_alias: alias } });
-    expect(created.status(), await created.text()).toBe(200);
-    const { token_id: id, key: token } = await created.json();
+    const alias = "Confirmation 用户 " + locale + "-" + randomUUID();
+    let id: string | null = null;
     try {
+      const created = await page.request.post(GATEWAY + "/key/generate", { headers, data: { key_alias: alias } });
+      expect(created.status(), await created.text()).toBe(200);
+      const result = await created.json();
+      id = result.token_id;
+      const token = result.key;
+      expect(typeof id).toBe("string");
       /** 真实详情与模型准入核验；blocked为期望持久状态，返回Promise，失败定位接口，不以UI/替身断言替代后台。 */
       const verifyBackend = async (blocked: boolean) => {
         const detail = await page.request.get(GATEWAY + "/key/info?key=" + id, { headers });
@@ -74,9 +79,21 @@ export function registerKeyStateConfirmation(locale: "en" | "zh-CN") {
         await verifyBackend(blocked);
       }
     } finally {
-      await page.unrouteAll({ behavior: "wait" });
-      const deleted = await page.request.post(GATEWAY + "/key/delete", { headers, data: { key: id } });
-      expect(deleted.status(), await deleted.text()).toBe(200);
+      try {
+        await page.unrouteAll({ behavior: "wait" });
+      } finally {
+        // 即使创建响应无法解析、没有拿到ID，也按唯一夹具别名回收；只查询本人范围，不触碰其他测试或用户的Key。
+        const listed = await page.request.get(GATEWAY + "/key/list?scope=personal&key_alias=" + encodeURIComponent(alias), { headers });
+        expect(listed.status(), await listed.text()).toBe(200);
+        const rows = (await listed.json()).keys;
+        expect(Array.isArray(rows)).toBe(true);
+        for (const row of rows) {
+          expect(row.key_alias).toBe(alias);
+          const deleted = await page.request.post(GATEWAY + "/key/delete", { headers, data: { key: row.token } });
+          expect(deleted.status(), await deleted.text()).toBe(200);
+        }
+        if (id) expect((await page.request.get(GATEWAY + "/key/info?key=" + id, { headers })).status()).toBe(404);
+      }
     }
   });
 }
