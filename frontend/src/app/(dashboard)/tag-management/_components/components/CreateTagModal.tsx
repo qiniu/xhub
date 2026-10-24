@@ -27,15 +27,8 @@ const labelWithHint = (label: React.ReactNode, hint: string): React.ReactNode =>
   </>
 );
 
-interface ModelInfo {
-  model_name: string;
-  litellm_params: {
-    model: string;
-  };
-  model_info: {
-    id: string;
-  };
-}
+/** 模型选项直接采用部署列表契约，不假定上游参数中一定有model字段。 */
+ type ModelInfo = import("@/lib/http/contracts/models").components["schemas"]["DeploymentRow"];
 
 const createTagShape = {
   tag_name: z.string().min(1, { error: () => t("Please input a tag name") }),

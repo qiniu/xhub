@@ -37,6 +37,11 @@ const (
 	CreatedKeyRotationIntervalLessThannil CreatedKeyRotationInterval = "<nil>"
 )
 
+// Defines values for KeyHealthKey.
+const (
+	Healthy KeyHealthKey = "healthy"
+)
+
 // Defines values for KeyInfoRecordAllowedRoutes.
 const (
 	KeyInfoRecordAllowedRoutesLlmApiRoutes KeyInfoRecordAllowedRoutes = "llm_api_routes"
@@ -143,6 +148,15 @@ type BudgetReservation struct {
 	State         string    `json:"state"`
 	TeamId        string    `json:"team_id"`
 	UserId        string    `json:"user_id"`
+}
+
+// BulkKeyPatch defines model for BulkKeyPatch.
+type BulkKeyPatch = map[string]json.RawMessage
+
+// BulkKeyResult defines model for BulkKeyResult.
+type BulkKeyResult struct {
+	Keys    []KeyRecord `json:"keys"`
+	Updated int         `json:"updated"`
 }
 
 // CreateKey defines model for CreateKey.
@@ -300,6 +314,24 @@ type ErrorDetail struct {
 	Type  string          `json:"type"`
 }
 
+// KeyAliases defines model for KeyAliases.
+type KeyAliases struct {
+	Aliases     []string `json:"aliases"`
+	CurrentPage int      `json:"current_page"`
+	Size        int      `json:"size"`
+	TotalCount  int      `json:"total_count"`
+	TotalPages  int      `json:"total_pages"`
+}
+
+// KeyHealth defines model for KeyHealth.
+type KeyHealth struct {
+	Key              KeyHealthKey `json:"key"`
+	LoggingCallbacks interface{}  `json:"logging_callbacks"`
+}
+
+// KeyHealthKey defines model for KeyHealth.Key.
+type KeyHealthKey string
+
 // KeyInfo defines model for KeyInfo.
 type KeyInfo struct {
 	Info KeyInfoRecord `json:"info"`
@@ -412,6 +444,18 @@ type KeySelector struct {
 // RateInput null/空串取消；字符串须为非负int32整数 / Null or empty clears; strings must represent nonnegative int32 integers.
 type RateInput = json.RawMessage
 
+// ResetKeySpend defines model for ResetKeySpend.
+type ResetKeySpend struct {
+	// ResetTo 缺省保留（创建不设独立上限）；null/空串清空；0禁止此Key消费；字符串须为有限非负数 / Omission preserves (creation has no separate cap); null or empty string clears; zero blocks this key; strings must be finite nonnegative numbers.
+	ResetTo *BudgetInput `json:"reset_to"`
+}
+
+// RotateKey defines model for RotateKey.
+type RotateKey = map[string]json.RawMessage
+
+// RotateKeyByBody defines model for RotateKeyByBody.
+type RotateKeyByBody = map[string]json.RawMessage
+
 // UnblockedKey defines model for UnblockedKey.
 type UnblockedKey struct {
 	Blocked UnblockedKeyBlocked `json:"blocked"`
@@ -422,6 +466,11 @@ type UnblockedKeyBlocked bool
 
 // UpdateKey defines model for UpdateKey.
 type UpdateKey = map[string]json.RawMessage
+
+// ListKeyAliasesParams defines parameters for ListKeyAliases.
+type ListKeyAliasesParams struct {
+	Search *string `form:"search,omitempty" json:"search,omitempty"`
+}
 
 // GetKeyParams defines parameters for GetKey.
 type GetKeyParams struct {
@@ -473,17 +522,29 @@ type GetKeyV2ParamsScope string
 // BlockKeyJSONRequestBody defines body for BlockKey for application/json ContentType.
 type BlockKeyJSONRequestBody = KeySelector
 
+// BulkUpdateKeysJSONRequestBody defines body for BulkUpdateKeys for application/json ContentType.
+type BulkUpdateKeysJSONRequestBody = BulkKeyPatch
+
 // DeleteKeysJSONRequestBody defines body for DeleteKeys for application/json ContentType.
 type DeleteKeysJSONRequestBody = DeleteKeys
 
 // CreateKeyJSONRequestBody defines body for CreateKey for application/json ContentType.
 type CreateKeyJSONRequestBody = CreateKey
 
+// RegenerateKeyJSONRequestBody defines body for RegenerateKey for application/json ContentType.
+type RegenerateKeyJSONRequestBody = RotateKeyByBody
+
 // UnblockKeyJSONRequestBody defines body for UnblockKey for application/json ContentType.
 type UnblockKeyJSONRequestBody = KeySelector
 
 // UpdateKeyJSONRequestBody defines body for UpdateKey for application/json ContentType.
 type UpdateKeyJSONRequestBody = UpdateKey
+
+// RegenerateKeyByPathJSONRequestBody defines body for RegenerateKeyByPath for application/json ContentType.
+type RegenerateKeyByPathJSONRequestBody = RotateKey
+
+// ResetKeySpendJSONRequestBody defines body for ResetKeySpend for application/json ContentType.
+type ResetKeySpendJSONRequestBody = ResetKeySpend
 
 // GetKeyV2JSONRequestBody defines body for GetKeyV2 for application/json ContentType.
 type GetKeyV2JSONRequestBody = KeySelector

@@ -197,3 +197,6 @@ At the end of each batch, it must be possible to answer: which module owns the b
 Use LiteLLM's [request lifecycle](https://docs.litellm.ai/docs/proxy/architecture), [routing responsibilities](https://docs.litellm.ai/docs/routing), and [Responses adapter interface](https://github.com/BerriAI/litellm/blob/main/litellm/llms/base_llm/responses/transformation.py) as references for responsibility separation and compatibility validation. Its [native Responses configuration](https://docs.litellm.ai/docs/response_api_native_passthrough) illustrates why capabilities and execution paths require explicit declarations. It does not establish the capabilities of XHub's current suppliers, and is not a reason to copy every feature or commercial-edition restriction.
 
 Pin the reference version or commit during implementation and record what is being adopted. Preserve XHub's existing accounting reliability, permission checks, and history constraints. No Python service or change to the current feature set is required.
+
+
+See [core contract completion](core-contract-completion.md) for stage3 scope, evidence and explicit unmigrated boundaries. Submission does not mean merge or deployment.

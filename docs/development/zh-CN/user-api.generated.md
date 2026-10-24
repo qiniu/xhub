@@ -15,6 +15,8 @@
 | `POST /user/update` | 按现有权限更新用户 | 200, 400, 401, 403, 404, 409, 500, 503 |
 | `POST /user/bulk_update` | 原子修改用户预算和刷新日 | 200, 400, 401, 403, 404, 409, 500, 503 |
 | `POST /user/delete` | 删除用户，不允许删除自己 | 200, 400, 401, 403, 404, 409, 500, 503 |
+| `POST /user/set_password` | 按现有权限重置密码并撤销旧会话；不返回密码，不撤销API Key | 200, 400, 401, 403, 404, 409, 500, 503 |
+| `POST /user/{user_id}/password` | 按现有权限重置密码并撤销旧会话；不返回密码，不撤销API Key | 200, 400, 401, 403, 404, 409, 500, 503 |
 
 ### GET /user/list
 
@@ -267,6 +269,55 @@
     "application/json": {
       "schema": {
         "$ref": "#/components/schemas/DeleteUser"
+      }
+    }
+  }
+}
+```
+
+
+### POST /user/set_password
+
+按现有权限重置密码并撤销旧会话；不返回密码，不撤销API Key
+
+```json
+{
+  "required": true,
+  "content": {
+    "application/json": {
+      "schema": {
+        "$ref": "#/components/schemas/SetPasswordByBody"
+      }
+    }
+  }
+}
+```
+
+
+### POST /user/{user_id}/password
+
+按现有权限重置密码并撤销旧会话；不返回密码，不撤销API Key
+
+```json
+[
+  {
+    "in": "path",
+    "name": "user_id",
+    "required": true,
+    "schema": {
+      "type": "string"
+    }
+  }
+]
+```
+
+```json
+{
+  "required": true,
+  "content": {
+    "application/json": {
+      "schema": {
+        "$ref": "#/components/schemas/SetPassword"
       }
     }
   }
@@ -1282,5 +1333,72 @@
     }
   },
   "description": "完整错误字段在同一对象层合并，避免生成器覆盖嵌套 error。"
+}
+```
+
+### SetPassword
+
+```json
+{
+  "type": "object",
+  "properties": {
+    "user_id": {
+      "type": "string"
+    },
+    "password": {
+      "type": "string",
+      "description": "8–72 UTF-8字节，由服务校验"
+    }
+  },
+  "required": [
+    "password"
+  ],
+  "additionalProperties": false
+}
+```
+
+### SetPasswordByBody
+
+```json
+{
+  "type": "object",
+  "properties": {
+    "user_id": {
+      "type": "string"
+    },
+    "password": {
+      "type": "string",
+      "description": "8–72 UTF-8字节，由服务校验"
+    }
+  },
+  "required": [
+    "password",
+    "user_id"
+  ],
+  "additionalProperties": false
+}
+```
+
+### PasswordUpdated
+
+```json
+{
+  "type": "object",
+  "properties": {
+    "user_id": {
+      "type": "string"
+    },
+    "password_updated": {
+      "type": "boolean",
+      "enum": [
+        true
+      ]
+    }
+  },
+  "required": [
+    "user_id",
+    "password_updated"
+  ],
+  "additionalProperties": false
 }
 ```
