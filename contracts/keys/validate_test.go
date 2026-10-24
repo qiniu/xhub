@@ -21,6 +21,9 @@ func TestKeyContractRequests(t *testing.T) {
 		valid      bool
 	}{
 		{"/key/generate", `{}`, true},
+		{"/key/generate", `{"team_id":null}`, true},
+		{"/key/generate", `{"team_id":"team-id"}`, true},
+		{"/key/generate", `{"team_id":42}`, false},
 		{"/key/generate", `{"max_budget":null}`, true},
 		{"/key/generate", `{"max_budget":0}`, true},
 		{"/key/generate", `{"max_budget":-1}`, false},

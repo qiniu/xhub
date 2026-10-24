@@ -149,7 +149,7 @@ scope=personal仅登录用户本人，管理员也不例外；非法分页/排�
     "schema": {
       "type": "string"
     },
-    "description": "历史命名，实际按记录ID筛选 / Legacy name, actually filters by record ID."
+    "description": "历史命名，实际按记录ID筛选"
   },
   {
     "name": "substring_matching",
@@ -715,7 +715,8 @@ scope=personal仅登录用户本人，管理员也不例外；非法分页/排�
       "type": "string"
     },
     "team_id": {
-      "type": "string"
+      "type": "string",
+      "nullable": true
     },
     "project_id": {
       "type": "string"

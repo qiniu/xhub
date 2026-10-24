@@ -28,7 +28,7 @@
     "schema": {
       "type": "string"
     },
-    "description": "按当前解析：无效/小于1的page回退1，page_size超出1..500回退100。 / Current parsing: invalid/page below 1 defaults to 1; page_size outside 1..500 defaults to 100."
+    "description": "按当前解析：无效/小于1的page回退1，page_size超出1..500回退100。"
   },
   {
     "name": "page_size",
@@ -36,7 +36,7 @@
     "schema": {
       "type": "string"
     },
-    "description": "按当前解析：无效/小于1的page回退1，page_size超出1..500回退100。 / Current parsing: invalid/page below 1 defaults to 1; page_size outside 1..500 defaults to 100."
+    "description": "按当前解析：无效/小于1的page回退1，page_size超出1..500回退100。"
   },
   {
     "name": "search",
@@ -44,7 +44,7 @@
     "schema": {
       "type": "string"
     },
-    "description": "兼容查询字符串；授权及字段组合由服务执行。 / Compatibility query string; authorization and combinations checked by service."
+    "description": "兼容查询字符串；授权及字段组合由服务执行。"
   },
   {
     "name": "user_email",
@@ -52,7 +52,7 @@
     "schema": {
       "type": "string"
     },
-    "description": "兼容查询字符串；授权及字段组合由服务执行。 / Compatibility query string; authorization and combinations checked by service."
+    "description": "兼容查询字符串；授权及字段组合由服务执行。"
   },
   {
     "name": "user_ids",
@@ -60,7 +60,7 @@
     "schema": {
       "type": "string"
     },
-    "description": "兼容查询字符串；授权及字段组合由服务执行。 / Compatibility query string; authorization and combinations checked by service."
+    "description": "兼容查询字符串；授权及字段组合由服务执行。"
   },
   {
     "name": "role",
@@ -68,7 +68,7 @@
     "schema": {
       "type": "string"
     },
-    "description": "兼容查询字符串；授权及字段组合由服务执行。 / Compatibility query string; authorization and combinations checked by service."
+    "description": "兼容查询字符串；授权及字段组合由服务执行。"
   },
   {
     "name": "team",
@@ -76,7 +76,7 @@
     "schema": {
       "type": "string"
     },
-    "description": "兼容查询字符串；授权及字段组合由服务执行。 / Compatibility query string; authorization and combinations checked by service."
+    "description": "兼容查询字符串；授权及字段组合由服务执行。"
   },
   {
     "name": "sso_user_ids",
@@ -84,7 +84,7 @@
     "schema": {
       "type": "string"
     },
-    "description": "兼容查询字符串；授权及字段组合由服务执行。 / Compatibility query string; authorization and combinations checked by service."
+    "description": "兼容查询字符串；授权及字段组合由服务执行。"
   },
   {
     "name": "organization_ids",
@@ -92,7 +92,7 @@
     "schema": {
       "type": "string"
     },
-    "description": "兼容查询字符串；授权及字段组合由服务执行。 / Compatibility query string; authorization and combinations checked by service."
+    "description": "兼容查询字符串；授权及字段组合由服务执行。"
   },
   {
     "name": "sort_by",
@@ -100,7 +100,7 @@
     "schema": {
       "type": "string"
     },
-    "description": "兼容查询字符串；授权及字段组合由服务执行。 / Compatibility query string; authorization and combinations checked by service."
+    "description": "兼容查询字符串；授权及字段组合由服务执行。"
   },
   {
     "name": "sort_order",
@@ -108,7 +108,7 @@
     "schema": {
       "type": "string"
     },
-    "description": "兼容查询字符串；授权及字段组合由服务执行。 / Compatibility query string; authorization and combinations checked by service."
+    "description": "兼容查询字符串；授权及字段组合由服务执行。"
   }
 ]
 ```
@@ -126,7 +126,7 @@
     "schema": {
       "type": "string"
     },
-    "description": "兼容查询字符串；授权及字段组合由服务执行。 / Compatibility query string; authorization and combinations checked by service."
+    "description": "兼容查询字符串；授权及字段组合由服务执行。"
   }
 ]
 ```
@@ -144,7 +144,7 @@
     "schema": {
       "type": "string"
     },
-    "description": "兼容查询字符串；授权及字段组合由服务执行。 / Compatibility query string; authorization and combinations checked by service."
+    "description": "兼容查询字符串；授权及字段组合由服务执行。"
   }
 ]
 ```
@@ -162,7 +162,7 @@
     "schema": {
       "type": "string"
     },
-    "description": "兼容查询字符串；授权及字段组合由服务执行。 / Compatibility query string; authorization and combinations checked by service."
+    "description": "兼容查询字符串；授权及字段组合由服务执行。"
   },
   {
     "name": "user_email",
@@ -170,7 +170,7 @@
     "schema": {
       "type": "string"
     },
-    "description": "兼容查询字符串；授权及字段组合由服务执行。 / Compatibility query string; authorization and combinations checked by service."
+    "description": "兼容查询字符串；授权及字段组合由服务执行。"
   }
 ]
 ```
@@ -188,7 +188,7 @@
     "schema": {
       "type": "string"
     },
-    "description": "兼容查询字符串；授权及字段组合由服务执行。 / Compatibility query string; authorization and combinations checked by service."
+    "description": "兼容查询字符串；授权及字段组合由服务执行。"
   },
   {
     "name": "user_email",
@@ -196,7 +196,7 @@
     "schema": {
       "type": "string"
     },
-    "description": "兼容查询字符串；授权及字段组合由服务执行。 / Compatibility query string; authorization and combinations checked by service."
+    "description": "兼容查询字符串；授权及字段组合由服务执行。"
   }
 ]
 ```

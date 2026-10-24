@@ -2,6 +2,8 @@ import type { components, paths } from "../../src/lib/http/contracts/keys";
 
 type S = components["schemas"];
 const blank: S["CreateKey"] = {};
+// 创建表单无团队时显式发送null；生成类型必须兼容实际请求。
+const teamless: S["CreateKey"] = { team_id: null };
 const clear: S["UpdateKey"] = { key: "id", max_budget: null, route_template_id: null };
 const zero: S["UpdateKey"] = { key: "id", max_budget: 0 };
 const remove: S["DeleteKeys"] = { keys: ["id"] };
@@ -18,4 +20,4 @@ const wrongDelete: S["DeletedKeys"] = { deleted: true };
 const missingDelete: S["DeleteKeys"] = {};
 // @ts-expect-error 不能声明自动轮换支持。
 const rotating: S["CreateKey"] = { auto_rotate: true };
-void [blank, clear, zero, remove, response, missing, batch, management, wrongDelete, missingDelete, rotating];
+void [teamless, blank, clear, zero, remove, response, missing, batch, management, wrongDelete, missingDelete, rotating];

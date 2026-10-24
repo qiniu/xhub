@@ -149,7 +149,7 @@ scope=personal is the logged-in owner only, including admins; invalid pagination
     "schema": {
       "type": "string"
     },
-    "description": "历史命名，实际按记录ID筛选 / Legacy name, actually filters by record ID."
+    "description": "Legacy name, actually filters by record ID."
   },
   {
     "name": "substring_matching",
@@ -715,7 +715,8 @@ Authorizes every target before deleting individually; storage failure may leave 
       "type": "string"
     },
     "team_id": {
-      "type": "string"
+      "type": "string",
+      "nullable": true
     },
     "project_id": {
       "type": "string"

@@ -24,7 +24,7 @@ Save supplier; duplicate creation replaces existing configuration.
 ```json
 {
   "required": false,
-  "description": "空正文沿用空对象语义；正文存在时必须是 JSON 对象。 / Empty body acts as an empty object; nonempty body must be a JSON object.",
+  "description": "Empty body acts as an empty object; nonempty body must be a JSON object.",
   "content": {
     "application/json": {
       "schema": {
@@ -74,7 +74,7 @@ Merge patch; upsert when missing.
 ```json
 {
   "required": false,
-  "description": "空正文沿用空对象语义；正文存在时必须是 JSON 对象。 / Empty body acts as an empty object; nonempty body must be a JSON object.",
+  "description": "Empty body acts as an empty object; nonempty body must be a JSON object.",
   "content": {
     "application/json": {
       "schema": {
@@ -111,7 +111,7 @@ Delete supplier; repeated deletion returns deleted=0.
 ```json
 {
   "required": false,
-  "description": "空正文沿用空对象语义；正文存在时必须是 JSON 对象。 / Empty body acts as an empty object; nonempty body must be a JSON object.",
+  "description": "Empty body acts as an empty object; nonempty body must be a JSON object.",
   "content": {
     "application/json": {
       "schema": {
