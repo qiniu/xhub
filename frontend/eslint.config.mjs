@@ -134,6 +134,19 @@ const eslintConfig = [
       "jest-dom/prefer-to-have-text-content": "error",
     },
   },
+  {
+    // Playwright reporter 与 node:test 在 Node CommonJS 中加载，不能按浏览器/ESM 误报。
+    // 只声明运行时与加载方式；未声明变量等检查继续生效，不扩大历史错误预算。
+    files: ["e2e/**/*.cjs"],
+    languageOptions: {
+      sourceType: "commonjs",
+      globals: {
+        console: "readonly", process: "readonly", __dirname: "readonly", __filename: "readonly",
+        Buffer: "readonly", setTimeout: "readonly", clearTimeout: "readonly", URL: "readonly",
+      },
+    },
+    rules: { "@typescript-eslint/no-require-imports": "off" },
+  },
 ];
 
 export default eslintConfig;

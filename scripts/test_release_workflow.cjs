@@ -377,3 +377,20 @@ test('budget reconciliation release gate covers components and bilingual real fl
     assert.ok(existsSync(join(__dirname, '../frontend', file)), '人工对账场景不存在：' + locale);
   }
 });
+
+/** 验证数据库先于 Go 测试启动、门禁自测与原始证据进入发布流程；只读工作流，无需清理。 */
+test('test gates require PostgreSQL, self-tests and structured evidence', () => {
+  const steps = workflow.jobs.verify.steps;
+  const database = steps.findIndex(item => item.run === 'docker compose up -d --wait postgres redis');
+  const unit = steps.findIndex(item => item.run === 'go test ./internal/... ./cmd/regression/testsupport/...');
+  assert.ok(database >= 0 && database < unit, '数据库必须先于全部 DB 夹具测试启动');
+  const commands = steps.map(item => item.run || '').join('\n');
+  for (const name of ['scripts.test_regression_results', 'scripts.test_test_gates', 'scripts.test_e2e_summary', 'scripts.test_e2e_model_endpoints', 'frontend/e2e/checklist-reporter.test.cjs']) {
+    assert.ok(commands.includes(name), `缺少门禁测试 ${name}`);
+  }
+  const paths = steps.filter(item => item.uses === 'actions/upload-artifact@v4').map(item => item.with.path).join('\n');
+  assert.ok(paths.includes('.e2e/runs/regression-*/events.jsonl'));
+  assert.ok(paths.includes('.e2e/runs/regression-*/summary.json'));
+  assert.ok(paths.includes('.e2e/release/cleanup-status.json'));
+  assert.ok(paths.includes('.e2e/release-agent-reliability/cleanup-status.json'));
+});

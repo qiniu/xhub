@@ -16,17 +16,19 @@ export E2E_BACKEND_MODE=deterministic E2E_FULL_COVERAGE=0
 export E2E_SCOPE='模型完整目录、Kling/Vidu 保存编辑、端点加载异常、供应商切换、护栏、密钥生命周期、权重配置；后端完整确定性业务回归'
 export E2E_BROWSER_STATUS=1 E2E_BACKEND_STATUS=1
 unset E2E_LIVE E2E_LIVE_VENDORS E2E_PROVIDER_METADATA XHUB_REGRESSION_LIVE
-mkdir -p "$E2E_ACCEPTANCE_DIR/browser" "$ROOT/.e2e"
+export E2E_RUN_DIR="$E2E_ACCEPTANCE_DIR/browser"
+mkdir -p "$E2E_RUN_DIR" "$ROOT/.e2e"
 REDIS_NAME="xhub-model-e2e-redis-$$"
-report_written=0
-# cleanup 保留入口退出码，补写中断报告并清理本次 Redis 与锁；由 EXIT 调用。
+# cleanup 由 EXIT 调用，无参数；先清理专属 Redis/锁，再生成最终报告。
+# 清理失败不得被阶段成功掩盖；已有测试/启动失败保留原退出码，日志留供定位。
 cleanup() {
-  local code=$?
-  if [[ "$report_written" == 0 ]]; then
-    E2E_RUN_DIR="$E2E_ACCEPTANCE_DIR/browser" python3 "$ROOT/scripts/e2e-summary.py" || true
-  fi
-  docker rm -f "$REDIS_NAME" >/dev/null 2>&1 || true
-  rmdir "$LOCK" || true
+  local code=$? cleanup_status=0
+  docker rm -f "$REDIS_NAME" >"$E2E_ACCEPTANCE_DIR/cleanup.log" 2>&1 || cleanup_status=1
+  rmdir "$LOCK" || cleanup_status=1
+  export E2E_CLEANUP_STATUS="$cleanup_status"
+  if [[ "$cleanup_status" != 0 && "$code" == 0 ]]; then code=1; fi
+  E2E_RUN_DIR="$E2E_ACCEPTANCE_DIR/browser" python3 "$ROOT/scripts/e2e-summary.py" || { if [[ "$code" == 0 ]]; then code=1; fi; }
+  echo "Regression finished: exit=$code; report: $E2E_ACCEPTANCE_DIR/report.html"
   return "$code"
 }
 trap cleanup EXIT
@@ -72,15 +74,6 @@ if run_stage Browser "$E2E_ACCEPTANCE_DIR/browser.log" bash scripts/e2e.sh \
 else
   export E2E_BROWSER_STATUS=$?
 fi
-# 只有本次确实启动浏览器后才复制结果，避免把上一轮报告当成当前证据。
-if rg -q '^Running [0-9]+ tests? using' "$E2E_ACCEPTANCE_DIR/browser.log"; then
-  for artifact in results.json junit.xml; do
-    if [[ -f "$ROOT/.e2e/current/$artifact" ]]; then cp "$ROOT/.e2e/current/$artifact" "$E2E_ACCEPTANCE_DIR/browser/"; fi
-  done
-  for artifact in playwright-report test-results .e2e-report; do
-    if [[ -d "$ROOT/frontend/$artifact" ]]; then cp -R "$ROOT/frontend/$artifact" "$E2E_ACCEPTANCE_DIR/"; fi
-  done
-fi
 echo '[3/4] Running complete deterministic backend regression'
 if run_stage Backend "$E2E_ACCEPTANCE_DIR/backend.log" bash scripts/regression.sh -v; then
   export E2E_BACKEND_STATUS=0
@@ -91,7 +84,4 @@ echo '[4/4] Writing JSON, Markdown and HTML report'
 export E2E_RUN_DIR="$E2E_ACCEPTANCE_DIR/browser"
 status=0
 if [[ "$E2E_BROWSER_STATUS" != 0 || "$E2E_BACKEND_STATUS" != 0 ]]; then status=1; fi
-python3 scripts/e2e-summary.py || status=1
-report_written=1
-echo "Regression finished: exit=$status; report: $E2E_ACCEPTANCE_DIR/report.html"
 exit "$status"

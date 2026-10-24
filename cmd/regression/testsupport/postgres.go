@@ -22,19 +22,12 @@ import (
 	"github.com/jackc/pgx/v5"
 )
 
-// DefaultDatabaseURL is the local verification database from docker-compose.yml.
-//
-// Tests skip, rather than fail, when no database answers here. That keeps
-// `go test ./...` usable on a machine without Docker, at the cost of a green
-// run that proves less than it appears to; XHUB_TEST_DATABASE_URL overrides it
-// when a real run is wanted.
+// DefaultDatabaseURL 是本地 Compose 测试库；所有调用 Postgres 的测试都要求数据库可用。
+// 缺少依赖必须失败，不再以 skip 产生绿色结果；显式 URL 由环境覆盖。
 const DefaultDatabaseURL = "postgres://xhub:xhub_dev_password@127.0.0.1:5433/xhub?sslmode=disable"
 
-// DatabaseURL returns the DSN the suites should connect to.
-// 参数：无。
-// 返回 string（string）：测试套件连接 Postgres 的 DSN。环境没有配置时为空串，不能拿去建连。
-// 调用：仅在 postgres.go 内使用
-// 测试：无直接单测
+// DatabaseURL 返回 XHUB_TEST_DATABASE_URL 或本地默认 URL；无参数、无网络副作用。
+// 供隔离数据库夹具及其调用方使用；返回值包含凭据，不得打印到测试报告。
 func DatabaseURL() string {
 	if dsn := os.Getenv("XHUB_TEST_DATABASE_URL"); dsn != "" {
 		return dsn
@@ -42,46 +35,51 @@ func DatabaseURL() string {
 	return DefaultDatabaseURL
 }
 
-// Postgres returns a DSN whose search_path points at a schema created for this one test, and registers the cleanup that drops it. A private schema is what makes these suites safe to run against a database a gateway is also using: the test writes real accounts, real keys and real usage rows, and without the schema it would read the developer's own rows and leave its own behind. The prefix names the caller in the schema, so a schema leaked by a killed test run can be traced back to the package that made it. The test skips when the database is unreachable. It fails only when the database answers and the fixture cannot be built, because that is a real error rather than a missing dependency.
-// 参数 t（*testing.T）：当前测试。库不可达时跳过，建夹具失败时让测试失败；prefix（string）：写进 schema 名的前缀，用来认出是哪个包留下的库。不是用来匹配或去掉的路径前缀。
-// 返回 string（string）：search_path 指向本次测试 schema 的 DSN。测试结束时注册的清理会删掉这个 schema。
-// 调用：仅在 postgres.go 内使用
-// 测试：authz_test.go、guard_test.go、guardrail_block_test.go
+// Postgres 为 t 创建 prefix 标识的独立 schema，返回带 search_path 的 URL，并注册清理。
+// IAM、Store、Gateway 与后台回归使用此夹具；地址、连接、创建及清理失败均使测试失败，禁止静默 skip。
+// 只删除本例 schema；网络操作有超时，错误只报告阶段与类型，避免输出含密码的 DSN。
 func Postgres(t *testing.T, prefix string) string {
 	t.Helper()
 	dsn := DatabaseURL()
 	u, err := url.Parse(dsn)
-	if err != nil {
-		t.Skipf("test database url unusable: %v", err)
+	if err != nil || (u.Scheme != "postgres" && u.Scheme != "postgresql") {
+		t.Fatal("test database URL is invalid; check XHUB_TEST_DATABASE_URL (credentials omitted)")
 	}
 	schema := fmt.Sprintf("%s_test_%d", prefix, time.Now().UnixNano())
-	ctx := context.Background()
-
+	identifier := pgx.Identifier{schema}.Sanitize()
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
 	root, err := pgx.Connect(ctx, dsn)
 	if err != nil {
-		if os.Getenv("XHUB_REGRESSION_STRICT") == "1" {
-			t.Fatalf("regression database is unreachable; check XHUB_TEST_DATABASE_URL or start PostgreSQL on 127.0.0.1:5433")
-		}
-		t.Skipf("test database is unreachable (%T)", err)
+		t.Fatalf("test database connection failed (%T); check XHUB_TEST_DATABASE_URL or local PostgreSQL on 127.0.0.1:5433", err)
 	}
-	if _, err := root.Exec(ctx, "CREATE SCHEMA "+schema); err != nil {
+	if _, err := root.Exec(ctx, "CREATE SCHEMA "+identifier); err != nil {
 		root.Close(ctx)
-		t.Fatalf("create schema: %v", err)
+		t.Fatalf("create test schema failed (%T)", err)
 	}
-	root.Close(ctx)
-
+	// 创建后立即注册清理，随后构建连接串或关闭连接失败也必须回收 schema。
+	t.Cleanup(func() {
+		cleanupCtx, cleanupCancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer cleanupCancel()
+		c, err := pgx.Connect(cleanupCtx, dsn)
+		if err != nil {
+			t.Errorf("test schema cleanup connection failed for %s (%T)", schema, err)
+			return
+		}
+		defer func() {
+			if err := c.Close(cleanupCtx); err != nil {
+				t.Errorf("test schema cleanup close failed for %s (%T)", schema, err)
+			}
+		}()
+		if _, err := c.Exec(cleanupCtx, "DROP SCHEMA IF EXISTS "+identifier+" CASCADE"); err != nil {
+			t.Errorf("test schema cleanup DROP failed for %s (%T)", schema, err)
+		}
+	})
+	if err := root.Close(ctx); err != nil {
+		t.Fatalf("close test schema setup connection failed (%T)", err)
+	}
 	q := u.Query()
 	q.Set("search_path", schema)
 	u.RawQuery = q.Encode()
-
-	t.Cleanup(func() {
-		c, err := pgx.Connect(context.Background(), dsn)
-		if err != nil {
-			// The database went away mid-test. Nothing to drop it from.
-			return
-		}
-		defer c.Close(context.Background())
-		_, _ = c.Exec(context.Background(), "DROP SCHEMA "+schema+" CASCADE")
-	})
 	return u.String()
 }

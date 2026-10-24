@@ -16,10 +16,26 @@ class RegressionOutputTests(unittest.TestCase):
             root = Path(directory)
             (root / 'scripts').mkdir()
             shutil.copy(Path(__file__).with_name('regression.sh'), root / 'scripts/regression.sh')
+            shutil.copy(Path(__file__).with_name('check-regression-results.py'), root / 'scripts/check-regression-results.py')
             (root / 'bin').mkdir()
             commands = {
                 'psql': '#!/bin/bash\nexit 0\n',
-                'go': '#!/bin/bash\necho "=== RUN   TestExample"\nfor ((i=0;i<10000;i++)); do echo "trace gateway diagnostic"; done\necho "stderr diagnostic" >&2\necho "--- $RESULT: TestExample (0.01s)"\nexit "$STATUS"\n',
+                'go': '''#!/usr/bin/env python3
+import json, os, sys
+pkg = "fixture/cmd/regression"
+def event(action, name=None, output=None):
+    print(json.dumps(dict(Action=action, Package=pkg, **({"Test": name} if name else {}), **({"Output": output} if output else {}))), flush=True)
+event("start")
+event("run", "TestExample")
+event("output", "TestExample", "=== RUN   TestExample\\n")
+for _ in range(10000): event("output", "TestExample", "trace gateway diagnostic\\n")
+event("output", "TestExample", "stderr diagnostic\\n")
+result = os.environ["RESULT"]
+event("output", "TestExample", "--- " + result + ": TestExample (0.01s)\\n")
+event(result.lower(), "TestExample")
+event(result.lower())
+sys.exit(int(os.environ["STATUS"]))
+''',
             }
             for name, content in commands.items():
                 path = root / 'bin' / name
@@ -36,6 +52,8 @@ class RegressionOutputTests(unittest.TestCase):
                     self.assertEqual('=== RUN' in output, verbose)
                     self.assertLess(len(output), 1000)
                     log = Path(next(line.split(': ', 1)[1] for line in output.splitlines() if line.startswith('full regression log: ')))
+                    self.assertTrue(log.with_name("events.jsonl").is_file())
+                    self.assertTrue(log.with_name("summary.json").is_file())
                     self.assertEqual(log.read_text().count('trace gateway diagnostic'), 10000)
                     self.assertIn('stderr diagnostic', log.read_text())
                     self.assertIn('backend regression failed' if status else 'backend regression passed', output)

@@ -11,7 +11,7 @@ SCENARIO = {"name": "identical", "deployments": [{"id": "a"}, {"id": "b"}]}
 
 
 class ReportTests(unittest.TestCase):
-    def report(self, *, browser=True, errors=None, weighted=None, configured=False, backend=True, preflight=None, backend_failure=False, browser_failure=False, browser_log=None, backend_log=None, raw_browser=None, raw_weighted=None, raw_metadata=None):
+    def report(self, *, browser=True, errors=None, weighted=None, configured=False, backend=True, preflight=None, backend_failure=False, browser_failure=False, browser_log=None, backend_log=None, raw_browser=None, raw_weighted=None, raw_metadata=None, cleanup_code=0):
         """构造隔离报告输入并执行汇总器。
 
         参数控制浏览器、后端、权重和原始损坏内容；返回退出码、summary 与 HTML。
@@ -21,7 +21,7 @@ class ReportTests(unittest.TestCase):
             out = Path(directory)
             (out / "browser").mkdir()
             (out / "evidence").mkdir()
-            (out / ".e2e-report").mkdir()
+            (out / "browser/coverage").mkdir()
             if preflight:
                 (out / "preflight.log").write_text(preflight)
             if browser_log:
@@ -33,7 +33,7 @@ class ReportTests(unittest.TestCase):
                     "stats": {"expected": 0 if browser_failure else 1, "unexpected": int(browser_failure), "skipped": 0},
                     "errors": [{"message": error} for error in errors or []],
                     "suites": [{"title": "browser", "specs": [{"title": "click and reload",
-                        "tests": [{"status": "unexpected" if browser_failure else "expected", "results": [{"duration": 1,
+                        "tests": [{"status": "unexpected" if browser_failure else "expected", "results": [{"duration": 1, "status": "failed" if browser_failure else "passed",
                             "errors": [{"message": "\u001b[31mError: saved value missing\u001b[0m\nExpected: 7\nReceived: 3"}] if browser_failure else []}]}]}]}],
                 }))
             if backend:
@@ -50,17 +50,36 @@ class ReportTests(unittest.TestCase):
                 (out / "evidence/weighted-identical.json").write_text(raw_weighted)
             elif weighted is not None:
                 (out / "evidence/weighted-identical.json").write_text(json.dumps(weighted))
-            (out / ".e2e-report/routes.txt").write_text("route unsupported POST /unsupported 501\n")
+            (out / "browser/coverage/routes.txt").write_text("route unsupported POST /unsupported 501\n")
             metadata = raw_metadata if raw_metadata is not None else json.dumps({"providers": [], "weighted_scenarios": [SCENARIO] if configured else []})
             env = dict(os.environ, E2E_ACCEPTANCE_DIR=str(out), E2E_RUN_DIR=str(out / "browser"),
                        E2E_BROWSER_STATUS="0", E2E_BACKEND_STATUS="0", E2E_FULL_COVERAGE="1",
-                       E2E_PROVIDER_METADATA=metadata)
+                       E2E_PROVIDER_METADATA=metadata, E2E_CLEANUP_STATUS=str(cleanup_code))
             result = subprocess.run(["python3", str(SCRIPT)], env=env, capture_output=True, text=True)
             self.last_stdout = result.stdout
             summary = json.loads((out / "summary.json").read_text())
             self.assertTrue((out / "report.md").is_file())
             self.assertTrue((out / "report.html").is_file())
             return result.returncode, summary, (out / "report.html").read_text()
+
+    def test_cleanup_failure_is_in_final_report(self):
+        """实际报告器收到清理失败或未知状态须拒绝通过，HTML/终端保留原因，临时目录自动清理。"""
+        for status in (1, 9):
+            with self.subTest(status=status):
+                code, summary, html = self.report(cleanup_code=status)
+                self.assertEqual((code, summary["status"], summary["cleanup_exit"]), (1, "failed", status))
+                self.assertIn("[cleanup]", self.last_stdout)
+                self.assertIn("资源清理退出码", html)
+
+    def test_all_skipped_layers_cannot_pass(self):
+        """所有浏览器用例跳过或后台仅父 PASS/子 SKIP 时必须失败，临时报告自动删除。"""
+        skipped = json.dumps({"stats": {"expected": 0, "skipped": 1, "unexpected": 0},
+            "suites": [{"specs": [{"title": "optional", "tests": [{"status": "skipped", "results": [{"status": "skipped"}]}]}]}]})
+        for options in ({"raw_browser": skipped}, {"backend_log":
+            "--- PASS: TestParent (0.01s)\n    --- SKIP: TestParent/optional (0.00s)\nok fixture/cmd/regression 0.01s\n"}):
+            with self.subTest(options=options):
+                code, summary, _ = self.report(**options)
+                self.assertEqual((code, summary["status"]), (1, "failed"))
 
     def test_missing_results_cannot_pass_even_with_zero_exit_codes(self):
         code, summary, _ = self.report(browser=False, backend=False)
