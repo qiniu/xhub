@@ -149,6 +149,8 @@ The fail-before/pass-after verification takes place within the same fix PR, reta
 
 Track errors in established behavior as BUG issues. Use Proposals for new documentation routes, check-level semantics, or contract workflows. Cross-module plans use Architecture-Design under repository conventions. This document does not replace acceptance records for individual changes.
 
+The first phase-2 pilot targets supplier management, whose persistence failure baseline is established: [contract pilot and boundaries](supplier-contract-pilot.md) (Proposal #149). Users, keys and other domains remain unmigrated; this is not a whole-API generation or compatibility-layer refactor.
+
 ## Acceptance and release for each batch
 
 Each report must identify the commit, affected APIs, old and new behavior, test layers, commands, pass/fail/skip/exclusion/rerun counts, report paths, cleanup results, and external dependency boundaries. Tests not executed must say “not run.” A command that matches no cases must not be reported as passing. Count Go top-level tests and subtests separately. Reports retain only request IDs and redacted structures, not real keys, passwords, or chat contents.
