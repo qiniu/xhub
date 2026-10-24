@@ -35,7 +35,7 @@
 
 ### GET /key/list
 
-scope=personal仅登录用户本人，管理员也不例外；非法分页/排序返回400，空列表总页数为1。status/organization_id/expand等旧参数被忽略，不声明为有效筛选。
+scope=personal仅登录用户本人，管理员也不例外；非法分页/排序返回400，空列表总页数为1。status/expand等旧参数被忽略，不声明为有效筛选。
 
 ```json
 [
@@ -157,6 +157,16 @@ scope=personal仅登录用户本人，管理员也不例外；非法分页/排�
     "required": false,
     "schema": {
       "type": "boolean"
+    }
+  },
+  {
+    "name": "organization_id",
+    "in": "query",
+    "required": false,
+    "allowEmptyValue": true,
+    "description": "按密钥所属用户当前团队的组织精确筛选，与权限范围及其他条件取交集；空值不限制组织，非空时无团队 Key 不匹配。",
+    "schema": {
+      "type": "string"
     }
   }
 ]

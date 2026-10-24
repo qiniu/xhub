@@ -55,6 +55,22 @@ func TestKeyContractRequests(t *testing.T) {
 	}
 }
 
+// TestKeyOrganizationQuery 验证组织筛选的契约缺省、空值、普通ID和组合条件；纯内存验证，无数据库或待清理资源。
+func TestKeyOrganizationQuery(t *testing.T) {
+	v, err := NewValidator(Document)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, query := range []string{"", "?organization_id=", "?organization_id=org-a", "?organization_id=org-a&scope=personal&team_id=team-a&size=1&page=2"} {
+		if err := v.Request(httptest.NewRequest("GET", "/key/list"+query, nil)); err != nil {
+			t.Fatalf("合法组织筛选违反契约 %s: %v", query, err)
+		}
+	}
+	if err := v.Request(httptest.NewRequest("GET", "/key/list?organization_id=org-a&size=0", nil)); err == nil {
+		t.Fatal("组织筛选不能使非法分页变为合法")
+	}
+}
+
 // TestKeyContractResponses 验证状态码一致、成功对象完整、禁用/恢复方向以及读取响应禁止凭据字段；纯内存测试，无清理。
 func TestKeyContractResponses(t *testing.T) {
 	v, err := NewValidator(Document)

@@ -448,6 +448,9 @@ type ListKeysParams struct {
 	// KeyHash 历史命名，实际按记录ID筛选 / Legacy name, actually filters by record ID.
 	KeyHash           *string `form:"key_hash,omitempty" json:"key_hash,omitempty"`
 	SubstringMatching *bool   `form:"substring_matching,omitempty" json:"substring_matching,omitempty"`
+
+	// OrganizationId 按密钥所属用户当前团队的组织精确筛选，与权限范围及其他条件取交集；空值不限制组织，非空时无团队 Key 不匹配。 / Exact match on the key owner's current team organization; intersected with authorization and other filters. Empty means no restriction; teamless keys do not match a nonempty value.
+	OrganizationId *string `form:"organization_id,omitempty" json:"organization_id,omitempty"`
 }
 
 // ListKeysParamsScope defines parameters for ListKeys.
