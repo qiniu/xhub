@@ -28,7 +28,7 @@ export interface paths {
         };
         /**
          * 按权限列出Key / List keys within permission scope
-         * @description scope=personal仅登录用户本人，管理员也不例外；非法分页/排序返回400，空列表总页数为1。status/organization_id/expand等旧参数被忽略，不声明为有效筛选。 / scope=personal is the logged-in owner only, including admins; invalid pagination or sorting returns 400; empty results have one total page. Legacy status, organization_id and expand parameters are ignored, not effective filters.
+         * @description scope=personal仅登录用户本人，管理员也不例外；非法分页/排序返回400，空列表总页数为1。status/expand等旧参数被忽略，不声明为有效筛选。 / scope=personal is the logged-in owner only, including admins; invalid pagination or sorting returns 400; empty results have one total page. Legacy status and expand parameters are ignored, not effective filters.
          */
         get: operations["listKeys"];
         put?: never;
@@ -558,6 +558,8 @@ export interface operations {
                 /** @description 历史命名，实际按记录ID筛选 / Legacy name, actually filters by record ID. */
                 key_hash?: string;
                 substring_matching?: boolean;
+                /** @description 按密钥所属用户当前团队的组织精确筛选，与权限范围及其他条件取交集；空值不限制组织，非空时无团队 Key 不匹配。 / Exact match on the key owner's current team organization; intersected with authorization and other filters. Empty means no restriction; teamless keys do not match a nonempty value. */
+                organization_id?: string;
             };
             header?: never;
             path?: never;

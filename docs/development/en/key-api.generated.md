@@ -35,7 +35,7 @@ Only creation returns plaintext; defaults to current user, team derived from mem
 
 ### GET /key/list
 
-scope=personal is the logged-in owner only, including admins; invalid pagination or sorting returns 400; empty results have one total page. Legacy status, organization_id and expand parameters are ignored, not effective filters.
+scope=personal is the logged-in owner only, including admins; invalid pagination or sorting returns 400; empty results have one total page. Legacy status and expand parameters are ignored, not effective filters.
 
 ```json
 [
@@ -157,6 +157,16 @@ scope=personal is the logged-in owner only, including admins; invalid pagination
     "required": false,
     "schema": {
       "type": "boolean"
+    }
+  },
+  {
+    "name": "organization_id",
+    "in": "query",
+    "required": false,
+    "allowEmptyValue": true,
+    "description": "Exact match on the key owner's current team organization; intersected with authorization and other filters. Empty means no restriction; teamless keys do not match a nonempty value.",
+    "schema": {
+      "type": "string"
     }
   }
 ]

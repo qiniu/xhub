@@ -69,7 +69,8 @@ jobs:
           set -euo pipefail
           mkdir -p coverage
           # cmd/regression 是由现有 Docker and Release/verify 作业单独执行的长时后台回归套件。
-          # 这里覆盖所有 Go 单元包，同时排除被 npm 带入的第三方 Go 源码。
+          # 这里覆盖所有 Go 单元包；下方契约作业另外采集真实 HTTP 回归并上传同一 backend 旗标，合并处理器覆盖证据。
+          # 排除被 npm 带入的第三方 Go 源码。
           mapfile -t packages < <(go list ./... | grep -vE '/cmd/regression$|/frontend/node_modules/')
           go test -race -timeout=25m -covermode=atomic -coverprofile=coverage/go.out "${packages[@]}"
       - name: Print Go coverage summary
@@ -198,12 +199,31 @@ jobs:
           cp configs/config.example.yaml configs/config.yaml
           docker compose up -d --wait postgres redis
       - name: Run real supplier contract regression
+        env:
+          XHUB_REGRESSION_COVERPROFILE: coverage/supplier-contract.out
         run: bash scripts/regression.sh '^TestSupplierContract'
+      - name: Validate regression coverage
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -s coverage/supplier-contract.out
+          go tool cover -func=coverage/supplier-contract.out | tail -1
+      - name: Upload regression coverage
+        uses: codecov/codecov-action@v5
+        with:
+          files: coverage/supplier-contract.out
+          flags: backend
+          name: supplier-contract
+          disable_search: true
+          fail_ci_if_error: true
+          use_oidc: true
       - uses: actions/upload-artifact@v4
         if: always()
         with:
           name: supplier-contract-regression
-          path: .e2e/runs/
+          path: |
+            .e2e/runs/
+            coverage/supplier-contract.out
           if-no-files-found: error
       - run: docker compose down -v
         if: always()
@@ -236,12 +256,31 @@ jobs:
           cp configs/config.example.yaml configs/config.yaml
           docker compose up -d --wait postgres redis
       - name: Run real user contract regression
+        env:
+          XHUB_REGRESSION_COVERPROFILE: coverage/user-contract.out
         run: bash scripts/regression.sh '^Test(UserContract|UserBulkBudget|UserMonthlyBudget|UserEnterpriseIdentity|SoftBudgetAllocationHTTP)'
+      - name: Validate regression coverage
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -s coverage/user-contract.out
+          go tool cover -func=coverage/user-contract.out | tail -1
+      - name: Upload regression coverage
+        uses: codecov/codecov-action@v5
+        with:
+          files: coverage/user-contract.out
+          flags: backend
+          name: user-contract
+          disable_search: true
+          fail_ci_if_error: true
+          use_oidc: true
       - uses: actions/upload-artifact@v4
         if: always()
         with:
           name: user-contract-regression
-          path: .e2e/runs/
+          path: |
+            .e2e/runs/
+            coverage/user-contract.out
           if-no-files-found: error
       - run: docker compose down -v
         if: always()
@@ -274,12 +313,31 @@ jobs:
           cp configs/config.example.yaml configs/config.yaml
           docker compose up -d --wait postgres redis
       - name: Run real key contract regression
+        env:
+          XHUB_REGRESSION_COVERPROFILE: coverage/key-contract.out
         run: bash scripts/regression.sh '^Test(KeyContract|SharedPersonalKeyBudgetHTTP|PersonalKeysIsolation|ModelLimitChain|TeamlessPersonalKeys)'
+      - name: Validate regression coverage
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -s coverage/key-contract.out
+          go tool cover -func=coverage/key-contract.out | tail -1
+      - name: Upload regression coverage
+        uses: codecov/codecov-action@v5
+        with:
+          files: coverage/key-contract.out
+          flags: backend
+          name: key-contract
+          disable_search: true
+          fail_ci_if_error: true
+          use_oidc: true
       - uses: actions/upload-artifact@v4
         if: always()
         with:
           name: key-contract-regression
-          path: .e2e/runs/
+          path: |
+            .e2e/runs/
+            coverage/key-contract.out
           if-no-files-found: error
       - run: docker compose down -v
         if: always()

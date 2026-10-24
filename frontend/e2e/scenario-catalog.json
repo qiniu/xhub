@@ -2993,5 +2993,19 @@
     "title": "key state requires explicit confirmation zh-CN",
     "kind": "implemented",
     "environment": "default offline"
+  },
+  {
+    "id": "REG-key-organization-filter-en",
+    "file": "e2e/scenarios/regression/key-organization-filter-en.test.ts",
+    "title": "key organization filter and permission intersection en",
+    "kind": "implemented",
+    "environment": "default offline"
+  },
+  {
+    "id": "REG-key-organization-filter-zh-CN",
+    "file": "e2e/scenarios/regression/key-organization-filter-zh-CN.test.ts",
+    "title": "key organization filter and permission intersection zh-CN",
+    "kind": "implemented",
+    "environment": "default offline"
   }
 ]
