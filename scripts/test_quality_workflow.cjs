@@ -1,7 +1,9 @@
 /** 质量工作流回归：读取真实 YAML，验证 PR 门禁、覆盖率输入和失败传播；只读配置，无需清理。 */
 const { test } = require('node:test');
 const assert = require('node:assert/strict');
-const { readFileSync } = require('node:fs');
+const { readFileSync, mkdtempSync, mkdirSync, writeFileSync, rmSync } = require('node:fs');
+const { tmpdir } = require('node:os');
+const { spawnSync } = require('node:child_process');
 const { join } = require('node:path');
 const yaml = require('../frontend/node_modules/js-yaml');
 
@@ -166,4 +168,58 @@ test('key contract requires generation, permissions and real budget regression',
   const artifact = job.steps.find(item => item.uses === 'actions/upload-artifact@v4');
   assert.equal(artifact.if, 'always()');
   assert.equal(artifact.with['if-no-files-found'], 'error');
+});
+
+/** 三个真实 HTTP/PG 契约作业必须产出各自覆盖率并上传 backend，避免处理器执行证据遗漏。
+ * 前置真实 YAML；检查插桩、报告校验、精确上传与诊断归档，失败不允许跳过，纯配置测试无数据需清理。 */
+test('real contract regression coverage is validated archived and uploaded', () => {
+  for (const area of ['supplier', 'user', 'key']) {
+    const job = `${area}-contract`;
+    const profile = `coverage/${area}-contract.out`;
+    const run = step(job, `Run real ${area} contract regression`);
+    assert.equal(run.env?.XHUB_REGRESSION_COVERPROFILE, profile, `${job} 未采集真实回归覆盖率`);
+    const check = step(job, 'Validate regression coverage');
+    assert.match(check.run, /set -euo pipefail/);
+    assert.ok(check.run.includes(`test -s ${profile}`), '报告缺失必须失败');
+    assert.ok(check.run.includes(`go tool cover -func=${profile}`), '报告必须可以被 Go 解析');
+    const upload = step(job, 'Upload regression coverage');
+    assert.equal(upload.uses, 'codecov/codecov-action@v5');
+    assert.equal(upload.with.files, profile);
+    assert.equal(upload.with.flags, 'backend');
+    assert.equal(upload.with.name, job);
+    assert.equal(upload.with.disable_search, true);
+    assert.equal(upload.with.fail_ci_if_error, true);
+    assert.equal(upload.with.use_oidc, true);
+    assert.ok(!upload.if || upload.if === 'success()', '不上传失败或取消用例的覆盖率充当成功证据');
+    const artifact = workflow.jobs[job].steps.find(item => item.uses === 'actions/upload-artifact@v4');
+    assert.equal(artifact.if, 'always()');
+    assert.ok(artifact.with.path.includes(profile));
+    assert.ok(artifact.with.path.includes('.e2e/runs/'));
+    assert.ok(workflow.jobs[job].steps.indexOf(run) < workflow.jobs[job].steps.indexOf(check));
+    assert.ok(workflow.jobs[job].steps.indexOf(check) < workflow.jobs[job].steps.indexOf(upload));
+  }
+  assert.equal(codecov.coverage.status.patch.default.target, '70%');
+  assert.equal(codecov.coverage.status.patch.default.threshold, '1%');
+});
+
+/** 执行工作流中的真实 shell 校验，确认缺失、空文件和损坏的覆盖率报告均失败。
+ * 前置本机 Go/bash；每个作业在临时目录注入报告故障，验证非零退出；finally 删除目录，无仓库或数据库副作用。 */
+test('regression coverage validation rejects missing empty and malformed reports', () => {
+  for (const area of ['supplier', 'user', 'key']) {
+    const directory = mkdtempSync(join(tmpdir(), 'xhub-coverage-gate-'));
+    try {
+      mkdirSync(join(directory, 'coverage'));
+      for (const content of [null, '', 'not a Go coverage profile\n']) {
+        if (content !== null) writeFileSync(join(directory, `coverage/${area}-contract.out`), content);
+        const result = spawnSync('bash', ['-c', step(`${area}-contract`, 'Validate regression coverage').run], {
+          cwd: directory, encoding: 'utf8', timeout: 30000,
+        });
+        assert.equal(result.error, undefined, '校验命令必须实际执行');
+        assert.equal(result.signal, null, '不能把超时当作报告校验失败');
+        assert.notEqual(result.status, 0, `${area} 错误报告被当成成功: ${content}`);
+      }
+    } finally {
+      rmSync(directory, { recursive: true, force: true });
+    }
+  }
 });
