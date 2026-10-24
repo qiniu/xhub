@@ -83,6 +83,7 @@ export const zhCN = {
 },
 
   uiErrors: {"dailyUnavailable": "每日用量暂不可用", "bulkUpdateInvalid": "批量更新返回了异常结果", "reservationInvalid": "预算预占响应格式无效", "resolutionInvalid": "预算核对响应格式无效", "budgetMissing": "缺少预算快照", "samlMetadataInvalid": "SAML 元数据响应格式无效"},
+  keyActions: { invalidStateResponse: "无法确认密钥状态是否已更新，请刷新页面核对当前状态。" },
   createdKey: { warning: "请将此密钥保存在安全的位置。你将无法在 XHub 中再次查看它；如果丢失，请重新生成密钥。" },
   budgetReconciliation: budgetReconciliationZhCN,
   hardBudget: {

@@ -37,8 +37,8 @@ Excluded: rotation/regeneration, reset spend, bulk editing, aliases, health, tea
 ## Explicit gaps
 
 1. The unused legacy keyInfoCall sends `{keys:[...]}` although POST /v2/key/info requires one key. Real regression confirms 400; this contract does not invent batch support or modify that function.
-2. setKeyBlockedState substitutes the requested state when a 200 response lacks blocked; its existing unit test expects this. Tracked in [#154](https://github.com/qiniu/xhub/issues/154). Normal real backend/browser behavior is verified; that stub test is not evidence of persistence.
-3. Legacy organization_id/status/expand/return_full_object/include_team_keys/include_created_by_keys parameters are ignored, not documented as effective filters.
+2. The follow-up for [#154](https://github.com/qiniu/xhub/issues/154) removes requested-state fallback: only an explicit matching boolean confirms success. Empty, missing, wrong-type or opposite states show a refresh-to-check error, without asserting that the backend did not write. See follow-up verification below.
+3. Legacy organization_id/status/expand/return_full_object/include_team_keys/include_created_by_keys parameters are ignored, not documented as effective filters. The visible organization filter is confirmed broken via real HTTP and tracked separately in [#156](https://github.com/qiniu/xhub/issues/156). No active deleted-key page entry was found.
 4. Legacy create/delete/detail parsing remains permissive. The supported contract is a single JSON object; it does not promise every undeclared/malformed input is rejected. Strict update malformed-input 400 and preservation are tested against the real service.
 
 ## Verification and maintenance
@@ -65,7 +65,7 @@ External boundaries: upstreams are controlled local HTTP services, not productio
 
 ## Executed verification (2026-10-24)
 
-Four Go contract packages passed with race checks; 16 generator/workflow tests passed, with 9 workflow checks rerun after the final selector update; 138 frontend tests passed with zero failures. Final backend selection: eight passed leaves, zero failed, one external-vendor live subtest intentionally skipped in offline mode and not counted as passed. The earlier six-case contract/budget/isolation selection had zero skips. Four EN/zh E2E cases passed with zero failures/skips and both test/cleanup exit codes zero; these represent two bilingual scenarios, not all 415 project scenarios.
+Four Go contract packages passed with race checks; 16 generator/workflow tests passed, with 9 workflow checks rerun after the final selector update; 138 frontend tests passed with zero failures. Final backend selection: eight passed leaves, zero failed, one external-vendor live subtest intentionally skipped in offline mode and not counted as passed. The earlier six-case contract/budget/isolation selection had zero skips. Four EN/zh E2E cases passed with zero failures/skips and both test/cleanup exit codes zero; these represent two bilingual scenarios, not all project scenarios (417 in the current catalog).
 
 All three generation drift/type-negative checks, full frontend typecheck and Go vet passed. ESLint remains at 217 historical errors under the unchanged 289 budget, not zero static debt. Initial build errors exposed old non-null view declarations; types were corrected. An initial component assertion looked for an input instead of the actual plaintext pre element; correcting that assertion yielded all 138 passing. No business validation or failure gate was relaxed.
 
@@ -85,3 +85,34 @@ node scripts/check-eslint-error-budget.mjs ../.verification/key-contract/eslint.
 ```
 
 Local evidence: `.verification/key-contract/frontend-unit.json`, `unit-go.log`, `generator-tests.log`, `workflow-final.log`, `full-typecheck.log`, `vet.log`, `eslint-budget.log`; backend `.e2e/runs/regression-J1Uxq05D/regression.log`; browser `.e2e/key-contract-final/html/index.html`, `results.json`, `cleanup-status.json`. Raw reports stay untracked; CI reruns checks and uploads artifacts.
+
+## State-confirmation follow-up (#154, 2026-10-24)
+
+Only `useSetKeyBlockedState` response confirmation and translated feedback change. Permissions, budgets, backend writes and database structure stay unchanged. Only a matching boolean `blocked` triggers success. An unknown outcome keeps the confirmation dialog open and asks the user to refresh. Automated scenarios are registered in the catalog.
+
+- Test first: the old implementation failed 43 of 50 cases, passing seven. After the fix, all 50 hook cases and 13 existing detail component cases pass (63 total, zero failures).
+- Five real backend tests pass without skips. The new test injects PostgreSQL constraints to verify HTTP 500, preserved state, explicit confirmation after storage recovery, and real inference admission (blocked 401, active 200). Its initial repeated prompt hit the cache; unique English prompts now require actual upstream calls without weakening assertions.
+- Four EN/zh E2E cases pass with zero failures/skips and zero test/cleanup exit codes. New cases cover bad responses without sending writes, dropped replies after real writes, refresh/read-back, and normal block/unblock with actual inference. Existing cases cover creation, editing, expiry, rotation and deletion. Malformed replies are browser-boundary fault injection, not evidence that the normal backend emits bad 200s; persistence and inference use the real gateway/PostgreSQL.
+- Frontend typecheck, Go vet and all eight reporter unit tests pass. ESLint remains at 217 historical errors under the unchanged 289 budget.
+- Separate filter audit: two real requests that should match nothing (nonmatching organization and deleted status) both returned an active key. Both tests fail as defect evidence, not passes. The temporary reproducer is archived locally rather than included in the green fix suite. The visible organization filter is tracked in #156.
+
+Executed commands (root directory except the three npx commands, run in frontend):
+
+```bash
+npx vitest run 'src/app/(dashboard)/hooks/keys/useSetKeyBlockedState.test.ts' src/components/templates/key_info_view.test.tsx --reporter=json --outputFile=../.verification/key-state/unit.json
+npx tsc --noEmit
+npx eslint . --quiet --format json --output-file ../.verification/key-state/eslint-final.json --pass-on-unpruned-suppressions
+node frontend/scripts/check-eslint-error-budget.mjs .verification/key-state/eslint-final.json 289
+node --test frontend/e2e/checklist-reporter.test.cjs
+go vet ./cmd/regression
+bash scripts/regression.sh '^TestKeyContract'
+E2E_RUN_DIR="$PWD/.e2e/key-state-registered" bash scripts/e2e.sh \
+  scenarios/regression/key-state-confirmation-en.test.ts \
+  scenarios/regression/key-state-confirmation-zh-CN.test.ts \
+  scenarios/regression/key-lifecycle-en.test.ts \
+  scenarios/regression/key-lifecycle-zh-CN.test.ts
+```
+
+Reports: `.verification/key-state/repro.json`, `unit.json`, `typecheck.log`, `eslint-final.json`, `vet.log`, `reporter-final.log`; backend `.e2e/runs/regression-iUEW1nLJ/regression.log`; browser `.e2e/key-state-registered/results.json`, `html/index.html`, `cleanup-status.json`. Separate defect evidence: `.e2e/runs/regression-fAFBzhat/regression.log`, reproducer `.verification/key-state/key_filter_audit_test.go.txt`. Raw artifacts are not committed; CI executes the tests.
+
+Boundaries: controlled local upstream, no real vendor requests or evidence about production packet-loss frequency. No production operations, merge or deployment. Rollback reverts frontend confirmation only, without a database migration.
