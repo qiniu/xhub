@@ -12,6 +12,127 @@ Generated from the pilot OpenAPI source. No production route or client is replac
 | `PATCH /credentials/{credential_name}` | Merge patch; upsert when missing. | 200, 400, 401, 403, 500, 503 |
 | `DELETE /credentials/{credential_name}` | Delete supplier; repeated deletion returns deleted=0. | 200, 400, 401, 403, 500, 503 |
 
+### GET /credentials
+
+List suppliers (two equivalent array aliases).
+
+
+### POST /credentials
+
+Save supplier; duplicate creation replaces existing configuration.
+
+```json
+{
+  "required": false,
+  "description": "空正文沿用空对象语义；正文存在时必须是 JSON 对象。 / Empty body acts as an empty object; nonempty body must be a JSON object.",
+  "content": {
+    "application/json": {
+      "schema": {
+        "$ref": "#/components/schemas/CredentialInput"
+      },
+      "example": {
+        "credential_name": "example-provider",
+        "credential_info": {
+          "custom_llm_provider": "openai"
+        },
+        "credential_values": {
+          "api_base": "https://provider.example/v1",
+          "api_key": "example-not-a-secret"
+        }
+      }
+    }
+  }
+}
+```
+
+
+### GET /credentials/by_name/{credential_name}
+
+Read supplier with masked secret strings.
+
+```json
+[
+  {
+    "$ref": "#/components/parameters/CredentialName"
+  }
+]
+```
+
+
+### PATCH /credentials/{credential_name}
+
+Merge patch; upsert when missing.
+
+```json
+[
+  {
+    "$ref": "#/components/parameters/CredentialName"
+  }
+]
+```
+
+```json
+{
+  "required": false,
+  "description": "空正文沿用空对象语义；正文存在时必须是 JSON 对象。 / Empty body acts as an empty object; nonempty body must be a JSON object.",
+  "content": {
+    "application/json": {
+      "schema": {
+        "$ref": "#/components/schemas/CredentialInput"
+      },
+      "example": {
+        "credential_name": "example-provider",
+        "credential_info": {
+          "custom_llm_provider": "openai"
+        },
+        "credential_values": {
+          "api_base": "https://provider.example/v1",
+          "api_key": "example-not-a-secret"
+        }
+      }
+    }
+  }
+}
+```
+
+
+### DELETE /credentials/{credential_name}
+
+Delete supplier; repeated deletion returns deleted=0.
+
+```json
+[
+  {
+    "$ref": "#/components/parameters/CredentialName"
+  }
+]
+```
+
+```json
+{
+  "required": false,
+  "description": "空正文沿用空对象语义；正文存在时必须是 JSON 对象。 / Empty body acts as an empty object; nonempty body must be a JSON object.",
+  "content": {
+    "application/json": {
+      "schema": {
+        "$ref": "#/components/schemas/CredentialInput"
+      },
+      "example": {
+        "credential_name": "example-provider",
+        "credential_info": {
+          "custom_llm_provider": "openai"
+        },
+        "credential_values": {
+          "api_base": "https://provider.example/v1",
+          "api_key": "example-not-a-secret"
+        }
+      }
+    }
+  }
+}
+```
+
+
 ## Schemas
 
 ### CredentialInput

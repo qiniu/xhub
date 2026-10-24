@@ -73,8 +73,24 @@ export function registerUserBulkBudgetScenario(locale: "en" | "zh-CN") {
       await dialog.getByRole("button", { name: tr("pages.users.saveChanges"), exact: true }).click();
       const response = await saved;
       expect(response.status(), await response.text()).toBe(status);
-      if (status === 200) await expect(dialog).toHaveCount(0);
-      return response.json();
+      const result = await response.json();
+      if (status === 200) {
+        await expect(dialog).toHaveCount(0);
+        expect(result.atomic).toBe(true);
+        expect(result.batch_id).toBeTruthy();
+        expect(result.failed_updates).toBe(0);
+        expect(result.total_requested).toBe(result.results.length);
+        expect(result.successful_updates).toBe(result.results.length);
+        for (const row of result.results) {
+          expect(row.success).toBe(true);
+          expect(row.updated_user.user_id).toBe(row.user_id);
+          expect(row.updated_user.max_budget).toBe(mode === "clear" ? null : Number(value));
+        }
+      } else {
+        expect(result.error.code).toBe(String(status));
+        expect(result.error.message).toBeTruthy();
+      }
+      return result;
     };
     try {
       const configured = await page.request.post(GATEWAY + "/model/new", {
