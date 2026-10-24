@@ -32,7 +32,7 @@ type quotaNode struct {
 }
 
 // quotaUnused 计算组织、团队、个人仍需由父级保留的金额；Key 仅校验单项金额，不预留。参数 n 是树节点；返回未消费保留金额或非法分配错误。
-// 调用：管理写入及消费检查；共享节点递归传递下级保留金额，固定节点不得低于消费与下级保留总和。
+// 调用：单项及批量管理写入；共享节点递归传递下级保留金额，固定节点只允许下级保留其非负剩余额度；历史软预算超支不作为分配错误。
 func quotaUnused(n *quotaNode) (float64, error) {
 	// Key 金额仅限制自身消费；软预算可能已超支，但不能因此锁住个人的其他入口。
 	if n.Kind == "key" {
@@ -52,10 +52,16 @@ func quotaUnused(n *quotaNode) (float64, error) {
 	if n.Limit == nil {
 		return unused, nil
 	}
-	if math.IsNaN(*n.Limit) || math.IsInf(*n.Limit, 0) || *n.Limit < 0 || n.Spend+unused > *n.Limit+1e-9 {
+	if math.IsNaN(*n.Limit) || math.IsInf(*n.Limit, 0) || *n.Limit < 0 {
 		return 0, ErrQuotaAllocation
 	}
-	return math.Max(0, *n.Limit-n.Spend), nil
+	// 软预算允许在途请求完成后超支。负余额没有可预留金额，但不应阻塞无关兄弟节点的管理操作。
+	// 仍按真实消费扣减父级余额，不能把历史超支抹掉或继续为下级分配正额度。
+	remaining := math.Max(0, *n.Limit-n.Spend)
+	if unused > remaining+1e-9 {
+		return 0, ErrQuotaAllocation
+	}
+	return remaining, nil
 }
 
 // quotaTree 读取当前事务的额度归属；参数 s 是会话，返回节点索引或数据库错误。
@@ -188,7 +194,7 @@ func quotaTreeFor(s *xorm.Session, kind, id string) (map[string]*quotaNode, erro
 }
 
 // validateQuota 校验指定节点及祖先。参数 kind/id 标识修改对象；返回分配错误，事务调用方负责回滚。
-// 只验证受影响路径，减少分配可释放未使用容量，历史消费不回退，不阻断无关资料修改。
+// 只验证受影响路径；直接修改对象仍不得低于自身消费与预占，递归兄弟节点允许历史软预算超支。
 func validateQuota(s *xorm.Session, kind, id string) error {
 	nodes, err := quotaTree(s)
 	if err != nil {
@@ -200,6 +206,10 @@ func validateQuota(s *xorm.Session, kind, id string) error {
 	}
 	if err := applyBudgetHolds(s, nodes); err != nil {
 		return err
+	}
+	// 保留直接修改对象的降额约束；仅递归扫描到的历史超支不阻塞此次分配。
+	if kind != "key" && n.Limit != nil && n.Spend > *n.Limit+1e-9 {
+		return ErrQuotaAllocation
 	}
 	for n != nil {
 		if n.Parent == "ambiguous" {

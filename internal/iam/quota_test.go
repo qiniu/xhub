@@ -41,7 +41,7 @@ func TestQuotaHotPeriod(t *testing.T) {
 func quotaLimit(value float64) *float64 { return &value }
 
 // TestQuotaUnused 验证逐级未消费保留；前置纯内存树，覆盖固定、共享、零、已消费和非法输入，无外部数据需清理。
-// 参数 t 为测试上下文，无返回；包含个人重置恢复预留后超配拒绝、父级扩容恢复的边界。
+// 参数 t 为测试上下文，无返回；包含软预算超支不阻塞兄弟、超支父级禁止新增预留、个人重置及父级扩容边界。
 func TestQuotaUnused(t *testing.T) {
 	for _, tc := range []struct {
 		name string
@@ -56,6 +56,12 @@ func TestQuotaUnused(t *testing.T) {
 		{"重置前消费抵消个人预留", &quotaNode{Limit: quotaLimit(1000), Spend: 100, Children: []*quotaNode{{Limit: quotaLimit(1000), Spend: 100}}}, 900, false},
 		{"重置个人不得抹去父级消费", &quotaNode{Limit: quotaLimit(1000), Spend: 100, Children: []*quotaNode{{Limit: quotaLimit(1000), Spend: 0}}}, 0, true},
 		{"父级扩容后允许个人重新预留", &quotaNode{Limit: quotaLimit(1100), Spend: 100, Children: []*quotaNode{{Limit: quotaLimit(1000), Spend: 0}}}, 1000, false},
+		{"超支叶子不预留", &quotaNode{Kind: "user", Limit: quotaLimit(500), Spend: 500.45}, 0, false},
+		{"共享父级传递兄弟预留", &quotaNode{Children: []*quotaNode{{Kind: "user", Limit: quotaLimit(500), Spend: 500.45}, {Limit: quotaLimit(500)}}}, 500, false},
+		{"固定父级扣除实际超支", &quotaNode{Limit: quotaLimit(1000), Spend: 501, Children: []*quotaNode{{Limit: quotaLimit(500), Spend: 501}, {Limit: quotaLimit(499)}}}, 499, false},
+		{"超支不可给兄弟虚增余额", &quotaNode{Limit: quotaLimit(1000), Spend: 501, Children: []*quotaNode{{Limit: quotaLimit(500), Spend: 501}, {Limit: quotaLimit(500)}}}, 0, true},
+		{"超支父级无预留可管理", &quotaNode{Limit: quotaLimit(500), Spend: 501, Children: []*quotaNode{{Limit: quotaLimit(500), Spend: 501}}}, 0, false},
+		{"超支父级不得新增预留", &quotaNode{Limit: quotaLimit(500), Spend: 501, Children: []*quotaNode{{Limit: quotaLimit(1)}}}, 0, true},
 		{"零", &quotaNode{Limit: quotaLimit(0)}, 0, false},
 		{"负数", &quotaNode{Limit: quotaLimit(-1)}, 0, true},
 		{"非数", &quotaNode{Limit: quotaLimit(math.NaN())}, 0, true},
