@@ -55,6 +55,7 @@ test("缺少 Go OpenAPI 来源时失败且保留已有生成文件", () => {
     writeFileSync(paths.routeCatalogPath, "[]\n");
     writeFileSync(paths.outputPath, "existing schema\n");
     assert.throws(() => runGeneratorCheck(fixture.scriptUrl), /只包含 method\/path/);
+    assert.throws(() => runGeneratorCheck(fixture.scriptUrl), /gen:api:suppliers/);
     assert.equal(readFileSync(paths.outputPath, "utf8"), "existing schema\n");
   } finally {
     rmSync(fixture.root, { recursive: true, force: true });

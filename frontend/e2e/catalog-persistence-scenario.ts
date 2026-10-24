@@ -6,7 +6,7 @@ import { GATEWAY, UPSTREAM, loginAdmin, sessionBearer, stableGoto, uiPath } from
 /**
  * 注册供应商目录持久化的双语完整流程；locale 为页面语言，无返回值。
  * 前置隔离数据库、真实网关、生产构建控制台和本地上游；页面创建/编辑/删除供应商，
- * 接口回读后经调试台验证配置真实用于推理，并验证非法 JSON/RPC 不覆盖已保存配置，OAuth 占位入口明确失败且不影响已登录会话。
+ * 接口回读后经调试台验证配置真实用于推理，覆盖空 Key/null 扩展与列表别名，并验证非法 JSON/RPC 不覆盖已保存配置，OAuth 占位入口明确失败且不影响已登录会话。
  * 回调页验证双语提示和真实跳转，不将收到回调当作授权成功；临时无脚本上下文仅用于观察跳转前的服务端页面文案。
  * 不拦截或伪造后台响应；finally 清理部署和凭据，运行器另行回收专属 schema。
  */
@@ -73,6 +73,8 @@ export function registerCatalogPersistence(locale: Locale) {
       const created = await creation;
       expect(created.status(), "页面创建供应商必须由真实后台成功持久化").toBe(200);
       credentialExists = true;
+      expect(await created.json()).toMatchObject({ id: name, credential_name: name });
+      expect(await created.json(), "创建响应应省略凭据对象").not.toHaveProperty("credential_values");
       expect(created.request().postDataJSON()).toMatchObject({
         credential_name: name,
         credential_info: { custom_llm_provider: "openai" },
@@ -91,6 +93,18 @@ export function registerCatalogPersistence(locale: Locale) {
       expect((await update).status(), "编辑后的供应商地址必须保存成功").toBe(200);
       await expect(edit).toHaveCount(0);
 
+      // 真实补丁保留原 Key；null 扩展应保留，后续模型推理会证明没有把空 Key 写入供应商。
+      const emptySecret = await page.request.patch(GATEWAY + "/credentials/" + name, {
+        headers, data: { credential_values: { api_key: "" }, contract_note: null, contract_enabled: false },
+      });
+      expect(emptySecret.status(), "空 Key 补丁应沿用已有凭据").toBe(200);
+      const listed = await page.request.get(GATEWAY + "/credentials", { headers });
+      expect(listed.status()).toBe(200);
+      const listing = await listed.json();
+      expect(listing.data, "两个兼容列表字段应一致").toEqual(listing.credentials);
+      expect(listing.data).toEqual(expect.arrayContaining([expect.objectContaining({
+        credential_name: name, contract_note: null, contract_enabled: false,
+      })]));
       const stored = await page.request.get(GATEWAY + "/credentials/by_name/" + name, { headers });
       expect(stored.status(), "刷新后的供应商应能通过独立接口回读").toBe(200);
       expect(await stored.json()).toMatchObject({
