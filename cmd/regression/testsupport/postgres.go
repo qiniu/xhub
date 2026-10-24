@@ -40,10 +40,26 @@ func DatabaseURL() string {
 // 只删除本例 schema；网络操作有超时，错误只报告阶段与类型，避免输出含密码的 DSN。
 func Postgres(t *testing.T, prefix string) string {
 	t.Helper()
+	return postgresFixture(t, prefix)
+}
+
+// postgresReporter 限定夹具需要的测试报告能力；真实调用使用 testing.T，故障测试捕获报告以验证失败分支。
+// 不替换数据库连接或 SQL；Cleanup 必须保留测试结束时的回收顺序，Fatalf 必须中止当前夹具调用。
+type postgresReporter interface {
+	Helper()
+	Fatalf(string, ...any)
+	Errorf(string, ...any)
+	Cleanup(func())
+}
+
+// postgresFixture 执行真实 PostgreSQL 隔离与清理，参数为报告器及 schema 前缀，返回隔离连接串。
+// Postgres 包装器和进程内故障测试共用此路径；失败通过报告器标记，数据库副作用与公开夹具一致。
+func postgresFixture(t postgresReporter, prefix string) string {
+	t.Helper()
 	dsn := DatabaseURL()
 	u, err := url.Parse(dsn)
 	if err != nil || (u.Scheme != "postgres" && u.Scheme != "postgresql") {
-		t.Fatal("test database URL is invalid; check XHUB_TEST_DATABASE_URL (credentials omitted)")
+		t.Fatalf("test database URL is invalid; check XHUB_TEST_DATABASE_URL (credentials omitted)")
 	}
 	schema := fmt.Sprintf("%s_test_%d", prefix, time.Now().UnixNano())
 	identifier := pgx.Identifier{schema}.Sanitize()
