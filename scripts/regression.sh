@@ -38,9 +38,7 @@ for arg in "$@"; do
   esac
 done
 
-# The suite skips instead of failing when the database is unreachable, which is
-# right for `go test ./...` and wrong here: a run that silently skipped every
-# database test would report success while proving nothing.
+# 必需数据库不可达必须失败；入口预检快速报错，Go 夹具也独立强制连接和清理。
 if command -v psql >/dev/null 2>&1; then
   if [[ -n "${XHUB_TEST_DATABASE_URL:-}" ]]; then
     if ! psql "$XHUB_TEST_DATABASE_URL" -X -qAt -c 'select 1' >/dev/null 2>&1; then
@@ -71,12 +69,6 @@ if [[ "$VERBOSE" == 1 ]]; then
   ARGS+=(-v)
 fi
 if [[ -n "$PATTERN" ]]; then
-  # -list only matches top-level names. Capture first to avoid SIGPIPE with pipefail.
-  TEST_NAMES="$(go test ./cmd/regression/ -list "${PATTERN%%/*}")"
-  if ! rg -q '^Test' <<< "$TEST_NAMES"; then
-    echo "no regression tests matched: $PATTERN" >&2
-    exit 1
-  fi
   ARGS+=(-run "$PATTERN")
 fi
 
@@ -93,17 +85,21 @@ mkdir -p "$ROOT/.e2e/runs"
 LOG_DIR="$(mktemp -d "$ROOT/.e2e/runs/regression-XXXXXXXX")"
 LOG_FILE="$LOG_DIR/regression.log"
 echo "full regression log: $LOG_FILE"
-# 始终采集详细证据；pipefail 保留测试、写入与过滤失败，避免伪报通过。
-# -v 只显示测试状态并刷新缓冲，截短异常长用例名，业务日志保存在文件中。
-if go test ./cmd/regression/ "${ARGS[@]}" -v 2>&1 | tee "$LOG_FILE" | awk -v verbose="$VERBOSE" '
-  verbose == 1 && ($0 ~ /^=== RUN / || $0 ~ /^[[:space:]]*--- (PASS|FAIL|SKIP):/ || $0 ~ /^(PASS|FAIL|ok[[:space:]])/) {
-    print substr($0, 1, 400)
-    fflush()
-  }
-'; then
+# -json 提供真实执行事件；不能靠 -list 或日志里的 PASS 判断子用例是否执行。
+CHECK_ARGS=(--log "$LOG_FILE" --summary "$LOG_DIR/summary.json" --pattern "$PATTERN")
+if [[ "$VERBOSE" == 1 ]]; then CHECK_ARGS+=(--verbose); fi
+set +e
+go test ./cmd/regression/ "${ARGS[@]}" -json 2>&1 | tee "$LOG_DIR/events.jsonl" | python3 "$ROOT/scripts/check-regression-results.py" "${CHECK_ARGS[@]}"
+STAGE_STATUS=("${PIPESTATUS[@]}")
+set -e
+# 优先保留 Go 的失败码；Go 成功也必须检查证据写入及用例匹配门禁。
+STATUS=0
+for stage in "${STAGE_STATUS[@]}"; do
+  if [[ "$stage" != 0 ]]; then STATUS="$stage"; break; fi
+done
+if [[ "$STATUS" == 0 ]]; then
   echo "backend regression passed"
 else
-  STATUS=$?
   echo "backend regression failed (exit $STATUS); see $LOG_FILE" >&2
   exit "$STATUS"
 fi

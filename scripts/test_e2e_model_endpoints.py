@@ -13,7 +13,7 @@ SCRIPTS = Path(__file__).resolve().parent
 class ModelEndpointsRunnerTests(unittest.TestCase):
     """在临时工作区验证编排、退出码和清理；产品业务由 Playwright/Go 验证。"""
 
-    def run_entry(self, *, browser_code=0, backend_code=0, missing=False, redis_code=0, locked=False):
+    def run_entry(self, *, browser_code=0, backend_code=0, missing=False, redis_code=0, locked=False, cleanup_code=0, entry="e2e-model-endpoints.sh"):
         """参数注入阶段故障，返回退出码、报告、清理证据；临时工作区由上下文清理。
 
         调用方为入口契约测试；真实报告器读取本次产物，Docker/浏览器/后端命令不访问服务。
@@ -23,7 +23,7 @@ class ModelEndpointsRunnerTests(unittest.TestCase):
             scripts = root / "scripts"
             scripts.mkdir()
             (root / ".e2e/current").mkdir(parents=True)
-            for name in ("e2e-model-endpoints.sh", "e2e-summary.py"):
+            for name in (entry, "e2e-summary.py"):
                 shutil.copyfile(SCRIPTS / name, scripts / name)
             binaries = root / "bin"
             binaries.mkdir()
@@ -33,6 +33,7 @@ import os, sys
 from pathlib import Path
 with Path("docker-calls.txt").open("a") as log: log.write(" ".join(sys.argv[1:]) + "\\n")
 if sys.argv[1] == "run": raise SystemExit(int(os.environ["TEST_REDIS_CODE"]))
+if sys.argv[1] == "rm": raise SystemExit(int(os.environ["TEST_CLEANUP_CODE"]))
 if sys.argv[1] == "port": print("127.0.0.1:16379")
 ''',
                 "git": "#!/usr/bin/env bash\necho fixture-revision\n",
@@ -48,10 +49,12 @@ import json, os
 from pathlib import Path
 if os.environ["TEST_MISSING"] != "1":
     failed = int(os.environ["TEST_BROWSER_CODE"]) != 0
-    Path(".e2e/current/results.json").write_text(json.dumps({
+    target = Path(os.environ["E2E_RUN_DIR"]) / "results.json"
+    target.parent.mkdir(parents=True, exist_ok=True)
+    target.write_text(json.dumps({
         "stats": {"expected": int(not failed), "unexpected": int(failed), "skipped": 0},
         "suites": [{"title": "fixture", "specs": [{"title": "persist",
-            "tests": [{"status": "unexpected" if failed else "expected", "results": []}]}]}],
+            "tests": [{"status": "unexpected" if failed else "expected", "results": [{"status": "failed" if failed else "passed"}]}]}]}],
     }))
 PY
 exit "$TEST_BROWSER_CODE"
@@ -72,9 +75,11 @@ exit "$TEST_BACKEND_CODE"
                 (root / ".e2e/acceptance.lock").mkdir()
             env = dict(os.environ, PATH=str(binaries) + os.pathsep + os.environ["PATH"],
                        TEST_BROWSER_CODE=str(browser_code), TEST_BACKEND_CODE=str(backend_code),
-                       TEST_MISSING=str(int(missing)), TEST_REDIS_CODE=str(redis_code))
-            result = subprocess.run(["bash", str(scripts / "e2e-model-endpoints.sh")],
-                                    cwd=root, env=env, capture_output=True, text=True, timeout=20)
+                       TEST_MISSING=str(int(missing)), TEST_REDIS_CODE=str(redis_code),
+                       TEST_CLEANUP_CODE=str(cleanup_code), E2E_LIVE="1", E2E_LIVE_VENDORS="local-fixture",
+                       E2E_ACCEPTANCE_DIR=str(root / ".e2e/runs/fixture"))
+            result = subprocess.run(["bash", str(scripts / entry)],
+                                    cwd=root, env=env, capture_output=True, text=True, timeout=45)
             reports = list((root / ".e2e/runs").glob("*/summary.json"))
             summary = json.loads(reports[0].read_text()) if reports else None
             calls = root / "docker-calls.txt"
@@ -131,6 +136,16 @@ exit "$TEST_BACKEND_CODE"
         self.assertEqual(summary["status"], "failed")
         self.assertFalse(evidence["backend_started"])
         self.assert_cleaned(evidence)
+
+    def test_redis_cleanup_failure_fails_both_entry_and_final_report(self):
+        """两种验收入口在阶段都成功而 Redis 删除失败时必须退出失败，最终报告明确清理错误。"""
+        for entry in ("e2e-model-endpoints.sh", "e2e-all.sh"):
+            with self.subTest(entry=entry):
+                result, summary, evidence = self.run_entry(cleanup_code=9, entry=entry)
+                self.assertNotEqual(result.returncode, 0, result.stdout + result.stderr)
+                self.assertEqual(summary["status"], "failed")
+                self.assertEqual(summary["cleanup_exit"], 1)
+                self.assertFalse(evidence["lock_exists"])
 
     def test_existing_acceptance_lock_blocks_without_removing_owner_lock(self):
         """已有锁拒绝启动；不创建容器/报告、不删除他人锁，临时目录由测试清理。"""
