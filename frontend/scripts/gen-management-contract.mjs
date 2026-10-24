@@ -17,6 +17,17 @@ function localized(text, locale) {
   return locale === "en" ? parts.at(-1) : parts[0];
 }
 
+/** 为文档递归选择说明语言；value为契约节点，locale为语言，返回副本。
+ * 供操作与Schema展示使用；example/examples/default/enum/const是原始数据，不翻译、不修改输入或协议字段。 */
+function localizedView(value, locale) {
+  if (Array.isArray(value)) return value.map(item => localizedView(item, locale));
+  if (!value || typeof value !== "object") return value;
+  return Object.fromEntries(Object.entries(value).map(([key, child]) => {
+    if (["example", "examples", "default", "enum", "const"].includes(key)) return [key, child];
+    return [key, key === "description" && typeof child === "string" ? localized(child, locale) : localizedView(child, locale)];
+  }));
+}
+
 /** 从 spec 生成不依赖 CDN 的离线 Markdown；locale 决定标题和描述，返回完整参考，未知语言显式报错。 */
 export function renderReference(spec, locale, domain = "suppliers") {
   const l = labels[locale] && { ...labels[locale] };
@@ -34,14 +45,14 @@ export function renderReference(spec, locale, domain = "suppliers") {
   for (const [path, methods] of Object.entries(spec.paths)) {
     for (const [method, op] of Object.entries(methods)) {
       lines.push("", `### ${method.toUpperCase()} ${path}`, "", localized(op.description || op.summary, locale), "");
-      if (op.parameters) lines.push("```json", JSON.stringify(op.parameters, null, 2), "```", "");
-      if (op.requestBody) lines.push("```json", JSON.stringify(op.requestBody, null, 2), "```", "");
+      if (op.parameters) lines.push("```json", JSON.stringify(localizedView(op.parameters, locale), null, 2), "```", "");
+      if (op.requestBody) lines.push("```json", JSON.stringify(localizedView(op.requestBody, locale), null, 2), "```", "");
     }
   }
   lines.push("", `## ${l.schemas}`, "");
   for (const [name, schema] of Object.entries(spec.components.schemas)) {
     // JSON Schema 原文保留字段与校验语义；描述仅在文档展示时选语言，不改变契约或用户输入。
-    const view = JSON.parse(JSON.stringify(schema), (key, value) => key === "description" ? localized(value, locale) : value);
+    const view = localizedView(schema, locale);
     lines.push(`### ${name}`, "", "```json", JSON.stringify(view, null, 2), "```", "");
   }
   return lines.join("\n");
