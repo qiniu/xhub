@@ -149,7 +149,7 @@ OpenAPI 描述入口、认证、错误包络和可描述的字段；它不能单
 
 已有既定行为的错误用 BUG 跟踪；新增文档入口、检查级别语义或契约流程用 Proposal；跨模块方案按仓库规范使用 Architecture-Design。本文不代替这些具体变更的验收记录。
 
-实际阶段 2 首个试点选择已完成持久化反例测试的供应商管理：[契约试点与范围](supplier-contract-pilot.md)（Proposal #149）。用户、Key 和其他领域仍未迁移；这不代表整份 API 已生成或兼容层已重构。
+实际阶段 2 首个试点选择已完成持久化反例测试的供应商管理：[契约试点与范围](supplier-contract-pilot.md)（Proposal #149）。用户与 Key 的核心批次已分别完成，见[用户契约](user-contract.md)和[Key契约](key-contract.md)。第三阶段新增[模型与端点契约批次](model-contract.md)（Proposal #159）；日志及各域明确排除的接口尚未迁移，阶段3尚未整体完成，不代表兼容层已重构。
 
 ## 每批变更的验收与发布
 

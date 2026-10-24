@@ -39,6 +39,10 @@ export function renderReference(spec, locale, domain = "suppliers") {
     l.title = locale === "en" ? "Key management API — generated reference" : "密钥管理 API — 生成参考";
     l.notice = locale === "en" ? "Generated from OpenAPI; no production handler is replaced. See key-contract.md for compatibility and verification boundaries." : "由 OpenAPI 生成，不替换生产 handler。兼容及验证边界见 key-contract.md。";
   }
+  if (l && domain === "models") {
+    l.title = locale === "en" ? "Model and endpoint API — generated reference" : "模型与端点 API — 生成参考";
+    l.notice = locale === "en" ? "Generated from OpenAPI; no production handler is replaced. See model-contract.md for verification boundaries." : "由 OpenAPI 生成，不替换生产 handler。验证边界见 model-contract.md。";
+  }
   if (!l) throw new Error(`Unsupported locale: ${locale}`);
   const lines = [`# ${l.title}`, "", l.notice, "", `[OpenAPI](../../../contracts/${domain}/openapi.json)`, "", `| ${l.operation} | ${l.summary} | ${l.responses} |`, "| --- | --- | --- |"];
   for (const [path, methods] of Object.entries(spec.paths)) {
@@ -75,16 +79,16 @@ export function syncArtifacts(targetRoot, artifacts, check) {
   }
 }
 
-/** 从 targetRoot/domain 的唯一 spec（仅 users/suppliers/keys） 调用固定版本生成器；默认仓库根目录，测试可传临时目录，失败原样终止，返回产物映射，不注册运行时 handler。 */
+/** 从 targetRoot/domain 的唯一 spec（仅 users/suppliers/keys/models） 调用固定版本生成器；默认仓库根目录，测试可传临时目录，失败原样终止，返回产物映射，不注册运行时 handler。 */
 export async function generate(targetRoot = root, domain = "suppliers") {
-  if (!["suppliers", "users", "keys"].includes(domain)) throw new Error(`Unsupported contract: ${domain}`);
+  if (!["suppliers", "users", "keys", "models"].includes(domain)) throw new Error(`Unsupported contract: ${domain}`);
   const source = `contracts/${domain}/openapi.json`;
-  const prefix = ({ suppliers: "supplier", users: "user", keys: "key" })[domain];
+  const prefix = ({ suppliers: "supplier", users: "user", keys: "key", models: "model" })[domain];
   const spec = JSON.parse(readFileSync(resolve(targetRoot, source), "utf8"));
   const routes = JSON.parse(readFileSync(resolve(targetRoot, "internal/catalog/routes.json"), "utf8"));
   // 目录来自兼容清单，部分已实现的用户/密钥别名只在真实挂载文件中；两者都读取，绝不靠手写白名单放行。
-  if (domain === "users" || domain === "keys") {
-    const mount = readFileSync(resolve(targetRoot, `internal/gateway/${domain === "users" ? "identity" : "keys"}/mount.go`), "utf8");
+  if (domain === "users" || domain === "keys" || domain === "models") {
+    const mount = readFileSync(resolve(targetRoot, `internal/gateway/${domain === "users" ? "identity" : domain}/mount.go`), "utf8");
     for (const match of mount.matchAll(/reg\.Handle\("(GET|POST|PUT|PATCH|DELETE) ([^" ]+)"/g)) routes.push({m:match[1], p:match[2]});
   }
   for (const [path, methods] of Object.entries(spec.paths)) {

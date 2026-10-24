@@ -170,10 +170,10 @@ test('key contract requires generation, permissions and real budget regression',
   assert.equal(artifact.with['if-no-files-found'], 'error');
 });
 
-/** 三个真实 HTTP/PG 契约作业必须产出各自覆盖率并上传 backend，避免处理器执行证据遗漏。
+/** 四个真实 HTTP/PG 契约作业必须产出各自覆盖率并上传 backend，避免处理器执行证据遗漏。
  * 前置真实 YAML；检查插桩、报告校验、精确上传与诊断归档，失败不允许跳过，纯配置测试无数据需清理。 */
 test('real contract regression coverage is validated archived and uploaded', () => {
-  for (const area of ['supplier', 'user', 'key']) {
+  for (const area of ['supplier', 'user', 'key', 'model']) {
     const job = `${area}-contract`;
     const profile = `coverage/${area}-contract.out`;
     const run = step(job, `Run real ${area} contract regression`);
@@ -205,7 +205,7 @@ test('real contract regression coverage is validated archived and uploaded', () 
 /** 执行工作流中的真实 shell 校验，确认缺失、空文件和损坏的覆盖率报告均失败。
  * 前置本机 Go/bash；每个作业在临时目录注入报告故障，验证非零退出；finally 删除目录，无仓库或数据库副作用。 */
 test('regression coverage validation rejects missing empty and malformed reports', () => {
-  for (const area of ['supplier', 'user', 'key']) {
+  for (const area of ['supplier', 'user', 'key', 'model']) {
     const directory = mkdtempSync(join(tmpdir(), 'xhub-coverage-gate-'));
     try {
       mkdirSync(join(directory, 'coverage'));
@@ -222,4 +222,16 @@ test('regression coverage validation rejects missing empty and malformed reports
       rmSync(directory, { recursive: true, force: true });
     }
   }
+});
+
+/** 模型契约作业必须执行真实协议/权限回归，生成器和校验失败阻断；只读工作流，无线上副作用。 */
+test('model contract requires generated types and real deployment regression', () => {
+  const job = workflow.jobs['model-contract'];
+  assert.ok(job);
+  assert.equal(step('model-contract', 'Check generated contract and TypeScript types').run, 'npm --prefix frontend run check:api:models');
+  assert.equal(step('model-contract', 'Test generator drift rejection').run, 'node --test frontend/scripts/gen-model-contract.test.mjs');
+  assert.equal(step('model-contract', 'Validate OpenAPI and Go types').run, 'go test -race ./contracts/models');
+  assert.equal(step('model-contract', 'Run real model contract regression').run, "bash scripts/regression.sh '^Test(ModelContract|OfficialCredentialSupportsNativeModel)'");
+  assert.ok(job.steps.every(item => !item['continue-on-error']));
+  assert.equal(job.steps.find(item => item.run === 'docker compose down -v').if, 'always()');
 });

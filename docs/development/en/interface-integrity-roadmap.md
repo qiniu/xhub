@@ -149,7 +149,7 @@ The fail-before/pass-after verification takes place within the same fix PR, reta
 
 Track errors in established behavior as BUG issues. Use Proposals for new documentation routes, check-level semantics, or contract workflows. Cross-module plans use Architecture-Design under repository conventions. This document does not replace acceptance records for individual changes.
 
-The first phase-2 pilot targets supplier management, whose persistence failure baseline is established: [contract pilot and boundaries](supplier-contract-pilot.md) (Proposal #149). Users, keys and other domains remain unmigrated; this is not a whole-API generation or compatibility-layer refactor.
+The first phase-2 pilot targets supplier management, whose persistence failure baseline is established: [contract pilot and boundaries](supplier-contract-pilot.md) (Proposal #149). Core user and key batches are documented in [user contracts](user-contract.md) and [key contracts](key-contract.md). Phase 3 adds the [model and endpoint batch](model-contract.md) (Proposal #159). Logs and explicitly excluded operations remain unmigrated; phase 3 is not complete and the compatibility layer has not been refactored.
 
 ## Acceptance and release for each batch
 
