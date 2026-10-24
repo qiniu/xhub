@@ -244,7 +244,7 @@ export interface components {
             /** @enum {string} */
             owner_type?: "personal" | "";
             user_id?: string;
-            team_id?: string;
+            team_id?: string | null;
             project_id?: string;
         };
         UpdateKey: {

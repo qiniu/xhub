@@ -68,7 +68,7 @@ func (c *keyContractClient) call(method, path, token string, body any, want int,
 func TestKeyContractLifecycle(t *testing.T) {
 	c := newKeyContractClient(t)
 	call := func(m, p string, b any, w int) reply { t.Helper(); return c.call(m, p, c.admin, b, w, true) }
-	created := call("POST", "/key/generate", map[string]any{"key_alias": "保留原始名称", "max_budget": "10", "duration": "1h", "models": []string{"key-contract-chat"}}, 200).json()
+	created := call("POST", "/key/generate", map[string]any{"team_id": nil, "key_alias": "保留原始名称", "max_budget": "10", "duration": "1h", "models": []string{"key-contract-chat"}}, 200).json()
 	id, token := created["token_id"].(string), created["key"].(string)
 	raw, err := json.Marshal(created)
 	if err != nil {

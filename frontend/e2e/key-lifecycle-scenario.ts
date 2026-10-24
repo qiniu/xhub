@@ -57,6 +57,8 @@ export function registerKeyLifecycleScenario(locale: "en" | "zh-CN") {
       );
       await page.getByRole("button", { name: tr("pages.apiKeys.createSubmit"), exact: true }).click();
       const minted = await mintedPromise;
+      // 无团队表单实际发送null；契约必须接受此输入，不能仅测试省略字段。
+      expect(minted.request().postDataJSON().team_id).toBeNull();
       expect(minted.status()).toBe(200);
       const original = await minted.json();
       id = original.token_id;

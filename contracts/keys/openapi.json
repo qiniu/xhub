@@ -986,7 +986,8 @@
             "type": "string"
           },
           "team_id": {
-            "type": "string"
+            "type": "string",
+            "nullable": true
           },
           "project_id": {
             "type": "string"
