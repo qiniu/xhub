@@ -206,8 +206,8 @@ const UsagePage: React.FC<UsagePageProps> = ({ teams, organizations }) => {
         modelSpend[model].metrics.api_requests += metrics.metrics.api_requests;
         modelSpend[model].metrics.successful_requests += metrics.metrics.successful_requests || 0;
         modelSpend[model].metrics.failed_requests += metrics.metrics.failed_requests || 0;
-        modelSpend[model].metrics.cache_read_input_tokens += metrics.metrics.cache_read_input_tokens || 0;
-        modelSpend[model].metrics.cache_creation_input_tokens += metrics.metrics.cache_creation_input_tokens || 0;
+        modelSpend[model].metrics.cache_read_input_tokens! += metrics.metrics.cache_read_input_tokens || 0;
+        modelSpend[model].metrics.cache_creation_input_tokens! += metrics.metrics.cache_creation_input_tokens || 0;
       });
     });
 
@@ -252,8 +252,8 @@ const UsagePage: React.FC<UsagePageProps> = ({ teams, organizations }) => {
         modelGroupSpend[modelGroup].metrics.api_requests += metrics.metrics.api_requests;
         modelGroupSpend[modelGroup].metrics.successful_requests += metrics.metrics.successful_requests || 0;
         modelGroupSpend[modelGroup].metrics.failed_requests += metrics.metrics.failed_requests || 0;
-        modelGroupSpend[modelGroup].metrics.cache_read_input_tokens += metrics.metrics.cache_read_input_tokens || 0;
-        modelGroupSpend[modelGroup].metrics.cache_creation_input_tokens +=
+        modelGroupSpend[modelGroup].metrics.cache_read_input_tokens! += metrics.metrics.cache_read_input_tokens || 0;
+        modelGroupSpend[modelGroup].metrics.cache_creation_input_tokens! +=
           metrics.metrics.cache_creation_input_tokens || 0;
       });
     });
@@ -300,8 +300,8 @@ const UsagePage: React.FC<UsagePageProps> = ({ teams, organizations }) => {
         providerSpendMap[provider].metrics.api_requests += metrics.metrics.api_requests;
         providerSpendMap[provider].metrics.successful_requests += metrics.metrics.successful_requests || 0;
         providerSpendMap[provider].metrics.failed_requests += metrics.metrics.failed_requests || 0;
-        providerSpendMap[provider].metrics.cache_read_input_tokens += metrics.metrics.cache_read_input_tokens || 0;
-        providerSpendMap[provider].metrics.cache_creation_input_tokens +=
+        providerSpendMap[provider].metrics.cache_read_input_tokens! += metrics.metrics.cache_read_input_tokens || 0;
+        providerSpendMap[provider].metrics.cache_creation_input_tokens! +=
           metrics.metrics.cache_creation_input_tokens || 0;
       });
     });
@@ -349,8 +349,8 @@ const UsagePage: React.FC<UsagePageProps> = ({ teams, organizations }) => {
         keySpend[key].metrics.api_requests += metrics.metrics.api_requests;
         keySpend[key].metrics.successful_requests += metrics.metrics.successful_requests;
         keySpend[key].metrics.failed_requests += metrics.metrics.failed_requests;
-        keySpend[key].metrics.cache_read_input_tokens += metrics.metrics.cache_read_input_tokens || 0;
-        keySpend[key].metrics.cache_creation_input_tokens += metrics.metrics.cache_creation_input_tokens || 0;
+        keySpend[key].metrics.cache_read_input_tokens! += metrics.metrics.cache_read_input_tokens || 0;
+        keySpend[key].metrics.cache_creation_input_tokens! += metrics.metrics.cache_creation_input_tokens || 0;
       });
     });
 

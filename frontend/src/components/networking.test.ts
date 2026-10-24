@@ -167,8 +167,9 @@ describe("modelInfoCall", () => {
     global.fetch = currentFetch;
   });
 
+  /** 使用HTTP形状替身验证请求参数或错误传播，纯客户端单元测试；每例恢复fetch，无后台数据。 */
   it("sends the exact model name as the model query param and leaves search alone", async () => {
-    const mockFetch = vi.fn().mockResolvedValue({ ok: true, json: vi.fn().mockResolvedValue({ data: [] }) } as any);
+    const mockFetch = vi.fn().mockImplementation(() => Promise.resolve(new Response(JSON.stringify({ data: [] }), { status: 200, headers: { "Content-Type": "application/json" } })));
     global.fetch = mockFetch as any;
 
     await Networking.modelInfoCall(
@@ -194,7 +195,8 @@ describe("modelInfoCall", () => {
     expect(parsed.searchParams.get("exclude_auto_routers")).toBe("true");
   });
 
-  it("returns an empty page and does not toast when the account cannot list deployments", async () => {
+  /** 使用HTTP形状替身验证请求参数或错误传播，纯客户端单元测试；每例恢复fetch，无后台数据。 */
+  it("rejects forbidden model listing without pretending it is empty", async () => {
     const { toast } = await import("@/lib/toast");
     const info = vi.spyOn(toast, "info").mockImplementation(() => undefined);
     global.fetch = vi.fn().mockResolvedValue({
@@ -211,13 +213,7 @@ describe("modelInfoCall", () => {
         }),
     }) as any;
 
-    await expect(Networking.modelInfoCall("token", "user", "Internal User")).resolves.toEqual({
-      data: [],
-      total_count: 0,
-      current_page: 1,
-      total_pages: 0,
-      size: 50,
-    });
+    await expect(Networking.modelInfoCall("token", "user", "Internal User")).rejects.toMatchObject({status:403,body:{error:{message:"this credential cannot list deployments"}}});
     expect(info).not.toHaveBeenCalled();
     info.mockRestore();
   });
@@ -229,10 +225,7 @@ describe("daily activity helpers", () => {
   let currentFetch: typeof global.fetch;
 
   const setupSuccessfulFetch = () => {
-    const mockFetch = vi.fn().mockResolvedValue({
-      ok: true,
-      json: vi.fn().mockResolvedValue({ data: [] }),
-    } as any);
+    const mockFetch = vi.fn().mockImplementation(() => Promise.resolve(new Response(JSON.stringify({ data: [] }), { status: 200, headers: { "Content-Type": "application/json" } })));
     global.fetch = mockFetch as any;
     return mockFetch;
   };
@@ -246,6 +239,7 @@ describe("daily activity helpers", () => {
     global.fetch = currentFetch;
   });
 
+  /** 使用HTTP形状替身验证请求参数或错误传播，纯客户端单元测试；每例恢复fetch，无后台数据。 */
   it("appends tag list when tags argument is provided", async () => {
     const mockFetch = setupSuccessfulFetch();
 
@@ -259,6 +253,7 @@ describe("daily activity helpers", () => {
     expect(parsed.searchParams.get("tags")).toBe("alpha,beta");
   });
 
+  /** 使用HTTP形状替身验证请求参数或错误传播，纯客户端单元测试；每例恢复fetch，无后台数据。 */
   it("always includes exclude_team_ids but only adds team_ids when given", async () => {
     const mockFetchWithoutTeams = setupSuccessfulFetch();
 
@@ -550,10 +545,7 @@ describe("uiSpendLogsCall exclude_internal_health_checks serialization", () => {
   });
 
   const mockOkFetch = () => {
-    const mockFetch = vi.fn().mockResolvedValue({
-      ok: true,
-      json: vi.fn().mockResolvedValue({ data: [], total: 0, page: 1, page_size: 50, total_pages: 0 }),
-    } as any);
+    const mockFetch = vi.fn().mockImplementation(() => Promise.resolve(new Response(JSON.stringify({ data: [], total: 0, page: 1, page_size: 50, total_pages: 0 }), { status: 200, headers: { "Content-Type": "application/json" } })));
     global.fetch = mockFetch as any;
     return mockFetch;
   };
@@ -571,6 +563,7 @@ describe("uiSpendLogsCall exclude_internal_health_checks serialization", () => {
     return new URL(url as string, "http://example.com");
   };
 
+  /** 使用HTTP形状替身验证请求参数或错误传播，纯客户端单元测试；每例恢复fetch，无后台数据。 */
   it("appends exclude_internal_health_checks=true when the toggle is on", async () => {
     const mockFetch = mockOkFetch();
 
@@ -579,6 +572,7 @@ describe("uiSpendLogsCall exclude_internal_health_checks serialization", () => {
     expect(lastUrl(mockFetch).searchParams.get("exclude_internal_health_checks")).toBe("true");
   });
 
+  /** 使用HTTP形状替身验证请求参数或错误传播，纯客户端单元测试；每例恢复fetch，无后台数据。 */
   it("omits exclude_internal_health_checks when the toggle is off", async () => {
     const mockFetch = mockOkFetch();
 
@@ -587,6 +581,7 @@ describe("uiSpendLogsCall exclude_internal_health_checks serialization", () => {
     expect(lastUrl(mockFetch).searchParams.has("exclude_internal_health_checks")).toBe(false);
   });
 
+  /** 使用HTTP形状替身验证请求参数或错误传播，纯客户端单元测试；每例恢复fetch，无后台数据。 */
   it("omits exclude_internal_health_checks when the param is absent", async () => {
     const mockFetch = mockOkFetch();
 
@@ -607,11 +602,9 @@ describe("sessionSpendLogsCall", () => {
     global.fetch = originalFetch;
   });
 
+  /** 使用HTTP形状替身验证请求参数或错误传播，纯客户端单元测试；每例恢复fetch，无后台数据。 */
   it("should request the first page with defaults so the caller can page through the session", async () => {
-    const mockFetch = vi.fn().mockResolvedValue({
-      ok: true,
-      json: vi.fn().mockResolvedValue({ data: [], total: 0, page: 1, page_size: 100, total_pages: 1 }),
-    } as any);
+    const mockFetch = vi.fn().mockImplementation(() => Promise.resolve(new Response(JSON.stringify({ data: [], total: 0, page: 1, page_size: 100, total_pages: 1 }), { status: 200, headers: { "Content-Type": "application/json" } })));
     global.fetch = mockFetch as any;
 
     await Networking.sessionSpendLogsCall("token", "session-123");
@@ -627,11 +620,9 @@ describe("sessionSpendLogsCall", () => {
     expect(parsed.searchParams.get("page_size")).toBe("100");
   });
 
+  /** 使用HTTP形状替身验证请求参数或错误传播，纯客户端单元测试；每例恢复fetch，无后台数据。 */
   it("should pass explicit page and page_size query params for later pages", async () => {
-    const mockFetch = vi.fn().mockResolvedValue({
-      ok: true,
-      json: vi.fn().mockResolvedValue({ data: [], total: 250, page: 3, page_size: 100, total_pages: 3 }),
-    } as any);
+    const mockFetch = vi.fn().mockImplementation(() => Promise.resolve(new Response(JSON.stringify({ data: [], total: 250, page: 3, page_size: 100, total_pages: 3 }), { status: 200, headers: { "Content-Type": "application/json" } })));
     global.fetch = mockFetch as any;
 
     await Networking.sessionSpendLogsCall("token", "session-123", 3, 100);
@@ -642,11 +633,9 @@ describe("sessionSpendLogsCall", () => {
     expect(parsed.searchParams.get("page_size")).toBe("100");
   });
 
+  /** 使用HTTP形状替身验证请求参数或错误传播，纯客户端单元测试；每例恢复fetch，无后台数据。 */
   it("scopes a session to its API key caller", async () => {
-    const mockFetch = vi.fn().mockResolvedValue({
-      ok: true,
-      json: vi.fn().mockResolvedValue({ data: [], total: 0 }),
-    } as any);
+    const mockFetch = vi.fn().mockImplementation(() => Promise.resolve(new Response(JSON.stringify({ data: [], total: 0 }), { status: 200, headers: { "Content-Type": "application/json" } })));
     global.fetch = mockFetch as any;
 
     await Networking.sessionSpendLogsCall("token", "shared", 1, 100, {
@@ -660,11 +649,9 @@ describe("sessionSpendLogsCall", () => {
     expect(parsed.searchParams.has("user_id")).toBe(false);
   });
 
+  /** 使用HTTP形状替身验证请求参数或错误传播，纯客户端单元测试；每例恢复fetch，无后台数据。 */
   it("scopes a keyless session to its user caller", async () => {
-    const mockFetch = vi.fn().mockResolvedValue({
-      ok: true,
-      json: vi.fn().mockResolvedValue({ data: [], total: 0 }),
-    } as any);
+    const mockFetch = vi.fn().mockImplementation(() => Promise.resolve(new Response(JSON.stringify({ data: [], total: 0 }), { status: 200, headers: { "Content-Type": "application/json" } })));
     global.fetch = mockFetch as any;
 
     await Networking.sessionSpendLogsCall("token", "shared", 1, 100, { userId: "user-1" });

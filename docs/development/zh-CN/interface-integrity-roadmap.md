@@ -197,3 +197,6 @@ npm run test:types
 借鉴 LiteLLM 的[请求生命周期](https://docs.litellm.ai/docs/proxy/architecture)、[路由职责](https://docs.litellm.ai/docs/routing)和 [Responses 适配接口](https://github.com/BerriAI/litellm/blob/main/litellm/llms/base_llm/responses/transformation.py)，重点是职责分离与兼容性验证。其[原生 Responses 配置](https://docs.litellm.ai/docs/response_api_native_passthrough)说明能力与执行路径需要明确声明；不据此推断 XHub 当前供应商能力，也不复制其全部功能或商业版限制。
 
 实施时固定参考版本或提交，记录借鉴范围。保留 XHub 已有可靠账务、权限与历史约束；无需引入 Python 服务或更改当前功能集合。
+
+
+第三阶段核心集合的收尾范围、真实证据入口及外围未迁移边界见[核心契约收尾](core-contract-completion.md)。提交不代表合并或部署。

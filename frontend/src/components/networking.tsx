@@ -1,5 +1,6 @@
+import type { components as UsageContract } from "@/lib/http/contracts/usage";
 import type { components as ModelContractComponents } from "@/lib/http/contracts/models";
-// 本批仅给部署补丁和删除接入生成响应类型；其他旧客户端保持原行为。
+// 核心管理调用使用生成的响应类型；错误由公共 ApiClient 保留状态与正文。
 type ModelContract = ModelContractComponents["schemas"];
 // Shared date formatter for daily activity endpoints
 export const formatDate = (date: Date) => {
@@ -597,9 +598,10 @@ export const deletePriceProvider = async (accessToken: string, litellmProvider: 
   });
 };
 
+/** 创建部署并返回后台生成的model_info.id；参数为会话和现有表单，失败不弹成功提示，供模型编辑器调用。 */
 export const modelCreateCall = async (accessToken: string, formValues: Model) => {
   try {
-    const data = await apiClient.post(`/model/new`, {
+    const data = await apiClient.post<ModelContract["Deployment"]>(`/model/new`, {
       accessToken,
       body: {
         ...formValues,
@@ -702,9 +704,10 @@ export const budgetUpdateCall = async (
  * administrator may reset any account, and a team or organization administrator
  * the people they administer.
  */
+/** 按既有权限重置目标密码；参数为会话、用户ID、密码，返回确认对象，失败抛错且不记录密码。 */
 export const userSetPasswordCall = async (accessToken: string, userId: string, password: string) => {
   try {
-    return await apiClient.post(`/user/set_password`, {
+    return await apiClient.post<UserContract["schemas"]["PasswordUpdated"]>(`/user/set_password`, {
       accessToken,
       body: { user_id: userId, password },
     });
@@ -1309,6 +1312,7 @@ const appendDailyActivityQueryParam = (params: URLSearchParams, key: string, val
   params.append(key, `${value}`);
 };
 
+/** 将端点、日期、页码及可选筛选编码为相对URL；只负责序列化，公共客户端统一添加base，避免重复路径。 */
 const buildDailyActivityUrl = (
   endpoint: string,
   startTime: Date,
@@ -1317,7 +1321,7 @@ const buildDailyActivityUrl = (
   extraQueryParams?: Record<string, DailyActivityQueryValue>,
 ) => {
   const resolvedEndpoint = endpoint.startsWith("/") ? endpoint : `/${endpoint}`;
-  const baseUrl = proxyBaseUrl ? `${proxyBaseUrl}${resolvedEndpoint}` : resolvedEndpoint;
+  const baseUrl = resolvedEndpoint;
 
   const params = new URLSearchParams();
   params.append("start_date", formatDate(startTime));
@@ -1346,6 +1350,7 @@ type DailyActivityCallOptions = {
   extraQueryParams?: Record<string, DailyActivityQueryValue>;
 };
 
+/** 按浏览器日期/时区读取日报，保留筛选及分页；返回生成契约，失败抛ApiError而非零统计，供用户与实体用量页调用。 */
 const fetchDailyActivity = async ({
   accessToken,
   endpoint,
@@ -1357,27 +1362,8 @@ const fetchDailyActivity = async ({
   try {
     const url = buildDailyActivityUrl(endpoint, startTime, endTime, page, extraQueryParams);
 
-    const response = await fetch(url, {
-      method: "GET",
-      headers: {
-        [globalLitellmHeaderName]: `Bearer ${accessToken}`,
-        "Content-Type": "application/json",
-      },
-    });
-
-    if (!response.ok) {
-      const errorData = await response.json();
-      const errorMessage = deriveErrorMessage(errorData);
-      handleError(errorMessage);
-      throw new Error(errorMessage);
-    }
-
-    const data = await response.json();
-    return data;
-  } catch (error) {
-    console.error(`Failed to fetch daily activity (${endpoint}):`, error);
-    throw error;
-  }
+    return await apiClient.get<UsageContract["schemas"]["DailyUsage"]>(url, {accessToken});
+  } catch (error) { throw error; }
 };
 
 export const userDailyActivityCall = async (
@@ -1553,39 +1539,13 @@ export const agentDailyActivityCall = async (
   });
 };
 
-export const regenerateKeyCall = async (accessToken: string, keyToRegenerate: string, formData: any) => {
-  try {
-    const url = proxyBaseUrl
-      ? `${proxyBaseUrl}/key/${keyToRegenerate}/regenerate`
-      : `/key/${keyToRegenerate}/regenerate`;
-
-    const response = await fetch(url, {
-      method: "POST",
-      headers: {
-        [globalLitellmHeaderName]: `Bearer ${accessToken}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify(formData),
-    });
-
-    if (!response.ok) {
-      const errorData = await response.json();
-      const errorMessage = deriveErrorMessage(errorData);
-      handleError(errorMessage);
-      throw new Error(errorMessage);
-    }
-
-    const data = await response.json();
-    return data;
-  } catch (error) {
-    console.error("Failed to regenerate key:", error);
-    throw error;
-  }
+/** 轮换指定Key，参数为会话、ID及补丁，返回仅此一次的新凭据；失败原样抛出ApiError，旧Key撤销由后台执行。 */
+export const regenerateKeyCall = async (accessToken: string, keyToRegenerate: string, formData: object): Promise<KeyContract["schemas"]["CreatedKey"]> => {
+  return apiClient.post(`/key/${encodeURIComponent(keyToRegenerate)}/regenerate`, { accessToken, body: formData });
 };
 
-let ModelListerrorShown = false;
-let errorTimer: NodeJS.Timeout | null = null;
 
+/** 按兼容查询读取管理部署列表；后端决定支持的筛选，403必须抛出而非返回空成功，调用方负责显示错误。 */
 export const modelInfoCall = async (
   accessToken: string,
   userID: string,
@@ -1606,7 +1566,7 @@ export const modelInfoCall = async (
    * Get all models on proxy
    */
   try {
-    let url = proxyBaseUrl ? `${proxyBaseUrl}/v2/model/info` : `/v2/model/info`;
+    let url = "/v2/model/info";
     const params = new URLSearchParams();
     params.append("include_team_models", "true");
     params.append("page", page.toString());
@@ -1642,44 +1602,8 @@ export const modelInfoCall = async (
       url += `?${params.toString()}`;
     }
 
-    const response = await fetch(url, {
-      method: "GET",
-      headers: {
-        [globalLitellmHeaderName]: `Bearer ${accessToken}`,
-        "Content-Type": "application/json",
-      },
-    });
-
-    if (!response.ok) {
-      const errorData = await response.text();
-      // 403 is the account's answer, not a page error. The logs filter and the
-      // auto-router badge used to toast the raw JSON, including "error shown=false".
-      if (response.status === 403 || isQuietAccessDenial(errorData)) {
-        return { data: [], total_count: 0, current_page: page, total_pages: 0, size };
-      }
-      let shown = errorData;
-      shown += `error shown=${ModelListerrorShown}`;
-      if (!ModelListerrorShown) {
-        if (shown.includes("No model list passed")) {
-          shown = "No Models Exist. Click Add Model to get started.";
-        }
-        toast.info(shown);
-        ModelListerrorShown = true;
-
-        if (errorTimer) clearTimeout(errorTimer);
-        errorTimer = setTimeout(() => {
-          ModelListerrorShown = false;
-        }, 10000);
-      }
-
-      throw new Error(t("Network response was not ok"));
-    }
-
-    const data = await response.json();
-    return data;
-  } catch (error) {
-    throw error;
-  }
+    return await apiClient.get<ModelContract["DeploymentList"]>(url, { accessToken });
+  } catch (error) { throw error; }
 };
 
 export const modelInfoV1Call = async (accessToken: string, modelId: string) => {
@@ -2015,6 +1939,7 @@ interface UiSpendLogsCallOptions {
   params?: UiSpendLogsParams;
 }
 
+/** 读取授权范围内日志；参数保留既有筛选和分页，返回契约页；失败保留状态/正文，不伪造空页。 */
 export const uiSpendLogsCall = async ({
   accessToken,
   start_date,
@@ -2025,7 +1950,7 @@ export const uiSpendLogsCall = async ({
 }: UiSpendLogsCallOptions) => {
   try {
     // Construct base URL
-    let url = proxyBaseUrl ? `${proxyBaseUrl}/spend/logs/ui` : `/spend/logs/ui`;
+    let url = "/spend/logs/ui";
 
     const queryParams = new URLSearchParams();
     queryParams.append("start_date", start_date);
@@ -2050,27 +1975,8 @@ export const uiSpendLogsCall = async ({
       url += `?${queryString}`;
     }
 
-    const response = await fetch(url, {
-      method: "GET",
-      headers: {
-        [globalLitellmHeaderName]: `Bearer ${accessToken}`,
-        "Content-Type": "application/json",
-      },
-    });
-
-    if (!response.ok) {
-      const errorData = await response.json();
-      const errorMessage = deriveErrorMessage(errorData);
-      handleError(errorMessage);
-      throw new Error(errorMessage);
-    }
-
-    const data = await response.json();
-    return data;
-  } catch (error) {
-    console.error("Failed to fetch spend logs:", error);
-    throw error;
-  }
+    return await apiClient.get<UsageContract["schemas"]["LogPage"]>(url, { accessToken });
+  } catch (error) { throw error; }
 };
 
 export const adminSpendLogsCall = async (accessToken: string) => {
@@ -2226,92 +2132,16 @@ export const adminTopModelsCall = async (accessToken: string) => {
   }
 };
 
-export const keyInfoCall = async (accessToken: string, keys: string[]) => {
-  try {
-    let url = proxyBaseUrl ? `${proxyBaseUrl}/v2/key/info` : `/v2/key/info`;
 
-    const response = await fetch(url, {
-      method: "POST",
-      headers: {
-        [globalLitellmHeaderName]: `Bearer ${accessToken}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        keys: keys,
-      }),
-    });
 
-    if (!response.ok) {
-      const errorData = await response.text();
-      if (errorData.includes("Invalid proxy server token passed")) {
-        throw new Error(t("Invalid proxy server token passed"));
-      }
-      handleError(errorData);
-      throw new Error(t("Network response was not ok"));
-    }
-
-    const data = await response.json();
-    return data;
-  } catch (error) {
-    console.error("Failed to create key:", error);
-    throw error;
-  }
-};
-
+/** 对部署执行真实探测；参数为会话、上游参数、部署信息及模式；200失败保留healthy=false，非2xx抛ApiError供页面展示。 */
 export const testConnectionRequest = async (
   accessToken: string,
   litellm_params: Record<string, any>,
   model_info: Record<string, any>,
   mode: string,
-) => {
-  try {
-    // Construct the URL based on environment
-    const url = proxyBaseUrl ? `${proxyBaseUrl}/health/test_connection` : `/health/test_connection`;
-
-    const response = await fetch(url, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        [globalLitellmHeaderName]: `Bearer ${accessToken}`,
-      },
-      body: JSON.stringify({
-        litellm_params: litellm_params,
-        model_info: model_info,
-        mode: mode,
-      }),
-    });
-
-    // Check for non-JSON responses first
-    const contentType = response.headers.get("content-type");
-    if (!contentType || !contentType.includes("application/json")) {
-      const text = await response.text();
-      console.error("Received non-JSON response:", text);
-      throw new Error(
-        `Received non-JSON response (${response.status}: ${response.statusText}). Check network tab for details.`,
-      );
-    }
-
-    const data = await response.json();
-
-    if (!response.ok || data.status === "error") {
-      // Return the error response instead of throwing an error
-      // This allows the caller to handle the error format properly
-      if (data.status === "error") {
-        return data; // Return the full error response
-      } else {
-        return {
-          status: "error",
-          message: data.error?.message || `Connection test failed: ${response.status} ${response.statusText}`,
-        };
-      }
-    }
-
-    return data;
-  } catch (error) {
-    console.error("Model connection test error:", error);
-    // For network errors or other exceptions, still throw
-    throw error;
-  }
+): Promise<ModelContract["ConnectionResult"]> => {
+  return apiClient.post("/health/test_connection", {accessToken, body: {litellm_params, model_info, mode}});
 };
 
 // ... existing code ...
@@ -2397,13 +2227,14 @@ export interface PaginatedKeyAliasResponse {
   size: number;
 }
 
+/** 读取授权范围内的Key别名；保留旧参数签名，后台忽略分页/团队参数，返回生成契约并传播错误。 */
 export const keyAliasesCall = async (
   accessToken: string,
   page: number = 1,
   size: number = 50,
   search?: string,
   team_id?: string,
-): Promise<PaginatedKeyAliasResponse> => {
+): Promise<KeyContract["schemas"]["KeyAliases"]> => {
   /**
    * Get key aliases from proxy with pagination and optional search
    */
@@ -2423,6 +2254,7 @@ export const keyAliasesCall = async (
   }
 };
 
+/** 汇总指定日期与用户/Key范围的日报；参数保留空值语义，返回契约统计，失败不清零或扩大筛选。 */
 export const userDailyActivityAggregatedCall = async (
   accessToken: string,
   startTime: Date,
@@ -2440,7 +2272,7 @@ export const userDailyActivityAggregatedCall = async (
       const day = String(date.getDate()).padStart(2, "0");
       return `${year}-${month}-${day}`;
     };
-    return await apiClient.get(`/user/daily/activity/aggregated`, {
+    return await apiClient.get<UsageContract["schemas"]["DailyUsage"]>(`/user/daily/activity/aggregated`, {
       accessToken,
       query: {
         start_date: formatDate(startTime),
@@ -2698,39 +2530,9 @@ export const teamUpdateCall = async (
 
 /** 按部署ID合并现有表单并返回契约响应；参数为登录凭据、补丁和ID，供编辑/启停调用。
  * 保持原序列化与HTTP错误传播，不修改预算或权限；失败不由客户端伪造成功结果。 */
-export const modelPatchUpdateCall = async (
-  accessToken: string,
-  formValues: Record<string, any>, // Assuming formValues is an object
-  modelId: string,
-): Promise<ModelContract["Deployment"]> => {
-  try {
-    // Intentionally not logging the payload: it can contain freshly-entered
-    // provider secrets (api_key, vertex_credentials, AWS creds).
-    const url = proxyBaseUrl ? `${proxyBaseUrl}/model/${modelId}/update` : `/model/${modelId}/update`;
-    const response = await fetch(url, {
-      method: "PATCH",
-      headers: {
-        [globalLitellmHeaderName]: `Bearer ${accessToken}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        ...formValues, // Include formValues in the request body
-      }),
-    });
-
-    if (!response.ok) {
-      const errorData = await response.text();
-      handleError(errorData);
-      console.error("Error update from the server:", errorData);
-      throw new Error(t("Network response was not ok"));
-    }
-    const data = await response.json();
-    return data;
-    // Handle success - you might want to update some state or UI based on the created key
-  } catch (error) {
-    console.error("Failed to update model:", error);
-    throw error;
-  }
+/** 提交部署补丁并返回真实部署；保留省略/null/零，供模型编辑页调用，失败保留HTTP状态及正文。 */
+export const modelPatchUpdateCall = async (accessToken: string, formValues: ModelContract["UpdateDeployment"], modelId: string): Promise<ModelContract["Deployment"]> => {
+  return apiClient.patch(`/model/${encodeURIComponent(modelId)}/update`, { accessToken, body: formValues });
 };
 
 export interface Member {
@@ -4541,34 +4343,9 @@ export const createGuardrailCall = async (accessToken: string, guardrailData: an
   }
 };
 
-export const uiSpendLogDetailsCall = async (accessToken: string, logId: string, start_date: string) => {
-  try {
-    // Construct base URL
-    let url = proxyBaseUrl
-      ? `${proxyBaseUrl}/spend/logs/ui/${logId}?start_date=${encodeURIComponent(start_date)}`
-      : `/spend/logs/ui/${logId}?start_date=${encodeURIComponent(start_date)}`;
-
-    const response = await fetch(url, {
-      method: "GET",
-      headers: {
-        [globalLitellmHeaderName]: `Bearer ${accessToken}`,
-        "Content-Type": "application/json",
-      },
-    });
-
-    if (!response.ok) {
-      const errorData = await response.json();
-      const errorMessage = deriveErrorMessage(errorData);
-      handleError(errorMessage);
-      throw new Error(errorMessage);
-    }
-
-    const data = await response.json();
-    return data;
-  } catch (error) {
-    console.error("Failed to fetch log details:", error);
-    throw error;
-  }
+/** 日志抽屉按ID读取授权详情；正文可为JSON或字符串，404保留不可见语义，不修改或猜测历史数据。 */
+export const uiSpendLogDetailsCall = async (accessToken: string, logId: string, start_date: string): Promise<UsageContract["schemas"]["LogRecord"]> => {
+  return apiClient.get(`/spend/logs/ui/${encodeURIComponent(logId)}`, { accessToken, query: { start_date } });
 };
 
 export const fetchOpenAPIRegistry = async (accessToken: string) => {
@@ -5322,6 +5099,7 @@ export const teamPermissionsUpdateCall = async (accessToken: string, teamId: str
  * { data, total, page, page_size, total_pages }). Callers that need the whole
  * session should page through total_pages and accumulate the results.
  */
+/** 读取授权范围内日志；参数保留既有筛选和分页，返回契约页；失败保留状态/正文，不伪造空页。 */
 export const sessionSpendLogsCall = async (
   accessToken: string,
   session_id: string,
@@ -5340,31 +5118,10 @@ export const sessionSpendLogsCall = async (
     } else if (caller?.userId) {
       params.set("user_id", caller.userId);
     }
-    let url = proxyBaseUrl
-      ? `${proxyBaseUrl}/spend/logs/session/ui?${params.toString()}`
-      : `/spend/logs/session/ui?${params.toString()}`;
+    const url = `/spend/logs/session/ui?${params.toString()}`;
 
-    const response = await fetch(url, {
-      method: "GET",
-      headers: {
-        [globalLitellmHeaderName]: `Bearer ${accessToken}`,
-        "Content-Type": "application/json",
-      },
-    });
-
-    if (!response.ok) {
-      const errorData = await response.json();
-      const errorMessage = deriveErrorMessage(errorData);
-      handleError(errorMessage);
-      throw new Error(errorMessage);
-    }
-
-    const data = await response.json();
-    return data;
-  } catch (error) {
-    console.error("Failed to fetch session logs:", error);
-    throw error;
-  }
+    return await apiClient.get<UsageContract["schemas"]["LogPage"]>(url, { accessToken });
+  } catch (error) { throw error; }
 };
 
 export const vectorStoreCreateCall = async (accessToken: string, formValues: Record<string, any>): Promise<void> => {
