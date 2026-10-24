@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"errors"
 	"net/http"
-	"strings"
 	"time"
 
 	"github.com/sunqirui1987/xhub/internal/util"
@@ -23,23 +22,13 @@ type catalogRecordStore interface {
 
 // writeCatalogStore 处理已鉴权、已解析的通用目录读写；st 为存储，w/r 为 HTTP 输出及路径，body 为请求对象。
 // 由 writeCatalogPersist 调用，结果直接写入 w；保持合法响应及缺失记录更新时的 upsert，仅真实持久化成功才能返回成功。
-// JSON-RPC/OAuth 旧兼容分支保留，不在本次持久化修复内；非事务批量删除失败时不回滚已删除项，但必须返回错误。
+// 顶层JSON-RPC信封明确拒绝，普通token资源名不得触发令牌签发；非事务批量删除失败时不回滚已删除项，但必须返回错误。
 func writeCatalogStore(st catalogRecordStore, w http.ResponseWriter, r *http.Request, body map[string]any) {
 	path := r.URL.Path
+	// 此入口是已鉴权的REST资源接口，没有RPC执行器。拒绝信封，而非吞掉操作并伪造空工具列表。
+	// 仅检查顶层标记，资源内部的嵌套元数据仍按正常目录字段持久化。
 	if _, ok := body["jsonrpc"]; ok {
-		util.WriteJSON(w, 200, map[string]any{
-			"jsonrpc": "2.0",
-			"id":      body["id"],
-			"result":  map[string]any{"tools": []any{}},
-		})
-		return
-	}
-	if (strings.Contains(path, "/oauth/token") || strings.HasSuffix(path, "/token")) && !strings.Contains(path, "count") {
-		util.WriteJSON(w, 200, map[string]any{
-			"access_token": "at-" + util.CallID()[:12],
-			"token_type":   "Bearer",
-			"expires_in":   3600,
-		})
+		util.WriteError(w, http.StatusBadRequest, "unsupported_protocol", "JSON-RPC is not supported by this REST management endpoint")
 		return
 	}
 	kind, action, id := parseMgmt(r.Method, path, body)

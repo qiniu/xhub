@@ -1,26 +1,65 @@
 import { expect, test } from "@playwright/test";
 
 import { translate, type Locale } from "../src/i18n/translate";
-import { GATEWAY, UPSTREAM, loginAdmin, sessionBearer, stableGoto } from "./helpers";
+import { GATEWAY, UPSTREAM, loginAdmin, sessionBearer, stableGoto, uiPath } from "./helpers";
 
 /**
  * 注册供应商目录持久化的双语完整流程；locale 为页面语言，无返回值。
  * 前置隔离数据库、真实网关、生产构建控制台和本地上游；页面创建/编辑/删除供应商，
- * 接口回读后经调试台验证配置真实用于推理，并验证非法 JSON 不覆盖已保存配置。
+ * 接口回读后经调试台验证配置真实用于推理，并验证非法 JSON/RPC 不覆盖已保存配置，OAuth 占位入口明确失败且不影响已登录会话。
+ * 回调页验证双语提示和真实跳转，不将收到回调当作授权成功；临时无脚本上下文仅用于观察跳转前的服务端页面文案。
  * 不拦截或伪造后台响应；finally 清理部署和凭据，运行器另行回收专属 schema。
  */
 export function registerCatalogPersistence(locale: Locale) {
-  test("catalog persistence survives reload and rejects invalid updates " + locale, async ({ page }) => {
+  test("catalog persistence survives reload and rejects invalid updates " + locale, async ({ page, browser }) => {
     test.setTimeout(120_000);
     const tr = (key: string) => translate(locale, key);
-    const name = "e2e-catalog-integrity-" + locale;
-    const modelName = name + "-model";
+    // token是合法供应商名，必须走真实CRUD，不能被路径后缀误判成OAuth令牌交换。
+    const name = "token";
+    const modelName = "e2e-catalog-integrity-" + locale + "-model";
     let credentialExists = false;
     let modelID = "";
     await loginAdmin(page);
     await page.getByRole("button", { name: locale === "en" ? "English" : "中文", exact: true }).click();
     const headers = { Authorization: "Bearer " + await sessionBearer(page) };
     try {
+      // 真实HTTP验证保留OAuth入口无令牌、无伪造成功，并且不会清除当前正常登录会话。
+      for (const endpoint of ["/v1/mcp/server/oauth/missing/token", "/authorize/complete"]) {
+        const denied = await page.request.post(GATEWAY + endpoint, {
+          headers, form: { grant_type: "authorization_code", code: "invalid-local-code", code_verifier: "invalid-local-verifier" },
+        });
+        expect(denied.status(), "未执行的授权入口不能返回成功").toBe(501);
+        expect(await denied.json()).toMatchObject({ error: { type: "not_implemented" } });
+        expect(await denied.text()).not.toContain("access_token");
+        expect(denied.headers()["cache-control"]).toBe("no-store");
+      }
+      const flow = await page.request.get(GATEWAY + "/authorize/flow?flow=e2e-fixture", { headers });
+      expect(flow.status(), "旧fixture不能作为真实已连接状态").toBe(501);
+      expect((await page.request.get(GATEWAY + "/auth/me", { headers })).status()).toBe(200);
+      const callbackURL = new URL(uiPath("/mcp/oauth/callback?error=access_denied&state=local-fixture"), page.url()).href;
+      // 禁用脚本观察真实服务端渲染文案，避免自动跳转导致断言竞争；未拦截或替换 HTTP 内容。
+      const preview = await browser.newContext({ javaScriptEnabled: false, storageState: await page.context().storageState() });
+      try {
+        const callback = await preview.newPage();
+        const result = await callback.goto(callbackURL);
+        expect(result?.status()).toBe(200);
+        await expect(callback.getByRole("heading", { name: tr("mcpOAuthCallback.title") })).toBeVisible();
+        await expect(callback.getByText(tr("mcpOAuthCallback.pending"), { exact: true })).toBeVisible();
+        await expect(callback.getByText(tr("mcpOAuthCallback.returnHelp"), { exact: true })).toBeVisible();
+        await expect(callback.getByText(tr("Authorization complete. You may close this window and return to the LiteLLM dashboard."))).toHaveCount(0);
+      } finally {
+        await preview.close();
+      }
+      // 常规浏览器执行真实回调和重定向；保留上游错误，不产生令牌，当前会话仍可使用。
+      await page.goto(callbackURL, { waitUntil: "commit" });
+      await expect(page).not.toHaveURL(/\/mcp\/oauth\/callback/);
+      const callbackPayload = await page.evaluate(() => {
+        const raw = sessionStorage.getItem("litellm-tools-mcp-oauth-result");
+        return raw ? JSON.parse(atob(raw)) : null;
+      });
+      expect(callbackPayload).toMatchObject({ code: null, error: "access_denied", state: "local-fixture" });
+      expect(callbackPayload).not.toHaveProperty("access_token");
+      expect((await page.request.get(GATEWAY + "/auth/me", { headers })).status()).toBe(200);
       await stableGoto(page, "/model-providers");
       await page.getByRole("button", { name: tr("modelProviders.add"), exact: true }).click();
       const create = page.getByRole("dialog", { name: tr("Add model provider"), exact: true });
@@ -65,6 +104,13 @@ export function registerCatalogPersistence(locale: Locale) {
       });
       expect(invalid.status(), "非法 JSON 更新必须明确拒绝，不能伪报保存成功").toBe(400);
       expect((await invalid.json()).error, "失败响应应包含明确的错误对象").toBeTruthy();
+      const rpc = await page.request.patch(GATEWAY + "/credentials/" + name, {
+        headers, data: { jsonrpc: "2.0", id: "probe", method: "tools/list", credential_values: { api_base: "http://127.0.0.1:1" } },
+      });
+      expect(rpc.status(), "REST目录不能以空工具列表伪报RPC成功").toBe(400);
+      expect(await rpc.json()).toMatchObject({ error: { type: "unsupported_protocol" } });
+      const unchanged = await page.request.get(GATEWAY + "/credentials/by_name/" + name, { headers });
+      expect(await unchanged.json()).toEqual(await stored.json());
       await page.reload();
       await page.getByTestId("credential-actions-" + name).click();
       await page.getByTestId("credential-action-edit").click();

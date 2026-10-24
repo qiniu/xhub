@@ -7,6 +7,12 @@ import { routeTemplatesEn } from "./routeTemplates.en";
 
 export const en = {
   probes: probesEn,
+  mcpOAuthCallback: {
+    title: "MCP authorization callback",
+    pending: "Returning to the console. Receiving a callback does not confirm successful authorization.",
+    returnHelp: "If you are not redirected, return to the original page to check the connection result.",
+    loading: "Loading authorization callback…",
+  },
   consoleDirectory: {
     "userDeleteRefreshFailed": "User deleted, but the list could not be refreshed. Refresh the page to reload the remaining users.",
     "noTeams": "No teams found",
