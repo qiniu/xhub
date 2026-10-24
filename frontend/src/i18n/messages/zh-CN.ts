@@ -8,6 +8,12 @@ import { routeTemplatesZhCN } from "./routeTemplates.zh-CN";
 
 export const zhCN = {
   probes: probesZhCN,
+  mcpOAuthCallback: {
+    title: "MCP 授权回调",
+    pending: "正在返回控制台。收到回调并不代表授权已成功。",
+    returnHelp: "如未自动跳转，请返回原页面查看连接结果。",
+    loading: "正在加载授权回调…",
+  },
   consoleDirectory: {
     "userDeleteRefreshFailed": "用户已删除，但列表刷新失败。请刷新页面重新加载其余用户。",
     "noTeams": "未找到团队",

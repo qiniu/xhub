@@ -15,7 +15,7 @@ type catalogRoute struct {
 }
 
 // TestCatalogReads 通过真实网关处理器调用目录中的全部 GET 路由。
-// 前置条件是隔离数据库和管理员会话；验证已删除、已退役、未实现维度及普通读取的精确 JSON 契约。
+// 前置条件是隔离数据库和管理员会话；验证已删除、已退役、未实现维度、占位授权及普通读取的精确 JSON 契约。
 // 参数 t 为测试上下文，返回无；网关与数据库由 bootGateway 和测试清理函数回收。
 func TestCatalogReads(t *testing.T) {
 	srv, base, db := bootGateway(t)
@@ -62,7 +62,7 @@ func TestCatalogReads(t *testing.T) {
 			}
 			if (strings.Contains(path, "/threads/") && strings.HasSuffix(path, "/messages")) ||
 				strings.HasPrefix(path, "/guardrails/submissions/") ||
-				path == "/guardrails/ui/major_airlines" || strings.HasPrefix(path, "/guardrails/ui/category_yaml/") {
+				path == "/authorize/flow" || path == "/guardrails/ui/major_airlines" || strings.HasPrefix(path, "/guardrails/ui/category_yaml/") {
 				var probe map[string]any
 				if status != http.StatusNotImplemented || json.Unmarshal(body, &probe) != nil {
 					t.Fatalf("unsupported resource status %d %s", status, trim(body))

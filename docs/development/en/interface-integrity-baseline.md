@@ -125,8 +125,39 @@ This batch preserves valid whitespace-only bodies, existing valid JSON larger th
 Follow-up work proceeds as separate reversible changes:
 
 1. Real prompt [#137](https://github.com/qiniu/xhub/issues/137) / search [#138](https://github.com/qiniu/xhub/issues/138) execution contracts, accounting for the current pages and retained components.
-2. OAuth token and generic JSON-RPC false successes, with explicit authorization and protocol behavior for retained features.
+2. OAuth token and generic JSON-RPC false successes: see the correction and verification scope below.
 3. Strict test infrastructure, cleanup failures, and historical exclusions.
 4. An authoritative contract and offline documentation pilot for a verified user or Key domain, then incremental compatibility-layer consolidation.
 
 No production changes, employee-account tests, restored removed routes, or feature reduction are included. Real suppliers, Qiniu SSO, TLS/reverse proxies, and release Docker deployment remain separate acceptance boundaries.
+
+## OAuth and JSON-RPC boundary correction (#144, #145)
+
+Follow-up checks on `30e60c7`, with failing tests run before the fix, confirmed [#144](https://github.com/qiniu/xhub/issues/144) and [#145](https://github.com/qiniu/xhub/issues/145). The earlier table retains historical audit facts. This section records the corrected contract; it does not claim to implement an OAuth or MCP service.
+
+| Entry | Observable contract after this fix |
+| --- | --- |
+| `GET /authorize/flow`, `POST /authorize/complete`, `POST /v1/mcp/server/oauth/{server_id}/token` | Preserve the URLs. Anonymous and authenticated requests receive HTTP 501 with XHub `error.type=not_implemented` and no caching. Do not generate random tokens, mark `e2e-fixture` as connected, or echo authorization codes or PKCE. These are not working OAuth authorization-server endpoints |
+| A top-level `jsonrpc` field at generic REST management endpoints | After existing management authorization, return HTTP 400 with `error.type=unsupported_protocol`, no JSON-RPC `result`, and no catalog access. Nested resource `metadata.jsonrpc` remains ordinary data. This is REST protocol rejection, not a JSON-RPC method dispatcher |
+| Ordinary resource paths such as `/credentials/token` and `/search_tools/token` | Remove the token-generating suffix heuristic. Treat `token` as a valid resource name and perform real persistence, reads, updates, and deletion. Credential details still use `/credentials/by_name/token` |
+| `/ui/mcp/oauth/callback` | Both languages state that a callback does not confirm authorization. Forward the original code or error and redirect, without claiming a token exchange or successful storage |
+
+Enterprise SSO uses separate `/auth/enterprise/*` handlers, unchanged here. Existing local SAML/OIDC tests cover that separation. Removed `/v1/mcp` and `/v1/mcp/oauth/token` paths remain 404; this fix does not restore MCP functionality.
+
+Evidence by layer:
+
+- [`catalog_protocol_test.go`](../../../internal/gateway/family/catalog_protocol_test.go) and [`onboarding_test.go`](../../../internal/gateway/onboarding_test.go) deterministically cover RPC requests, notifications, invalid versions, ordinary token resources, unavailable storage, and well-shaped, empty, and malformed OAuth bodies.
+- [`protocol_false_success_test.go`](../../../cmd/regression/protocol_false_success_test.go) exercises real HTTP, private PostgreSQL schemas, anonymous/user/admin authorization, unchanged records on failure, ordinary resource lifecycles, valid sessions, and removed URLs. Both new top-level regressions failed before the fix and passed afterward.
+- [`page.test.tsx`](../../../frontend/src/app/mcp/oauth/callback/page.test.tsx) checks both languages for unverified codes, provider errors, and storage failure without claiming completed authorization or saved data.
+- [`catalog-persistence-scenario.ts`](../../../frontend/e2e/catalog-persistence-scenario.ts) uses both UI languages to create a provider named `token`, edit/reload/read it, reject RPC without changing configuration, invoke a local upstream through the stored credential with usage accounting, and delete it with a subsequent 404. It also covers OAuth failure contracts, callback copy, real redirects, and the existing login session. A temporary script-disabled browser observes server-rendered copy before automatic redirection; the normal browser verifies callback behavior. Management responses are not fabricated.
+
+Reproduction commands, using isolated test infrastructure:
+
+~~~bash
+XHUB_REGRESSION_STRICT=1 go test ./internal/gateway/family ./internal/gateway -count=1
+bash scripts/regression.sh 'TestProtocolFalseSuccess|TestCatalogIntegrity|TestProvider|TestSupplierCatalogLifecycle|TestOfficialCredentialSupportsNativeModel|TestEnterpriseSAMLHTTPFlow|TestEnterpriseProvisioningAndArchive'
+(cd frontend && npx vitest run src/app/mcp/oauth/callback/page.test.tsx src/components/networking.test.ts src/hooks/useToolsOAuthFlow.test.tsx)
+E2E_RUN_DIR="$PWD/.e2e/protocol-false-success-final" bash scripts/e2e.sh scenarios/regression/catalog-persistence-en.test.ts scenarios/regression/catalog-persistence-zh-CN.test.ts
+~~~
+
+External boundaries: no commercial MCP OAuth provider, real enterprise IdP, or production network was tested. This batch establishes explicit unsupported behavior, real resource operations, session separation, and local upstream calls, not complete OAuth/JSON-RPC support. No data migration or production deployment is included.
