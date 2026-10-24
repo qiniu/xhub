@@ -7,6 +7,7 @@ import socket
 import subprocess
 import tempfile
 import unittest
+import zipfile
 
 SCRIPTS = Path(__file__).resolve().parent
 
@@ -14,8 +15,8 @@ SCRIPTS = Path(__file__).resolve().parent
 class RegressionSelectionTests(unittest.TestCase):
     """用真实 go test 匹配顶层/子用例；临时模块和日志自动删除。"""
 
-    def run_selection(self, pattern):
-        """参数为 Go 筛选表达式；返回实际脚本结果，数据库预检替身仅隔离此不使用 DB 的临时 Go 模块。"""
+    def run_selection(self, pattern, cold_cache=False):
+        """参数为 Go 筛选表达式及是否使用空依赖缓存；返回脚本结果与日志，临时 Go 模块和本地依赖代理自动清理，数据库预检仅为替身。"""
         with tempfile.TemporaryDirectory(prefix="xhub-gate-") as directory:
             root = Path(directory)
             (root / "scripts").mkdir()
@@ -38,8 +39,43 @@ func TestParent(t *testing.T) {
 func TestTop(t *testing.T) { t.Log("executed leaf") }
 ''')
             env = dict(os.environ, PATH=str(root / "bin") + os.pathsep + os.environ["PATH"], GOWORK="off")
-            return subprocess.run(["bash", str(root / "scripts/regression.sh"), pattern],
+            if cold_cache:
+                # 文件代理使真实 Go 首次下载可重复且离线，不能用伪造 JSON 代替下载诊断。
+                # 直接使用仓库已准备的工具链；空模块缓存不能触发额外的 Go 工具链下载。
+                goroot = subprocess.check_output(["go", "env", "GOROOT"], cwd=SCRIPTS.parent, text=True).strip()
+                (root / "bin/go").symlink_to(Path(goroot) / "bin/go")
+                module = "example.com/gatefixture"
+                proxy = root / "proxy" / module / "@v"
+                proxy.mkdir(parents=True)
+                mod = f"module {module}\n\ngo 1.24\n"
+                (proxy / "v1.0.0.mod").write_text(mod)
+                (proxy / "v1.0.0.info").write_text('{"Version":"v1.0.0","Time":"2026-01-01T00:00:00Z"}')
+                with zipfile.ZipFile(proxy / "v1.0.0.zip", "w") as archive:
+                    archive.writestr(f"{module}@v1.0.0/go.mod", mod)
+                    archive.writestr(f"{module}@v1.0.0/value.go", "package gatefixture\nconst Value = 42\n")
+                (root / "go.mod").write_text(f"module gate-fixture\n\ngo 1.24\nrequire {module} v1.0.0\n")
+                (root / "cmd/regression/download_test.go").write_text('''package regression
+import ("testing"; "example.com/gatefixture")
+// 首次加载本地模块后检查真实依赖值；临时代理与缓存由 Python 夹具回收。
+func TestDownloaded(t *testing.T) { if gatefixture.Value != 42 { t.Fatal("dependency value") } }
+''')
+                env.update(GOMODCACHE=str(root / "module-cache"), GOPROXY=(root / "proxy").as_uri(),
+                           GOSUMDB="off", GOPRIVATE="", GONOPROXY="", GOFLAGS="-mod=mod", GOTOOLCHAIN="local")
+            result = subprocess.run(["bash", str(root / "scripts/regression.sh"), pattern],
                                   cwd=root, env=env, text=True, capture_output=True, timeout=45)
+            logs = list((root / ".e2e/runs").glob("*/regression.log"))
+            if logs:
+                result.regression_log = logs[0].read_text()
+                result.events = logs[0].with_name("events.jsonl").read_text()
+            return result
+
+    def test_real_cold_cache_download_does_not_corrupt_events(self):
+        """真实 Go 从临时文件代理下载依赖，下载日志保留而 JSON 事件纯净；无外部网络，代理、缓存和模块自动删除。"""
+        result = self.run_selection("^TestDownloaded$", cold_cache=True)
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr + getattr(result, "regression_log", ""))
+        self.assertIn("go: downloading example.com/gatefixture v1.0.0", result.regression_log)
+        events = [json.loads(line) for line in result.events.splitlines()]
+        self.assertTrue(any(event.get("Action") == "pass" and event.get("Test") == "TestDownloaded" for event in events))
 
     def test_real_selected_leaf_passes(self):
         """真实顶层与子用例执行后允许成功；临时目录自动清理。"""

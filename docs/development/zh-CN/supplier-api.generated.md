@@ -149,33 +149,239 @@
   ],
   "properties": {
     "error": {
-      "type": "object",
-      "required": [
-        "code",
-        "message",
-        "type",
-        "param"
-      ],
-      "properties": {
-        "code": {
-          "type": "string",
-          "pattern": "^[45][0-9]{2}$"
-        },
-        "message": {
-          "type": "string"
-        },
-        "type": {
-          "type": "string"
-        },
-        "param": {
-          "nullable": true,
-          "x-go-type": "json.RawMessage",
-          "x-go-type-skip-optional-pointer": true,
-          "description": "当前为 null。"
-        }
-      }
+      "$ref": "#/components/schemas/ErrorDetail"
     }
   },
   "description": "管理接口错误信封；HTTP 状态与 code 一致，不用成功对象代替失败。"
+}
+```
+
+### Error401
+
+```json
+{
+  "type": "object",
+  "required": [
+    "error"
+  ],
+  "properties": {
+    "error": {
+      "allOf": [
+        {
+          "$ref": "#/components/schemas/ErrorDetail"
+        },
+        {
+          "type": "object",
+          "required": [
+            "code"
+          ],
+          "properties": {
+            "code": {
+              "type": "string",
+              "pattern": "^401$"
+            }
+          }
+        }
+      ]
+    }
+  },
+  "description": "完整错误字段在同一对象层合并，避免生成器覆盖嵌套 error。"
+}
+```
+
+### Error403
+
+```json
+{
+  "type": "object",
+  "required": [
+    "error"
+  ],
+  "properties": {
+    "error": {
+      "allOf": [
+        {
+          "$ref": "#/components/schemas/ErrorDetail"
+        },
+        {
+          "type": "object",
+          "required": [
+            "code"
+          ],
+          "properties": {
+            "code": {
+              "type": "string",
+              "pattern": "^403$"
+            }
+          }
+        }
+      ]
+    }
+  },
+  "description": "完整错误字段在同一对象层合并，避免生成器覆盖嵌套 error。"
+}
+```
+
+### Error500
+
+```json
+{
+  "type": "object",
+  "required": [
+    "error"
+  ],
+  "properties": {
+    "error": {
+      "allOf": [
+        {
+          "$ref": "#/components/schemas/ErrorDetail"
+        },
+        {
+          "type": "object",
+          "required": [
+            "code"
+          ],
+          "properties": {
+            "code": {
+              "type": "string",
+              "pattern": "^500$"
+            }
+          }
+        }
+      ]
+    }
+  },
+  "description": "完整错误字段在同一对象层合并，避免生成器覆盖嵌套 error。"
+}
+```
+
+### Error503
+
+```json
+{
+  "type": "object",
+  "required": [
+    "error"
+  ],
+  "properties": {
+    "error": {
+      "allOf": [
+        {
+          "$ref": "#/components/schemas/ErrorDetail"
+        },
+        {
+          "type": "object",
+          "required": [
+            "code"
+          ],
+          "properties": {
+            "code": {
+              "type": "string",
+              "pattern": "^503$"
+            }
+          }
+        }
+      ]
+    }
+  },
+  "description": "完整错误字段在同一对象层合并，避免生成器覆盖嵌套 error。"
+}
+```
+
+### Error400
+
+```json
+{
+  "type": "object",
+  "required": [
+    "error"
+  ],
+  "properties": {
+    "error": {
+      "allOf": [
+        {
+          "$ref": "#/components/schemas/ErrorDetail"
+        },
+        {
+          "type": "object",
+          "required": [
+            "code"
+          ],
+          "properties": {
+            "code": {
+              "type": "string",
+              "pattern": "^400$"
+            }
+          }
+        }
+      ]
+    }
+  },
+  "description": "完整错误字段在同一对象层合并，避免生成器覆盖嵌套 error。"
+}
+```
+
+### Error404
+
+```json
+{
+  "type": "object",
+  "required": [
+    "error"
+  ],
+  "properties": {
+    "error": {
+      "allOf": [
+        {
+          "$ref": "#/components/schemas/ErrorDetail"
+        },
+        {
+          "type": "object",
+          "required": [
+            "code"
+          ],
+          "properties": {
+            "code": {
+              "type": "string",
+              "pattern": "^404$"
+            }
+          }
+        }
+      ]
+    }
+  },
+  "description": "完整错误字段在同一对象层合并，避免生成器覆盖嵌套 error。"
+}
+```
+
+### ErrorDetail
+
+```json
+{
+  "type": "object",
+  "required": [
+    "code",
+    "message",
+    "type",
+    "param"
+  ],
+  "properties": {
+    "code": {
+      "type": "string",
+      "pattern": "^[45][0-9]{2}$"
+    },
+    "message": {
+      "type": "string"
+    },
+    "type": {
+      "type": "string"
+    },
+    "param": {
+      "nullable": true,
+      "x-go-type": "json.RawMessage",
+      "x-go-type-skip-optional-pointer": true,
+      "description": "当前为 null。"
+    }
+  }
 }
 ```

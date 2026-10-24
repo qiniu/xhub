@@ -390,34 +390,205 @@
         ],
         "properties": {
           "error": {
-            "type": "object",
-            "required": [
-              "code",
-              "message",
-              "type",
-              "param"
-            ],
-            "properties": {
-              "code": {
-                "type": "string",
-                "pattern": "^[45][0-9]{2}$"
-              },
-              "message": {
-                "type": "string"
-              },
-              "type": {
-                "type": "string"
-              },
-              "param": {
-                "nullable": true,
-                "x-go-type": "json.RawMessage",
-                "x-go-type-skip-optional-pointer": true,
-                "description": "当前为 null。 / Currently null."
-              }
-            }
+            "$ref": "#/components/schemas/ErrorDetail"
           }
         },
         "description": "管理接口错误信封；HTTP 状态与 code 一致，不用成功对象代替失败。 / Management error envelope; code matches HTTP status and failures never use a success object."
+      },
+      "Error401": {
+        "type": "object",
+        "required": [
+          "error"
+        ],
+        "properties": {
+          "error": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/ErrorDetail"
+              },
+              {
+                "type": "object",
+                "required": [
+                  "code"
+                ],
+                "properties": {
+                  "code": {
+                    "type": "string",
+                    "pattern": "^401$"
+                  }
+                }
+              }
+            ]
+          }
+        },
+        "description": "完整错误字段在同一对象层合并，避免生成器覆盖嵌套 error。 / Error fields are combined at the same object level to avoid replacing the nested error."
+      },
+      "Error403": {
+        "type": "object",
+        "required": [
+          "error"
+        ],
+        "properties": {
+          "error": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/ErrorDetail"
+              },
+              {
+                "type": "object",
+                "required": [
+                  "code"
+                ],
+                "properties": {
+                  "code": {
+                    "type": "string",
+                    "pattern": "^403$"
+                  }
+                }
+              }
+            ]
+          }
+        },
+        "description": "完整错误字段在同一对象层合并，避免生成器覆盖嵌套 error。 / Error fields are combined at the same object level to avoid replacing the nested error."
+      },
+      "Error500": {
+        "type": "object",
+        "required": [
+          "error"
+        ],
+        "properties": {
+          "error": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/ErrorDetail"
+              },
+              {
+                "type": "object",
+                "required": [
+                  "code"
+                ],
+                "properties": {
+                  "code": {
+                    "type": "string",
+                    "pattern": "^500$"
+                  }
+                }
+              }
+            ]
+          }
+        },
+        "description": "完整错误字段在同一对象层合并，避免生成器覆盖嵌套 error。 / Error fields are combined at the same object level to avoid replacing the nested error."
+      },
+      "Error503": {
+        "type": "object",
+        "required": [
+          "error"
+        ],
+        "properties": {
+          "error": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/ErrorDetail"
+              },
+              {
+                "type": "object",
+                "required": [
+                  "code"
+                ],
+                "properties": {
+                  "code": {
+                    "type": "string",
+                    "pattern": "^503$"
+                  }
+                }
+              }
+            ]
+          }
+        },
+        "description": "完整错误字段在同一对象层合并，避免生成器覆盖嵌套 error。 / Error fields are combined at the same object level to avoid replacing the nested error."
+      },
+      "Error400": {
+        "type": "object",
+        "required": [
+          "error"
+        ],
+        "properties": {
+          "error": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/ErrorDetail"
+              },
+              {
+                "type": "object",
+                "required": [
+                  "code"
+                ],
+                "properties": {
+                  "code": {
+                    "type": "string",
+                    "pattern": "^400$"
+                  }
+                }
+              }
+            ]
+          }
+        },
+        "description": "完整错误字段在同一对象层合并，避免生成器覆盖嵌套 error。 / Error fields are combined at the same object level to avoid replacing the nested error."
+      },
+      "Error404": {
+        "type": "object",
+        "required": [
+          "error"
+        ],
+        "properties": {
+          "error": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/ErrorDetail"
+              },
+              {
+                "type": "object",
+                "required": [
+                  "code"
+                ],
+                "properties": {
+                  "code": {
+                    "type": "string",
+                    "pattern": "^404$"
+                  }
+                }
+              }
+            ]
+          }
+        },
+        "description": "完整错误字段在同一对象层合并，避免生成器覆盖嵌套 error。 / Error fields are combined at the same object level to avoid replacing the nested error."
+      },
+      "ErrorDetail": {
+        "type": "object",
+        "required": [
+          "code",
+          "message",
+          "type",
+          "param"
+        ],
+        "properties": {
+          "code": {
+            "type": "string",
+            "pattern": "^[45][0-9]{2}$"
+          },
+          "message": {
+            "type": "string"
+          },
+          "type": {
+            "type": "string"
+          },
+          "param": {
+            "nullable": true,
+            "x-go-type": "json.RawMessage",
+            "x-go-type-skip-optional-pointer": true,
+            "description": "当前为 null。 / Currently null."
+          }
+        }
       }
     },
     "responses": {
@@ -426,25 +597,7 @@
         "content": {
           "application/json": {
             "schema": {
-              "allOf": [
-                {
-                  "$ref": "#/components/schemas/Error"
-                },
-                {
-                  "type": "object",
-                  "properties": {
-                    "error": {
-                      "type": "object",
-                      "properties": {
-                        "code": {
-                          "type": "string",
-                          "pattern": "^401$"
-                        }
-                      }
-                    }
-                  }
-                }
-              ]
+              "$ref": "#/components/schemas/Error401"
             }
           }
         }
@@ -454,25 +607,7 @@
         "content": {
           "application/json": {
             "schema": {
-              "allOf": [
-                {
-                  "$ref": "#/components/schemas/Error"
-                },
-                {
-                  "type": "object",
-                  "properties": {
-                    "error": {
-                      "type": "object",
-                      "properties": {
-                        "code": {
-                          "type": "string",
-                          "pattern": "^403$"
-                        }
-                      }
-                    }
-                  }
-                }
-              ]
+              "$ref": "#/components/schemas/Error403"
             }
           }
         }
@@ -482,25 +617,7 @@
         "content": {
           "application/json": {
             "schema": {
-              "allOf": [
-                {
-                  "$ref": "#/components/schemas/Error"
-                },
-                {
-                  "type": "object",
-                  "properties": {
-                    "error": {
-                      "type": "object",
-                      "properties": {
-                        "code": {
-                          "type": "string",
-                          "pattern": "^500$"
-                        }
-                      }
-                    }
-                  }
-                }
-              ]
+              "$ref": "#/components/schemas/Error500"
             }
           }
         }
@@ -510,25 +627,7 @@
         "content": {
           "application/json": {
             "schema": {
-              "allOf": [
-                {
-                  "$ref": "#/components/schemas/Error"
-                },
-                {
-                  "type": "object",
-                  "properties": {
-                    "error": {
-                      "type": "object",
-                      "properties": {
-                        "code": {
-                          "type": "string",
-                          "pattern": "^503$"
-                        }
-                      }
-                    }
-                  }
-                }
-              ]
+              "$ref": "#/components/schemas/Error503"
             }
           }
         }
@@ -538,25 +637,7 @@
         "content": {
           "application/json": {
             "schema": {
-              "allOf": [
-                {
-                  "$ref": "#/components/schemas/Error"
-                },
-                {
-                  "type": "object",
-                  "properties": {
-                    "error": {
-                      "type": "object",
-                      "properties": {
-                        "code": {
-                          "type": "string",
-                          "pattern": "^400$"
-                        }
-                      }
-                    }
-                  }
-                }
-              ]
+              "$ref": "#/components/schemas/Error400"
             }
           }
         }
@@ -566,25 +647,7 @@
         "content": {
           "application/json": {
             "schema": {
-              "allOf": [
-                {
-                  "$ref": "#/components/schemas/Error"
-                },
-                {
-                  "type": "object",
-                  "properties": {
-                    "error": {
-                      "type": "object",
-                      "properties": {
-                        "code": {
-                          "type": "string",
-                          "pattern": "^404$"
-                        }
-                      }
-                    }
-                  }
-                }
-              ]
+              "$ref": "#/components/schemas/Error404"
             }
           }
         }

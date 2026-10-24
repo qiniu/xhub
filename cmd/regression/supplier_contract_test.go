@@ -161,8 +161,14 @@ func TestSupplierContractDeniedAndMalformed(t *testing.T) {
 	}
 	// GET 常规无正文；意外收到损坏正文也由同一解析器拒绝，错误响应仍必须记入契约。
 	for _, path := range []string{"/credentials", "/credentials/by_name/contract-denied"} {
-		req := httptest.NewRequest("GET", path, strings.NewReader("null"))
-		c.check(req, catalogRawRequest(t, c.h, "GET", path, c.admin, "null"), 400)
+		for _, body := range []string{"null", "[]", "42", "true", `"text"`, "{} {}"} {
+			req := httptest.NewRequest("GET", path, strings.NewReader(body))
+			req.Header.Set("Content-Type", "application/json")
+			if err := c.v.Request(req); err == nil {
+				t.Fatalf("GET 畸形正文未被契约拒绝: %s %s", path, body)
+			}
+			c.check(req, catalogRawRequest(t, c.h, "GET", path, c.admin, body), 400)
+		}
 	}
 	c.call("POST", "/credentials", c.admin, map[string]any{"jsonrpc": "2.0", "method": "tools/list"}, 400)
 	if rows := rowsOf(c.call("GET", "/credentials", c.admin, nil, 200), "credentials"); len(rows) != 0 {

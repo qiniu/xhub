@@ -69,8 +69,9 @@ func (v *Validator) Request(req *http.Request) error {
 		if len(bytes.TrimSpace(raw)) == 0 {
 			req.Body = nil
 			req.ContentLength = 0
-		} else if !json.Valid(raw) {
-			return fmt.Errorf("contract request: invalid or trailing JSON")
+		} else if !json.Valid(raw) || bytes.TrimSpace(raw)[0] != '{' {
+			// GET 没有 requestBody 声明时库会跳过正文；网关仍要求非空正文是单个对象。
+			return fmt.Errorf("contract request: expected a single JSON object")
 		}
 	}
 	return openapi3filter.ValidateRequest(req.Context(), input)
@@ -82,6 +83,11 @@ func (v *Validator) Response(req *http.Request, status int, header http.Header, 
 	input, err := v.input(req)
 	if err != nil {
 		return err
+	}
+	// 库对 301/304/307/308 提前成功返回，IncludeResponseStatus 无法拦截；先核对操作声明。
+	responses := input.Route.Operation.Responses
+	if responses.Status(status) == nil && responses.Default() == nil {
+		return fmt.Errorf("contract response: undeclared status %d", status)
 	}
 	if !json.Valid(body) {
 		return fmt.Errorf("contract response: invalid or trailing JSON")

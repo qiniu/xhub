@@ -1,5 +1,6 @@
 """执行真实回归脚本，验证控制台输出与完整日志契约。"""
 import os
+import json
 from pathlib import Path
 import shutil
 import subprocess
@@ -23,6 +24,8 @@ class RegressionOutputTests(unittest.TestCase):
                 'go': '''#!/usr/bin/env python3
 import json, os, sys
 pkg = "fixture/cmd/regression"
+print("go: downloading fixture/module v1.0.0", file=sys.stderr, flush=True)
+if os.environ.get("STDOUT_NOISE"): print("invalid stdout diagnostic", flush=True)
 def event(action, name=None, output=None):
     print(json.dumps(dict(Action=action, Package=pkg, **({"Test": name} if name else {}), **({"Output": output} if output else {}))), flush=True)
 event("start")
@@ -56,8 +59,17 @@ sys.exit(int(os.environ["STATUS"]))
                     self.assertTrue(log.with_name("summary.json").is_file())
                     self.assertEqual(log.read_text().count('trace gateway diagnostic'), 10000)
                     self.assertIn('stderr diagnostic', log.read_text())
+                    self.assertIn('go: downloading fixture/module', log.read_text())
+                    self.assertNotIn('go: downloading', log.with_name('events.jsonl').read_text())
+                    self.assertIn('go: downloading', log.with_name('go-stderr.log').read_text())
                     self.assertIn('backend regression failed' if status else 'backend regression passed', output)
             self.assertEqual(len(list((root / '.e2e/runs').iterdir())), 4)
+            # stdout 仍必须是严格事件流，不能为了容忍下载诊断而忽略真实证据损坏。
+            env = {**os.environ, 'PATH': str(root / 'bin') + ':' + os.environ['PATH'], 'STATUS': '0', 'RESULT': 'PASS', 'STDOUT_NOISE': '1'}
+            result = subprocess.run(['bash', str(root / 'scripts/regression.sh')], env=env, capture_output=True, text=True)
+            self.assertNotEqual(result.returncode, 0, result.stdout + result.stderr)
+            latest = max((root / '.e2e/runs').iterdir(), key=lambda path: path.stat().st_mtime_ns)
+            self.assertIn('invalid event stream', json.loads((latest / 'summary.json').read_text())['errors'])
 
 
 if __name__ == '__main__':

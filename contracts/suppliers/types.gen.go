@@ -41,6 +41,11 @@ type Deletion struct {
 
 // Error 管理接口错误信封；HTTP 状态与 code 一致，不用成功对象代替失败。 / Management error envelope; code matches HTTP status and failures never use a success object.
 type Error struct {
+	Error ErrorDetail `json:"error"`
+}
+
+// Error400 完整错误字段在同一对象层合并，避免生成器覆盖嵌套 error。 / Error fields are combined at the same object level to avoid replacing the nested error.
+type Error400 struct {
 	Error struct {
 		Code    string `json:"code"`
 		Message string `json:"message"`
@@ -51,50 +56,78 @@ type Error struct {
 	} `json:"error"`
 }
 
-// CredentialName defines model for CredentialName.
-type CredentialName = string
-
-// Error400 defines model for Error400.
-type Error400 struct {
-	Error struct {
-		Code *string `json:"code,omitempty"`
-	} `json:"error"`
-}
-
-// Error401 defines model for Error401.
+// Error401 完整错误字段在同一对象层合并，避免生成器覆盖嵌套 error。 / Error fields are combined at the same object level to avoid replacing the nested error.
 type Error401 struct {
 	Error struct {
-		Code *string `json:"code,omitempty"`
+		Code    string `json:"code"`
+		Message string `json:"message"`
+
+		// Param 当前为 null。 / Currently null.
+		Param json.RawMessage `json:"param"`
+		Type  string          `json:"type"`
 	} `json:"error"`
 }
 
-// Error403 defines model for Error403.
+// Error403 完整错误字段在同一对象层合并，避免生成器覆盖嵌套 error。 / Error fields are combined at the same object level to avoid replacing the nested error.
 type Error403 struct {
 	Error struct {
-		Code *string `json:"code,omitempty"`
+		Code    string `json:"code"`
+		Message string `json:"message"`
+
+		// Param 当前为 null。 / Currently null.
+		Param json.RawMessage `json:"param"`
+		Type  string          `json:"type"`
 	} `json:"error"`
 }
 
-// Error404 defines model for Error404.
+// Error404 完整错误字段在同一对象层合并，避免生成器覆盖嵌套 error。 / Error fields are combined at the same object level to avoid replacing the nested error.
 type Error404 struct {
 	Error struct {
-		Code *string `json:"code,omitempty"`
+		Code    string `json:"code"`
+		Message string `json:"message"`
+
+		// Param 当前为 null。 / Currently null.
+		Param json.RawMessage `json:"param"`
+		Type  string          `json:"type"`
 	} `json:"error"`
 }
 
-// Error500 defines model for Error500.
+// Error500 完整错误字段在同一对象层合并，避免生成器覆盖嵌套 error。 / Error fields are combined at the same object level to avoid replacing the nested error.
 type Error500 struct {
 	Error struct {
-		Code *string `json:"code,omitempty"`
+		Code    string `json:"code"`
+		Message string `json:"message"`
+
+		// Param 当前为 null。 / Currently null.
+		Param json.RawMessage `json:"param"`
+		Type  string          `json:"type"`
 	} `json:"error"`
 }
 
-// Error503 defines model for Error503.
+// Error503 完整错误字段在同一对象层合并，避免生成器覆盖嵌套 error。 / Error fields are combined at the same object level to avoid replacing the nested error.
 type Error503 struct {
 	Error struct {
-		Code *string `json:"code,omitempty"`
+		Code    string `json:"code"`
+		Message string `json:"message"`
+
+		// Param 当前为 null。 / Currently null.
+		Param json.RawMessage `json:"param"`
+		Type  string          `json:"type"`
 	} `json:"error"`
 }
+
+// ErrorDetail defines model for ErrorDetail.
+type ErrorDetail struct {
+	Code    string `json:"code"`
+	Message string `json:"message"`
+
+	// Param 当前为 null。 / Currently null.
+	Param json.RawMessage `json:"param"`
+	Type  string          `json:"type"`
+}
+
+// CredentialName defines model for CredentialName.
+type CredentialName = string
 
 // CreateCredentialJSONRequestBody defines body for CreateCredential for application/json ContentType.
 type CreateCredentialJSONRequestBody = CredentialInput

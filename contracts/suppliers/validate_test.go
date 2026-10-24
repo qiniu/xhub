@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"reflect"
+	"strconv"
 	"strings"
 	"testing"
 )
@@ -35,6 +36,10 @@ func TestContractValidation(t *testing.T) {
 		{"unavailable", "GET", "/credentials", `{"error":{"message":"unavailable","code":"503","type":"unavailable","param":null}}`, 503, true},
 		{"trailing response", "GET", "/credentials", `{"object":"list","data":[],"credentials":[]} {}`, 200, false},
 		{"undeclared status", "GET", "/credentials", `{}`, 202, false},
+		{"redirect 301", "GET", "/credentials", `{}`, 301, false},
+		{"not modified", "GET", "/credentials", `{}`, 304, false},
+		{"redirect 307", "GET", "/credentials", `{}`, 307, false},
+		{"redirect 308", "GET", "/credentials", `{}`, 308, false},
 		{"html", "GET", "/credentials", `<html>ok</html>`, 200, false},
 		{"unknown method", "PUT", "/credentials/sample", `{}`, 200, false},
 		{"unknown path", "GET", "/models", `{}`, 200, false},
@@ -51,9 +56,12 @@ func TestContractValidation(t *testing.T) {
 	if err := v.Response(req, 200, http.Header{"Content-Type": []string{"text/html"}}, []byte(`{"object":"list","data":[],"credentials":[]}`)); err == nil {
 		t.Fatal("错误媒体类型被放过")
 	}
+	if err := v.Response(req, 307, http.Header{"Content-Type": []string{"text/html"}}, []byte(`{}`)); err == nil {
+		t.Fatal("重定向不能跳过状态和媒体类型校验")
+	}
 }
 
-// TestContractRequests 验证创建/更新允许扩展、null 字段和空对象，但拒绝非对象和损坏 JSON；鉴权由真实回归覆盖，此处无网络或数据清理。
+// TestContractRequests 验证写入及两个 GET 操作允许扩展、null 字段和空对象，但拒绝非对象和损坏 JSON；鉴权由真实回归覆盖，此处无网络或数据清理。
 func TestContractRequests(t *testing.T) {
 	v, err := NewValidator(Document)
 	if err != nil {
@@ -65,17 +73,84 @@ func TestContractRequests(t *testing.T) {
 	}{
 		{`{}`, true}, {`{"credential_values":null,"extension":false}`, true}, {``, true}, {" \n ", true}, {`null`, false}, {`[]`, false}, {`42`, false}, {`{} {}`, false}, {`{"x":`, false},
 	} {
-		t.Run(tc.body, func(t *testing.T) {
-			req := httptest.NewRequest("PATCH", "/credentials/sample", strings.NewReader(tc.body))
-			req.Header.Set("Content-Type", "application/json")
-			err := v.Request(req)
-			if (err == nil) != tc.valid {
-				t.Fatalf("请求契约通过=%v，预期=%v: %v", err == nil, tc.valid, err)
-			}
-		})
+		for _, op := range []struct{ method, path string }{{"PATCH", "/credentials/sample"}, {"GET", "/credentials"}, {"GET", "/credentials/by_name/sample"}} {
+			t.Run(op.method+op.path+tc.body, func(t *testing.T) {
+				req := httptest.NewRequest(op.method, op.path, strings.NewReader(tc.body))
+				req.Header.Set("Content-Type", "application/json")
+				err := v.Request(req)
+				if (err == nil) != tc.valid {
+					t.Fatalf("请求契约通过=%v，预期=%v: %v", err == nil, tc.valid, err)
+				}
+			})
+		}
 	}
 	if err := v.Request(httptest.NewRequest("POST", "/outside", nil)); err == nil {
 		t.Fatal("未知路径不能跳过验证")
+	}
+}
+
+// TestGeneratedErrorsRoundTrip 验证各 HTTP 错误生成类型完整保留四个必填字段及 null；源响应和回编码均须符合真实契约。
+// 只在内存编解码；另验证缺字段及状态码不一致必须失败，无网络、数据库或待清理数据。
+func TestGeneratedErrorsRoundTrip(t *testing.T) {
+	v, err := NewValidator(Document)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, tc := range []struct {
+		status int
+		target any
+	}{
+		{400, &Error400{}}, {401, &Error401{}}, {403, &Error403{}},
+		{404, &Error404{}}, {500, &Error500{}}, {503, &Error503{}},
+	} {
+		t.Run(strconv.Itoa(tc.status), func(t *testing.T) {
+			req := httptest.NewRequest("GET", "/credentials/by_name/sample", nil)
+			header := http.Header{"Content-Type": []string{"application/json"}}
+			want := map[string]any{"error": map[string]any{"code": strconv.Itoa(tc.status), "message": "fixture failure", "type": "fixture_error", "param": nil}}
+			raw, err := json.Marshal(want)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if err := json.Unmarshal(raw, tc.target); err != nil {
+				t.Fatal(err)
+			}
+			encoded, err := json.Marshal(tc.target)
+			if err != nil {
+				t.Fatal(err)
+			}
+			var got any
+			if err := json.Unmarshal(encoded, &got); err != nil {
+				t.Fatal(err)
+			}
+			if !reflect.DeepEqual(want, got) {
+				t.Fatalf("错误类型丢字段: want=%s got=%s", raw, encoded)
+			}
+			if err := v.Response(req, tc.status, header, encoded); err != nil {
+				t.Fatal(err)
+			}
+			for _, field := range []string{"code", "message", "type", "param"} {
+				var invalid map[string]map[string]any
+				if err := json.Unmarshal(raw, &invalid); err != nil {
+					t.Fatal(err)
+				}
+				delete(invalid["error"], field)
+				body, err := json.Marshal(invalid)
+				if err != nil {
+					t.Fatal(err)
+				}
+				if v.Response(req, tc.status, header, body) == nil {
+					t.Fatalf("缺少 %s 被接受", field)
+				}
+			}
+			want["error"].(map[string]any)["code"] = "499"
+			invalid, err := json.Marshal(want)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if v.Response(req, tc.status, header, invalid) == nil {
+				t.Fatal("错误码与状态不一致被接受")
+			}
+		})
 	}
 }
 

@@ -149,33 +149,239 @@ Generated from the pilot OpenAPI source. No production route or client is replac
   ],
   "properties": {
     "error": {
-      "type": "object",
-      "required": [
-        "code",
-        "message",
-        "type",
-        "param"
-      ],
-      "properties": {
-        "code": {
-          "type": "string",
-          "pattern": "^[45][0-9]{2}$"
-        },
-        "message": {
-          "type": "string"
-        },
-        "type": {
-          "type": "string"
-        },
-        "param": {
-          "nullable": true,
-          "x-go-type": "json.RawMessage",
-          "x-go-type-skip-optional-pointer": true,
-          "description": "Currently null."
-        }
-      }
+      "$ref": "#/components/schemas/ErrorDetail"
     }
   },
   "description": "Management error envelope; code matches HTTP status and failures never use a success object."
+}
+```
+
+### Error401
+
+```json
+{
+  "type": "object",
+  "required": [
+    "error"
+  ],
+  "properties": {
+    "error": {
+      "allOf": [
+        {
+          "$ref": "#/components/schemas/ErrorDetail"
+        },
+        {
+          "type": "object",
+          "required": [
+            "code"
+          ],
+          "properties": {
+            "code": {
+              "type": "string",
+              "pattern": "^401$"
+            }
+          }
+        }
+      ]
+    }
+  },
+  "description": "Error fields are combined at the same object level to avoid replacing the nested error."
+}
+```
+
+### Error403
+
+```json
+{
+  "type": "object",
+  "required": [
+    "error"
+  ],
+  "properties": {
+    "error": {
+      "allOf": [
+        {
+          "$ref": "#/components/schemas/ErrorDetail"
+        },
+        {
+          "type": "object",
+          "required": [
+            "code"
+          ],
+          "properties": {
+            "code": {
+              "type": "string",
+              "pattern": "^403$"
+            }
+          }
+        }
+      ]
+    }
+  },
+  "description": "Error fields are combined at the same object level to avoid replacing the nested error."
+}
+```
+
+### Error500
+
+```json
+{
+  "type": "object",
+  "required": [
+    "error"
+  ],
+  "properties": {
+    "error": {
+      "allOf": [
+        {
+          "$ref": "#/components/schemas/ErrorDetail"
+        },
+        {
+          "type": "object",
+          "required": [
+            "code"
+          ],
+          "properties": {
+            "code": {
+              "type": "string",
+              "pattern": "^500$"
+            }
+          }
+        }
+      ]
+    }
+  },
+  "description": "Error fields are combined at the same object level to avoid replacing the nested error."
+}
+```
+
+### Error503
+
+```json
+{
+  "type": "object",
+  "required": [
+    "error"
+  ],
+  "properties": {
+    "error": {
+      "allOf": [
+        {
+          "$ref": "#/components/schemas/ErrorDetail"
+        },
+        {
+          "type": "object",
+          "required": [
+            "code"
+          ],
+          "properties": {
+            "code": {
+              "type": "string",
+              "pattern": "^503$"
+            }
+          }
+        }
+      ]
+    }
+  },
+  "description": "Error fields are combined at the same object level to avoid replacing the nested error."
+}
+```
+
+### Error400
+
+```json
+{
+  "type": "object",
+  "required": [
+    "error"
+  ],
+  "properties": {
+    "error": {
+      "allOf": [
+        {
+          "$ref": "#/components/schemas/ErrorDetail"
+        },
+        {
+          "type": "object",
+          "required": [
+            "code"
+          ],
+          "properties": {
+            "code": {
+              "type": "string",
+              "pattern": "^400$"
+            }
+          }
+        }
+      ]
+    }
+  },
+  "description": "Error fields are combined at the same object level to avoid replacing the nested error."
+}
+```
+
+### Error404
+
+```json
+{
+  "type": "object",
+  "required": [
+    "error"
+  ],
+  "properties": {
+    "error": {
+      "allOf": [
+        {
+          "$ref": "#/components/schemas/ErrorDetail"
+        },
+        {
+          "type": "object",
+          "required": [
+            "code"
+          ],
+          "properties": {
+            "code": {
+              "type": "string",
+              "pattern": "^404$"
+            }
+          }
+        }
+      ]
+    }
+  },
+  "description": "Error fields are combined at the same object level to avoid replacing the nested error."
+}
+```
+
+### ErrorDetail
+
+```json
+{
+  "type": "object",
+  "required": [
+    "code",
+    "message",
+    "type",
+    "param"
+  ],
+  "properties": {
+    "code": {
+      "type": "string",
+      "pattern": "^[45][0-9]{2}$"
+    },
+    "message": {
+      "type": "string"
+    },
+    "type": {
+      "type": "string"
+    },
+    "param": {
+      "nullable": true,
+      "x-go-type": "json.RawMessage",
+      "x-go-type-skip-optional-pointer": true,
+      "description": "Currently null."
+    }
+  }
 }
 ```

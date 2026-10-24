@@ -10,4 +10,10 @@ const missing: components["schemas"]["Credential"] = { credential_name: "example
 const wrongCount: components["schemas"]["Deletion"] = { id: "example", credential_name: "example", deleted: "1" };
 // @ts-expect-error 创建对象不能变成字符串。
 const scalar: components["schemas"]["CredentialInput"] = "invalid";
-void [input, list, missing, wrongCount, scalar];
+// 错误生成类型必须保留全部必填字段；状态码内容由运行时 OpenAPI 校验，此处核对类型结构。
+const error: components["responses"]["Error404"]["content"]["application/json"] = { error: { code: "404", message: "Not found", type: "not_found", param: null } };
+// @ts-expect-error 只有 code 的嵌套错误不能当作完整错误响应。
+const partialError: components["responses"]["Error404"]["content"]["application/json"] = { error: { code: "404" } };
+// @ts-expect-error code 不能因为 allOf 合并而变成可选字段。
+const missingErrorCode: components["responses"]["Error400"]["content"]["application/json"] = { error: { message: "Invalid request", type: "invalid_request", param: null } };
+void [input, list, missing, wrongCount, scalar, error, partialError, missingErrorCode];

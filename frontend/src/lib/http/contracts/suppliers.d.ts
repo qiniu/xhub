@@ -97,13 +97,50 @@ export interface components {
         };
         /** @description 管理接口错误信封；HTTP 状态与 code 一致，不用成功对象代替失败。 / Management error envelope; code matches HTTP status and failures never use a success object. */
         Error: {
-            error: {
+            error: components["schemas"]["ErrorDetail"];
+        };
+        /** @description 完整错误字段在同一对象层合并，避免生成器覆盖嵌套 error。 / Error fields are combined at the same object level to avoid replacing the nested error. */
+        Error401: {
+            error: components["schemas"]["ErrorDetail"] & {
                 code: string;
-                message: string;
-                type: string;
-                /** @description 当前为 null。 / Currently null. */
-                param: unknown;
             };
+        };
+        /** @description 完整错误字段在同一对象层合并，避免生成器覆盖嵌套 error。 / Error fields are combined at the same object level to avoid replacing the nested error. */
+        Error403: {
+            error: components["schemas"]["ErrorDetail"] & {
+                code: string;
+            };
+        };
+        /** @description 完整错误字段在同一对象层合并，避免生成器覆盖嵌套 error。 / Error fields are combined at the same object level to avoid replacing the nested error. */
+        Error500: {
+            error: components["schemas"]["ErrorDetail"] & {
+                code: string;
+            };
+        };
+        /** @description 完整错误字段在同一对象层合并，避免生成器覆盖嵌套 error。 / Error fields are combined at the same object level to avoid replacing the nested error. */
+        Error503: {
+            error: components["schemas"]["ErrorDetail"] & {
+                code: string;
+            };
+        };
+        /** @description 完整错误字段在同一对象层合并，避免生成器覆盖嵌套 error。 / Error fields are combined at the same object level to avoid replacing the nested error. */
+        Error400: {
+            error: components["schemas"]["ErrorDetail"] & {
+                code: string;
+            };
+        };
+        /** @description 完整错误字段在同一对象层合并，避免生成器覆盖嵌套 error。 / Error fields are combined at the same object level to avoid replacing the nested error. */
+        Error404: {
+            error: components["schemas"]["ErrorDetail"] & {
+                code: string;
+            };
+        };
+        ErrorDetail: {
+            code: string;
+            message: string;
+            type: string;
+            /** @description 当前为 null。 / Currently null. */
+            param: unknown;
         };
     };
     responses: {
@@ -113,11 +150,7 @@ export interface components {
                 [name: string]: unknown;
             };
             content: {
-                "application/json": components["schemas"]["Error"] & {
-                    error?: {
-                        code?: string;
-                    };
-                };
+                "application/json": components["schemas"]["Error401"];
             };
         };
         /** @description 非管理员。 / Administrator required. */
@@ -126,11 +159,7 @@ export interface components {
                 [name: string]: unknown;
             };
             content: {
-                "application/json": components["schemas"]["Error"] & {
-                    error?: {
-                        code?: string;
-                    };
-                };
+                "application/json": components["schemas"]["Error403"];
             };
         };
         /** @description 持久化失败，不伪造成功。 / Storage failure, never success. */
@@ -139,11 +168,7 @@ export interface components {
                 [name: string]: unknown;
             };
             content: {
-                "application/json": components["schemas"]["Error"] & {
-                    error?: {
-                        code?: string;
-                    };
-                };
+                "application/json": components["schemas"]["Error500"];
             };
         };
         /** @description 存储不可用。 / Store unavailable. */
@@ -152,11 +177,7 @@ export interface components {
                 [name: string]: unknown;
             };
             content: {
-                "application/json": components["schemas"]["Error"] & {
-                    error?: {
-                        code?: string;
-                    };
-                };
+                "application/json": components["schemas"]["Error503"];
             };
         };
         /** @description 非法 JSON 或 REST 端点收到 JSON-RPC。 / Invalid JSON or JSON-RPC on REST. */
@@ -165,11 +186,7 @@ export interface components {
                 [name: string]: unknown;
             };
             content: {
-                "application/json": components["schemas"]["Error"] & {
-                    error?: {
-                        code?: string;
-                    };
-                };
+                "application/json": components["schemas"]["Error400"];
             };
         };
         /** @description 记录不存在。 / Record not found. */
@@ -178,11 +195,7 @@ export interface components {
                 [name: string]: unknown;
             };
             content: {
-                "application/json": components["schemas"]["Error"] & {
-                    error?: {
-                        code?: string;
-                    };
-                };
+                "application/json": components["schemas"]["Error404"];
             };
         };
     };

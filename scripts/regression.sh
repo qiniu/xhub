@@ -89,9 +89,12 @@ echo "full regression log: $LOG_FILE"
 CHECK_ARGS=(--log "$LOG_FILE" --summary "$LOG_DIR/summary.json" --pattern "$PATTERN")
 if [[ "$VERBOSE" == 1 ]]; then CHECK_ARGS+=(--verbose); fi
 set +e
-go test ./cmd/regression/ "${ARGS[@]}" -json 2>&1 | tee "$LOG_DIR/events.jsonl" | python3 "$ROOT/scripts/check-regression-results.py" "${CHECK_ARGS[@]}"
+# Go 工具链把依赖下载和编译诊断写 stderr；只将 stdout 作为 JSON 证据，损坏事件仍须失败。
+go test ./cmd/regression/ "${ARGS[@]}" -json 2>"$LOG_DIR/go-stderr.log" | tee "$LOG_DIR/events.jsonl" | python3 "$ROOT/scripts/check-regression-results.py" "${CHECK_ARGS[@]}"
 STAGE_STATUS=("${PIPESTATUS[@]}")
 set -e
+# 诊断单独保存并汇入完整日志，既不污染证据也不丢失败原因；写入失败同样阻断。
+cat "$LOG_DIR/go-stderr.log" >> "$LOG_FILE"
 # 优先保留 Go 的失败码；Go 成功也必须检查证据写入及用例匹配门禁。
 STATUS=0
 for stage in "${STAGE_STATUS[@]}"; do
