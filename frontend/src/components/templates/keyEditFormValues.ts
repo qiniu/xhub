@@ -18,6 +18,7 @@ export interface AgentsAndGroups {
   accessGroups: string[];
 }
 
+/** 密钥编辑表单输入；保留缺省、null与用户字符串，供现有解析和提交使用，不代替后台授权或预算校验。 */
 export interface KeyEditFormValues {
   key_alias?: string;
   models?: string[];
@@ -57,7 +58,8 @@ export interface KeyEditFormValues {
   token?: string;
   disabled_callbacks?: string[];
   auto_rotate?: boolean;
-  rotation_interval?: string;
+  // 实际Key响应始终为null；保留旧表单字符串类型供历史页面使用。
+  rotation_interval?: string | null;
   route_template_id?: string;
 }
 
@@ -171,7 +173,7 @@ export const keyEditFormSchema = z.object({
   token: z.custom<string | undefined>(),
   disabled_callbacks: z.custom<string[] | undefined>(),
   auto_rotate: z.custom<boolean | undefined>(),
-  rotation_interval: z.custom<string | undefined>(),
+  rotation_interval: z.custom<string | null | undefined>(),
   route_template_id: z.custom<string | undefined>(),
 });
 

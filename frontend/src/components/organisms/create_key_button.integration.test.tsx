@@ -116,6 +116,7 @@ describe("CreateKey", () => {
       await submit();
 
       expect(await createdPayload()).toStrictEqual(DEFAULT_PAYLOAD);
+      expect(await screen.findByText("sk-created", { exact: true })).toBeVisible();
     });
 
     /** 分配边界：前置创建弹窗，提交零 RPM 与整数 TPM；验证字段进入个人 Key 请求，组件卸载清理。 */

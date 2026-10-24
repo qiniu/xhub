@@ -954,3 +954,28 @@ describe("portable console UI config bootstrap", () => {
     expect(fetcher).toHaveBeenCalledWith("/gw/litellm/.well-known/litellm-ui-config");
   });
 });
+
+/** 密钥契约接入只收紧静态响应；单测以fetch替身核对缺省/null/0原始请求及失败传播，afterEach恢复状态。 */
+describe("key contract adapters preserve wire behavior", () => {
+  afterEach(() => vi.unstubAllGlobals());
+  /** 验证创建/修改保留预算字段存在性与用户输入，无持久数据。 */
+  it.each([undefined, null, 0, ""])("preserves budget presence: %s", async (budget) => {
+    const fetcher = vi.fn().mockResolvedValue({ ok: true, json: async () => ({ token_id: "id", max_budget: budget }) });
+    vi.stubGlobal("fetch", fetcher);
+    const fields = budget === undefined ? {} : { max_budget: budget };
+    await Networking.keyCreateCall("session", "user-id", { key_alias: "Original 名字", ...fields });
+    await Networking.keyUpdateCall("session", { key: "id", ...fields });
+    const sent = fetcher.mock.calls.map(([, init]) => JSON.parse(init.body));
+    expect(sent).toEqual([{ user_id: "user-id", key_alias: "Original 名字", ...fields }, { key: "id", ...fields }]);
+    expect(fetcher.mock.calls[0][1].headers.Authorization).toBe("Bearer session");
+  });
+  /** 后台失败必须抛出；这里只验证客户端边界，真实PG写失败另有regression；不产生数据。 */
+  it.each([400, 403, 500])("propagates key management HTTP failures: %s", async (status) => {
+    vi.stubGlobal("fetch", vi.fn().mockImplementation(async () => new Response(JSON.stringify({ error: { message: "Key write rejected" } }), {
+      status, headers: { "Content-Type": "application/json" },
+    })));
+    await expect(Networking.keyCreateCall("session", "user-id", {})).rejects.toThrow("Key write rejected");
+    await expect(Networking.keyUpdateCall("session", { key: "id" })).rejects.toThrow("Key write rejected");
+    await expect(Networking.keyDeleteCall("session", "id")).rejects.toThrow("Key write rejected");
+  });
+});

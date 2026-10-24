@@ -29,7 +29,9 @@
     "gen:api:suppliers": "node scripts/gen-supplier-contract.mjs",
     "check:api:suppliers": "node scripts/gen-supplier-contract.mjs --check && tsc --noEmit --strict --skipLibCheck tests/contracts/suppliers.typecheck.ts",
     "gen:api:users": "node scripts/gen-user-contract.mjs",
-    "check:api:users": "node scripts/gen-user-contract.mjs --check && tsc --noEmit --strict --skipLibCheck tests/contracts/users.typecheck.ts"
+    "check:api:users": "node scripts/gen-user-contract.mjs --check && tsc --noEmit --strict --skipLibCheck tests/contracts/users.typecheck.ts",
+    "gen:api:keys": "node scripts/gen-key-contract.mjs",
+    "check:api:keys": "node scripts/gen-key-contract.mjs --check && tsc --noEmit --strict --skipLibCheck tests/contracts/keys.typecheck.ts"
   },
   "dependencies": {
     "@base-ui/react": "^1.6.0",

@@ -147,3 +147,23 @@ test('user contract requires generation, permissions and real budget regression'
   assert.equal(artifact.if, 'always()');
   assert.equal(artifact.with['if-no-files-found'], 'error');
 });
+
+/** 前置真实质量工作流；契约漂移和真实数据库回归必须独立阻断，不能 continue-on-error，产物与清理必须保留；只读无清理。 */
+test('key contract requires generation, permissions and real budget regression', () => {
+  const job = workflow.jobs['key-contract'];
+  assert.ok(job, '必须注册密钥契约作业');
+  assert.equal(step('key-contract', 'Check generated contract and TypeScript types').run,
+    'npm --prefix frontend run check:api:keys');
+  assert.equal(step('key-contract', 'Test generator drift rejection').run,
+    'node --test frontend/scripts/gen-key-contract.test.mjs');
+  assert.equal(step('key-contract', 'Validate OpenAPI and Go types').run, 'go test -race ./contracts/keys');
+  assert.match(step('key-contract', 'Prepare contract database').run, /docker compose up -d --wait postgres redis/);
+  assert.equal(step('key-contract', 'Run real key contract regression').run,
+    "bash scripts/regression.sh '^Test(KeyContract|SharedPersonalKeyBudgetHTTP|PersonalKeysIsolation|ModelLimitChain|TeamlessPersonalKeys)'");
+  assert.ok(job.steps.every(item => !item['continue-on-error']), '门禁不得忽略失败');
+  const cleanup = job.steps.find(item => item.run === 'docker compose down -v');
+  assert.equal(cleanup.if, 'always()');
+  const artifact = job.steps.find(item => item.uses === 'actions/upload-artifact@v4');
+  assert.equal(artifact.if, 'always()');
+  assert.equal(artifact.with['if-no-files-found'], 'error');
+});

@@ -1,3 +1,4 @@
+import type { components as KeyContract } from "@/lib/http/contracts/keys";
 import { Setter } from "@/types";
 import { useEffect, useState } from "react";
 import { keyListCall, Member, Organization } from "../networking";
@@ -32,6 +33,7 @@ export interface Team {
   organization_models?: string[] | null;
 }
 
+/** 旧页面聚合视图；与真实Key响应重叠的可空字段直接引用生成契约，其余历史展示字段暂不宣称为后台支持。 */
 export interface KeyResponse {
   budget_pending?: number;
   budget_reservations?: import("../common_components/KeyBudgetStatus").BudgetReservationView[];
@@ -40,18 +42,18 @@ export interface KeyResponse {
   key_name: string;
   key_alias: string;
   spend: number;
-  max_budget: number;
-  expires: string;
+  max_budget: KeyContract["schemas"]["KeyRecord"]["max_budget"];
+  expires: KeyContract["schemas"]["KeyRecord"]["expires"];
   models: string[];
   aliases: Record<string, unknown>;
   config: Record<string, unknown>;
-  user_id: string;
+  user_id: KeyContract["schemas"]["KeyRecord"]["user_id"];
   team_id: string | null;
   project_id: string | null;
   max_parallel_requests: number;
   metadata: Record<string, unknown>;
-  tpm_limit: number;
-  rpm_limit: number;
+  tpm_limit: KeyContract["schemas"]["KeyRecord"]["tpm_limit"];
+  rpm_limit: KeyContract["schemas"]["KeyRecord"]["rpm_limit"];
   duration: string;
   budget_duration: string;
   budget_reset_at: string;
@@ -68,7 +70,7 @@ export interface KeyResponse {
   organization_id: string | null;
   org_id?: string | null;
   created_at: string;
-  created_by?: string;
+  created_by?: KeyContract["schemas"]["KeyRecord"]["created_by"];
   updated_at: string;
   settings_updated_at?: string | null;
   last_active: string | null;
@@ -109,7 +111,7 @@ export interface KeyResponse {
   route_template_id?: string | null;
   budget_limits?: Array<{ budget_duration: string; max_budget: number; reset_at?: string }>;
   auto_rotate?: boolean;
-  rotation_interval?: string;
+  rotation_interval?: KeyContract["schemas"]["KeyRecord"]["rotation_interval"];
   last_rotation_at?: string;
   key_rotation_at?: string;
   next_rotation_at?: string;
