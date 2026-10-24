@@ -1,4 +1,4 @@
-// Package keys 保存管理接口契约；验证工具只用于开发，不注册生产 handler。
+// Package usage 保存管理接口契约；验证工具只用于开发，不注册生产 handler。
 package usage
 
 import (

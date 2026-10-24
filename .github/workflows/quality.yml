@@ -457,3 +457,41 @@ jobs:
           if-no-files-found: error
       - run: docker compose down -v
         if: always()
+
+  contract-compatibility:
+    name: API backward compatibility
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - name: Install pinned compatibility checker
+        run: go install github.com/oasdiff/oasdiff@v1.11.7
+      - name: Test compatibility failure gates
+        run: node --test frontend/scripts/check-contract-compatibility.test.mjs
+      - name: Compare contracts with baseline
+        env:
+          CONTRACT_BASE: ${{ github.event.pull_request.base.sha || github.event.before }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p coverage
+          base="$CONTRACT_BASE"
+          # 手动运行没有before；使用当前提交的父提交，不能退化成自己与自己比较。
+          if [[ -z "$base" || "$base" =~ ^0+$ ]]; then
+            base=$(git rev-parse HEAD^)
+          fi
+          node frontend/scripts/check-contract-compatibility.mjs "$base" > coverage/contract-compatibility.json
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: contract-compatibility
+          path: coverage/contract-compatibility.json
+          if-no-files-found: error

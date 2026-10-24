@@ -77,7 +77,12 @@ export function registerUsageErrorScenario(locale:"en"|"zh-CN"){
    await expect(page.getByPlaceholder(tr("Search teams by alias..."),{exact:true})).toBeVisible();
    await expect(page.getByRole("button",{name:tr("Export Data"),exact:true})).toBeDisabled();
    expect((await page.request.post(control+"/usage/migrate")).status()).toBe(200);legacy=false;
+   // 团队汇总客户端恢复后必须取得真实契约结果；只观察实际响应，不拦截或伪造接口。
+   const teamRecovered=page.waitForResponse(r=>new URL(r.url()).pathname==="/team/daily/activity/aggregated"&&r.status()===200);
    await page.getByRole("button",{name:tr("usageLoad.retry"),exact:true}).click();
+   const teamBody=await (await teamRecovered).json();
+   expect(teamBody.metadata.total_api_requests).toBeGreaterThan(0);
+   expect(Array.isArray(teamBody.results)).toBe(true);
    await expect(page.getByRole("button",{name:tr("Export Data"),exact:true})).toBeEnabled();
    await expect(page.getByRole("tab",{name:tr("Key Activity"),exact:true})).toHaveAttribute("aria-selected","true");
    await info.attach("usage-recovery",{body:JSON.stringify({realDatabaseFailure:500,fallback:true,partialPages:[1,2],recovered:true,emptyRange:true}),contentType:"application/json"});

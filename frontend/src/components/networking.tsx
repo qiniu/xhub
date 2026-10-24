@@ -1437,6 +1437,7 @@ export const teamDailyActivityCall = async (
   });
 };
 
+/** 读取团队汇总契约；参数为会话、日期和可选团队范围，返回真实日报，HTTP失败原样传播；供团队用量页调用，无写入。 */
 export const teamDailyActivityAggregatedCall = async (
   accessToken: string,
   startTime: Date,
@@ -1447,7 +1448,7 @@ export const teamDailyActivityAggregatedCall = async (
    * Get aggregated daily team activity with per-team breakdown (no pagination)
    */
   try {
-    return await apiClient.get(`/team/daily/activity/aggregated`, {
+    return await apiClient.get<UsageContract["schemas"]["DailyUsage"]>(`/team/daily/activity/aggregated`, {
       accessToken,
       query: {
         start_date: formatDate(startTime),

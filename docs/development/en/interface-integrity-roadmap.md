@@ -2,7 +2,7 @@
 
 [中文](../zh-CN/interface-integrity-roadmap.md) | [Development guide](README.md)
 
-Updated: 2026-10-24. Analysis baseline: `185726e37e8f456fa62b8df33560cda153b959d8`. Status: implementation plan; the phases below have not yet passed acceptance.
+Updated: 2026-10-24. Analysis baseline: `185726e37e8f456fa62b8df33560cda153b959d8`. Status: staged implementation. Core contracts and excluded domains are tracked separately; submission, integration into main, and deployment are separate acceptance events.
 
 XHub is serving production users. This plan preserves existing features, pages, and compatibility endpoints. It first establishes complete API behavior, trustworthy test results, and consistent frontend/backend contracts, then gradually consolidates the compatibility layer and execution pipeline. Improvement is measured by how easily a behavior change can be understood, verified, and rolled back, rather than by the number of lines removed.
 
@@ -149,7 +149,7 @@ The fail-before/pass-after verification takes place within the same fix PR, reta
 
 Track errors in established behavior as BUG issues. Use Proposals for new documentation routes, check-level semantics, or contract workflows. Cross-module plans use Architecture-Design under repository conventions. This document does not replace acceptance records for individual changes.
 
-The first phase-2 pilot targets supplier management, whose persistence failure baseline is established: [contract pilot and boundaries](supplier-contract-pilot.md) (Proposal #149). Core user and key batches are documented in [user contracts](user-contract.md) and [key contracts](key-contract.md). Phase 3 adds the [model and endpoint batch](model-contract.md) (Proposal #159). Logs and explicitly excluded operations remain unmigrated; phase 3 is not complete and the compatibility layer has not been refactored.
+Stage 2 piloted supplier contracts (#149), followed by users, keys, and model/endpoints (#159). Stage 3 closes the 48-operation core set in #161, including logs/daily usage, password reset, and key lifecycle. See [core contract completion](core-contract-completion.md). #162 was merged into the already-closed source branch of #160, so its changes did not reach main. A new main-targeted PR must integrate that work and pass compatibility and real-test gates before acceptance. Peripheral APIs remain explicitly unmigrated.
 
 ## Acceptance and release for each batch
 

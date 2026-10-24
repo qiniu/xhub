@@ -39,3 +39,16 @@ Organization/team membership CRUD; SSO/SCIM and directory mappings; public model
 Run each gen-key/user/usage-contract.mjs with --check, contract-inventory.mjs --check, go test ./contracts/..., Node generator/workflow tests, Vitest clients and pages, scripts/regression.sh and scripts/e2e.sh. Reports live in the selected .e2e run directory. Missing databases, zero matches, skipped tests and failed cleanup cannot pass. Keep the70% patch gate unchanged and upload coverage from real regression execution.
 
 Tests use isolated PostgreSQL and controlled local HTTP model servers; external vendors and production SSO are not exercised. No schema migration or feature flag is introduced. Roll back domain client/contract changes without restoring databases; never add the development validator to the production request path.
+
+## Closeout review and compatibility gate
+
+#162 targeted `codex/model-endpoint-contract` and merged after #160 had already reached main. Its changes therefore need a new main-targeted PR. Two merged PR states do not prove commit ancestry.
+
+- The team aggregate client now uses generated `DailyUsage`; a compile-time negative case rejects a return to `any`. English/Chinese recovery E2E observes the real team aggregate response and retry UI.
+- `TestUsageContractScope` generates real traffic in two organizations/teams and checks non-platform-admin daily usage, mixed filters, cross-user logs, shared session IDs, and admin pagination. Foreign `user_id` intersects to empty statistics; invisible team/organization lists return404. Existing authorization and budget semantics are unchanged.
+- Pinned [oasdiff v1.11.7](https://github.com/oasdiff/oasdiff/tree/v1.11.7) compares the PR base SHA with the working tree, failing on WARN or ERR. New domains are self-compared to check parsing and marked added, not certified backward-compatible. Deleted domains, missing baselines, zero contracts, invalid JSON/references, and unavailable tools fail closed.
+- Real comparator fixtures reject deleted operations, new required inputs, referenced input type changes, and removed/changed response fields. Optional input additions and documentation changes pass. Generation drift, HTTP validation, and compatibility comparison cover different boundaries. Semantic, authorization, budget, billing, and SSE compatibility still require real regression.
+- Local: `go install github.com/oasdiff/oasdiff@v1.11.7`, then `node frontend/scripts/check-contract-compatibility.mjs origin/main`. CI compares the actual PR base SHA; manual runs compare the parent commit. Missing history must fail rather than comparing the current tree with itself. This is a development/CI tool, not a production dependency.
+- Project coverage and the70% patch gate remain unchanged. Partial uploads are not final coverage acceptance.
+
+Production SSO, commercial upstreams, and production reverse proxies remain untested here. No merge/deployment is performed. Stages4/5 remain separate.

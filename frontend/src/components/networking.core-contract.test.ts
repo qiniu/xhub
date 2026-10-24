@@ -1,3 +1,4 @@
+import { teamDailyActivityAggregatedCall } from "./networking";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
   userDailyActivityCall,
@@ -27,6 +28,7 @@ function reply(body: unknown, status = 200) {
   );
 }
 const calls = [
+  () => teamDailyActivityAggregatedCall("session", new Date(2026, 0, 1), new Date(2026, 0, 2), ["team-a", "team-b"]),
   () => userDailyActivityCall("session", new Date(2026, 0, 1), new Date(2026, 0, 2)),
   () => testConnectionRequest("session", {}, {}, "chat"),
   () => modelInfoCall("session", "user", "user"),
@@ -39,6 +41,20 @@ const calls = [
   () => userDailyActivityAggregatedCall("session", new Date(2026, 0, 1), new Date(2026, 0, 2)),
 ];
 describe("core contract client errors", () => {
+  /** 团队汇总传递团队筛选和日期，保留真实统计及未知字段；纯HTTP序列化测试，afterEach恢复fetch。 */
+  it("preserves team aggregation contract and filters", async () => {
+    const body = { results: [], metadata: { total_api_requests: 2, total_spend: 0.25 }, future: { original: true } };
+    reply(body);
+    expect(await teamDailyActivityAggregatedCall("s", new Date(2026, 0, 1), new Date(2026, 0, 2), ["team-a", "team-b"])).toEqual(body);
+    const url = new URL(String(fetcher.mock.calls.at(-1)![0]), "http://test");
+    expect(url.searchParams.get("team_ids")).toBe("team-a,team-b");
+    expect(url.searchParams.get("exclude_team_ids")).toBe("litellm-dashboard");
+    expect(url.searchParams.get("start_date")).toBe("2026-01-01");
+    reply(body);
+    await teamDailyActivityAggregatedCall("s", new Date(2026, 0, 1), new Date(2026, 0, 2), []);
+    expect(new URL(String(fetcher.mock.calls.at(-1)![0]), "http://test").searchParams.has("team_ids")).toBe(false);
+  });
+
   /** 所有迁移客户端保留400/401/403/404/500状态与原文，尤其权限拒绝不得伪装成功空列表；无外部资源。 */
   it.each([400, 401, 403, 404, 500])("preserves status and body %s", async (status) => {
     const body = {
