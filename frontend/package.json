@@ -25,7 +25,9 @@
     "knip:ci": "knip --exclude exports,nsExports,types,nsTypes,enumMembers,classMembers,duplicates",
     "knip:fix": "knip --fix",
     "gen:api": "node scripts/gen-api-types.mjs",
-    "test:e2e:report": "playwright show-report"
+    "test:e2e:report": "playwright show-report",
+    "gen:api:suppliers": "node scripts/gen-supplier-contract.mjs",
+    "check:api:suppliers": "node scripts/gen-supplier-contract.mjs --check && tsc --noEmit --strict --skipLibCheck tests/contracts/suppliers.typecheck.ts"
   },
   "dependencies": {
     "@base-ui/react": "^1.6.0",
