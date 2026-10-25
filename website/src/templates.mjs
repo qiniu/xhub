@@ -1,3 +1,4 @@
+import { documentSpace } from "./document-space.mjs";
 import { copy, groups, integration, quickstart, repository } from "./content.mjs";
 import { documentPath, escapeHTML as e, rootPrefix } from "./core.mjs";
 import { localizedSource } from "./localization.mjs";
@@ -6,7 +7,7 @@ import { localizedSource } from "./localization.mjs";
 export function header(lang, prefix, alternate) {
   const t = copy[lang];
   const home = `${prefix}${lang === "en" ? "en/" : ""}index.html`;
-  return `<header class="header"><div class="nav-wrap"><a class="brand" href="${home}" aria-label="XHub ${lang === "zh" ? "首页" : "home"}"><span class="brand-mark" aria-hidden="true">X</span>XHub</a><button class="menu-button" aria-label="${t.menu}" aria-expanded="false" aria-controls="main-navigation">☰</button><nav id="main-navigation" aria-label="${lang === "zh" ? "主导航" : "Main navigation"}"><a href="${home}#capabilities">${t.features}</a><a href="${home}#use-cases">${t.useCases}</a><a href="${prefix}${documentPath(lang === "zh" ? "README.zh-CN.md" : "README.md")}">${t.docs}</a><a href="${prefix}${documentPath("center/" + lang + "/api/models.md")}">${t.api}</a><button class="search-open">${t.search}<kbd>/</kbd></button></nav><div class="nav-actions"><a class="language-link" href="${alternate}" aria-label="${lang === "zh" ? "Switch to English" : "切换到简体中文"}">${t.switch}</a><a class="nav-github" href="${repository}">GitHub <span aria-hidden="true">↗</span></a></div></div></header>`;
+  return `<header class="header"><div class="nav-wrap"><a class="brand" href="${home}" aria-label="XHub ${lang === "zh" ? "首页" : "home"}"><span class="brand-mark" aria-hidden="true">X</span>XHub</a><button class="menu-button" aria-label="${t.menu}" aria-expanded="false" aria-controls="main-navigation">☰</button><nav id="main-navigation" aria-label="${lang === "zh" ? "主导航" : "Main navigation"}"><a href="${home}#capabilities">${t.features}</a><a href="${home}#use-cases">${t.useCases}</a><a href="${prefix}${documentPath(lang === "zh" ? "README.zh-CN.md" : "README.md")}">${t.docs}</a><a href="${prefix}reference/${lang}/index.html">${t.api}</a><a href="${prefix}docs/development/${lang === "zh" ? "zh-CN" : "en"}/README.html">${t.developerDocs}</a><button class="search-open">${t.search}<kbd>/</kbd></button></nav><div class="nav-actions"><a class="language-link" href="${alternate}" aria-label="${lang === "zh" ? "Switch to English" : "切换到简体中文"}">${t.switch}</a><a class="nav-github" href="${repository}">GitHub <span aria-hidden="true">↗</span></a></div></div></header>`;
 }
 
 /** 生成代码块与复制按钮；参数为代码、标签和语言，返回已转义 HTML，供首页调用。 */
@@ -38,7 +39,7 @@ export function homepage(lang) {
     <section class="section flow-section"><p class="eyebrow">${t.flowLabel}</p><h2>${t.flowTitle}</h2><div class="flow-grid">${t.flow.map(([title, text], index) => `<article><span class="step">0${index + 1}</span><h3>${title}</h3><p>${text}</p></article>`).join("")}</div></section>
     <section id="use-cases" class="section"><div class="section-heading"><h2>${t.casesTitle}</h2></div><div class="use-case-grid">${t.cases.map(([title, text]) => `<article><h3>${title}</h3><p>${text}</p></article>`).join("")}</div></section>
     <section id="install" class="install-section"><div class="section install-grid"><div><p class="eyebrow">${t.installLabel}</p><h2>${t.installTitle}</h2><p>${t.installIntro}</p><p class="requirements">${t.requirements}</p><a class="text-link" href="${start}">${t.installDocs} →</a><div class="ports"><span>${t.console} <code>:3000</code></span><span>${t.gateway} <code>:4000</code></span></div></div><div>${codeBlock(quickstart, "Docker Compose", lang)}${codeBlock(integration, "Python · OpenAI SDK", lang)}</div></div></section>
-    <section class="section documentation-section"><p class="eyebrow">${t.docsLabel}</p><h2>${t.docsTitle}</h2><p>${t.docsIntro}</p><div class="docs-card-grid">${t.docCards.map(([title, text, source]) => `<a class="doc-card" href="${doc(source)}"><h3>${title}<span aria-hidden="true">↗</span></h3><p>${text}</p></a>`).join("")}</div><a class="button secondary" href="${doc(lang === "zh" ? "README.zh-CN.md" : "README.md")}">${t.allDocs} →</a></section></main>`;
+    <section class="section documentation-section"><p class="eyebrow">${t.docsLabel}</p><h2>${t.docsTitle}</h2><p>${t.docsIntro}</p><div class="docs-card-grid">${t.docCards.map(([title, text, source]) => `<a class="doc-card" href="${source.startsWith("api/") ? `${prefix}reference/${lang}/index.html` : doc(source)}"><h3>${title}<span aria-hidden="true">↗</span></h3><p>${text}</p></a>`).join("")}</div><a class="button secondary" href="${doc(lang === "zh" ? "README.zh-CN.md" : "README.md")}">${t.allDocs} →</a></section></main>`;
   return shell({ lang, output, title: lang === "zh" ? "企业 AI 网关与治理平台" : "Enterprise AI gateway & governance", description: t.intro, body, alternate: lang === "zh" ? "./en/index.html" : "../index.html" });
 }
 
@@ -50,6 +51,7 @@ export function documentPage({ source, title, html, headings, documents, lang, a
   const known = new Map(documents.map((item) => [item.source, item]));
   const used = new Set();
   const center = source.startsWith("center/");
+  const space = documentSpace(source);
   const category = documents.find((item) => item.source === source)?.group;
   const selectedGroups = center ? centerGroups.filter((item) => item.lang === lang && item.group === category).map((item) => ({ zh: item.title, en: item.title, files: item.files })) : groups;
   const sidebar = selectedGroups.map((group) => {
@@ -60,7 +62,8 @@ export function documentPage({ source, title, html, headings, documents, lang, a
       const repositorySource = known.get(file)?.repositorySource;
       const candidate = repositorySource && localizedSource(repositorySource, lang, new Set(documents.map((item) => item.repositorySource)));
       return documents.find((item) => item.repositorySource === candidate)?.source;
-    }).filter(Boolean);
+    }).filter(file => file && documentSpace(file) === space);
+    if (!files.length) return "";
     if (center && category === "api") {
       const articles = files.filter((file) => known.has(file)).map((file) => known.get(file));
       articles.forEach((article) => used.add(article.source));
@@ -74,8 +77,8 @@ export function documentPage({ source, title, html, headings, documents, lang, a
     }
     return `<section class="nav-group"><h2>${group[lang]}</h2>${files.filter((file) => known.has(file) && !used.has(file)).map((file) => { used.add(file); return `<a href="${prefix}${documentPath(file)}" ${file === source ? 'aria-current="page"' : ""}>${e(known.get(file).title)}</a>`; }).join("")}</section>`;
   }).join("");
-  const remaining = documents.filter((item) => !center && !item.source.startsWith("center/") && !used.has(item.source) && item.lang === lang);
+  const remaining = documents.filter((item) => !center && !item.source.startsWith("center/") && !used.has(item.source) && item.lang === lang && documentSpace(item.source) === space);
   const refs = remaining.map((item) => `<a href="${prefix}${documentPath(item.source)}" ${item.source === source ? 'aria-current="page"' : ""}>${e(item.title)}<small>${e(item.source.replace(/\/readme(?:_cn)?\.md$/i, ""))}</small></a>`).join("");
-  const body = `<div class="docs-layout"><aside class="docs-sidebar" aria-label="${t.documentHome}"><button class="search-open sidebar-search">${t.search}<kbd>/</kbd></button>${sidebar}${refs ? `<details class="nav-group additional-docs" ${used.has(source) ? "" : "open"}><summary>${t.moduleDocs}</summary>${refs}</details>` : ""}</aside><main id="main" class="doc-main"><div class="doc-meta"><a href="${prefix}${documentPath(lang === "zh" ? "README.zh-CN.md" : "README.md")}">${t.documentHome}</a><span>/</span><span>${e(title)}</span></div><article class="prose">${html}</article><div class="doc-end"><a href="${repository}/blob/main/${documents.find((item) => item.source === source)?.repositorySource || (source.startsWith("modules/") ? source.slice(8) : `docs/${source}`)}">${t.source} ↗</a><a href="#main">↑ ${t.toc}</a></div></main><aside class="toc" aria-label="${t.toc}"><strong>${t.toc}</strong>${headings.filter((item) => item.depth === 2 || item.depth === 3).map((item) => `<a class="depth-${item.depth}" href="#${e(item.id)}">${e(item.text)}</a>`).join("")}</aside></div>`;
+  const body = `<div class="docs-layout"><aside class="docs-sidebar" aria-label="${t.documentHome}"><button class="search-open sidebar-search">${t.search}<kbd>/</kbd></button>${sidebar}${refs ? `<details class="nav-group additional-docs" ${used.has(source) ? "" : "open"}><summary>${space === "developer" ? t.moreDeveloper : t.moreProduct}</summary>${refs}</details>` : ""}</aside><main id="main" class="doc-main"><div class="doc-meta"><a href="${prefix}${documentPath(lang === "zh" ? "README.zh-CN.md" : "README.md")}">${t.documentHome}</a><span>/</span><span>${e(title)}</span></div><article class="prose">${html}</article><div class="doc-end"><a href="${repository}/blob/main/${documents.find((item) => item.source === source)?.repositorySource || (source.startsWith("modules/") ? source.slice(8) : `docs/${source}`)}">${t.source} ↗</a><a href="#main">↑ ${t.toc}</a></div></main><aside class="toc" aria-label="${t.toc}"><strong>${t.toc}</strong>${headings.filter((item) => item.depth === 2 || item.depth === 3).map((item) => `<a class="depth-${item.depth}" href="#${e(item.id)}">${e(item.text)}</a>`).join("")}</aside></div>`;
   return shell({ lang, output, title, description: `${title} — XHub ${t.docs}`, body, alternate: `${prefix}${documentPath(alternate)}`, docs: true });
 }

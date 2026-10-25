@@ -50,7 +50,7 @@ test("双语文档入口区分安装、使用、API 和开发", async () => {
     const html = homepage(lang);
     assert.equal((html.match(/class="doc-card"/g) || []).length, 4);
     assert.ok(html.includes(`docs/development/${locale}/README.html`));
-    assert.ok(html.includes(`docs/api/${locale}/models.html`));
+    assert.ok(html.includes(`reference/${lang}/index.html`));
     const source = await readFile(new URL(`../../docs/${file}`, import.meta.url), "utf8");
     assert.equal((source.match(/^## /gm) || []).length, 3);
     assert.doesNotMatch(source, /not implemented|尚未实现|Suno protocol development/);
