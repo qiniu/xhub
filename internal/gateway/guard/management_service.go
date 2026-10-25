@@ -42,7 +42,8 @@ func (s managementService) Get(id string) (map[string]any, error) {
 // Delete 删除已读取确认的 id；调用方持有管理写锁，错误由 HTTP 层统一映射。
 func (s managementService) Delete(id string) error { return s.Store.DeleteKV("guardrails", id) }
 
-// List 合并 YAML 副本与数据库规则并排序；管理和执行读取共用此实现。
+// List 合并 YAML 副本与数据库规则并排序，仅供管理接口及 storedRules 使用。
+// 执行层 listGuardrails 独立加载，并做名称歧义拒绝和全局默认继承；不能把其结果用于可编辑配置。
 // 数据库失败返回 nil 和原错误，禁止把部分 YAML 结果当完整列表。
 func (s managementService) List() ([]map[string]any, error) {
 	out := s.Configured()

@@ -105,7 +105,7 @@ test('quality runs the real Go selection and cleanup gate checks', () => {
   const steps = workflow.jobs['workflow-regression'].steps;
   assert.ok(steps.some(item => item.uses === 'actions/setup-go@v5'));
   const commands = steps.map(item => item.run || '').join('\n');
-  for (const name of ['scripts.test_regression_results', 'scripts.test_test_gates', 'scripts.test_e2e_summary', 'scripts.test_e2e_model_endpoints', 'frontend/e2e/checklist-reporter.test.cjs']) {
+  for (const name of ['scripts.test_regression_results', 'scripts.test_test_gates', 'scripts.test_e2e_summary', 'scripts.test_e2e_model_endpoints', 'frontend/e2e/checklist-reporter.test.cjs', 'frontend/e2e/guard-resource-cleanup.test.cjs', 'frontend/e2e/guard-resource-fixture.test.cjs']) {
     assert.ok(commands.includes(name), `缺少门禁测试 ${name}`);
   }
 });

@@ -180,7 +180,7 @@ Acceptance covers real SQL failures, edited saved templates, actual outbound con
 
 ## Stage 4: guardrail configuration management service
 
-[Proposal #176](https://github.com/qiniu/xhub/issues/176) moves configuration reads, patch merging, validation, name conflict checks and persistence from `guard.Manage` into a package-local `managementService` with a narrow KV store interface. Existing validation and response redaction remain shared; execution uses the same rule-list implementation.
+[Proposal #176](https://github.com/qiniu/xhub/issues/176) moves configuration reads, patch merging, validation, name conflict checks and persistence from `guard.Manage` into a package-local `managementService` with a narrow KV store interface. Existing validation and response redaction remain shared; management lists retain editable configuration. Execution still loads rules independently through `listGuardrails`, rejects ambiguous names and inherits global defaults. These are existing semantics; this batch does not merge the two read paths.
 
 The HTTP adapter retains authorization prerequisites, routing, JSON parsing, YAML read-only checks, error mapping and the global mutation lock. That lock still spans reading, parsing and saving, preserving error precedence and preventing concurrent duplicate names or lost credential updates. This batch neither tightens legacy JSON parsing nor declares internal branches to be public routes.
 

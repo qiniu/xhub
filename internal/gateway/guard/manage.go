@@ -177,7 +177,7 @@ func normalizeRule(row map[string]any) map[string]any {
 // storedRules 合并 YAML 规则与唯一 guardrails KV 命名空间，再按优先级排序。
 // 参数：s：具备非 nil RecordStore 的宿主；调用方处理存储不可用情况。
 // 返回：规则列表和存储错误；读取失败不返回部分规则作为成功结果。
-// 调用：Manage、listGuardrails。
+// 调用：管理兼容读取与 current_storage_test；执行层 listGuardrails 保留独立语义。
 // 测试：engine_test.go、internal/gateway/guardrail_manage_test.go。
 func storedRules(s Host) ([]map[string]any, error) {
 	return (managementService{Store: s.RecordStore(), Configured: func() []map[string]any { return configuredRules(s) }}).List()
