@@ -32,7 +32,7 @@ jobs:
       - run: npm ci
         working-directory: frontend
       - run: node --test scripts/test_release_workflow.cjs
-      - run: node --test scripts/test_dependabot.cjs frontend/e2e/checklist-reporter.test.cjs
+      - run: node --test scripts/test_dependabot.cjs frontend/e2e/checklist-reporter.test.cjs frontend/e2e/gateway-response.test.cjs
       - run: python3 -m unittest scripts.test_deploy_build -v
       - run: python3 -m unittest scripts.test_regression_output scripts.test_makefile scripts.test_regression_results scripts.test_test_gates scripts.test_e2e_summary scripts.test_e2e_model_endpoints -v
       # 隔离回归夹具在随机端口启动本机 Redis，Compose 服务不能替代 redis-server 二进制。

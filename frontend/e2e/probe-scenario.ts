@@ -2,6 +2,7 @@ import { expect, test, type Page } from "@playwright/test";
 import { translate, type Locale } from "../src/i18n/translate";
 import { GATEWAY, loginAdmin, sessionBearer, stableGoto } from "./helpers";
 import { startProbeFixture, type ProbeFixture } from "./probe-fixture";
+import { matchesGatewayResponse } from "./gateway-response.cjs";
 
 type Domain = "prompts" | "search_tools";
 type Operation = "创建" | "更新" | "删除" | "测试" | "测试连接";
@@ -27,13 +28,11 @@ async function fillProbe(ctx: ProbeContext, name: string) {
 }
 
 /** 等待真实管理请求并检查成功；ctx确定页面与资源，method/action指定本次操作，返回服务器对象。
- * 只观察网络，不拦截或伪造响应；请求失败使测试失败，资源由外层finally清理。
+ * 只观察直连或 /gw 代理的真实网络，不拦截或伪造响应；请求失败使测试失败，资源由外层finally清理。
  */
 async function saveProbe(ctx: ProbeContext, method: string, action: string) {
-  const pending = ctx.page.waitForResponse(response => {
-    const path = new URL(response.url()).pathname;
-    return response.request().method() === method && path === `/${ctx.domain}${ctx.id ? "/" + encodeURIComponent(ctx.id) : ""}`;
-  });
+  const endpoint = `/${ctx.domain}${ctx.id ? "/" + encodeURIComponent(ctx.id) : ""}`;
+  const pending = ctx.page.waitForResponse(response => matchesGatewayResponse(response.url(), response.request().method(), endpoint, method));
   await ctx.page.getByRole("button", { name: translate(ctx.locale, action), exact: true }).click();
   const response = await pending;
   expect(response.status(), "配置操作必须由真实后台完成").toBe(200);
@@ -48,7 +47,7 @@ async function exerciseProbe(ctx: ProbeContext) {
   const tr = (key: string) => translate(locale, key);
   const path = `/${domain}/${domain === "prompts" ? "test" : "test_connection"}`;
   const before = fixture.requests.length;
-  const pending = page.waitForResponse(response => new URL(response.url()).pathname === path && response.request().method() === "POST");
+  const pending = page.waitForResponse(response => matchesGatewayResponse(response.url(), response.request().method(), path, "POST"));
   await page.getByRole("button", { name: tr("probes.test"), exact: true }).click();
   const response = await pending;
   expect(response.status(), "连接/提示词测试应返回真实执行结果").toBe(200);
@@ -70,7 +69,7 @@ async function exerciseProbe(ctx: ProbeContext) {
     }).toEqual({ model: ctx.model, input: 8, output: 2, spend: 0.000012 });
     // 未提供必需变量时不能发上游请求，也不能继续显示上一次成功结果。
     await page.getByRole("textbox", { name: tr("probes.variables"), exact: true }).fill("{}");
-    const invalid = page.waitForResponse(r => new URL(r.url()).pathname === path && r.request().method() === "POST");
+    const invalid = page.waitForResponse(r => matchesGatewayResponse(r.url(), r.request().method(), path, "POST"));
     await page.getByRole("button", { name: tr("probes.test"), exact: true }).click();
     expect((await invalid).status()).toBe(400);
     expect(fixture.requests.length).toBe(before + 1);
@@ -85,7 +84,7 @@ async function exerciseProbe(ctx: ProbeContext) {
   }
   const failureCalls = fixture.requests.length;
   fixture.failure = true;
-  const rejected = page.waitForResponse(r => new URL(r.url()).pathname === path && r.request().method() === "POST");
+  const rejected = page.waitForResponse(r => matchesGatewayResponse(r.url(), r.request().method(), path, "POST"));
   await page.getByRole("button", { name: tr("probes.test"), exact: true }).click();
   expect((await rejected).status()).toBe(domain === "prompts" ? 403 : 429);
   expect(fixture.requests.length, "失败必须来自本次真实上游调用，不能使用旧缓存").toBe(failureCalls + 1);
@@ -94,7 +93,7 @@ async function exerciseProbe(ctx: ProbeContext) {
   await expect(page.getByRole("heading", { name: tr(domain === "prompts" ? "probes.promptsTitle" : "probes.searchTitle"), exact: true })).toBeVisible();
   const recoveryCalls = fixture.requests.length;
   fixture.failure = false;
-  const recovered = page.waitForResponse(r => new URL(r.url()).pathname === path && r.request().method() === "POST");
+  const recovered = page.waitForResponse(r => matchesGatewayResponse(r.url(), r.request().method(), path, "POST"));
   await page.getByRole("button", { name: tr("probes.test"), exact: true }).click();
   expect((await recovered).status()).toBe(200);
   expect(fixture.requests.length, "恢复后必须重新调用而不是复用旧成功").toBe(recoveryCalls + 1);
