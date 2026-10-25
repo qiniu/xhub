@@ -110,6 +110,11 @@ config["include"].append(os.environ["E2E_BUILD_DIR"] + "/types/**/*.ts")
 config["exclude"] = [*config.get("exclude", []), ".next"]
 Path("tsconfig.e2e.json").write_text(json.dumps(config, indent=2) + "\n")
 PYCONFIG
+# 公共入口始终从当前源重建 Swagger，避免本地/全量运行依赖缺失或过期的 website/dist。
+# 安装/构建失败由 set -e 阻断；不触碰生产站点，SCARF 禁用依赖安装遥测。
+echo "Building current standalone API reference..."
+SCARF_ANALYTICS=false npm ci --prefix "$ROOT/website"
+npm run build --prefix "$ROOT/website"
 echo "Building production console ($E2E_BUILD_DIR)..."
 npm run build
 echo "Building gateway and catalog sweep before the service readiness timeout..."

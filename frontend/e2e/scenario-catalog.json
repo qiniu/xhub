@@ -3007,5 +3007,19 @@
     "title": "key organization filter and permission intersection zh-CN",
     "kind": "implemented",
     "environment": "default offline"
+  },
+  {
+    "id": "SC-443",
+    "file": "e2e/scenarios/regression/swagger-reference-en.test.ts",
+    "title": "Swagger reference real user lifecycle en",
+    "kind": "implemented",
+    "environment": "default offline"
+  },
+  {
+    "id": "SC-444",
+    "file": "e2e/scenarios/regression/swagger-reference-zh-CN.test.ts",
+    "title": "Swagger reference real user lifecycle zh",
+    "kind": "implemented",
+    "environment": "default offline"
   }
 ]

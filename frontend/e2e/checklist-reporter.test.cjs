@@ -183,3 +183,14 @@ test('reporter 的 lint 使用真实 Node 环境且保留错误门禁', async ()
   const [esm] = await eslint.lintText('const fs = require("node:fs"); export default fs;', {filePath: path.join(__dirname, 'runtime-fixture.ts')});
   assert.ok(esm.messages.some(item => item.ruleId === '@typescript-eslint/no-require-imports'), 'CommonJS 规则不得扩散到 TypeScript');
 });
+
+/** 目的：Swagger双语结果必须绑定清单中的独立文件和精确标题；模拟通过/失败，验证登记及失败不可计通过；无外部资源。 */
+test('Swagger双语场景登记且失败不能假通过', () => {
+  const {evaluateScenarios} = require('./scenario-coverage.cjs');
+  const catalog = require('./scenario-catalog.json');
+  const results = [['en','en'],['zh-CN','zh']].map(([file,lang]) => ({file:`e2e/scenarios/regression/swagger-reference-${file}.test.ts`, title:`Swagger reference real user lifecycle ${lang}`, status:'passed'}));
+  assert.deepEqual(evaluateScenarios(catalog,results).unregistered,[]);
+  assert.equal(evaluateScenarios(catalog,results).passed,2);
+  results[0].status='failed';
+  assert.equal(evaluateScenarios(catalog,results).passed,1);
+});

@@ -69,8 +69,9 @@ try {
       await page.waitForURL(`**/development/${locale}/README.html`);
       const links = await page.locator(".docs-sidebar .nav-group a").evaluateAll((items) => items.map((item) => item.href));
       assert.equal(new Set(links).size, links.length, "目录不能出现重复目标地址");
-      assert.ok(links.some((value) => value.endsWith(`/center/${lang}/billing/usage-based-billing.html`)), "计费入口必须指向计费文章");
-      assert.ok(links.some((value) => value.endsWith(`/center/${lang}/api/chat-completions.html`)), "API 目录必须包含真实 Chat Completions 入口");
+      assert.ok(!links.some((value) => value.includes(`/center/${lang}/`)), "开发侧栏不能混入产品指南");
+      assert.ok(!links.some((value) => value.includes("api.generated.html")), "开发侧栏不能混入生成字段表");
+      await expect(page.getByRole("navigation").getByRole("link", { name: lang === "zh" ? "API 参考" : "API reference", exact: true })).toHaveAttribute("href", `../../../reference/${lang}/index.html`);
       await page.screenshot({ path: `${reportDirectory}/docs-navigation-${lang}.png` });
     }
   });
@@ -117,9 +118,9 @@ try {
     assert.doesNotMatch(await page.locator(".docs-sidebar").innerText(), /[\u4e00-\u9fff]/);
     await page.screenshot({ path: reportDirectory + "/development-english.png", fullPage: true });
     await page.getByRole("navigation").getByRole("link", { name: "API reference", exact: true }).click();
-    await page.getByRole("heading", { name: "List models", exact: true }).waitFor();
-    await page.getByRole("link", { name: "切换到简体中文", exact: true }).click();
-    await page.getByRole("heading", { name: "模型列表", exact: true }).waitFor();
+    await page.getByRole("heading", { name: "API reference", exact: true }).waitFor();
+    await page.getByRole("link", { name: "简体中文", exact: true }).click();
+    await page.getByRole("heading", { name: "API 参考", exact: true }).waitFor();
   });
   await scenario("构建回归：文档、资源、搜索页面和锚点均可达", async () => { assert.deepEqual(regression.errors, []); assert.ok(regression.indexedDocuments >= 100); });
   // 目的：从真实帮助进入供应商操作及代码指南，验证双语、英文示例、源码链接和刷新；前置实际构建与 HTTP 索引，无上游调用，浏览器最终清理。
@@ -164,7 +165,8 @@ try {
     await page.getByRole("heading", {name: "欢迎使用 XHub", exact: true}).waitFor();
     await page.getByRole("link", {name: "常见问题与故障排查", exact: true}).click();
     assert.match(await page.locator("article").innerText(), /401/);
-    await page.getByRole("navigation").getByRole("link", {name: "API 文档", exact: true}).click();
+    await page.getByRole("navigation").getByRole("link", {name: "API 参考", exact: true}).click();
+    await page.getByRole("link", {name: "协议使用指南", exact: true}).click();
     await page.getByRole("heading", {name: "模型列表", exact: true}).waitFor();
     assert.equal(await page.locator(".docs-sidebar").getByRole("link", {name: "快速开始", exact: true}).count(), 0);
     assert.match(await page.locator("article").innerText(), /data\[\]\.id/);
@@ -308,7 +310,7 @@ try {
       assert.ok(await mobilePage.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth));
       await mobilePage.screenshot({ path: `${reportDirectory}/homepage-mobile.png`, fullPage: true });
       await mobilePage.getByRole("button", { name: "打开导航" }).click();
-      await mobilePage.getByRole("navigation").getByRole("link", { name: "帮助文档", exact: true }).click();
+      await mobilePage.getByRole("navigation").getByRole("link", { name: "产品文档", exact: true }).click();
       await mobilePage.getByRole("heading", { name: "XHub 文档", exact: true }).waitFor();
       assert.ok(await mobilePage.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth));
       await mobilePage.goto(`${base}docs/user-guide.zh-CN.html`);
@@ -323,6 +325,52 @@ try {
   await page.screenshot({ path: `${reportDirectory}/homepage-desktop.png`, fullPage: true });
   await page.goto(`${base}docs/development/guardrails.html`);
   await page.screenshot({ path: `${reportDirectory}/documentation-desktop.png`, fullPage: true });
+  // 验证真正 Swagger 资源、五域响应、双语选择、旧地址迁移与加载失败恢复；仅故障路径中断网络，不模拟成功响应，最后撤销路由。
+  await scenario("Swagger 五域 → 双语 → 旧参考迁移 → 失败恢复", async () => {
+    for (const [lang, label, title] of [["zh", "接口领域", "API 参考"], ["en", "API domain", "API reference"]]) {
+      await page.goto(base + `reference/${lang}/index.html`);
+      await expect(page.getByRole("heading", {name: title, exact: true})).toBeVisible();
+      for (const [domain, count] of [["suppliers",5],["users",11],["keys",14],["models",9],["usage",9]]) {
+        await page.getByLabel(label, {exact: true}).selectOption(domain);
+        await expect(page.locator(".swagger-ui .opblock")).toHaveCount(count);
+        assert.equal(await page.getByRole("button", {name: "Try it out", exact: true}).count(), 0);
+        await expect(page.getByRole("link", {name: lang === "zh" ? "下载原始 OpenAPI" : "Download original OpenAPI", exact:true})).toHaveAttribute("href", `../specs/${domain}.json`);
+      }
+      const sessionSummary = page.getByRole("button", {name: /^GET \/spend\/logs\/session\/ui /});
+      const summary = await sessionSummary.innerText();
+      assert.ok(summary.includes(lang === "en" ? "Empty session_id" : "session_id空时"));
+      assert.ok(!summary.includes(lang === "en" ? "权限范围内日志" : "Scoped logs"));
+      await page.getByLabel(label, {exact:true}).selectOption("users");
+      await page.getByRole("link", {name: lang === "zh" ? "English" : "简体中文", exact:true}).click();
+      assert.ok(page.url().includes("domain=users"));
+      await expect(page.locator(".swagger-ui .opblock")).toHaveCount(11);
+    }
+    await page.goto(base + "docs/development/en/user-api.generated.html");
+    await page.waitForURL("**/reference/en/index.html?domain=users");
+    await expect(page.locator(".swagger-ui .opblock")).toHaveCount(11);
+    // 真实跳转验证旧操作书签展开正确操作；未知或损坏片段回到领域，不能误导到另一个操作。
+    for (const lang of ["en", "zh"]) {
+      await page.goto(base + `docs/development/${lang === "zh" ? "zh-CN" : "en"}/user-api.generated.html#post-usernew`);
+      await page.waitForURL(`**/reference/${lang}/index.html?domain=users#/default/createUser`);
+      await expect(page.getByRole("button", {name:/^POST \/user\/new /})).toHaveAttribute("aria-expanded", "true");
+    }
+    for (const hash of ["#not-an-operation", "#%ZZ"]) {
+      await page.goto(base + "docs/development/en/user-api.generated.html" + hash);
+      await page.waitForURL("**/reference/en/index.html?domain=users");
+      await expect(page.locator(".swagger-ui .opblock")).toHaveCount(11);
+    }
+    await page.route("**/reference/specs/users.json", route => route.abort("failed"));
+    try {
+      await page.reload();
+      await expect(page.getByRole("alert")).toHaveText("Unable to load the contract. Refresh to retry.");
+      await expect(page.locator(".swagger-ui .opblock")).toHaveCount(0);
+    } finally { await page.unroute("**/reference/specs/users.json"); }
+    await page.reload();
+    await expect(page.locator(".swagger-ui .opblock")).toHaveCount(11);
+    const index = await (await page.request.get(base + "search-index.json")).json();
+    assert.ok(!index.some(item => item.url.includes("api.generated.html")), "搜索不能再次混入旧字段表");
+    await page.screenshot({path: reportDirectory + "/swagger-reference.png", fullPage: true});
+  });
   await scenario("浏览器无未处理脚本错误", async () => { assert.deepEqual(pageErrors, []); });
   await context.close();
 } finally {
