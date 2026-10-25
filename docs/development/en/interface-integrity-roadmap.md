@@ -151,6 +151,17 @@ Track errors in established behavior as BUG issues. Use Proposals for new docume
 
 Stage 2 piloted supplier contracts (#149), followed by users, keys, and model/endpoints (#159). Stage 3 closes the 48-operation core set in #161, including logs/daily usage, password reset, and key lifecycle. See [core contract completion](core-contract-completion.md). #162 was merged into the already-closed source branch of #160, so its changes did not reach main. A new main-targeted PR must integrate that work and pass compatibility and real-test gates before acceptance. Peripheral APIs remain explicitly unmigrated.
 
+## First phase-4 batch: supplier configuration service
+
+[Proposal #168](https://github.com/qiniu/xhub/issues/168) extracts suppliers only; it does not complete phase 4.
+
+- `family` retains legacy URL parsing, management authorization, JSON validation, HTTP envelopes, and error mapping.
+- `internal/gateway/suppliers` owns CRUD, patch merging, defaults, and response redaction through a narrow KV interface, without HTTP or data-plane dependencies.
+- Shared sensitive-field detection moves to `internal/credentialfields`; search configuration retains its own recursive merge semantics.
+- Storage kind/IDs, replacement creates, update upserts, nontransactional batch deletion, extensions, nulls, and zero values remain unchanged. No schema migration or cache is added.
+- Model execution still reads the original `credentials` records. Real regression covers address/key rotation, mask preservation, upstream 401, recovery, and billing; English and Chinese E2E covers UI editing through inference.
+- Reverting this batch restores the previous implementation without database rollback. This batch is PR-only; merge and deployment are separate decisions. Other resources migrate individually; native protocol execution is outside this batch.
+
 ## Acceptance and release for each batch
 
 Each report must identify the commit, affected APIs, old and new behavior, test layers, commands, pass/fail/skip/exclusion/rerun counts, report paths, cleanup results, and external dependency boundaries. Tests not executed must say “not run.” A command that matches no cases must not be reported as passing. Count Go top-level tests and subtests separately. Reports retain only request IDs and redacted structures, not real keys, passwords, or chat contents.
