@@ -398,3 +398,100 @@ jobs:
           if-no-files-found: error
       - run: docker compose down -v
         if: always()
+
+  usage-contract:
+    name: Usage API contract
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - run: npm ci
+        working-directory: frontend
+      - name: Check generated contract and TypeScript types
+        run: npm --prefix frontend run check:api:usage
+      - name: Test generator drift rejection
+        run: node --test frontend/scripts/gen-usage-contract.test.mjs
+      - name: Check core migration inventory
+        run: node frontend/scripts/contract-inventory.mjs --check && node --test frontend/scripts/contract-inventory.test.mjs
+      - name: Validate OpenAPI and Go types
+        run: go test -race ./contracts/usage
+      # 真实 HTTP/PG 契约回归不可由仅检查文件的生成器测试代替。
+      - name: Prepare contract database
+        run: |
+          cp configs/config.example.yaml configs/config.yaml
+          docker compose up -d --wait postgres redis
+      - name: Run real usage contract regression
+        env:
+          XHUB_REGRESSION_COVERPROFILE: coverage/usage-contract.out
+        run: bash scripts/regression.sh '^TestUsageContractRealTraffic$'
+      - name: Validate regression coverage
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -s coverage/usage-contract.out
+          go tool cover -func=coverage/usage-contract.out | tail -1
+      - name: Upload regression coverage
+        uses: codecov/codecov-action@v5
+        with:
+          files: coverage/usage-contract.out
+          flags: backend
+          name: usage-contract
+          disable_search: true
+          fail_ci_if_error: true
+          use_oidc: true
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: usage-contract-regression
+          path: |
+            .e2e/runs/
+            coverage/usage-contract.out
+          if-no-files-found: error
+      - run: docker compose down -v
+        if: always()
+
+  contract-compatibility:
+    name: API backward compatibility
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - name: Install pinned compatibility checker
+        run: go install github.com/oasdiff/oasdiff@v1.11.7
+      - name: Test compatibility failure gates
+        run: node --test frontend/scripts/check-contract-compatibility.test.mjs
+      - name: Compare contracts with baseline
+        env:
+          CONTRACT_BASE: ${{ github.event.pull_request.base.sha || github.event.before }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p coverage
+          base="$CONTRACT_BASE"
+          # 手动运行没有before；使用当前提交的父提交，不能退化成自己与自己比较。
+          if [[ -z "$base" || "$base" =~ ^0+$ ]]; then
+            base=$(git rev-parse HEAD^)
+          fi
+          node frontend/scripts/check-contract-compatibility.mjs "$base" > coverage/contract-compatibility.json
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: contract-compatibility
+          path: coverage/contract-compatibility.json
+          if-no-files-found: error

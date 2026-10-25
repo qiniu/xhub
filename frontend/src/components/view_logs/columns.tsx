@@ -40,9 +40,10 @@ export type LogEntry = {
   cache_key?: string;
   request_tags?: Record<string, any>;
   requester_ip_address?: string;
-  messages: string | any[] | Record<string, any>;
-  response: string | any[] | Record<string, any>;
-  proxy_server_request?: string | any[] | Record<string, any>;
+  /** 存储正文保持任意JSON；消费者展示前自行判断形状，不假定只会收到消息数组。 */
+  messages: unknown;
+  response: unknown;
+  proxy_server_request?: unknown;
   session_id?: string;
   /** 后端 PlanRoute 识别会话的来源：explicit（标准 ID）、parent（父响应）、
    * cache_key（缓存键哈希）、prompt（稳定首轮指纹）、generated（随机 UUID）。

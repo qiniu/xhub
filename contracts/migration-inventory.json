@@ -1,0 +1,6963 @@
+{
+  "scope": "Static declarations only; not a runtime support or test coverage claim",
+  "dynamicBoundaries": [
+    "SCIM concatenated routes in directory.go: enterprise provisioning, outside core CRUD batch",
+    "Bypass transport registry: data-plane protocols, stage 5",
+    "Frontend callers and real test evidence: docs/development/en/core-contract-completion.md"
+  ],
+  "routes": [
+    {
+      "route": "DELETE /{provider}/v1/files/{file_id}",
+      "sources": [
+        "catalog"
+      ],
+      "contract": null,
+      "status": "peripheral-unmigrated"
+    },
+    {
+      "route": "DELETE /access_group/{access_group}/delete",
+      "sources": [
+        "catalog"
+      ],
+      "contract": null,
+      "status": "peripheral-unmigrated"
+    },
+    {
+      "route": "DELETE /admin/directory/connections/{connection_id}",
+      "sources": [
+        "internal/gateway/directory.go"
+      ],
+      "contract": null,
+      "status": "peripheral-unmigrated"
+    },
+    {
+      "route": "DELETE /admin/enterprise/sso/{connection_id}",
+      "sources": [
+        "internal/gateway/directory.go"
+      ],
+      "contract": null,
+      "status": "peripheral-unmigrated"
+    },
+    {
+      "route": "DELETE /assistants/{assistant_id}",
+      "sources": [
+        "catalog"
+      ],
+      "contract": null,
+      "status": "peripheral-unmigrated"
+    },
+    {
+      "route": "DELETE /claude-code/plugins/{plugin_name}",
+      "sources": [
+        "catalog"
+      ],
+      "contract": null,
+      "status": "peripheral-unmigrated"
+    },
+    {
+      "route": "DELETE /cloudzero/delete",
+      "sources": [
+        "catalog"
+      ],
+      "contract": null,
+      "status": "peripheral-unmigrated"
+    },
+    {
+      "route": "DELETE /config_overrides/cyberark",
+      "sources": [
+        "catalog"
+      ],
+      "contract": null,
+      "status": "peripheral-unmigrated"
+    },
+    {
+      "route": "DELETE /config_overrides/hashicorp_vault",
+      "sources": [
+        "catalog"
+      ],
+      "contract": null,
+      "status": "peripheral-unmigrated"
+    },
+    {
+      "route": "DELETE /containers/{container_id}",
+      "sources": [
+        "catalog"
+      ],
+      "contract": null,
+      "status": "peripheral-unmigrated"
+    },
+    {
+      "route": "DELETE /credentials/{credential_name}",
+      "sources": [
+        "catalog"
+      ],
+      "contract": {
+        "domain": "suppliers",
+        "operation": "deleteCredential"
+      },
+      "status": "core-contracted"
+    },
+    {
+      "route": "DELETE /fallback/{model}",
+      "sources": [
+        "catalog"
+      ],
+      "contract": null,
+      "status": "peripheral-unmigrated"
+    },
+    {
+      "route": "DELETE /files/{file_id}",
+      "sources": [
+        "catalog"
+      ],
+      "contract": null,
+      "status": "peripheral-unmigrated"
+    },
+    {
+      "route": "DELETE /guardrails/{guardrail_id}",
+      "sources": [
+        "catalog"
+      ],
+      "contract": null,
+      "status": "peripheral-unmigrated"
+    },
+    {
+      "route": "DELETE /interactions/{interaction_id}",
+      "sources": [
+        "catalog"
+      ],
+      "contract": null,
+      "status": "peripheral-unmigrated"
+    },
+    {
+      "route": "DELETE /openai/v1/responses/{response_id}",
+      "sources": [
+        "catalog"
+      ],
+      "contract": null,
+      "status": "peripheral-unmigrated"
+    },
+    {
+      "route": "DELETE /organization/delete",
+      "sources": [
+        "catalog",
+        "internal/gateway/identity/mount.go"
+      ],
+      "contract": null,
+      "status": "peripheral-unmigrated"
+    },
+    {
+      "route": "DELETE /organization/member_delete",
+      "sources": [
+        "catalog",
+        "internal/gateway/identity/mount.go"
+      ],
+      "contract": null,
+      "status": "peripheral-unmigrated"
+    },
+    {
+      "route": "DELETE /policies/{policy_id}",
+      "sources": [
+        "catalog"
+      ],
+      "contract": null,
+      "status": "peripheral-unmigrated"
+    },
+    {
+      "route": "DELETE /policies/attachments/{attachment_id}",
+      "sources": [
+        "catalog"
+      ],
+      "contract": null,
+      "status": "peripheral-unmigrated"
+    },
+    {
+      "route": "DELETE /policies/name/{policy_name}/all-versions",
+      "sources": [
+        "catalog"
+      ],
+      "contract": null,
+      "status": "peripheral-unmigrated"
+    },
+    {
+      "route": "DELETE /price/provider",
+      "sources": [
+        "internal/gateway/models/mount.go"
+      ],
+      "contract": null,
+      "status": "peripheral-unmigrated"
+    },
+    {
+      "route": "DELETE /prompts/{prompt_id}",
+      "sources": [
+        "catalog"
+      ],
+      "contract": null,
+      "status": "peripheral-unmigrated"
+    },
+    {
+      "route": "DELETE /responses/{response_id}",
+      "sources": [
+        "catalog"
+      ],
+      "contract": null,
+      "status": "peripheral-unmigrated"
+    },
+    {
+      "route": "DELETE /schedule/anthropic_beta_headers_reload",
+      "sources": [
+        "catalog"
+      ],
+      "contract": null,
+      "status": "peripheral-unmigrated"
+    },
+    {
+      "route": "DELETE /schedule/model_cost_map_reload",
+      "sources": [
+        "catalog",
+        "internal/gateway/models/mount.go"
+      ],
+      "contract": null,
+      "status": "peripheral-unmigrated"
+    },
+    {
+      "route": "DELETE /search_tools/{search_tool_id}",
+      "sources": [
+        "catalog"
+      ],
+      "contract": null,
+      "status": "peripheral-unmigrated"
+    },
+    {
+      "route": "DELETE /server/{server_id}",
+      "sources": [
+        "catalog"
+      ],
+      "contract": null,
+      "status": "peripheral-unmigrated"
+    },
+    {
+      "route": "DELETE /server/{server_id}/oauth-user-credential",
+      "sources": [
+        "catalog"
+      ],
+      "contract": null,
+      "status": "peripheral-unmigrated"
+    },
+    {
+      "route": "DELETE /server/{server_id}/user-credential",
+      "sources": [
+        "catalog"
+      ],
+      "contract": null,
+      "status": "peripheral-unmigrated"
+    },
+    {
+      "route": "DELETE /server/{server_id}/user-env-vars",
+      "sources": [
+        "catalog"
+      ],
+      "contract": null,
+      "status": "peripheral-unmigrated"
+    },
+    {
+      "route": "DELETE /team/{team_id}/callback/{callback_name}",
+      "sources": [
+        "catalog"
+      ],
+      "contract": null,
+      "status": "peripheral-unmigrated"
+    },
+    {
+      "route": "DELETE /toolset/{toolset_id}",
+      "sources": [
+        "catalog"
+      ],
+      "contract": null,
+      "status": "peripheral-unmigrated"
+    },
+    {
+      "route": "DELETE /v1/access_group/{access_group_id}",
+      "sources": [
+        "catalog"
+      ],
+      "contract": null,
+      "status": "peripheral-unmigrated"
+    },
+    {
+      "route": "DELETE /v1/agents/{agent_id}",
+      "sources": [
+        "catalog"
+      ],
+      "contract": null,
+      "status": "peripheral-unmigrated"
+    },
+    {
+      "route": "DELETE /v1/assistants/{assistant_id}",
+      "sources": [
+        "catalog"
+      ],
+      "contract": null,
+      "status": "peripheral-unmigrated"
+    },
+    {
+      "route": "DELETE /v1/containers/{container_id}",
+      "sources": [
+        "catalog"
+      ],
+      "contract": null,
+      "status": "peripheral-unmigrated"
+    },
+    {
+      "route": "DELETE /v1/evals/{eval_id}",
+      "sources": [
+        "catalog"
+      ],
+      "contract": null,
+      "status": "peripheral-unmigrated"
+    },
+    {
+      "route": "DELETE /v1/evals/{eval_id}/runs/{run_id}",
+      "sources": [
+        "catalog"
+      ],
+      "contract": null,
+      "status": "peripheral-unmigrated"
+    },
+    {
+      "route": "DELETE /v1/files/{file_id}",
+      "sources": [
+        "catalog"
+      ],
+      "contract": null,
+      "status": "peripheral-unmigrated"
+    },
+    {
+      "route": "DELETE /v1/memory/{key}",
+      "sources": [
+        "catalog"
+      ],
+      "contract": null,
+      "status": "peripheral-unmigrated"
+    },
+    {
+      "route": "DELETE /v1/responses/{response_id}",
+      "sources": [
+        "catalog"
+      ],
+      "contract": null,
+      "status": "peripheral-unmigrated"
+    },
+    {
+      "route": "DELETE /v1/skills/{skill_id}",
+      "sources": [
+        "catalog"
+      ],
+      "contract": null,
+      "status": "peripheral-unmigrated"
+    },
+    {
+      "route": "DELETE /v1/tool/{tool_name}/overrides",
+      "sources": [
+        "catalog"
+      ],
+      "contract": null,
+      "status": "peripheral-unmigrated"
+    },
+    {
+      "route": "DELETE /v1/vector_stores/{vector_store_id}",
+      "sources": [
+        "catalog"
+      ],
+      "contract": null,
+      "status": "peripheral-unmigrated"
+    },
+    {
+      "route": "DELETE /v1/vector_stores/{vector_store_id}/files/{file_id}",
+      "sources": [
+        "catalog"
+      ],
+      "contract": null,
+      "status": "peripheral-unmigrated"
+    },
+    {
+      "route": "DELETE /v1beta/agents/{name}",
+      "sources": [
+        "catalog"
+      ],
+      "contract": null,
+      "status": "peripheral-unmigrated"
+    },
+    {
+      "route": "DELETE /v1beta/interactions/{interaction_id}",
+      "sources": [
+        "catalog"
+      ],
+      "contract": null,
+      "status": "peripheral-unmigrated"
+    },
+    {
+      "route": "DELETE /vantage/delete",
+      "sources": [
+        "catalog"
+      ],
+      "contract": null,
+      "status": "peripheral-unmigrated"
+    },
+    {
+      "route": "DELETE /vector_stores/{vector_store_id}",
+      "sources": [
+        "catalog"
+      ],
+      "contract": null,
+      "status": "peripheral-unmigrated"
+    },
+    {
+      "route": "DELETE /vector_stores/{vector_store_id}/files/{file_id}",
+      "sources": [
+        "catalog"
+      ],
+      "contract": null,
+      "status": "peripheral-unmigrated"
+    },
+    {
+      "route": "GET /",
+      "sources": [
+        "catalog"
+      ],
+      "contract": null,
+      "status": "peripheral-unmigrated"
+    },
+    {
+      "route": "GET /.well-known/agent-skills/index.json",
+      "sources": [
+        "catalog"
+      ],
+      "contract": null,
+      "status": "peripheral-unmigrated"
+    },
+    {
+      "route": "GET /.well-known/jwks.json",
+      "sources": [
+        "catalog"
+      ],
+      "contract": null,
+      "status": "peripheral-unmigrated"
+    },
+    {
+      "route": "GET /.well-known/litellm-cli-auth",
+      "sources": [
+        "catalog"
+      ],
+      "contract": null,
+      "status": "peripheral-unmigrated"
+    },
+    {
+      "route": "GET /.well-known/litellm-ui-config",
+      "sources": [
+        "catalog",
+        "internal/gateway/health/health.go"
+      ],
+      "contract": null,
+      "status": "peripheral-unmigrated"
+    },
+    {
+      "route": "GET /.well-known/oauth-authorization-server",
+      "sources": [
+        "catalog"
+      ],
+      "contract": null,
+      "status": "peripheral-unmigrated"
+    },
+    {
+      "route": "GET /.well-known/oauth-authorization-server/{root_path}/v1/mcp/oauth",
+      "sources": [
+        "catalog"
+      ],
+      "contract": null,
+      "status": "peripheral-unmigrated"
+    },
+    {
+      "route": "GET /.well-known/oauth-protected-resource",
+      "sources": [
+        "catalog"
+      ],
+      "contract": null,
+      "status": "peripheral-unmigrated"
+    },
+    {
+      "route": "GET /.well-known/openid-configuration",
+      "sources": [
+        "catalog"
+      ],
+      "contract": null,
+      "status": "peripheral-unmigrated"
+    },
+    {
+      "route": "GET /.well-known/skills/index.json",
+      "sources": [
+        "catalog"
+      ],
+      "contract": null,
+      "status": "peripheral-unmigrated"
+    },
+    {
+      "route": "GET /{mcp_server_name}/authorize",
+      "sources": [
+        "catalog"
+      ],
+      "contract": null,
+      "status": "peripheral-unmigrated"
+    },
+    {
+      "route": "GET /{provider}/v1/batches",
+      "sources": [
+        "catalog"
+      ],
+      "contract": null,
+      "status": "peripheral-unmigrated"
+    },
+    {
+      "route": "GET /{provider}/v1/batches/{batch_id}",
+      "sources": [
+        "catalog"
+      ],
+      "contract": null,
+      "status": "peripheral-unmigrated"
+    },
+    {
+      "route": "GET /{provider}/v1/files",
+      "sources": [
+        "catalog"
+      ],
+      "contract": null,
+      "status": "peripheral-unmigrated"
+    },
+    {
+      "route": "GET /{provider}/v1/files/{file_id}",
+      "sources": [
+        "catalog"
+      ],
+      "contract": null,
+      "status": "peripheral-unmigrated"
+    },
+    {
+      "route": "GET /{provider}/v1/files/{file_id}/content",
+      "sources": [
+        "catalog"
+      ],
+      "contract": null,
+      "status": "peripheral-unmigrated"
+    },
+    {
+      "route": "GET /a2a/{agent_id}/.well-known/agent-card.json",
+      "sources": [
+        "catalog"
+      ],
+      "contract": null,
+      "status": "peripheral-unmigrated"
+    },
+    {
+      "route": "GET /a2a/{agent_id}/.well-known/agent.json",
+      "sources": [
+        "catalog"
+      ],
+      "contract": null,
+      "status": "peripheral-unmigrated"
+    },
+    {
+      "route": "GET /access_group/{access_group}/info",
+      "sources": [
+        "catalog"
+      ],
+      "contract": null,
+      "status": "peripheral-unmigrated"
+    },
+    {
+      "route": "GET /access_group/list",
+      "sources": [
+        "catalog"
+      ],
+      "contract": null,
+      "status": "peripheral-unmigrated"
+    },
+    {
+      "route": "GET /access_groups",
+      "sources": [
+        "catalog"
+      ],
+      "contract": null,
+      "status": "peripheral-unmigrated"
+    },
+    {
+      "route": "GET /active/callbacks",
+      "sources": [
+        "catalog"
+      ],
+      "contract": null,
+      "status": "peripheral-unmigrated"
+    },
+    {
+      "route": "GET /admin/archive/kodo",
+      "sources": [
+        "internal/gateway/directory.go"
+      ],
+      "contract": null,
+      "status": "peripheral-unmigrated"
+    },
+    {
+      "route": "GET /admin/directory/connections",
+      "sources": [
+        "internal/gateway/directory.go"
+      ],
+      "contract": null,
+      "status": "peripheral-unmigrated"
+    },
+    {
+      "route": "GET /admin/directory/connections/{connection_id}",
+      "sources": [
+        "internal/gateway/directory.go"
+      ],
+      "contract": null,
+      "status": "peripheral-unmigrated"
+    },
+    {
+      "route": "GET /admin/enterprise/sso",
+      "sources": [
+        "internal/gateway/directory.go"
+      ],
+      "contract": null,
+      "status": "peripheral-unmigrated"
+    },
+    {
+      "route": "GET /admin/enterprise/sso/{connection_id}",
+      "sources": [
+        "internal/gateway/directory.go"
+      ],
+      "contract": null,
+      "status": "peripheral-unmigrated"
+    },
+    {
+      "route": "GET /admin/enterprise/sso/{connection_id}/metadata",
+      "sources": [
+        "internal/gateway/directory.go"
+      ],
+      "contract": null,
+      "status": "peripheral-unmigrated"
+    },
+    {
+      "route": "GET /agent/daily/activity",
+      "sources": [
+        "catalog"
+      ],
+      "contract": null,
+      "status": "peripheral-unmigrated"
+    },
+    {
+      "route": "GET /alerting/settings",
+      "sources": [
+        "catalog"
+      ],
+      "contract": null,
+      "status": "peripheral-unmigrated"
+    },
+    {
+      "route": "GET /api/plugins",
+      "sources": [
+        "catalog"
+      ],
+      "contract": null,
+      "status": "peripheral-unmigrated"
+    },
+    {
+      "route": "GET /api/plugins/auth-token",
+      "sources": [
+        "catalog"
+      ],
+      "contract": null,
+      "status": "peripheral-unmigrated"
+    },
+    {
+      "route": "GET /assistants",
+      "sources": [
+        "catalog"
+      ],
+      "contract": null,
+      "status": "peripheral-unmigrated"
+    },
+    {
+      "route": "GET /audit/logs",
+      "sources": [
+        "internal/gateway/identity/mount.go"
+      ],
+      "contract": null,
+      "status": "peripheral-unmigrated"
+    },
+    {
+      "route": "GET /auth/enterprise/{connection_id}/saml/metadata",
+      "sources": [
+        "internal/gateway/directory.go"
+      ],
+      "contract": null,
+      "status": "peripheral-unmigrated"
+    },
+    {
+      "route": "GET /auth/enterprise/{connection_id}/start",
+      "sources": [
+        "internal/gateway/directory.go"
+      ],
+      "contract": null,
+      "status": "peripheral-unmigrated"
+    },
+    {
+      "route": "GET /auth/enterprise/callback",
+      "sources": [
+        "internal/gateway/directory.go"
+      ],
+      "contract": null,
+      "status": "peripheral-unmigrated"
+    },
+    {
+      "route": "GET /auth/enterprise/options",
+      "sources": [
+        "internal/gateway/directory.go"
+      ],
+      "contract": null,
+      "status": "peripheral-unmigrated"
+    },
+    {
+      "route": "GET /auth/enterprise/saml/finish",
+      "sources": [
+        "internal/gateway/directory.go"
+      ],
+      "contract": null,
+      "status": "peripheral-unmigrated"
+    },
+    {
+      "route": "GET /auth/me",
+      "sources": [
+        "internal/gateway/routes.go"
+      ],
+      "contract": null,
+      "status": "peripheral-unmigrated"
+    },
+    {
+      "route": "GET /authorize",
+      "sources": [
+        "catalog"
+      ],
+      "contract": null,
+      "status": "peripheral-unmigrated"
+    },
+    {
+      "route": "GET /authorize/flow",
+      "sources": [
+        "catalog",
+        "internal/gateway/routes.go"
+      ],
+      "contract": null,
+      "status": "peripheral-unmigrated"
+    },
+    {
+      "route": "GET /authorize/mcp-session",
+      "sources": [
+        "catalog"
+      ],
+      "contract": null,
+      "status": "peripheral-unmigrated"
+    },
+    {
+      "route": "GET /batches",
+      "sources": [
+        "catalog"
+      ],
+      "contract": null,
+      "status": "peripheral-unmigrated"
+    },
+    {
+      "route": "GET /batches/{batch_id}",
+      "sources": [
+        "catalog"
+      ],
+      "contract": null,
+      "status": "peripheral-unmigrated"
+    },
+    {
+      "route": "GET /bootstrap/status",
+      "sources": [
+        "internal/gateway/routes.go"
+      ],
+      "contract": null,
+      "status": "peripheral-unmigrated"
+    },
+    {
+      "route": "GET /budget/list",
+      "sources": [
+        "catalog"
+      ],
+      "contract": null,
+      "status": "peripheral-unmigrated"
+    },
+    {
+      "route": "GET /budget/reservations",
+      "sources": [
+        "internal/gateway/identity/mount.go"
+      ],
+      "contract": null,
+      "status": "peripheral-unmigrated"
+    },
+    {
+      "route": "GET /budget/settings",
+      "sources": [
+        "catalog"
+      ],
+      "contract": null,
+      "status": "peripheral-unmigrated"
+    },
+    {
+      "route": "GET /budgets",
+      "sources": [
+        "catalog"
+      ],
+      "contract": null,
+      "status": "peripheral-unmigrated"
+    },
+    {
+      "route": "GET /cache/ping",
+      "sources": [
+        "internal/gateway/routes.go"
+      ],
+      "contract": null,
+      "status": "peripheral-unmigrated"
+    },
+    {
+      "route": "GET /cache/settings",
+      "sources": [
+        "catalog",
+        "internal/gateway/routes.go"
+      ],
+      "contract": null,
+      "status": "peripheral-unmigrated"
+    },
+    {
+      "route": "GET /callback",
+      "sources": [
+        "catalog"
+      ],
+      "contract": null,
+      "status": "peripheral-unmigrated"
+    },
+    {
+      "route": "GET /callbacks/configs",
+      "sources": [
+        "catalog"
+      ],
+      "contract": null,
+      "status": "peripheral-unmigrated"
+    },
+    {
+      "route": "GET /callbacks/list",
+      "sources": [
+        "catalog"
+      ],
+      "contract": null,
+      "status": "peripheral-unmigrated"
+    },
+    {
+      "route": "GET /claude-code/marketplace.json",
+      "sources": [
+        "catalog"
+      ],
+      "contract": null,
+      "status": "peripheral-unmigrated"
+    },
+    {
+      "route": "GET /claude-code/plugins",
+      "sources": [
+        "catalog"
+      ],
+      "contract": null,
+      "status": "peripheral-unmigrated"
+    },
+    {
+      "route": "GET /claude-code/plugins/{plugin_name}",
+      "sources": [
+        "catalog"
+      ],
+      "contract": null,
+      "status": "peripheral-unmigrated"
+    },
+    {
+      "route": "GET /cloudzero/settings",
+      "sources": [
+        "catalog"
+      ],
+      "contract": null,
+      "status": "peripheral-unmigrated"
+    },
+    {
+      "route": "GET /config_overrides/cyberark",
+      "sources": [
+        "catalog"
+      ],
+      "contract": null,
+      "status": "peripheral-unmigrated"
+    },
+    {
+      "route": "GET /config_overrides/hashicorp_vault",
+      "sources": [
+        "catalog"
+      ],
+      "contract": null,
+      "status": "peripheral-unmigrated"
+    },
+    {
+      "route": "GET /config/block_requests_for_models_without_pricing",
+      "sources": [
+        "catalog"
+      ],
+      "contract": null,
+      "status": "peripheral-unmigrated"
+    },
+    {
+      "route": "GET /config/cost_discount_config",
+      "sources": [
+        "catalog"
+      ],
+      "contract": null,
+      "status": "peripheral-unmigrated"
+    },
+    {
+      "route": "GET /config/cost_margin_config",
+      "sources": [
+        "catalog"
+      ],
+      "contract": null,
+      "status": "peripheral-unmigrated"
+    },
+    {
+      "route": "GET /config/field/info",
+      "sources": [
+        "catalog"
+      ],
+      "contract": null,
+      "status": "peripheral-unmigrated"
+    },
+    {
+      "route": "GET /config/list",
+      "sources": [
+        "catalog",
+        "internal/gateway/prefs/mount.go"
+      ],
+      "contract": null,
+      "status": "peripheral-unmigrated"
+    },
+    {
+      "route": "GET /config/yaml",
+      "sources": [
+        "catalog"
+      ],
+      "contract": null,
+      "status": "peripheral-unmigrated"
+    },
+    {
+      "route": "GET /containers",
+      "sources": [
+        "catalog"
+      ],
+      "contract": null,
+      "status": "peripheral-unmigrated"
+    },
+    {
+      "route": "GET /containers/{container_id}",
+      "sources": [
+        "catalog"
+      ],
+      "contract": null,
+      "status": "peripheral-unmigrated"
+    },
+    {
+      "route": "GET /coordination_redis/settings",
+      "sources": [
+        "catalog"
+      ],
+      "contract": null,
+      "status": "peripheral-unmigrated"
+    },
+    {
+      "route": "GET /credentials",
+      "sources": [
+        "catalog"
+      ],
+      "contract": {
+        "domain": "suppliers",
+        "operation": "listCredentials"
+      },
+      "status": "core-contracted"
+    },
+    {
+      "route": "GET /credentials/by_model/{model_id}",
+      "sources": [
+        "catalog"
+      ],
+      "contract": null,
+      "status": "peripheral-unmigrated"
+    },
+    {
+      "route": "GET /credentials/by_name/{credential_name}",
+      "sources": [
+        "catalog"
+      ],
+      "contract": {
+        "domain": "suppliers",
+        "operation": "getCredential"
+      },
+      "status": "core-contracted"
+    },
+    {
+      "route": "GET /credentials/migrate-encryption/check",
+      "sources": [
+        "catalog"
+      ],
+      "contract": null,
+      "status": "peripheral-unmigrated"
+    },
+    {
+      "route": "GET /cursor/models",
+      "sources": [
+        "catalog"
+      ],
+      "contract": null,
+      "status": "peripheral-unmigrated"
+    },
+    {
+      "route": "GET /cursor/v1/models",
+      "sources": [
+        "catalog"
+      ],
+      "contract": null,
+      "status": "peripheral-unmigrated"
+    },
+    {
+      "route": "GET /customer/daily/activity",
+      "sources": [
+        "catalog",
+        "internal/gateway/usage/mount.go"
+      ],
+      "contract": null,
+      "status": "peripheral-unmigrated"
+    },
+    {
+      "route": "GET /customer/info",
+      "sources": [
+        "catalog"
+      ],
+      "contract": null,
+      "status": "peripheral-unmigrated"
+    },
+    {
+      "route": "GET /customer/list",
+      "sources": [
+        "catalog",
+        "internal/gateway/routes.go"
+      ],
+      "contract": null,
+      "status": "peripheral-unmigrated"
+    },
+    {
+      "route": "GET /debug/asyncio-tasks",
+      "sources": [
+        "catalog"
+      ],
+      "contract": null,
+      "status": "peripheral-unmigrated"
+    },
+    {
+      "route": "GET /debug/memory/details",
+      "sources": [
+        "catalog"
+      ],
+      "contract": null,
+      "status": "peripheral-unmigrated"
+    },
+    {
+      "route": "GET /debug/memory/summary",
+      "sources": [
+        "catalog"
+      ],
+      "contract": null,
+      "status": "peripheral-unmigrated"
+    },
+    {
+      "route": "GET /discover",
+      "sources": [
+        "catalog"
+      ],
+      "contract": null,
+      "status": "peripheral-unmigrated"
+    },
+    {
+      "route": "GET /enabled",
+      "sources": [
+        "catalog"
+      ],
+      "contract": null,
+      "status": "peripheral-unmigrated"
+    },
+    {
+      "route": "GET /end_user/daily/activity",
+      "sources": [
+        "catalog"
+      ],
+      "contract": null,
+      "status": "peripheral-unmigrated"
+    },
+    {
+      "route": "GET /end_user/info",
+      "sources": [
+        "catalog"
+      ],
+      "contract": null,
+      "status": "peripheral-unmigrated"
+    },
+    {
+      "route": "GET /end_user/list",
+      "sources": [
+        "catalog",
+        "internal/gateway/routes.go"
+      ],
+      "contract": null,
+      "status": "peripheral-unmigrated"
+    },
+    {
+      "route": "GET /fallback/{model}",
+      "sources": [
+        "catalog"
+      ],
+      "contract": null,
+      "status": "peripheral-unmigrated"
+    },
+    {
+      "route": "GET /fallback/login",
+      "sources": [
+        "catalog"
+      ],
+      "contract": null,
+      "status": "peripheral-unmigrated"
+    },
+    {
+      "route": "GET /files",
+      "sources": [
+        "catalog"
+      ],
+      "contract": null,
+      "status": "peripheral-unmigrated"
+    },
+    {
+      "route": "GET /files/{file_id}",
+      "sources": [
+        "catalog"
+      ],
+      "contract": null,
+      "status": "peripheral-unmigrated"
+    },
+    {
+      "route": "GET /files/{file_id}/content",
+      "sources": [
+        "catalog"
+      ],
+      "contract": null,
+      "status": "peripheral-unmigrated"
+    },
+    {
+      "route": "GET /fine_tuning/jobs",
+      "sources": [
+        "catalog"
+      ],
+      "contract": null,
+      "status": "peripheral-unmigrated"
+    },
+    {
+      "route": "GET /fine_tuning/jobs/{fine_tuning_job_id}",
+      "sources": [
+        "catalog"
+      ],
+      "contract": null,
+      "status": "peripheral-unmigrated"
+    },
+    {
+      "route": "GET /gateway/daily/activity",
+      "sources": [
+        "catalog",
+        "internal/gateway/usage/mount.go"
+      ],
+      "contract": null,
+      "status": "peripheral-unmigrated"
+    },
+    {
+      "route": "GET /get_favicon",
+      "sources": [
+        "catalog"
+      ],
+      "contract": null,
+      "status": "peripheral-unmigrated"
+    },
+    {
+      "route": "GET /get_image",
+      "sources": [
+        "catalog"
+      ],
+      "contract": null,
+      "status": "peripheral-unmigrated"
+    },
+    {
+      "route": "GET /get_logo_url",
+      "sources": [
+        "catalog"
+      ],
+      "contract": null,
+      "status": "peripheral-unmigrated"
+    },
+    {
+      "route": "GET /get/allowed_ips",
+      "sources": [
+        "catalog"
+      ],
+      "contract": null,
+      "status": "peripheral-unmigrated"
+    },
+    {
+      "route": "GET /get/config/callbacks",
+      "sources": [
+        "catalog",
+        "internal/gateway/prefs/mount.go"
+      ],
+      "contract": null,
+      "status": "peripheral-unmigrated"
+    },
+    {
+      "route": "GET /get/default_team_settings",
+      "sources": [
+        "catalog"
+      ],
+      "contract": null,
+      "status": "peripheral-unmigrated"
+    },
+    {
+      "route": "GET /get/internal_user_settings",
+      "sources": [
+        "catalog"
+      ],
+      "contract": null,
+      "status": "peripheral-unmigrated"
+    },
+    {
+      "route": "GET /get/mcp_semantic_filter_settings",
+      "sources": [
+        "catalog"
+      ],
+      "contract": null,
+      "status": "peripheral-unmigrated"
+    },
+    {
+      "route": "GET /get/mcp_tool_search_settings",
+      "sources": [
+        "catalog"
+      ],
+      "contract": null,
+      "status": "peripheral-unmigrated"
+    },
+    {
+      "route": "GET /get/sso_settings",
+      "sources": [
+        "catalog"
+      ],
+      "contract": null,
+      "status": "peripheral-unmigrated"
+    },
+    {
+      "route": "GET /get/ui_settings",
+      "sources": [
+        "catalog"
+      ],
+      "contract": null,
+      "status": "peripheral-unmigrated"
+    },
+    {
+      "route": "GET /get/ui_theme_settings",
+      "sources": [
+        "catalog",
+        "internal/gateway/routes.go"
+      ],
+      "contract": null,
+      "status": "peripheral-unmigrated"
+    },
+    {
+      "route": "GET /get/user_banner",
+      "sources": [
+        "catalog"
+      ],
+      "contract": null,
+      "status": "peripheral-unmigrated"
+    },
+    {
+      "route": "GET /global/activity",
+      "sources": [
+        "catalog",
+        "internal/gateway/usage/mount.go"
+      ],
+      "contract": null,
+      "status": "peripheral-unmigrated"
+    },
+    {
+      "route": "GET /global/activity/cache_hits",
+      "sources": [
+        "catalog",
+        "internal/gateway/usage/mount.go"
+      ],
+      "contract": null,
+      "status": "peripheral-unmigrated"
+    },
+    {
+      "route": "GET /global/activity/exceptions",
+      "sources": [
+        "catalog"
+      ],
+      "contract": null,
+      "status": "peripheral-unmigrated"
+    },
+    {
+      "route": "GET /global/activity/exceptions/deployment",
+      "sources": [
+        "catalog"
+      ],
+      "contract": null,
+      "status": "peripheral-unmigrated"
+    },
+    {
+      "route": "GET /global/activity/model",
+      "sources": [
+        "catalog",
+        "internal/gateway/usage/mount.go"
+      ],
+      "contract": null,
+      "status": "peripheral-unmigrated"
+    },
+    {
+      "route": "GET /global/all_end_users",
+      "sources": [
+        "catalog"
+      ],
+      "contract": null,
+      "status": "peripheral-unmigrated"
+    },
+    {
+      "route": "GET /global/spend",
+      "sources": [
+        "catalog"
+      ],
+      "contract": null,
+      "status": "peripheral-unmigrated"
+    },
+    {
+      "route": "GET /global/spend/all_tag_names",
+      "sources": [
+        "catalog",
+        "internal/gateway/usage/mount.go"
+      ],
+      "contract": null,
+      "status": "peripheral-unmigrated"
+    },
+    {
+      "route": "GET /global/spend/keys",
+      "sources": [
+        "catalog",
+        "internal/gateway/usage/mount.go"
+      ],
+      "contract": null,
+      "status": "peripheral-unmigrated"
+    },
+    {
+      "route": "GET /global/spend/logs",
+      "sources": [
+        "catalog",
+        "internal/gateway/usage/mount.go"
+      ],
+      "contract": null,
+      "status": "peripheral-unmigrated"
+    },
+    {
+      "route": "GET /global/spend/models",
+      "sources": [
+        "catalog",
+        "internal/gateway/usage/mount.go"
+      ],
+      "contract": null,
+      "status": "peripheral-unmigrated"
+    },
+    {
+      "route": "GET /global/spend/provider",
+      "sources": [
+        "catalog",
+        "internal/gateway/usage/mount.go"
+      ],
+      "contract": null,
+      "status": "peripheral-unmigrated"
+    },
+    {
+      "route": "GET /global/spend/report",
+      "sources": [
+        "catalog"
+      ],
+      "contract": null,
+      "status": "peripheral-unmigrated"
+    },
+    {
+      "route": "GET /global/spend/tags",
+      "sources": [
+        "catalog",
+        "internal/gateway/usage/mount.go"
+      ],
+      "contract": null,
+      "status": "peripheral-unmigrated"
+    },
+    {
+      "route": "GET /global/spend/teams",
+      "sources": [
+        "catalog",
+        "internal/gateway/usage/mount.go"
+      ],
+      "contract": null,
+      "status": "peripheral-unmigrated"
+    },
+    {
+      "route": "GET /guardrails/{guardrail_id}",
+      "sources": [
+        "catalog"
+      ],
+      "contract": null,
+      "status": "peripheral-unmigrated"
+    },
+    {
+      "route": "GET /guardrails/{guardrail_id}/info",
+      "sources": [
+        "catalog"
+      ],
+      "contract": null,
+      "status": "peripheral-unmigrated"
+    },
+    {
+      "route": "GET /guardrails/list",
+      "sources": [
+        "catalog"
+      ],
+      "contract": null,
+      "status": "peripheral-unmigrated"
+    },
+    {
+      "route": "GET /guardrails/submissions",
+      "sources": [
+        "catalog"
+      ],
+      "contract": null,
+      "status": "peripheral-unmigrated"
+    },
+    {
+      "route": "GET /guardrails/submissions/{guardrail_id}",
+      "sources": [
+        "catalog"
+      ],
+      "contract": null,
+      "status": "peripheral-unmigrated"
+    },
+    {
+      "route": "GET /guardrails/ui/add_guardrail_settings",
+      "sources": [
+        "catalog"
+      ],
+      "contract": null,
+      "status": "peripheral-unmigrated"
+    },
+    {
+      "route": "GET /guardrails/ui/category_yaml/{category_name}",
+      "sources": [
+        "catalog"
+      ],
+      "contract": null,
+      "status": "peripheral-unmigrated"
+    },
+    {
+      "route": "GET /guardrails/ui/major_airlines",
+      "sources": [
+        "catalog"
+      ],
+      "contract": null,
+      "status": "peripheral-unmigrated"
+    },
+    {
+      "route": "GET /guardrails/ui/provider_specific_params",
+      "sources": [
+        "catalog"
+      ],
+      "contract": null,
+      "status": "peripheral-unmigrated"
+    },
+    {
+      "route": "GET /guardrails/usage/detail/{guardrail_id}",
+      "sources": [
+        "catalog",
+        "internal/gateway/usage/mount.go"
+      ],
+      "contract": null,
+      "status": "peripheral-unmigrated"
+    },
+    {
+      "route": "GET /guardrails/usage/logs",
+      "sources": [
+        "catalog",
+        "internal/gateway/usage/mount.go"
+      ],
+      "contract": null,
+      "status": "peripheral-unmigrated"
+    },
+    {
+      "route": "GET /guardrails/usage/overview",
+      "sources": [
+        "catalog",
+        "internal/gateway/usage/mount.go"
+      ],
+      "contract": null,
+      "status": "peripheral-unmigrated"
+    },
+    {
+      "route": "GET /health",
+      "sources": [
+        "catalog",
+        "internal/gateway/health/health.go"
+      ],
+      "contract": null,
+      "status": "peripheral-unmigrated"
+    },
+    {
+      "route": "GET /health/backlog",
+      "sources": [
+        "catalog"
+      ],
+      "contract": null,
+      "status": "peripheral-unmigrated"
+    },
+    {
+      "route": "GET /health/drain",
+      "sources": [
+        "catalog"
+      ],
+      "contract": null,
+      "status": "peripheral-unmigrated"
+    },
+    {
+      "route": "GET /health/history",
+      "sources": [
+        "catalog"
+      ],
+      "contract": null,
+      "status": "peripheral-unmigrated"
+    },
+    {
+      "route": "GET /health/license",
+      "sources": [
+        "catalog"
+      ],
+      "contract": null,
+      "status": "peripheral-unmigrated"
+    },
+    {
+      "route": "GET /health/liveliness",
+      "sources": [
+        "catalog",
+        "internal/gateway/health/health.go"
+      ],
+      "contract": null,
+      "status": "peripheral-unmigrated"
+    },
+    {
+      "route": "GET /health/liveness",
+      "sources": [
+        "catalog",
+        "internal/gateway/health/health.go"
+      ],
+      "contract": null,
+      "status": "peripheral-unmigrated"
+    },
+    {
+      "route": "GET /health/readiness",
+      "sources": [
+        "catalog",
+        "internal/gateway/health/health.go"
+      ],
+      "contract": null,
+      "status": "peripheral-unmigrated"
+    },
+    {
+      "route": "GET /health/readiness/details",
+      "sources": [
+        "catalog",
+        "internal/gateway/health/health.go"
+      ],
+      "contract": null,
+      "status": "peripheral-unmigrated"
+    },
+    {
+      "route": "GET /health/services",
+      "sources": [
+        "catalog",
+        "internal/gateway/usage/mount.go"
+      ],
+      "contract": null,
+      "status": "peripheral-unmigrated"
+    },
+    {
+      "route": "GET /health/shared-status",
+      "sources": [
+        "catalog"
+      ],
+      "contract": null,
+      "status": "peripheral-unmigrated"
+    },
+    {
+      "route": "GET /interactions/{interaction_id}",
+      "sources": [
+        "catalog"
+      ],
+      "contract": null,
+      "status": "peripheral-unmigrated"
+    },
+    {
+      "route": "GET /invitation/info",
+      "sources": [
+        "catalog"
+      ],
+      "contract": null,
+      "status": "peripheral-unmigrated"
+    },
+    {
+      "route": "GET /jwt/key/mapping/info",
+      "sources": [
+        "catalog"
+      ],
+      "contract": null,
+      "status": "peripheral-unmigrated"
+    },
+    {
+      "route": "GET /jwt/key/mapping/list",
+      "sources": [
+        "catalog"
+      ],
+      "contract": null,
+      "status": "peripheral-unmigrated"
+    },
+    {
+      "route": "GET /key/aliases",
+      "sources": [
+        "catalog",
+        "internal/gateway/keys/mount.go"
+      ],
+      "contract": {
+        "domain": "keys",
+        "operation": "listKeyAliases"
+      },
+      "status": "core-contracted"
+    },
+    {
+      "route": "GET /key/info",
+      "sources": [
+        "catalog",
+        "internal/gateway/keys/mount.go"
+      ],
+      "contract": {
+        "domain": "keys",
+        "operation": "getKey"
+      },
+      "status": "core-contracted"
+    },
+    {
+      "route": "GET /key/list",
+      "sources": [
+        "catalog",
+        "internal/gateway/keys/mount.go"
+      ],
+      "contract": {
+        "domain": "keys",
+        "operation": "listKeys"
+      },
+      "status": "core-contracted"
+    },
+    {
+      "route": "GET /key/spend/report",
+      "sources": [
+        "catalog"
+      ],
+      "contract": null,
+      "status": "peripheral-unmigrated"
+    },
+    {
+      "route": "GET /litellm/.well-known/litellm-ui-config",
+      "sources": [
+        "catalog",
+        "internal/gateway/health/health.go"
+      ],
+      "contract": null,
+      "status": "peripheral-unmigrated"
+    },
+    {
+      "route": "GET /memory-usage",
+      "sources": [
+        "catalog"
+      ],
+      "contract": null,
+      "status": "peripheral-unmigrated"
+    },
+    {
+      "route": "GET /memory-usage-in-mem-cache",
+      "sources": [
+        "catalog"
+      ],
+      "contract": null,
+      "status": "peripheral-unmigrated"
+    },
+    {
+      "route": "GET /memory-usage-in-mem-cache-items",
+      "sources": [
+        "catalog"
+      ],
+      "contract": null,
+      "status": "peripheral-unmigrated"
+    },
+    {
+      "route": "GET /model_group/info",
+      "sources": [
+        "catalog",
+        "internal/gateway/models/mount.go"
+      ],
+      "contract": null,
+      "status": "peripheral-unmigrated"
+    },
+    {
+      "route": "GET /model_hub",
+      "sources": [
+        "catalog",
+        "internal/gateway/publichub/public_hub.go"
+      ],
+      "contract": null,
+      "status": "peripheral-unmigrated"
+    },
+    {
+      "route": "GET /model_hub/{facet}",
+      "sources": [
+        "catalog",
+        "internal/gateway/publichub/public_hub.go"
+      ],
+      "contract": null,
+      "status": "peripheral-unmigrated"
+    },
+    {
+      "route": "GET /model/available",
+      "sources": [
+        "internal/gateway/models/mount.go"
+      ],
+      "contract": null,
+      "status": "peripheral-unmigrated"
+    },
+    {
+      "route": "GET /model/cost_map/source",
+      "sources": [
+        "catalog",
+        "internal/gateway/models/mount.go"
+      ],
+      "contract": null,
+      "status": "peripheral-unmigrated"
+    },
+    {
+      "route": "GET /model/deprecations",
+      "sources": [
+        "catalog"
+      ],
+      "contract": null,
+      "status": "peripheral-unmigrated"
+    },
+    {
+      "route": "GET /model/groups",
+      "sources": [
+        "internal/gateway/models/mount.go"
+      ],
+      "contract": {
+        "domain": "models",
+        "operation": "listModelGroups"
+      },
+      "status": "core-contracted"
+    },
+    {
+      "route": "GET /model/info",
+      "sources": [
+        "catalog"
+      ],
+      "contract": null,
+      "status": "peripheral-unmigrated"
+    },
+    {
+      "route": "GET /model/metrics",
+      "sources": [
+        "catalog"
+      ],
+      "contract": null,
+      "status": "peripheral-unmigrated"
+    },
+    {
+      "route": "GET /model/metrics/exceptions",
+      "sources": [
+        "catalog"
+      ],
+      "contract": null,
+      "status": "peripheral-unmigrated"
+    },
+    {
+      "route": "GET /model/metrics/slow_responses",
+      "sources": [
+        "catalog"
+      ],
+      "contract": null,
+      "status": "peripheral-unmigrated"
+    },
+    {
+      "route": "GET /model/settings",
+      "sources": [
+        "catalog"
+      ],
+      "contract": null,
+      "status": "peripheral-unmigrated"
+    },
+    {
+      "route": "GET /model/streaming_metrics",
+      "sources": [
+        "catalog"
+      ],
+      "contract": null,
+      "status": "peripheral-unmigrated"
+    },
+    {
+      "route": "GET /models",
+      "sources": [
+        "catalog",
+        "internal/gateway/models/mount.go"
+      ],
+      "contract": null,
+      "status": "peripheral-unmigrated"
+    },
+    {
+      "route": "GET /models/{model_id}",
+      "sources": [
+        "catalog"
+      ],
+      "contract": null,
+      "status": "peripheral-unmigrated"
+    },
+    {
+      "route": "GET /models/monitor",
+      "sources": [
+        "internal/gateway/usage/mount.go"
+      ],
+      "contract": null,
+      "status": "peripheral-unmigrated"
+    },
+    {
+      "route": "GET /network/client-ip",
+      "sources": [
+        "catalog"
+      ],
+      "contract": null,
+      "status": "peripheral-unmigrated"
+    },
+    {
+      "route": "GET /onboarding/get_token",
+      "sources": [
+        "catalog"
+      ],
+      "contract": null,
+      "status": "peripheral-unmigrated"
+    },
+    {
+      "route": "GET /openai/v1/responses/{response_id}",
+      "sources": [
+        "catalog"
+      ],
+      "contract": null,
+      "status": "peripheral-unmigrated"
+    },
+    {
+      "route": "GET /openai/v1/responses/{response_id}/input_items",
+      "sources": [
+        "catalog"
+      ],
+      "contract": null,
+      "status": "peripheral-unmigrated"
+    },
+    {
+      "route": "GET /openapi-registry",
+      "sources": [
+        "catalog"
+      ],
+      "contract": null,
+      "status": "peripheral-unmigrated"
+    },
+    {
+      "route": "GET /organization/daily/activity",
+      "sources": [
+        "catalog",
+        "internal/gateway/usage/mount.go"
+      ],
+      "contract": {
+        "domain": "usage",
+        "operation": "organizationDailyUsage"
+      },
+      "status": "core-contracted"
+    },
+    {
+      "route": "GET /organization/info",
+      "sources": [
+        "catalog",
+        "internal/gateway/identity/mount.go"
+      ],
+      "contract": null,
+      "status": "peripheral-unmigrated"
+    },
+    {
+      "route": "GET /organization/list",
+      "sources": [
+        "catalog",
+        "internal/gateway/identity/mount.go"
+      ],
+      "contract": null,
+      "status": "peripheral-unmigrated"
+    },
+    {
+      "route": "GET /organization/spend/report",
+      "sources": [
+        "catalog"
+      ],
+      "contract": null,
+      "status": "peripheral-unmigrated"
+    },
+    {
+      "route": "GET /otel-spans",
+      "sources": [
+        "catalog"
+      ],
+      "contract": null,
+      "status": "peripheral-unmigrated"
+    },
+    {
+      "route": "GET /ping",
+      "sources": [
+        "catalog",
+        "internal/gateway/routes.go"
+      ],
+      "contract": null,
+      "status": "peripheral-unmigrated"
+    },
+    {
+      "route": "GET /policies/{policy_id}",
+      "sources": [
+        "catalog"
+      ],
+      "contract": null,
+      "status": "peripheral-unmigrated"
+    },
+    {
+      "route": "GET /policies/{policy_id}/resolved-guardrails",
+      "sources": [
+        "catalog"
+      ],
+      "contract": null,
+      "status": "peripheral-unmigrated"
+    },
+    {
+      "route": "GET /policies/attachments/{attachment_id}",
+      "sources": [
+        "catalog"
+      ],
+      "contract": null,
+      "status": "peripheral-unmigrated"
+    },
+    {
+      "route": "GET /policies/attachments/list",
+      "sources": [
+        "catalog"
+      ],
+      "contract": null,
+      "status": "peripheral-unmigrated"
+    },
+    {
+      "route": "GET /policies/compare",
+      "sources": [
+        "catalog"
+      ],
+      "contract": null,
+      "status": "peripheral-unmigrated"
+    },
+    {
+      "route": "GET /policies/list",
+      "sources": [
+        "catalog"
+      ],
+      "contract": null,
+      "status": "peripheral-unmigrated"
+    },
+    {
+      "route": "GET /policies/name/{policy_name}/versions",
+      "sources": [
+        "catalog"
+      ],
+      "contract": null,
+      "status": "peripheral-unmigrated"
+    },
+    {
+      "route": "GET /policies/usage/overview",
+      "sources": [
+        "catalog"
+      ],
+      "contract": null,
+      "status": "peripheral-unmigrated"
+    },
+    {
+      "route": "GET /policy/info/{policy_name}",
+      "sources": [
+        "catalog"
+      ],
+      "contract": null,
+      "status": "peripheral-unmigrated"
+    },
+    {
+      "route": "GET /policy/list",
+      "sources": [
+        "catalog"
+      ],
+      "contract": null,
+      "status": "peripheral-unmigrated"
+    },
+    {
+      "route": "GET /policy/templates",
+      "sources": [
+        "catalog"
+      ],
+      "contract": null,
+      "status": "peripheral-unmigrated"
+    },
+    {
+      "route": "GET /price/catalog",
+      "sources": [
+        "internal/gateway/models/mount.go"
+      ],
+      "contract": null,
+      "status": "peripheral-unmigrated"
+    },
+    {
+      "route": "GET /project/info",
+      "sources": [
+        "internal/gateway/identity/mount.go"
+      ],
+      "contract": null,
+      "status": "peripheral-unmigrated"
+    },
+    {
+      "route": "GET /project/list",
+      "sources": [
+        "internal/gateway/identity/mount.go"
+      ],
+      "contract": null,
+      "status": "peripheral-unmigrated"
+    },
+    {
+      "route": "GET /prompts/{prompt_id}",
+      "sources": [
+        "catalog"
+      ],
+      "contract": null,
+      "status": "peripheral-unmigrated"
+    },
+    {
+      "route": "GET /prompts/{prompt_id}/info",
+      "sources": [
+        "catalog"
+      ],
+      "contract": null,
+      "status": "peripheral-unmigrated"
+    },
+    {
+      "route": "GET /prompts/{prompt_id}/versions",
+      "sources": [
+        "catalog"
+      ],
+      "contract": null,
+      "status": "peripheral-unmigrated"
+    },
+    {
+      "route": "GET /prompts/list",
+      "sources": [
+        "catalog"
+      ],
+      "contract": null,
+      "status": "peripheral-unmigrated"
+    },
+    {
+      "route": "GET /provider/budgets",
+      "sources": [
+        "catalog"
+      ],
+      "contract": null,
+      "status": "peripheral-unmigrated"
+    },
+    {
+      "route": "GET /public/agent_hub",
+      "sources": [
+        "catalog"
+      ],
+      "contract": null,
+      "status": "peripheral-unmigrated"
+    },
+    {
+      "route": "GET /public/agents/fields",
+      "sources": [
+        "catalog"
+      ],
+      "contract": null,
+      "status": "peripheral-unmigrated"
+    },
+    {
+      "route": "GET /public/autorouter_presets",
+      "sources": [
+        "catalog"
+      ],
+      "contract": null,
+      "status": "peripheral-unmigrated"
+    },
+    {
+      "route": "GET /public/complexity_router/scorer_defaults",
+      "sources": [
+        "catalog"
+      ],
+      "contract": null,
+      "status": "peripheral-unmigrated"
+    },
+    {
+      "route": "GET /public/endpoints",
+      "sources": [
+        "catalog",
+        "internal/gateway/publichub/public_hub.go"
+      ],
+      "contract": null,
+      "status": "peripheral-unmigrated"
+    },
+    {
+      "route": "GET /public/litellm_blog_posts",
+      "sources": [
+        "catalog"
+      ],
+      "contract": null,
+      "status": "peripheral-unmigrated"
+    },
+    {
+      "route": "GET /public/litellm_model_cost_map",
+      "sources": [
+        "catalog"
+      ],
+      "contract": null,
+      "status": "peripheral-unmigrated"
+    },
+    {
+      "route": "GET /public/mcp_hub",
+      "sources": [
+        "catalog"
+      ],
+      "contract": null,
+      "status": "peripheral-unmigrated"
+    },
+    {
+      "route": "GET /public/model_hub",
+      "sources": [
+        "catalog",
+        "internal/gateway/publichub/public_hub.go"
+      ],
+      "contract": null,
+      "status": "peripheral-unmigrated"
+    },
+    {
+      "route": "GET /public/model_hub/info",
+      "sources": [
+        "catalog",
+        "internal/gateway/publichub/public_hub.go"
+      ],
+      "contract": null,
+      "status": "peripheral-unmigrated"
+    },
+    {
+      "route": "GET /public/providers",
+      "sources": [
+        "catalog"
+      ],
+      "contract": null,
+      "status": "peripheral-unmigrated"
+    },
+    {
+      "route": "GET /public/providers/fields",
+      "sources": [
+        "catalog"
+      ],
+      "contract": null,
+      "status": "peripheral-unmigrated"
+    },
+    {
+      "route": "GET /public/skill_hub",
+      "sources": [
+        "catalog"
+      ],
+      "contract": null,
+      "status": "peripheral-unmigrated"
+    },
+    {
+      "route": "GET /public/v1/model_hub",
+      "sources": [
+        "internal/gateway/publichub/public_hub.go"
+      ],
+      "contract": null,
+      "status": "peripheral-unmigrated"
+    },
+    {
+      "route": "GET /public/v1/model_hub/{facet}",
+      "sources": [
+        "internal/gateway/publichub/public_hub.go"
+      ],
+      "contract": null,
+      "status": "peripheral-unmigrated"
+    },
+    {
+      "route": "GET /redis/info",
+      "sources": [
+        "catalog"
+      ],
+      "contract": null,
+      "status": "peripheral-unmigrated"
+    },
+    {
+      "route": "GET /registry.json",
+      "sources": [
+        "catalog"
+      ],
+      "contract": null,
+      "status": "peripheral-unmigrated"
+    },
+    {
+      "route": "GET /responses/{response_id}",
+      "sources": [
+        "catalog"
+      ],
+      "contract": null,
+      "status": "peripheral-unmigrated"
+    },
+    {
+      "route": "GET /responses/{response_id}/input_items",
+      "sources": [
+        "catalog"
+      ],
+      "contract": null,
+      "status": "peripheral-unmigrated"
+    },
+    {
+      "route": "GET /route_template/{template_id}",
+      "sources": [
+        "internal/gateway/identity/mount.go"
+      ],
+      "contract": null,
+      "status": "peripheral-unmigrated"
+    },
+    {
+      "route": "GET /route_template/{template_id}/usage",
+      "sources": [
+        "internal/gateway/identity/mount.go"
+      ],
+      "contract": null,
+      "status": "peripheral-unmigrated"
+    },
+    {
+      "route": "GET /route_template/binding",
+      "sources": [
+        "internal/gateway/identity/mount.go"
+      ],
+      "contract": null,
+      "status": "peripheral-unmigrated"
+    },
+    {
+      "route": "GET /route_template/list",
+      "sources": [
+        "internal/gateway/identity/mount.go"
+      ],
+      "contract": null,
+      "status": "peripheral-unmigrated"
+    },
+    {
+      "route": "GET /routes",
+      "sources": [
+        "catalog"
+      ],
+      "contract": null,
+      "status": "peripheral-unmigrated"
+    },
+    {
+      "route": "GET /schedule/anthropic_beta_headers_reload/status",
+      "sources": [
+        "catalog"
+      ],
+      "contract": null,
+      "status": "peripheral-unmigrated"
+    },
+    {
+      "route": "GET /schedule/model_cost_map_reload/status",
+      "sources": [
+        "catalog",
+        "internal/gateway/models/mount.go"
+      ],
+      "contract": null,
+      "status": "peripheral-unmigrated"
+    },
+    {
+      "route": "GET /search_tools/{search_tool_id}",
+      "sources": [
+        "catalog"
+      ],
+      "contract": null,
+      "status": "peripheral-unmigrated"
+    },
+    {
+      "route": "GET /search_tools/list",
+      "sources": [
+        "catalog"
+      ],
+      "contract": null,
+      "status": "peripheral-unmigrated"
+    },
+    {
+      "route": "GET /search_tools/ui/available_providers",
+      "sources": [
+        "catalog"
+      ],
+      "contract": null,
+      "status": "peripheral-unmigrated"
+    },
+    {
+      "route": "GET /search/tools",
+      "sources": [
+        "catalog"
+      ],
+      "contract": null,
+      "status": "peripheral-unmigrated"
+    },
+    {
+      "route": "GET /server",
+      "sources": [
+        "catalog"
+      ],
+      "contract": null,
+      "status": "peripheral-unmigrated"
+    },
+    {
+      "route": "GET /server/{server_id}",
+      "sources": [
+        "catalog"
+      ],
+      "contract": null,
+      "status": "peripheral-unmigrated"
+    },
+    {
+      "route": "GET /server/{server_id}/oauth-user-credential/status",
+      "sources": [
+        "catalog"
+      ],
+      "contract": null,
+      "status": "peripheral-unmigrated"
+    },
+    {
+      "route": "GET /server/{server_id}/user-env-vars",
+      "sources": [
+        "catalog"
+      ],
+      "contract": null,
+      "status": "peripheral-unmigrated"
+    },
+    {
+      "route": "GET /server/health",
+      "sources": [
+        "catalog"
+      ],
+      "contract": null,
+      "status": "peripheral-unmigrated"
+    },
+    {
+      "route": "GET /server/oauth/{server_id}/authorize",
+      "sources": [
+        "catalog"
+      ],
+      "contract": null,
+      "status": "peripheral-unmigrated"
+    },
+    {
+      "route": "GET /server/submissions",
+      "sources": [
+        "catalog"
+      ],
+      "contract": null,
+      "status": "peripheral-unmigrated"
+    },
+    {
+      "route": "GET /settings",
+      "sources": [
+        "catalog"
+      ],
+      "contract": null,
+      "status": "peripheral-unmigrated"
+    },
+    {
+      "route": "GET /spend_logs/end_users",
+      "sources": [
+        "catalog"
+      ],
+      "contract": null,
+      "status": "peripheral-unmigrated"
+    },
+    {
+      "route": "GET /spend_logs/users",
+      "sources": [
+        "catalog"
+      ],
+      "contract": null,
+      "status": "peripheral-unmigrated"
+    },
+    {
+      "route": "GET /spend/keys",
+      "sources": [
+        "catalog",
+        "internal/gateway/usage/mount.go"
+      ],
+      "contract": null,
+      "status": "peripheral-unmigrated"
+    },
+    {
+      "route": "GET /spend/logs",
+      "sources": [
+        "catalog"
+      ],
+      "contract": null,
+      "status": "peripheral-unmigrated"
+    },
+    {
+      "route": "GET /spend/logs/session/ui",
+      "sources": [
+        "catalog",
+        "internal/gateway/usage/mount.go"
+      ],
+      "contract": {
+        "domain": "usage",
+        "operation": "listSessionLogs"
+      },
+      "status": "core-contracted"
+    },
+    {
+      "route": "GET /spend/logs/ui",
+      "sources": [
+        "catalog",
+        "internal/gateway/usage/mount.go"
+      ],
+      "contract": {
+        "domain": "usage",
+        "operation": "listUILogs"
+      },
+      "status": "core-contracted"
+    },
+    {
+      "route": "GET /spend/logs/ui/{request_id}",
+      "sources": [
+        "catalog",
+        "internal/gateway/usage/mount.go"
+      ],
+      "contract": {
+        "domain": "usage",
+        "operation": "getLog"
+      },
+      "status": "core-contracted"
+    },
+    {
+      "route": "GET /spend/logs/v2",
+      "sources": [
+        "catalog",
+        "internal/gateway/usage/mount.go"
+      ],
+      "contract": {
+        "domain": "usage",
+        "operation": "listLogs"
+      },
+      "status": "core-contracted"
+    },
+    {
+      "route": "GET /spend/tags",
+      "sources": [
+        "catalog",
+        "internal/gateway/usage/mount.go"
+      ],
+      "contract": null,
+      "status": "peripheral-unmigrated"
+    },
+    {
+      "route": "GET /spend/users",
+      "sources": [
+        "catalog",
+        "internal/gateway/usage/mount.go"
+      ],
+      "contract": null,
+      "status": "peripheral-unmigrated"
+    },
+    {
+      "route": "GET /sso/callback",
+      "sources": [
+        "catalog"
+      ],
+      "contract": null,
+      "status": "peripheral-unmigrated"
+    },
+    {
+      "route": "GET /sso/cli/poll/{key_id}",
+      "sources": [
+        "catalog"
+      ],
+      "contract": null,
+      "status": "peripheral-unmigrated"
+    },
+    {
+      "route": "GET /sso/debug/callback",
+      "sources": [
+        "catalog"
+      ],
+      "contract": null,
+      "status": "peripheral-unmigrated"
+    },
+    {
+      "route": "GET /sso/debug/login",
+      "sources": [
+        "catalog"
+      ],
+      "contract": null,
+      "status": "peripheral-unmigrated"
+    },
+    {
+      "route": "GET /sso/get/ui_settings",
+      "sources": [
+        "catalog"
+      ],
+      "contract": null,
+      "status": "peripheral-unmigrated"
+    },
+    {
+      "route": "GET /sso/key/generate",
+      "sources": [
+        "catalog"
+      ],
+      "contract": null,
+      "status": "peripheral-unmigrated"
+    },
+    {
+      "route": "GET /sso/readiness",
+      "sources": [
+        "catalog"
+      ],
+      "contract": null,
+      "status": "peripheral-unmigrated"
+    },
+    {
+      "route": "GET /sso/saml/login",
+      "sources": [
+        "catalog"
+      ],
+      "contract": null,
+      "status": "peripheral-unmigrated"
+    },
+    {
+      "route": "GET /sso/saml/metadata",
+      "sources": [
+        "catalog"
+      ],
+      "contract": null,
+      "status": "peripheral-unmigrated"
+    },
+    {
+      "route": "GET /tag/daily/activity",
+      "sources": [
+        "catalog",
+        "internal/gateway/usage/mount.go"
+      ],
+      "contract": null,
+      "status": "peripheral-unmigrated"
+    },
+    {
+      "route": "GET /tag/dau",
+      "sources": [
+        "catalog"
+      ],
+      "contract": null,
+      "status": "peripheral-unmigrated"
+    },
+    {
+      "route": "GET /tag/distinct",
+      "sources": [
+        "catalog"
+      ],
+      "contract": null,
+      "status": "peripheral-unmigrated"
+    },
+    {
+      "route": "GET /tag/list",
+      "sources": [
+        "catalog",
+        "internal/gateway/usage/mount.go"
+      ],
+      "contract": null,
+      "status": "peripheral-unmigrated"
+    },
+    {
+      "route": "GET /tag/mau",
+      "sources": [
+        "catalog"
+      ],
+      "contract": null,
+      "status": "peripheral-unmigrated"
+    },
+    {
+      "route": "GET /tag/summary",
+      "sources": [
+        "catalog"
+      ],
+      "contract": null,
+      "status": "peripheral-unmigrated"
+    },
+    {
+      "route": "GET /tag/user-agent/per-user-analytics",
+      "sources": [
+        "catalog"
+      ],
+      "contract": null,
+      "status": "peripheral-unmigrated"
+    },
+    {
+      "route": "GET /tag/wau",
+      "sources": [
+        "catalog"
+      ],
+      "contract": null,
+      "status": "peripheral-unmigrated"
+    },
+    {
+      "route": "GET /team/{team_id}/callback",
+      "sources": [
+        "catalog"
+      ],
+      "contract": null,
+      "status": "peripheral-unmigrated"
+    },
+    {
+      "route": "GET /team/{team_id}/members/me",
+      "sources": [
+        "catalog"
+      ],
+      "contract": null,
+      "status": "peripheral-unmigrated"
+    },
+    {
+      "route": "GET /team/available",
+      "sources": [
+        "catalog",
+        "internal/gateway/identity/mount.go"
+      ],
+      "contract": null,
+      "status": "peripheral-unmigrated"
+    },
+    {
+      "route": "GET /team/daily/activity",
+      "sources": [
+        "catalog",
+        "internal/gateway/usage/mount.go"
+      ],
+      "contract": {
+        "domain": "usage",
+        "operation": "teamDailyUsage"
+      },
+      "status": "core-contracted"
+    },
+    {
+      "route": "GET /team/daily/activity/aggregated",
+      "sources": [
+        "catalog",
+        "internal/gateway/usage/mount.go"
+      ],
+      "contract": {
+        "domain": "usage",
+        "operation": "teamTotalUsage"
+      },
+      "status": "core-contracted"
+    },
+    {
+      "route": "GET /team/filter/ui",
+      "sources": [
+        "catalog"
+      ],
+      "contract": null,
+      "status": "peripheral-unmigrated"
+    },
+    {
+      "route": "GET /team/info",
+      "sources": [
+        "catalog",
+        "internal/gateway/identity/mount.go"
+      ],
+      "contract": null,
+      "status": "peripheral-unmigrated"
+    },
+    {
+      "route": "GET /team/list",
+      "sources": [
+        "catalog",
+        "internal/gateway/identity/mount.go"
+      ],
+      "contract": null,
+      "status": "peripheral-unmigrated"
+    },
+    {
+      "route": "GET /team/member_list",
+      "sources": [
+        "internal/gateway/identity/mount.go"
+      ],
+      "contract": null,
+      "status": "peripheral-unmigrated"
+    },
+    {
+      "route": "GET /team/metadata_schema",
+      "sources": [
+        "catalog"
+      ],
+      "contract": null,
+      "status": "peripheral-unmigrated"
+    },
+    {
+      "route": "GET /team/models",
+      "sources": [
+        "internal/gateway/identity/mount.go"
+      ],
+      "contract": null,
+      "status": "peripheral-unmigrated"
+    },
+    {
+      "route": "GET /team/permissions_list",
+      "sources": [
+        "catalog"
+      ],
+      "contract": null,
+      "status": "peripheral-unmigrated"
+    },
+    {
+      "route": "GET /team/spend/by_user",
+      "sources": [
+        "catalog",
+        "internal/gateway/usage/mount.go"
+      ],
+      "contract": null,
+      "status": "peripheral-unmigrated"
+    },
+    {
+      "route": "GET /team/spend/report",
+      "sources": [
+        "catalog"
+      ],
+      "contract": null,
+      "status": "peripheral-unmigrated"
+    },
+    {
+      "route": "GET /test",
+      "sources": [
+        "catalog",
+        "internal/gateway/usage/mount.go"
+      ],
+      "contract": null,
+      "status": "peripheral-unmigrated"
+    },
+    {
+      "route": "GET /threads/{thread_id}",
+      "sources": [
+        "catalog"
+      ],
+      "contract": null,
+      "status": "peripheral-unmigrated"
+    },
+    {
+      "route": "GET /threads/{thread_id}/messages",
+      "sources": [
+        "catalog"
+      ],
+      "contract": null,
+      "status": "peripheral-unmigrated"
+    },
+    {
+      "route": "GET /token/generate",
+      "sources": [
+        "catalog"
+      ],
+      "contract": null,
+      "status": "peripheral-unmigrated"
+    },
+    {
+      "route": "GET /tools",
+      "sources": [
+        "catalog"
+      ],
+      "contract": null,
+      "status": "peripheral-unmigrated"
+    },
+    {
+      "route": "GET /tools/list",
+      "sources": [
+        "catalog"
+      ],
+      "contract": null,
+      "status": "peripheral-unmigrated"
+    },
+    {
+      "route": "GET /toolset",
+      "sources": [
+        "catalog"
+      ],
+      "contract": null,
+      "status": "peripheral-unmigrated"
+    },
+    {
+      "route": "GET /toolset/{toolset_id}",
+      "sources": [
+        "catalog"
+      ],
+      "contract": null,
+      "status": "peripheral-unmigrated"
+    },
+    {
+      "route": "GET /user-credentials",
+      "sources": [
+        "catalog"
+      ],
+      "contract": null,
+      "status": "peripheral-unmigrated"
+    },
+    {
+      "route": "GET /user-env-vars/status",
+      "sources": [
+        "catalog"
+      ],
+      "contract": null,
+      "status": "peripheral-unmigrated"
+    },
+    {
+      "route": "GET /user/available_roles",
+      "sources": [
+        "catalog"
+      ],
+      "contract": null,
+      "status": "peripheral-unmigrated"
+    },
+    {
+      "route": "GET /user/available_users",
+      "sources": [
+        "internal/gateway/identity/mount.go"
+      ],
+      "contract": {
+        "domain": "users",
+        "operation": "availableUsers"
+      },
+      "status": "core-contracted"
+    },
+    {
+      "route": "GET /user/daily/activity",
+      "sources": [
+        "catalog",
+        "internal/gateway/usage/mount.go"
+      ],
+      "contract": {
+        "domain": "usage",
+        "operation": "userDailyUsage"
+      },
+      "status": "core-contracted"
+    },
+    {
+      "route": "GET /user/daily/activity/aggregated",
+      "sources": [
+        "catalog",
+        "internal/gateway/usage/mount.go"
+      ],
+      "contract": {
+        "domain": "usage",
+        "operation": "userTotalUsage"
+      },
+      "status": "core-contracted"
+    },
+    {
+      "route": "GET /user/filter/ui",
+      "sources": [
+        "catalog",
+        "internal/gateway/identity/mount.go"
+      ],
+      "contract": {
+        "domain": "users",
+        "operation": "filterUsers"
+      },
+      "status": "core-contracted"
+    },
+    {
+      "route": "GET /user/info",
+      "sources": [
+        "catalog",
+        "internal/gateway/identity/mount.go"
+      ],
+      "contract": {
+        "domain": "users",
+        "operation": "getUser"
+      },
+      "status": "core-contracted"
+    },
+    {
+      "route": "GET /user/list",
+      "sources": [
+        "catalog",
+        "internal/gateway/identity/mount.go"
+      ],
+      "contract": {
+        "domain": "users",
+        "operation": "listUsers"
+      },
+      "status": "core-contracted"
+    },
+    {
+      "route": "GET /user/spend/report",
+      "sources": [
+        "catalog"
+      ],
+      "contract": null,
+      "status": "peripheral-unmigrated"
+    },
+    {
+      "route": "GET /utils/available_routes",
+      "sources": [
+        "catalog"
+      ],
+      "contract": null,
+      "status": "peripheral-unmigrated"
+    },
+    {
+      "route": "GET /utils/supported_openai_params",
+      "sources": [
+        "catalog",
+        "internal/gateway/tokens/tokens.go"
+      ],
+      "contract": null,
+      "status": "peripheral-unmigrated"
+    },
+    {
+      "route": "GET /v1/access_group",
+      "sources": [
+        "catalog"
+      ],
+      "contract": null,
+      "status": "peripheral-unmigrated"
+    },
+    {
+      "route": "GET /v1/access_group/{access_group_id}",
+      "sources": [
+        "catalog"
+      ],
+      "contract": null,
+      "status": "peripheral-unmigrated"
+    },
+    {
+      "route": "GET /v1/agents",
+      "sources": [
+        "catalog"
+      ],
+      "contract": null,
+      "status": "peripheral-unmigrated"
+    },
+    {
+      "route": "GET /v1/agents/{agent_id}",
+      "sources": [
+        "catalog"
+      ],
+      "contract": null,
+      "status": "peripheral-unmigrated"
+    },
+    {
+      "route": "GET /v1/assistants",
+      "sources": [
+        "catalog"
+      ],
+      "contract": null,
+      "status": "peripheral-unmigrated"
+    },
+    {
+      "route": "GET /v1/batches",
+      "sources": [
+        "catalog"
+      ],
+      "contract": null,
+      "status": "peripheral-unmigrated"
+    },
+    {
+      "route": "GET /v1/batches/{batch_id}",
+      "sources": [
+        "catalog"
+      ],
+      "contract": null,
+      "status": "peripheral-unmigrated"
+    },
+    {
+      "route": "GET /v1/containers",
+      "sources": [
+        "catalog"
+      ],
+      "contract": null,
+      "status": "peripheral-unmigrated"
+    },
+    {
+      "route": "GET /v1/containers/{container_id}",
+      "sources": [
+        "catalog"
+      ],
+      "contract": null,
+      "status": "peripheral-unmigrated"
+    },
+    {
+      "route": "GET /v1/evals",
+      "sources": [
+        "catalog"
+      ],
+      "contract": null,
+      "status": "peripheral-unmigrated"
+    },
+    {
+      "route": "GET /v1/evals/{eval_id}",
+      "sources": [
+        "catalog"
+      ],
+      "contract": null,
+      "status": "peripheral-unmigrated"
+    },
+    {
+      "route": "GET /v1/evals/{eval_id}/runs",
+      "sources": [
+        "catalog"
+      ],
+      "contract": null,
+      "status": "peripheral-unmigrated"
+    },
+    {
+      "route": "GET /v1/evals/{eval_id}/runs/{run_id}",
+      "sources": [
+        "catalog"
+      ],
+      "contract": null,
+      "status": "peripheral-unmigrated"
+    },
+    {
+      "route": "GET /v1/files",
+      "sources": [
+        "catalog"
+      ],
+      "contract": null,
+      "status": "peripheral-unmigrated"
+    },
+    {
+      "route": "GET /v1/files/{file_id}",
+      "sources": [
+        "catalog"
+      ],
+      "contract": null,
+      "status": "peripheral-unmigrated"
+    },
+    {
+      "route": "GET /v1/files/{file_id}/content",
+      "sources": [
+        "catalog"
+      ],
+      "contract": null,
+      "status": "peripheral-unmigrated"
+    },
+    {
+      "route": "GET /v1/fine_tuning/jobs",
+      "sources": [
+        "catalog"
+      ],
+      "contract": null,
+      "status": "peripheral-unmigrated"
+    },
+    {
+      "route": "GET /v1/fine_tuning/jobs/{fine_tuning_job_id}",
+      "sources": [
+        "catalog"
+      ],
+      "contract": null,
+      "status": "peripheral-unmigrated"
+    },
+    {
+      "route": "GET /v1/indexes",
+      "sources": [
+        "catalog"
+      ],
+      "contract": null,
+      "status": "peripheral-unmigrated"
+    },
+    {
+      "route": "GET /v1/mcp/oauth/authorize",
+      "sources": [
+        "catalog"
+      ],
+      "contract": null,
+      "status": "peripheral-unmigrated"
+    },
+    {
+      "route": "GET /v1/memory",
+      "sources": [
+        "catalog"
+      ],
+      "contract": null,
+      "status": "peripheral-unmigrated"
+    },
+    {
+      "route": "GET /v1/memory/{key}",
+      "sources": [
+        "catalog"
+      ],
+      "contract": null,
+      "status": "peripheral-unmigrated"
+    },
+    {
+      "route": "GET /v1/model/deprecations",
+      "sources": [
+        "catalog"
+      ],
+      "contract": null,
+      "status": "peripheral-unmigrated"
+    },
+    {
+      "route": "GET /v1/model/info",
+      "sources": [
+        "catalog"
+      ],
+      "contract": null,
+      "status": "peripheral-unmigrated"
+    },
+    {
+      "route": "GET /v1/models",
+      "sources": [
+        "catalog",
+        "internal/gateway/models/mount.go"
+      ],
+      "contract": null,
+      "status": "peripheral-unmigrated"
+    },
+    {
+      "route": "GET /v1/models/{id}",
+      "sources": [
+        "internal/gateway/models/mount.go"
+      ],
+      "contract": null,
+      "status": "peripheral-unmigrated"
+    },
+    {
+      "route": "GET /v1/models/{model_id}",
+      "sources": [
+        "catalog"
+      ],
+      "contract": null,
+      "status": "peripheral-unmigrated"
+    },
+    {
+      "route": "GET /v1/responses/{response_id}",
+      "sources": [
+        "catalog"
+      ],
+      "contract": null,
+      "status": "peripheral-unmigrated"
+    },
+    {
+      "route": "GET /v1/responses/{response_id}/input_items",
+      "sources": [
+        "catalog"
+      ],
+      "contract": null,
+      "status": "peripheral-unmigrated"
+    },
+    {
+      "route": "GET /v1/search/tools",
+      "sources": [
+        "catalog"
+      ],
+      "contract": null,
+      "status": "peripheral-unmigrated"
+    },
+    {
+      "route": "GET /v1/skills",
+      "sources": [
+        "catalog"
+      ],
+      "contract": null,
+      "status": "peripheral-unmigrated"
+    },
+    {
+      "route": "GET /v1/skills/{skill_id}",
+      "sources": [
+        "catalog"
+      ],
+      "contract": null,
+      "status": "peripheral-unmigrated"
+    },
+    {
+      "route": "GET /v1/skills/{skill_id}/archive",
+      "sources": [
+        "catalog"
+      ],
+      "contract": null,
+      "status": "peripheral-unmigrated"
+    },
+    {
+      "route": "GET /v1/threads/{thread_id}",
+      "sources": [
+        "catalog"
+      ],
+      "contract": null,
+      "status": "peripheral-unmigrated"
+    },
+    {
+      "route": "GET /v1/threads/{thread_id}/messages",
+      "sources": [
+        "catalog"
+      ],
+      "contract": null,
+      "status": "peripheral-unmigrated"
+    },
+    {
+      "route": "GET /v1/tool/{tool_name}",
+      "sources": [
+        "catalog"
+      ],
+      "contract": null,
+      "status": "peripheral-unmigrated"
+    },
+    {
+      "route": "GET /v1/tool/{tool_name}/detail",
+      "sources": [
+        "catalog"
+      ],
+      "contract": null,
+      "status": "peripheral-unmigrated"
+    },
+    {
+      "route": "GET /v1/tool/{tool_name}/logs",
+      "sources": [
+        "catalog"
+      ],
+      "contract": null,
+      "status": "peripheral-unmigrated"
+    },
+    {
+      "route": "GET /v1/tool/list",
+      "sources": [
+        "catalog"
+      ],
+      "contract": null,
+      "status": "peripheral-unmigrated"
+    },
+    {
+      "route": "GET /v1/tool/policy/options",
+      "sources": [
+        "catalog"
+      ],
+      "contract": null,
+      "status": "peripheral-unmigrated"
+    },
+    {
+      "route": "GET /v1/tool/spend",
+      "sources": [
+        "catalog"
+      ],
+      "contract": null,
+      "status": "peripheral-unmigrated"
+    },
+    {
+      "route": "GET /v1/vector_store/list",
+      "sources": [
+        "catalog"
+      ],
+      "contract": null,
+      "status": "peripheral-unmigrated"
+    },
+    {
+      "route": "GET /v1/vector_stores",
+      "sources": [
+        "catalog"
+      ],
+      "contract": null,
+      "status": "peripheral-unmigrated"
+    },
+    {
+      "route": "GET /v1/vector_stores/{vector_store_id}",
+      "sources": [
+        "catalog"
+      ],
+      "contract": null,
+      "status": "peripheral-unmigrated"
+    },
+    {
+      "route": "GET /v1/vector_stores/{vector_store_id}/files",
+      "sources": [
+        "catalog"
+      ],
+      "contract": null,
+      "status": "peripheral-unmigrated"
+    },
+    {
+      "route": "GET /v1/vector_stores/{vector_store_id}/files/{file_id}",
+      "sources": [
+        "catalog"
+      ],
+      "contract": null,
+      "status": "peripheral-unmigrated"
+    },
+    {
+      "route": "GET /v1/vector_stores/{vector_store_id}/files/{file_id}/content",
+      "sources": [
+        "catalog"
+      ],
+      "contract": null,
+      "status": "peripheral-unmigrated"
+    },
+    {
+      "route": "GET /v1/videos",
+      "sources": [
+        "catalog"
+      ],
+      "contract": null,
+      "status": "peripheral-unmigrated"
+    },
+    {
+      "route": "GET /v1/videos/{video_id}",
+      "sources": [
+        "catalog"
+      ],
+      "contract": null,
+      "status": "peripheral-unmigrated"
+    },
+    {
+      "route": "GET /v1/videos/{video_id}/content",
+      "sources": [
+        "catalog"
+      ],
+      "contract": null,
+      "status": "peripheral-unmigrated"
+    },
+    {
+      "route": "GET /v1/videos/characters/{character_id}",
+      "sources": [
+        "catalog"
+      ],
+      "contract": null,
+      "status": "peripheral-unmigrated"
+    },
+    {
+      "route": "GET /v1/workflows/runs",
+      "sources": [
+        "catalog"
+      ],
+      "contract": null,
+      "status": "peripheral-unmigrated"
+    },
+    {
+      "route": "GET /v1/workflows/runs/{run_id}",
+      "sources": [
+        "catalog"
+      ],
+      "contract": null,
+      "status": "peripheral-unmigrated"
+    },
+    {
+      "route": "GET /v1/workflows/runs/{run_id}/events",
+      "sources": [
+        "catalog"
+      ],
+      "contract": null,
+      "status": "peripheral-unmigrated"
+    },
+    {
+      "route": "GET /v1/workflows/runs/{run_id}/messages",
+      "sources": [
+        "catalog"
+      ],
+      "contract": null,
+      "status": "peripheral-unmigrated"
+    },
+    {
+      "route": "GET /v1beta/agents",
+      "sources": [
+        "catalog"
+      ],
+      "contract": null,
+      "status": "peripheral-unmigrated"
+    },
+    {
+      "route": "GET /v1beta/agents/{name}",
+      "sources": [
+        "catalog"
+      ],
+      "contract": null,
+      "status": "peripheral-unmigrated"
+    },
+    {
+      "route": "GET /v1beta/agents/{name}/versions",
+      "sources": [
+        "catalog"
+      ],
+      "contract": null,
+      "status": "peripheral-unmigrated"
+    },
+    {
+      "route": "GET /v1beta/interactions/{interaction_id}",
+      "sources": [
+        "catalog"
+      ],
+      "contract": null,
+      "status": "peripheral-unmigrated"
+    },
+    {
+      "route": "GET /v2/guardrails/list",
+      "sources": [
+        "catalog"
+      ],
+      "contract": null,
+      "status": "peripheral-unmigrated"
+    },
+    {
+      "route": "GET /v2/model/info",
+      "sources": [
+        "catalog",
+        "internal/gateway/models/mount.go"
+      ],
+      "contract": {
+        "domain": "models",
+        "operation": "listDeployments"
+      },
+      "status": "core-contracted"
+    },
+    {
+      "route": "GET /v2/team/list",
+      "sources": [
+        "catalog",
+        "internal/gateway/identity/mount.go"
+      ],
+      "contract": null,
+      "status": "peripheral-unmigrated"
+    },
+    {
+      "route": "GET /v2/user/info",
+      "sources": [
+        "catalog",
+        "internal/gateway/identity/mount.go"
+      ],
+      "contract": {
+        "domain": "users",
+        "operation": "getUserV2"
+      },
+      "status": "core-contracted"
+    },
+    {
+      "route": "GET /vantage/settings",
+      "sources": [
+        "catalog"
+      ],
+      "contract": null,
+      "status": "peripheral-unmigrated"
+    },
+    {
+      "route": "GET /vector_store/list",
+      "sources": [
+        "catalog"
+      ],
+      "contract": null,
+      "status": "peripheral-unmigrated"
+    },
+    {
+      "route": "GET /vector_stores",
+      "sources": [
+        "catalog"
+      ],
+      "contract": null,
+      "status": "peripheral-unmigrated"
+    },
+    {
+      "route": "GET /vector_stores/{vector_store_id}",
+      "sources": [
+        "catalog"
+      ],
+      "contract": null,
+      "status": "peripheral-unmigrated"
+    },
+    {
+      "route": "GET /vector_stores/{vector_store_id}/files",
+      "sources": [
+        "catalog"
+      ],
+      "contract": null,
+      "status": "peripheral-unmigrated"
+    },
+    {
+      "route": "GET /vector_stores/{vector_store_id}/files/{file_id}",
+      "sources": [
+        "catalog"
+      ],
+      "contract": null,
+      "status": "peripheral-unmigrated"
+    },
+    {
+      "route": "GET /vector_stores/{vector_store_id}/files/{file_id}/content",
+      "sources": [
+        "catalog"
+      ],
+      "contract": null,
+      "status": "peripheral-unmigrated"
+    },
+    {
+      "route": "GET /videos",
+      "sources": [
+        "catalog"
+      ],
+      "contract": null,
+      "status": "peripheral-unmigrated"
+    },
+    {
+      "route": "GET /videos/{video_id}",
+      "sources": [
+        "catalog"
+      ],
+      "contract": null,
+      "status": "peripheral-unmigrated"
+    },
+    {
+      "route": "GET /videos/{video_id}/content",
+      "sources": [
+        "catalog"
+      ],
+      "contract": null,
+      "status": "peripheral-unmigrated"
+    },
+    {
+      "route": "GET /videos/characters/{character_id}",
+      "sources": [
+        "catalog"
+      ],
+      "contract": null,
+      "status": "peripheral-unmigrated"
+    },
+    {
+      "route": "OPTIONS /health/liveliness",
+      "sources": [
+        "catalog"
+      ],
+      "contract": null,
+      "status": "peripheral-unmigrated"
+    },
+    {
+      "route": "OPTIONS /health/liveness",
+      "sources": [
+        "catalog"
+      ],
+      "contract": null,
+      "status": "peripheral-unmigrated"
+    },
+    {
+      "route": "OPTIONS /health/readiness",
+      "sources": [
+        "catalog"
+      ],
+      "contract": null,
+      "status": "peripheral-unmigrated"
+    },
+    {
+      "route": "PATCH /config/block_requests_for_models_without_pricing",
+      "sources": [
+        "catalog"
+      ],
+      "contract": null,
+      "status": "peripheral-unmigrated"
+    },
+    {
+      "route": "PATCH /config/cost_discount_config",
+      "sources": [
+        "catalog"
+      ],
+      "contract": null,
+      "status": "peripheral-unmigrated"
+    },
+    {
+      "route": "PATCH /config/cost_margin_config",
+      "sources": [
+        "catalog"
+      ],
+      "contract": null,
+      "status": "peripheral-unmigrated"
+    },
+    {
+      "route": "PATCH /credentials/{credential_name}",
+      "sources": [
+        "catalog"
+      ],
+      "contract": {
+        "domain": "suppliers",
+        "operation": "updateCredential"
+      },
+      "status": "core-contracted"
+    },
+    {
+      "route": "PATCH /guardrails/{guardrail_id}",
+      "sources": [
+        "catalog"
+      ],
+      "contract": null,
+      "status": "peripheral-unmigrated"
+    },
+    {
+      "route": "PATCH /model/{model_id}/update",
+      "sources": [
+        "catalog",
+        "internal/gateway/models/mount.go"
+      ],
+      "contract": {
+        "domain": "models",
+        "operation": "patchDeployment"
+      },
+      "status": "core-contracted"
+    },
+    {
+      "route": "PATCH /organization/member_update",
+      "sources": [
+        "catalog"
+      ],
+      "contract": null,
+      "status": "peripheral-unmigrated"
+    },
+    {
+      "route": "PATCH /organization/update",
+      "sources": [
+        "catalog",
+        "internal/gateway/identity/mount.go"
+      ],
+      "contract": null,
+      "status": "peripheral-unmigrated"
+    },
+    {
+      "route": "PATCH /prompts/{prompt_id}",
+      "sources": [
+        "catalog"
+      ],
+      "contract": null,
+      "status": "peripheral-unmigrated"
+    },
+    {
+      "route": "PATCH /team/{team_id}",
+      "sources": [
+        "catalog"
+      ],
+      "contract": null,
+      "status": "peripheral-unmigrated"
+    },
+    {
+      "route": "PATCH /update/default_team_settings",
+      "sources": [
+        "catalog"
+      ],
+      "contract": null,
+      "status": "peripheral-unmigrated"
+    },
+    {
+      "route": "PATCH /update/internal_user_settings",
+      "sources": [
+        "catalog"
+      ],
+      "contract": null,
+      "status": "peripheral-unmigrated"
+    },
+    {
+      "route": "PATCH /update/mcp_semantic_filter_settings",
+      "sources": [
+        "catalog"
+      ],
+      "contract": null,
+      "status": "peripheral-unmigrated"
+    },
+    {
+      "route": "PATCH /update/mcp_tool_search_settings",
+      "sources": [
+        "catalog"
+      ],
+      "contract": null,
+      "status": "peripheral-unmigrated"
+    },
+    {
+      "route": "PATCH /update/sso_settings",
+      "sources": [
+        "catalog"
+      ],
+      "contract": null,
+      "status": "peripheral-unmigrated"
+    },
+    {
+      "route": "PATCH /update/ui_settings",
+      "sources": [
+        "catalog"
+      ],
+      "contract": null,
+      "status": "peripheral-unmigrated"
+    },
+    {
+      "route": "PATCH /update/ui_theme_settings",
+      "sources": [
+        "catalog",
+        "internal/gateway/routes.go"
+      ],
+      "contract": null,
+      "status": "peripheral-unmigrated"
+    },
+    {
+      "route": "PATCH /update/user_banner",
+      "sources": [
+        "catalog"
+      ],
+      "contract": null,
+      "status": "peripheral-unmigrated"
+    },
+    {
+      "route": "PATCH /v1/agents/{agent_id}",
+      "sources": [
+        "catalog"
+      ],
+      "contract": null,
+      "status": "peripheral-unmigrated"
+    },
+    {
+      "route": "PATCH /v1/workflows/runs/{run_id}",
+      "sources": [
+        "catalog"
+      ],
+      "contract": null,
+      "status": "peripheral-unmigrated"
+    },
+    {
+      "route": "PATCH /v2/organization/{organization_id}",
+      "sources": [
+        "catalog"
+      ],
+      "contract": null,
+      "status": "peripheral-unmigrated"
+    },
+    {
+      "route": "POST /{mcp_server_name}/register",
+      "sources": [
+        "catalog"
+      ],
+      "contract": null,
+      "status": "peripheral-unmigrated"
+    },
+    {
+      "route": "POST /{mcp_server_name}/token",
+      "sources": [
+        "catalog"
+      ],
+      "contract": null,
+      "status": "peripheral-unmigrated"
+    },
+    {
+      "route": "POST /{provider}/v1/batches",
+      "sources": [
+        "catalog"
+      ],
+      "contract": null,
+      "status": "peripheral-unmigrated"
+    },
+    {
+      "route": "POST /{provider}/v1/batches/{batch_id}/cancel",
+      "sources": [
+        "catalog"
+      ],
+      "contract": null,
+      "status": "peripheral-unmigrated"
+    },
+    {
+      "route": "POST /{provider}/v1/files",
+      "sources": [
+        "catalog"
+      ],
+      "contract": null,
+      "status": "peripheral-unmigrated"
+    },
+    {
+      "route": "POST /a2a/{agent_id}",
+      "sources": [
+        "catalog"
+      ],
+      "contract": null,
+      "status": "peripheral-unmigrated"
+    },
+    {
+      "route": "POST /a2a/{agent_id}/message/send",
+      "sources": [
+        "catalog"
+      ],
+      "contract": null,
+      "status": "peripheral-unmigrated"
+    },
+    {
+      "route": "POST /access_group/new",
+      "sources": [
+        "catalog"
+      ],
+      "contract": null,
+      "status": "peripheral-unmigrated"
+    },
+    {
+      "route": "POST /add/allowed_ip",
+      "sources": [
+        "catalog"
+      ],
+      "contract": null,
+      "status": "peripheral-unmigrated"
+    },
+    {
+      "route": "POST /admin/archive/kodo/retry",
+      "sources": [
+        "internal/gateway/directory.go"
+      ],
+      "contract": null,
+      "status": "peripheral-unmigrated"
+    },
+    {
+      "route": "POST /admin/archive/kodo/test",
+      "sources": [
+        "internal/gateway/directory.go"
+      ],
+      "contract": null,
+      "status": "peripheral-unmigrated"
+    },
+    {
+      "route": "POST /admin/directory/connections",
+      "sources": [
+        "internal/gateway/directory.go"
+      ],
+      "contract": null,
+      "status": "peripheral-unmigrated"
+    },
+    {
+      "route": "POST /admin/enterprise/sso",
+      "sources": [
+        "internal/gateway/directory.go"
+      ],
+      "contract": null,
+      "status": "peripheral-unmigrated"
+    },
+    {
+      "route": "POST /api/event_logging/batch",
+      "sources": [
+        "catalog"
+      ],
+      "contract": null,
+      "status": "peripheral-unmigrated"
+    },
+    {
+      "route": "POST /apply_guardrail",
+      "sources": [
+        "catalog",
+        "internal/gateway/guard/mount.go"
+      ],
+      "contract": null,
+      "status": "peripheral-unmigrated"
+    },
+    {
+      "route": "POST /assistants",
+      "sources": [
+        "catalog"
+      ],
+      "contract": null,
+      "status": "peripheral-unmigrated"
+    },
+    {
+      "route": "POST /audio/speech",
+      "sources": [
+        "catalog"
+      ],
+      "contract": null,
+      "status": "peripheral-unmigrated"
+    },
+    {
+      "route": "POST /audio/transcriptions",
+      "sources": [
+        "catalog"
+      ],
+      "contract": null,
+      "status": "peripheral-unmigrated"
+    },
+    {
+      "route": "POST /audio/translations",
+      "sources": [
+        "internal/gateway/routes.go"
+      ],
+      "contract": null,
+      "status": "peripheral-unmigrated"
+    },
+    {
+      "route": "POST /auth/enterprise/saml/acs",
+      "sources": [
+        "internal/gateway/directory.go"
+      ],
+      "contract": null,
+      "status": "peripheral-unmigrated"
+    },
+    {
+      "route": "POST /auth/logout",
+      "sources": [
+        "internal/gateway/routes.go"
+      ],
+      "contract": null,
+      "status": "peripheral-unmigrated"
+    },
+    {
+      "route": "POST /authorize/complete",
+      "sources": [
+        "catalog",
+        "internal/gateway/routes.go"
+      ],
+      "contract": null,
+      "status": "peripheral-unmigrated"
+    },
+    {
+      "route": "POST /batches",
+      "sources": [
+        "catalog"
+      ],
+      "contract": null,
+      "status": "peripheral-unmigrated"
+    },
+    {
+      "route": "POST /batches/{batch_id}/cancel",
+      "sources": [
+        "catalog"
+      ],
+      "contract": null,
+      "status": "peripheral-unmigrated"
+    },
+    {
+      "route": "POST /bootstrap",
+      "sources": [
+        "internal/gateway/routes.go"
+      ],
+      "contract": null,
+      "status": "peripheral-unmigrated"
+    },
+    {
+      "route": "POST /budget/delete",
+      "sources": [
+        "catalog"
+      ],
+      "contract": null,
+      "status": "peripheral-unmigrated"
+    },
+    {
+      "route": "POST /budget/info",
+      "sources": [
+        "catalog"
+      ],
+      "contract": null,
+      "status": "peripheral-unmigrated"
+    },
+    {
+      "route": "POST /budget/new",
+      "sources": [
+        "catalog"
+      ],
+      "contract": null,
+      "status": "peripheral-unmigrated"
+    },
+    {
+      "route": "POST /budget/reservations/{reservation_id}/reconcile",
+      "sources": [
+        "internal/gateway/identity/mount.go"
+      ],
+      "contract": null,
+      "status": "peripheral-unmigrated"
+    },
+    {
+      "route": "POST /budget/update",
+      "sources": [
+        "catalog"
+      ],
+      "contract": null,
+      "status": "peripheral-unmigrated"
+    },
+    {
+      "route": "POST /cache/settings",
+      "sources": [
+        "catalog",
+        "internal/gateway/routes.go"
+      ],
+      "contract": null,
+      "status": "peripheral-unmigrated"
+    },
+    {
+      "route": "POST /cache/settings/test",
+      "sources": [
+        "catalog"
+      ],
+      "contract": null,
+      "status": "peripheral-unmigrated"
+    },
+    {
+      "route": "POST /chat/completions",
+      "sources": [
+        "catalog",
+        "internal/gateway/routes.go"
+      ],
+      "contract": null,
+      "status": "peripheral-unmigrated"
+    },
+    {
+      "route": "POST /claude-code/plugins",
+      "sources": [
+        "catalog"
+      ],
+      "contract": null,
+      "status": "peripheral-unmigrated"
+    },
+    {
+      "route": "POST /claude-code/plugins/{plugin_name}/disable",
+      "sources": [
+        "catalog"
+      ],
+      "contract": null,
+      "status": "peripheral-unmigrated"
+    },
+    {
+      "route": "POST /claude-code/plugins/{plugin_name}/enable",
+      "sources": [
+        "catalog"
+      ],
+      "contract": null,
+      "status": "peripheral-unmigrated"
+    },
+    {
+      "route": "POST /cloudzero/dry-run",
+      "sources": [
+        "catalog"
+      ],
+      "contract": null,
+      "status": "peripheral-unmigrated"
+    },
+    {
+      "route": "POST /cloudzero/export",
+      "sources": [
+        "catalog"
+      ],
+      "contract": null,
+      "status": "peripheral-unmigrated"
+    },
+    {
+      "route": "POST /cloudzero/init",
+      "sources": [
+        "catalog"
+      ],
+      "contract": null,
+      "status": "peripheral-unmigrated"
+    },
+    {
+      "route": "POST /completions",
+      "sources": [
+        "catalog",
+        "internal/gateway/routes.go"
+      ],
+      "contract": null,
+      "status": "peripheral-unmigrated"
+    },
+    {
+      "route": "POST /compliance/eu-ai-act",
+      "sources": [
+        "catalog",
+        "internal/gateway/compliance/compliance.go"
+      ],
+      "contract": null,
+      "status": "peripheral-unmigrated"
+    },
+    {
+      "route": "POST /compliance/gdpr",
+      "sources": [
+        "catalog",
+        "internal/gateway/compliance/compliance.go"
+      ],
+      "contract": null,
+      "status": "peripheral-unmigrated"
+    },
+    {
+      "route": "POST /comprehendmedical",
+      "sources": [
+        "catalog"
+      ],
+      "contract": null,
+      "status": "peripheral-unmigrated"
+    },
+    {
+      "route": "POST /comprehendmedical/{operation}",
+      "sources": [
+        "catalog"
+      ],
+      "contract": null,
+      "status": "peripheral-unmigrated"
+    },
+    {
+      "route": "POST /config_overrides/cyberark",
+      "sources": [
+        "catalog"
+      ],
+      "contract": null,
+      "status": "peripheral-unmigrated"
+    },
+    {
+      "route": "POST /config_overrides/cyberark/test_connection",
+      "sources": [
+        "catalog"
+      ],
+      "contract": null,
+      "status": "peripheral-unmigrated"
+    },
+    {
+      "route": "POST /config_overrides/hashicorp_vault",
+      "sources": [
+        "catalog"
+      ],
+      "contract": null,
+      "status": "peripheral-unmigrated"
+    },
+    {
+      "route": "POST /config_overrides/hashicorp_vault/test_connection",
+      "sources": [
+        "catalog"
+      ],
+      "contract": null,
+      "status": "peripheral-unmigrated"
+    },
+    {
+      "route": "POST /config/callback/delete",
+      "sources": [
+        "catalog"
+      ],
+      "contract": null,
+      "status": "peripheral-unmigrated"
+    },
+    {
+      "route": "POST /config/field/delete",
+      "sources": [
+        "catalog",
+        "internal/gateway/prefs/mount.go"
+      ],
+      "contract": null,
+      "status": "peripheral-unmigrated"
+    },
+    {
+      "route": "POST /config/field/update",
+      "sources": [
+        "catalog",
+        "internal/gateway/prefs/mount.go"
+      ],
+      "contract": null,
+      "status": "peripheral-unmigrated"
+    },
+    {
+      "route": "POST /config/update",
+      "sources": [
+        "catalog",
+        "internal/gateway/prefs/mount.go"
+      ],
+      "contract": null,
+      "status": "peripheral-unmigrated"
+    },
+    {
+      "route": "POST /containers",
+      "sources": [
+        "catalog"
+      ],
+      "contract": null,
+      "status": "peripheral-unmigrated"
+    },
+    {
+      "route": "POST /coordination_redis/settings",
+      "sources": [
+        "catalog"
+      ],
+      "contract": null,
+      "status": "peripheral-unmigrated"
+    },
+    {
+      "route": "POST /coordination_redis/settings/test",
+      "sources": [
+        "catalog"
+      ],
+      "contract": null,
+      "status": "peripheral-unmigrated"
+    },
+    {
+      "route": "POST /cost/estimate",
+      "sources": [
+        "catalog"
+      ],
+      "contract": null,
+      "status": "peripheral-unmigrated"
+    },
+    {
+      "route": "POST /cost/predict-cache",
+      "sources": [
+        "catalog"
+      ],
+      "contract": null,
+      "status": "peripheral-unmigrated"
+    },
+    {
+      "route": "POST /credentials",
+      "sources": [
+        "catalog"
+      ],
+      "contract": {
+        "domain": "suppliers",
+        "operation": "createCredential"
+      },
+      "status": "core-contracted"
+    },
+    {
+      "route": "POST /credentials/migrate-encryption",
+      "sources": [
+        "catalog"
+      ],
+      "contract": null,
+      "status": "peripheral-unmigrated"
+    },
+    {
+      "route": "POST /cursor/chat/completions",
+      "sources": [
+        "catalog"
+      ],
+      "contract": null,
+      "status": "peripheral-unmigrated"
+    },
+    {
+      "route": "POST /customer/block",
+      "sources": [
+        "catalog"
+      ],
+      "contract": null,
+      "status": "peripheral-unmigrated"
+    },
+    {
+      "route": "POST /customer/delete",
+      "sources": [
+        "catalog"
+      ],
+      "contract": null,
+      "status": "peripheral-unmigrated"
+    },
+    {
+      "route": "POST /customer/new",
+      "sources": [
+        "catalog"
+      ],
+      "contract": null,
+      "status": "peripheral-unmigrated"
+    },
+    {
+      "route": "POST /customer/unblock",
+      "sources": [
+        "catalog"
+      ],
+      "contract": null,
+      "status": "peripheral-unmigrated"
+    },
+    {
+      "route": "POST /customer/update",
+      "sources": [
+        "catalog"
+      ],
+      "contract": null,
+      "status": "peripheral-unmigrated"
+    },
+    {
+      "route": "POST /debug/memory/gc/configure",
+      "sources": [
+        "catalog"
+      ],
+      "contract": null,
+      "status": "peripheral-unmigrated"
+    },
+    {
+      "route": "POST /delete",
+      "sources": [
+        "catalog"
+      ],
+      "contract": null,
+      "status": "peripheral-unmigrated"
+    },
+    {
+      "route": "POST /delete/allowed_ip",
+      "sources": [
+        "catalog"
+      ],
+      "contract": null,
+      "status": "peripheral-unmigrated"
+    },
+    {
+      "route": "POST /embeddings",
+      "sources": [
+        "catalog",
+        "internal/gateway/routes.go"
+      ],
+      "contract": null,
+      "status": "peripheral-unmigrated"
+    },
+    {
+      "route": "POST /end_user/block",
+      "sources": [
+        "catalog"
+      ],
+      "contract": null,
+      "status": "peripheral-unmigrated"
+    },
+    {
+      "route": "POST /end_user/delete",
+      "sources": [
+        "catalog"
+      ],
+      "contract": null,
+      "status": "peripheral-unmigrated"
+    },
+    {
+      "route": "POST /end_user/new",
+      "sources": [
+        "catalog"
+      ],
+      "contract": null,
+      "status": "peripheral-unmigrated"
+    },
+    {
+      "route": "POST /end_user/unblock",
+      "sources": [
+        "catalog"
+      ],
+      "contract": null,
+      "status": "peripheral-unmigrated"
+    },
+    {
+      "route": "POST /end_user/update",
+      "sources": [
+        "catalog"
+      ],
+      "contract": null,
+      "status": "peripheral-unmigrated"
+    },
+    {
+      "route": "POST /engines/{model}/chat/completions",
+      "sources": [
+        "catalog"
+      ],
+      "contract": null,
+      "status": "peripheral-unmigrated"
+    },
+    {
+      "route": "POST /engines/{model}/completions",
+      "sources": [
+        "catalog"
+      ],
+      "contract": null,
+      "status": "peripheral-unmigrated"
+    },
+    {
+      "route": "POST /engines/{model}/embeddings",
+      "sources": [
+        "catalog"
+      ],
+      "contract": null,
+      "status": "peripheral-unmigrated"
+    },
+    {
+      "route": "POST /fallback",
+      "sources": [
+        "catalog"
+      ],
+      "contract": null,
+      "status": "peripheral-unmigrated"
+    },
+    {
+      "route": "POST /files",
+      "sources": [
+        "catalog"
+      ],
+      "contract": null,
+      "status": "peripheral-unmigrated"
+    },
+    {
+      "route": "POST /fine_tuning/jobs",
+      "sources": [
+        "catalog"
+      ],
+      "contract": null,
+      "status": "peripheral-unmigrated"
+    },
+    {
+      "route": "POST /fine_tuning/jobs/{fine_tuning_job_id}/cancel",
+      "sources": [
+        "catalog"
+      ],
+      "contract": null,
+      "status": "peripheral-unmigrated"
+    },
+    {
+      "route": "POST /flushall",
+      "sources": [
+        "catalog",
+        "internal/gateway/routes.go"
+      ],
+      "contract": null,
+      "status": "peripheral-unmigrated"
+    },
+    {
+      "route": "POST /global/spend/end_users",
+      "sources": [
+        "catalog",
+        "internal/gateway/usage/mount.go"
+      ],
+      "contract": null,
+      "status": "peripheral-unmigrated"
+    },
+    {
+      "route": "POST /global/spend/refresh",
+      "sources": [
+        "catalog"
+      ],
+      "contract": null,
+      "status": "peripheral-unmigrated"
+    },
+    {
+      "route": "POST /global/spend/reset",
+      "sources": [
+        "catalog"
+      ],
+      "contract": null,
+      "status": "peripheral-unmigrated"
+    },
+    {
+      "route": "POST /guardrails",
+      "sources": [
+        "catalog"
+      ],
+      "contract": null,
+      "status": "peripheral-unmigrated"
+    },
+    {
+      "route": "POST /guardrails/apply_guardrail",
+      "sources": [
+        "catalog",
+        "internal/gateway/guard/mount.go"
+      ],
+      "contract": null,
+      "status": "peripheral-unmigrated"
+    },
+    {
+      "route": "POST /guardrails/register",
+      "sources": [
+        "catalog"
+      ],
+      "contract": null,
+      "status": "peripheral-unmigrated"
+    },
+    {
+      "route": "POST /guardrails/submissions/{guardrail_id}/approve",
+      "sources": [
+        "catalog"
+      ],
+      "contract": null,
+      "status": "peripheral-unmigrated"
+    },
+    {
+      "route": "POST /guardrails/submissions/{guardrail_id}/reject",
+      "sources": [
+        "catalog"
+      ],
+      "contract": null,
+      "status": "peripheral-unmigrated"
+    },
+    {
+      "route": "POST /guardrails/test_custom_code",
+      "sources": [
+        "catalog"
+      ],
+      "contract": null,
+      "status": "peripheral-unmigrated"
+    },
+    {
+      "route": "POST /guardrails/validate_blocked_words_file",
+      "sources": [
+        "catalog"
+      ],
+      "contract": null,
+      "status": "peripheral-unmigrated"
+    },
+    {
+      "route": "POST /health/test_connection",
+      "sources": [
+        "catalog",
+        "internal/gateway/usage/mount.go"
+      ],
+      "contract": {
+        "domain": "models",
+        "operation": "probeDeployment"
+      },
+      "status": "core-contracted"
+    },
+    {
+      "route": "POST /images/edits",
+      "sources": [
+        "catalog"
+      ],
+      "contract": null,
+      "status": "peripheral-unmigrated"
+    },
+    {
+      "route": "POST /images/generations",
+      "sources": [
+        "catalog"
+      ],
+      "contract": null,
+      "status": "peripheral-unmigrated"
+    },
+    {
+      "route": "POST /interactions",
+      "sources": [
+        "catalog"
+      ],
+      "contract": null,
+      "status": "peripheral-unmigrated"
+    },
+    {
+      "route": "POST /interactions/{interaction_id}/cancel",
+      "sources": [
+        "catalog"
+      ],
+      "contract": null,
+      "status": "peripheral-unmigrated"
+    },
+    {
+      "route": "POST /introspect",
+      "sources": [
+        "catalog"
+      ],
+      "contract": null,
+      "status": "peripheral-unmigrated"
+    },
+    {
+      "route": "POST /invitation/delete",
+      "sources": [
+        "catalog"
+      ],
+      "contract": null,
+      "status": "peripheral-unmigrated"
+    },
+    {
+      "route": "POST /invitation/new",
+      "sources": [
+        "catalog"
+      ],
+      "contract": null,
+      "status": "peripheral-unmigrated"
+    },
+    {
+      "route": "POST /invitation/update",
+      "sources": [
+        "catalog"
+      ],
+      "contract": null,
+      "status": "peripheral-unmigrated"
+    },
+    {
+      "route": "POST /jwt/key/mapping/delete",
+      "sources": [
+        "catalog"
+      ],
+      "contract": null,
+      "status": "peripheral-unmigrated"
+    },
+    {
+      "route": "POST /jwt/key/mapping/new",
+      "sources": [
+        "catalog"
+      ],
+      "contract": null,
+      "status": "peripheral-unmigrated"
+    },
+    {
+      "route": "POST /jwt/key/mapping/update",
+      "sources": [
+        "catalog"
+      ],
+      "contract": null,
+      "status": "peripheral-unmigrated"
+    },
+    {
+      "route": "POST /key/{key}/regenerate",
+      "sources": [
+        "catalog",
+        "internal/gateway/keys/mount.go"
+      ],
+      "contract": {
+        "domain": "keys",
+        "operation": "regenerateKeyByPath"
+      },
+      "status": "core-contracted"
+    },
+    {
+      "route": "POST /key/{key}/reset_spend",
+      "sources": [
+        "catalog",
+        "internal/gateway/keys/mount.go"
+      ],
+      "contract": {
+        "domain": "keys",
+        "operation": "resetKeySpend"
+      },
+      "status": "core-contracted"
+    },
+    {
+      "route": "POST /key/block",
+      "sources": [
+        "catalog",
+        "internal/gateway/keys/mount.go"
+      ],
+      "contract": {
+        "domain": "keys",
+        "operation": "blockKey"
+      },
+      "status": "core-contracted"
+    },
+    {
+      "route": "POST /key/bulk_update",
+      "sources": [
+        "catalog",
+        "internal/gateway/keys/mount.go"
+      ],
+      "contract": {
+        "domain": "keys",
+        "operation": "bulkUpdateKeys"
+      },
+      "status": "core-contracted"
+    },
+    {
+      "route": "POST /key/delete",
+      "sources": [
+        "catalog",
+        "internal/gateway/keys/mount.go"
+      ],
+      "contract": {
+        "domain": "keys",
+        "operation": "deleteKeys"
+      },
+      "status": "core-contracted"
+    },
+    {
+      "route": "POST /key/generate",
+      "sources": [
+        "catalog",
+        "internal/gateway/keys/mount.go"
+      ],
+      "contract": {
+        "domain": "keys",
+        "operation": "createKey"
+      },
+      "status": "core-contracted"
+    },
+    {
+      "route": "POST /key/health",
+      "sources": [
+        "catalog",
+        "internal/gateway/keys/mount.go"
+      ],
+      "contract": {
+        "domain": "keys",
+        "operation": "checkKeyHealth"
+      },
+      "status": "core-contracted"
+    },
+    {
+      "route": "POST /key/regenerate",
+      "sources": [
+        "catalog",
+        "internal/gateway/keys/mount.go"
+      ],
+      "contract": {
+        "domain": "keys",
+        "operation": "regenerateKey"
+      },
+      "status": "core-contracted"
+    },
+    {
+      "route": "POST /key/unblock",
+      "sources": [
+        "catalog",
+        "internal/gateway/keys/mount.go"
+      ],
+      "contract": {
+        "domain": "keys",
+        "operation": "unblockKey"
+      },
+      "status": "core-contracted"
+    },
+    {
+      "route": "POST /key/update",
+      "sources": [
+        "catalog",
+        "internal/gateway/keys/mount.go"
+      ],
+      "contract": {
+        "domain": "keys",
+        "operation": "updateKey"
+      },
+      "status": "core-contracted"
+    },
+    {
+      "route": "POST /lazy/warm/{name}",
+      "sources": [
+        "catalog"
+      ],
+      "contract": null,
+      "status": "peripheral-unmigrated"
+    },
+    {
+      "route": "POST /login",
+      "sources": [
+        "catalog",
+        "internal/gateway/routes.go"
+      ],
+      "contract": null,
+      "status": "peripheral-unmigrated"
+    },
+    {
+      "route": "POST /logout",
+      "sources": [
+        "internal/gateway/routes.go"
+      ],
+      "contract": null,
+      "status": "peripheral-unmigrated"
+    },
+    {
+      "route": "POST /make_public",
+      "sources": [
+        "catalog"
+      ],
+      "contract": null,
+      "status": "peripheral-unmigrated"
+    },
+    {
+      "route": "POST /model_group/make_public",
+      "sources": [
+        "catalog"
+      ],
+      "contract": null,
+      "status": "peripheral-unmigrated"
+    },
+    {
+      "route": "POST /model_hub/update_useful_links",
+      "sources": [
+        "catalog",
+        "internal/gateway/publichub/public_hub.go"
+      ],
+      "contract": null,
+      "status": "peripheral-unmigrated"
+    },
+    {
+      "route": "POST /model/block",
+      "sources": [
+        "catalog"
+      ],
+      "contract": null,
+      "status": "peripheral-unmigrated"
+    },
+    {
+      "route": "POST /model/builtin/add",
+      "sources": [
+        "internal/gateway/models/mount.go"
+      ],
+      "contract": null,
+      "status": "peripheral-unmigrated"
+    },
+    {
+      "route": "POST /model/builtin/models",
+      "sources": [
+        "internal/gateway/models/mount.go"
+      ],
+      "contract": null,
+      "status": "peripheral-unmigrated"
+    },
+    {
+      "route": "POST /model/builtin/refresh",
+      "sources": [
+        "internal/gateway/models/mount.go"
+      ],
+      "contract": null,
+      "status": "peripheral-unmigrated"
+    },
+    {
+      "route": "POST /model/delete",
+      "sources": [
+        "catalog",
+        "internal/gateway/models/mount.go"
+      ],
+      "contract": {
+        "domain": "models",
+        "operation": "deleteDeployment"
+      },
+      "status": "core-contracted"
+    },
+    {
+      "route": "POST /model/disable",
+      "sources": [
+        "internal/gateway/models/mount.go"
+      ],
+      "contract": {
+        "domain": "models",
+        "operation": "disableDeployment"
+      },
+      "status": "core-contracted"
+    },
+    {
+      "route": "POST /model/enable",
+      "sources": [
+        "internal/gateway/models/mount.go"
+      ],
+      "contract": {
+        "domain": "models",
+        "operation": "enableDeployment"
+      },
+      "status": "core-contracted"
+    },
+    {
+      "route": "POST /model/new",
+      "sources": [
+        "catalog",
+        "internal/gateway/models/mount.go"
+      ],
+      "contract": {
+        "domain": "models",
+        "operation": "createDeployment"
+      },
+      "status": "core-contracted"
+    },
+    {
+      "route": "POST /model/unblock",
+      "sources": [
+        "catalog"
+      ],
+      "contract": null,
+      "status": "peripheral-unmigrated"
+    },
+    {
+      "route": "POST /model/update",
+      "sources": [
+        "catalog",
+        "internal/gateway/models/mount.go"
+      ],
+      "contract": {
+        "domain": "models",
+        "operation": "updateDeployment"
+      },
+      "status": "core-contracted"
+    },
+    {
+      "route": "POST /models/{model_name}:countTokens",
+      "sources": [
+        "catalog"
+      ],
+      "contract": null,
+      "status": "peripheral-unmigrated"
+    },
+    {
+      "route": "POST /models/{model_name}:generateContent",
+      "sources": [
+        "catalog"
+      ],
+      "contract": null,
+      "status": "peripheral-unmigrated"
+    },
+    {
+      "route": "POST /models/{model_name}:streamGenerateContent",
+      "sources": [
+        "catalog"
+      ],
+      "contract": null,
+      "status": "peripheral-unmigrated"
+    },
+    {
+      "route": "POST /moderations",
+      "sources": [
+        "catalog"
+      ],
+      "contract": null,
+      "status": "peripheral-unmigrated"
+    },
+    {
+      "route": "POST /ocr",
+      "sources": [
+        "catalog"
+      ],
+      "contract": null,
+      "status": "peripheral-unmigrated"
+    },
+    {
+      "route": "POST /onboarding/claim_token",
+      "sources": [
+        "catalog"
+      ],
+      "contract": null,
+      "status": "peripheral-unmigrated"
+    },
+    {
+      "route": "POST /openai/deployments/{model}/chat/completions",
+      "sources": [
+        "catalog"
+      ],
+      "contract": null,
+      "status": "peripheral-unmigrated"
+    },
+    {
+      "route": "POST /openai/deployments/{model}/completions",
+      "sources": [
+        "catalog"
+      ],
+      "contract": null,
+      "status": "peripheral-unmigrated"
+    },
+    {
+      "route": "POST /openai/deployments/{model}/embeddings",
+      "sources": [
+        "catalog"
+      ],
+      "contract": null,
+      "status": "peripheral-unmigrated"
+    },
+    {
+      "route": "POST /openai/deployments/{model}/images/edits",
+      "sources": [
+        "catalog"
+      ],
+      "contract": null,
+      "status": "peripheral-unmigrated"
+    },
+    {
+      "route": "POST /openai/deployments/{model}/images/generations",
+      "sources": [
+        "catalog"
+      ],
+      "contract": null,
+      "status": "peripheral-unmigrated"
+    },
+    {
+      "route": "POST /openai/v1/realtime/calls",
+      "sources": [
+        "catalog"
+      ],
+      "contract": null,
+      "status": "peripheral-unmigrated"
+    },
+    {
+      "route": "POST /openai/v1/realtime/client_secrets",
+      "sources": [
+        "catalog"
+      ],
+      "contract": null,
+      "status": "peripheral-unmigrated"
+    },
+    {
+      "route": "POST /openai/v1/realtime/transcription_sessions",
+      "sources": [
+        "catalog"
+      ],
+      "contract": null,
+      "status": "peripheral-unmigrated"
+    },
+    {
+      "route": "POST /openai/v1/responses",
+      "sources": [
+        "catalog"
+      ],
+      "contract": null,
+      "status": "peripheral-unmigrated"
+    },
+    {
+      "route": "POST /openai/v1/responses/{response_id}/cancel",
+      "sources": [
+        "catalog"
+      ],
+      "contract": null,
+      "status": "peripheral-unmigrated"
+    },
+    {
+      "route": "POST /openai/v1/responses/compact",
+      "sources": [
+        "catalog"
+      ],
+      "contract": null,
+      "status": "peripheral-unmigrated"
+    },
+    {
+      "route": "POST /openai/v1/responses/input_tokens",
+      "sources": [
+        "catalog"
+      ],
+      "contract": null,
+      "status": "peripheral-unmigrated"
+    },
+    {
+      "route": "POST /organization/info",
+      "sources": [
+        "catalog"
+      ],
+      "contract": null,
+      "status": "peripheral-unmigrated"
+    },
+    {
+      "route": "POST /organization/member_add",
+      "sources": [
+        "catalog",
+        "internal/gateway/identity/mount.go"
+      ],
+      "contract": null,
+      "status": "peripheral-unmigrated"
+    },
+    {
+      "route": "POST /organization/member_delete",
+      "sources": [
+        "internal/gateway/identity/mount.go"
+      ],
+      "contract": null,
+      "status": "peripheral-unmigrated"
+    },
+    {
+      "route": "POST /organization/new",
+      "sources": [
+        "catalog",
+        "internal/gateway/identity/mount.go"
+      ],
+      "contract": null,
+      "status": "peripheral-unmigrated"
+    },
+    {
+      "route": "POST /policies",
+      "sources": [
+        "catalog"
+      ],
+      "contract": null,
+      "status": "peripheral-unmigrated"
+    },
+    {
+      "route": "POST /policies/attachments",
+      "sources": [
+        "catalog"
+      ],
+      "contract": null,
+      "status": "peripheral-unmigrated"
+    },
+    {
+      "route": "POST /policies/attachments/estimate-impact",
+      "sources": [
+        "catalog"
+      ],
+      "contract": null,
+      "status": "peripheral-unmigrated"
+    },
+    {
+      "route": "POST /policies/name/{policy_name}/versions",
+      "sources": [
+        "catalog"
+      ],
+      "contract": null,
+      "status": "peripheral-unmigrated"
+    },
+    {
+      "route": "POST /policies/resolve",
+      "sources": [
+        "catalog"
+      ],
+      "contract": null,
+      "status": "peripheral-unmigrated"
+    },
+    {
+      "route": "POST /policies/test-pipeline",
+      "sources": [
+        "catalog"
+      ],
+      "contract": null,
+      "status": "peripheral-unmigrated"
+    },
+    {
+      "route": "POST /policy/templates/enrich",
+      "sources": [
+        "catalog"
+      ],
+      "contract": null,
+      "status": "peripheral-unmigrated"
+    },
+    {
+      "route": "POST /policy/templates/enrich/stream",
+      "sources": [
+        "catalog"
+      ],
+      "contract": null,
+      "status": "peripheral-unmigrated"
+    },
+    {
+      "route": "POST /policy/templates/suggest",
+      "sources": [
+        "catalog"
+      ],
+      "contract": null,
+      "status": "peripheral-unmigrated"
+    },
+    {
+      "route": "POST /policy/templates/test",
+      "sources": [
+        "catalog"
+      ],
+      "contract": null,
+      "status": "peripheral-unmigrated"
+    },
+    {
+      "route": "POST /policy/test",
+      "sources": [
+        "catalog"
+      ],
+      "contract": null,
+      "status": "peripheral-unmigrated"
+    },
+    {
+      "route": "POST /policy/validate",
+      "sources": [
+        "catalog"
+      ],
+      "contract": null,
+      "status": "peripheral-unmigrated"
+    },
+    {
+      "route": "POST /price/model",
+      "sources": [
+        "internal/gateway/models/mount.go"
+      ],
+      "contract": null,
+      "status": "peripheral-unmigrated"
+    },
+    {
+      "route": "POST /price/model/listing",
+      "sources": [
+        "internal/gateway/models/mount.go"
+      ],
+      "contract": null,
+      "status": "peripheral-unmigrated"
+    },
+    {
+      "route": "POST /price/model/reset",
+      "sources": [
+        "internal/gateway/models/mount.go"
+      ],
+      "contract": null,
+      "status": "peripheral-unmigrated"
+    },
+    {
+      "route": "POST /price/provider",
+      "sources": [
+        "internal/gateway/models/mount.go"
+      ],
+      "contract": null,
+      "status": "peripheral-unmigrated"
+    },
+    {
+      "route": "POST /project/delete",
+      "sources": [
+        "internal/gateway/identity/mount.go"
+      ],
+      "contract": null,
+      "status": "peripheral-unmigrated"
+    },
+    {
+      "route": "POST /project/info",
+      "sources": [
+        "internal/gateway/identity/mount.go"
+      ],
+      "contract": null,
+      "status": "peripheral-unmigrated"
+    },
+    {
+      "route": "POST /project/list",
+      "sources": [
+        "internal/gateway/identity/mount.go"
+      ],
+      "contract": null,
+      "status": "peripheral-unmigrated"
+    },
+    {
+      "route": "POST /project/new",
+      "sources": [
+        "internal/gateway/identity/mount.go"
+      ],
+      "contract": null,
+      "status": "peripheral-unmigrated"
+    },
+    {
+      "route": "POST /project/update",
+      "sources": [
+        "internal/gateway/identity/mount.go"
+      ],
+      "contract": null,
+      "status": "peripheral-unmigrated"
+    },
+    {
+      "route": "POST /prompts",
+      "sources": [
+        "catalog"
+      ],
+      "contract": null,
+      "status": "peripheral-unmigrated"
+    },
+    {
+      "route": "POST /prompts/test",
+      "sources": [
+        "catalog",
+        "internal/gateway/routes.go"
+      ],
+      "contract": null,
+      "status": "peripheral-unmigrated"
+    },
+    {
+      "route": "POST /queue/chat/completions",
+      "sources": [
+        "catalog"
+      ],
+      "contract": null,
+      "status": "peripheral-unmigrated"
+    },
+    {
+      "route": "POST /rag/ingest",
+      "sources": [
+        "catalog"
+      ],
+      "contract": null,
+      "status": "peripheral-unmigrated"
+    },
+    {
+      "route": "POST /rag/query",
+      "sources": [
+        "catalog"
+      ],
+      "contract": null,
+      "status": "peripheral-unmigrated"
+    },
+    {
+      "route": "POST /realtime/calls",
+      "sources": [
+        "catalog"
+      ],
+      "contract": null,
+      "status": "peripheral-unmigrated"
+    },
+    {
+      "route": "POST /realtime/client_secrets",
+      "sources": [
+        "catalog"
+      ],
+      "contract": null,
+      "status": "peripheral-unmigrated"
+    },
+    {
+      "route": "POST /realtime/transcription_sessions",
+      "sources": [
+        "catalog"
+      ],
+      "contract": null,
+      "status": "peripheral-unmigrated"
+    },
+    {
+      "route": "POST /register",
+      "sources": [
+        "catalog"
+      ],
+      "contract": null,
+      "status": "peripheral-unmigrated"
+    },
+    {
+      "route": "POST /reload/anthropic_beta_headers",
+      "sources": [
+        "catalog"
+      ],
+      "contract": null,
+      "status": "peripheral-unmigrated"
+    },
+    {
+      "route": "POST /reload/model_cost_map",
+      "sources": [
+        "catalog",
+        "internal/gateway/models/mount.go"
+      ],
+      "contract": null,
+      "status": "peripheral-unmigrated"
+    },
+    {
+      "route": "POST /rerank",
+      "sources": [
+        "catalog"
+      ],
+      "contract": null,
+      "status": "peripheral-unmigrated"
+    },
+    {
+      "route": "POST /responses",
+      "sources": [
+        "catalog",
+        "internal/gateway/family/mount.go"
+      ],
+      "contract": null,
+      "status": "peripheral-unmigrated"
+    },
+    {
+      "route": "POST /responses/{response_id}/cancel",
+      "sources": [
+        "catalog"
+      ],
+      "contract": null,
+      "status": "peripheral-unmigrated"
+    },
+    {
+      "route": "POST /responses/compact",
+      "sources": [
+        "catalog"
+      ],
+      "contract": null,
+      "status": "peripheral-unmigrated"
+    },
+    {
+      "route": "POST /responses/input_tokens",
+      "sources": [
+        "catalog"
+      ],
+      "contract": null,
+      "status": "peripheral-unmigrated"
+    },
+    {
+      "route": "POST /revoke",
+      "sources": [
+        "catalog"
+      ],
+      "contract": null,
+      "status": "peripheral-unmigrated"
+    },
+    {
+      "route": "POST /route_template/{template_id}/delete",
+      "sources": [
+        "internal/gateway/identity/mount.go"
+      ],
+      "contract": null,
+      "status": "peripheral-unmigrated"
+    },
+    {
+      "route": "POST /route_template/{template_id}/update",
+      "sources": [
+        "internal/gateway/identity/mount.go"
+      ],
+      "contract": null,
+      "status": "peripheral-unmigrated"
+    },
+    {
+      "route": "POST /route_template/binding",
+      "sources": [
+        "internal/gateway/identity/mount.go"
+      ],
+      "contract": null,
+      "status": "peripheral-unmigrated"
+    },
+    {
+      "route": "POST /route_template/new",
+      "sources": [
+        "internal/gateway/identity/mount.go"
+      ],
+      "contract": null,
+      "status": "peripheral-unmigrated"
+    },
+    {
+      "route": "POST /route_template/preview",
+      "sources": [
+        "internal/gateway/routes.go"
+      ],
+      "contract": null,
+      "status": "peripheral-unmigrated"
+    },
+    {
+      "route": "POST /schedule/anthropic_beta_headers_reload",
+      "sources": [
+        "catalog"
+      ],
+      "contract": null,
+      "status": "peripheral-unmigrated"
+    },
+    {
+      "route": "POST /schedule/model_cost_map_reload",
+      "sources": [
+        "catalog",
+        "internal/gateway/models/mount.go"
+      ],
+      "contract": null,
+      "status": "peripheral-unmigrated"
+    },
+    {
+      "route": "POST /search",
+      "sources": [
+        "catalog"
+      ],
+      "contract": null,
+      "status": "peripheral-unmigrated"
+    },
+    {
+      "route": "POST /search_tools",
+      "sources": [
+        "catalog"
+      ],
+      "contract": null,
+      "status": "peripheral-unmigrated"
+    },
+    {
+      "route": "POST /search_tools/test_connection",
+      "sources": [
+        "catalog",
+        "internal/gateway/routes.go"
+      ],
+      "contract": null,
+      "status": "peripheral-unmigrated"
+    },
+    {
+      "route": "POST /search/{search_tool_name}",
+      "sources": [
+        "catalog"
+      ],
+      "contract": null,
+      "status": "peripheral-unmigrated"
+    },
+    {
+      "route": "POST /server",
+      "sources": [
+        "catalog"
+      ],
+      "contract": null,
+      "status": "peripheral-unmigrated"
+    },
+    {
+      "route": "POST /server/{server_id}/oauth-user-credential",
+      "sources": [
+        "catalog"
+      ],
+      "contract": null,
+      "status": "peripheral-unmigrated"
+    },
+    {
+      "route": "POST /server/{server_id}/user-credential",
+      "sources": [
+        "catalog"
+      ],
+      "contract": null,
+      "status": "peripheral-unmigrated"
+    },
+    {
+      "route": "POST /server/{server_id}/user-env-vars",
+      "sources": [
+        "catalog"
+      ],
+      "contract": null,
+      "status": "peripheral-unmigrated"
+    },
+    {
+      "route": "POST /server/import",
+      "sources": [
+        "catalog"
+      ],
+      "contract": null,
+      "status": "peripheral-unmigrated"
+    },
+    {
+      "route": "POST /server/oauth/{server_id}/register",
+      "sources": [
+        "catalog"
+      ],
+      "contract": null,
+      "status": "peripheral-unmigrated"
+    },
+    {
+      "route": "POST /server/oauth/{server_id}/token",
+      "sources": [
+        "catalog"
+      ],
+      "contract": null,
+      "status": "peripheral-unmigrated"
+    },
+    {
+      "route": "POST /server/oauth/session",
+      "sources": [
+        "catalog"
+      ],
+      "contract": null,
+      "status": "peripheral-unmigrated"
+    },
+    {
+      "route": "POST /server/register",
+      "sources": [
+        "catalog"
+      ],
+      "contract": null,
+      "status": "peripheral-unmigrated"
+    },
+    {
+      "route": "POST /spend/calculate",
+      "sources": [
+        "catalog",
+        "internal/gateway/usage/mount.go"
+      ],
+      "contract": null,
+      "status": "peripheral-unmigrated"
+    },
+    {
+      "route": "POST /sso/cli/complete/{login_id}",
+      "sources": [
+        "catalog"
+      ],
+      "contract": null,
+      "status": "peripheral-unmigrated"
+    },
+    {
+      "route": "POST /sso/cli/start",
+      "sources": [
+        "catalog"
+      ],
+      "contract": null,
+      "status": "peripheral-unmigrated"
+    },
+    {
+      "route": "POST /sso/saml/callback",
+      "sources": [
+        "catalog"
+      ],
+      "contract": null,
+      "status": "peripheral-unmigrated"
+    },
+    {
+      "route": "POST /tag/delete",
+      "sources": [
+        "catalog"
+      ],
+      "contract": null,
+      "status": "peripheral-unmigrated"
+    },
+    {
+      "route": "POST /tag/info",
+      "sources": [
+        "catalog"
+      ],
+      "contract": null,
+      "status": "peripheral-unmigrated"
+    },
+    {
+      "route": "POST /tag/new",
+      "sources": [
+        "catalog"
+      ],
+      "contract": null,
+      "status": "peripheral-unmigrated"
+    },
+    {
+      "route": "POST /tag/update",
+      "sources": [
+        "catalog"
+      ],
+      "contract": null,
+      "status": "peripheral-unmigrated"
+    },
+    {
+      "route": "POST /team/{team_id}/callback",
+      "sources": [
+        "catalog"
+      ],
+      "contract": null,
+      "status": "peripheral-unmigrated"
+    },
+    {
+      "route": "POST /team/{team_id}/disable_logging",
+      "sources": [
+        "catalog"
+      ],
+      "contract": null,
+      "status": "peripheral-unmigrated"
+    },
+    {
+      "route": "POST /team/{team_id}/member/{user_id}/reset_spend",
+      "sources": [
+        "catalog"
+      ],
+      "contract": null,
+      "status": "peripheral-unmigrated"
+    },
+    {
+      "route": "POST /team/block",
+      "sources": [
+        "catalog"
+      ],
+      "contract": null,
+      "status": "peripheral-unmigrated"
+    },
+    {
+      "route": "POST /team/bulk_member_add",
+      "sources": [
+        "catalog"
+      ],
+      "contract": null,
+      "status": "peripheral-unmigrated"
+    },
+    {
+      "route": "POST /team/delete",
+      "sources": [
+        "catalog",
+        "internal/gateway/identity/mount.go"
+      ],
+      "contract": null,
+      "status": "peripheral-unmigrated"
+    },
+    {
+      "route": "POST /team/key/bulk_update",
+      "sources": [
+        "catalog"
+      ],
+      "contract": null,
+      "status": "peripheral-unmigrated"
+    },
+    {
+      "route": "POST /team/member_add",
+      "sources": [
+        "catalog",
+        "internal/gateway/identity/mount.go"
+      ],
+      "contract": null,
+      "status": "peripheral-unmigrated"
+    },
+    {
+      "route": "POST /team/member_delete",
+      "sources": [
+        "catalog",
+        "internal/gateway/identity/mount.go"
+      ],
+      "contract": null,
+      "status": "peripheral-unmigrated"
+    },
+    {
+      "route": "POST /team/member_update",
+      "sources": [
+        "catalog",
+        "internal/gateway/identity/mount.go"
+      ],
+      "contract": null,
+      "status": "peripheral-unmigrated"
+    },
+    {
+      "route": "POST /team/model/add",
+      "sources": [
+        "catalog"
+      ],
+      "contract": null,
+      "status": "peripheral-unmigrated"
+    },
+    {
+      "route": "POST /team/model/delete",
+      "sources": [
+        "catalog"
+      ],
+      "contract": null,
+      "status": "peripheral-unmigrated"
+    },
+    {
+      "route": "POST /team/move",
+      "sources": [
+        "internal/gateway/identity/mount.go"
+      ],
+      "contract": null,
+      "status": "peripheral-unmigrated"
+    },
+    {
+      "route": "POST /team/new",
+      "sources": [
+        "catalog",
+        "internal/gateway/identity/mount.go"
+      ],
+      "contract": null,
+      "status": "peripheral-unmigrated"
+    },
+    {
+      "route": "POST /team/permissions_bulk_update",
+      "sources": [
+        "catalog"
+      ],
+      "contract": null,
+      "status": "peripheral-unmigrated"
+    },
+    {
+      "route": "POST /team/permissions_update",
+      "sources": [
+        "catalog"
+      ],
+      "contract": null,
+      "status": "peripheral-unmigrated"
+    },
+    {
+      "route": "POST /team/unblock",
+      "sources": [
+        "catalog"
+      ],
+      "contract": null,
+      "status": "peripheral-unmigrated"
+    },
+    {
+      "route": "POST /team/update",
+      "sources": [
+        "catalog",
+        "internal/gateway/identity/mount.go"
+      ],
+      "contract": null,
+      "status": "peripheral-unmigrated"
+    },
+    {
+      "route": "POST /test/connection",
+      "sources": [
+        "catalog"
+      ],
+      "contract": null,
+      "status": "peripheral-unmigrated"
+    },
+    {
+      "route": "POST /test/tools/list",
+      "sources": [
+        "catalog"
+      ],
+      "contract": null,
+      "status": "peripheral-unmigrated"
+    },
+    {
+      "route": "POST /threads",
+      "sources": [
+        "catalog"
+      ],
+      "contract": null,
+      "status": "peripheral-unmigrated"
+    },
+    {
+      "route": "POST /threads/{thread_id}/messages",
+      "sources": [
+        "catalog"
+      ],
+      "contract": null,
+      "status": "peripheral-unmigrated"
+    },
+    {
+      "route": "POST /threads/{thread_id}/runs",
+      "sources": [
+        "catalog"
+      ],
+      "contract": null,
+      "status": "peripheral-unmigrated"
+    },
+    {
+      "route": "POST /token",
+      "sources": [
+        "catalog"
+      ],
+      "contract": null,
+      "status": "peripheral-unmigrated"
+    },
+    {
+      "route": "POST /tools/call",
+      "sources": [
+        "catalog"
+      ],
+      "contract": null,
+      "status": "peripheral-unmigrated"
+    },
+    {
+      "route": "POST /toolset",
+      "sources": [
+        "catalog"
+      ],
+      "contract": null,
+      "status": "peripheral-unmigrated"
+    },
+    {
+      "route": "POST /upload/logo",
+      "sources": [
+        "catalog",
+        "internal/gateway/routes.go"
+      ],
+      "contract": null,
+      "status": "peripheral-unmigrated"
+    },
+    {
+      "route": "POST /usage/ai/chat",
+      "sources": [
+        "catalog"
+      ],
+      "contract": null,
+      "status": "peripheral-unmigrated"
+    },
+    {
+      "route": "POST /user/{user_id}/password",
+      "sources": [
+        "internal/gateway/identity/mount.go"
+      ],
+      "contract": {
+        "domain": "users",
+        "operation": "setUserPasswordByPath"
+      },
+      "status": "core-contracted"
+    },
+    {
+      "route": "POST /user/bulk_update",
+      "sources": [
+        "catalog",
+        "internal/gateway/identity/mount.go"
+      ],
+      "contract": {
+        "domain": "users",
+        "operation": "bulkUpdateUserBudget"
+      },
+      "status": "core-contracted"
+    },
+    {
+      "route": "POST /user/delete",
+      "sources": [
+        "catalog",
+        "internal/gateway/identity/mount.go"
+      ],
+      "contract": {
+        "domain": "users",
+        "operation": "deleteUser"
+      },
+      "status": "core-contracted"
+    },
+    {
+      "route": "POST /user/new",
+      "sources": [
+        "catalog",
+        "internal/gateway/identity/mount.go"
+      ],
+      "contract": {
+        "domain": "users",
+        "operation": "createUser"
+      },
+      "status": "core-contracted"
+    },
+    {
+      "route": "POST /user/set_password",
+      "sources": [
+        "internal/gateway/identity/mount.go"
+      ],
+      "contract": {
+        "domain": "users",
+        "operation": "setUserPassword"
+      },
+      "status": "core-contracted"
+    },
+    {
+      "route": "POST /user/update",
+      "sources": [
+        "catalog",
+        "internal/gateway/identity/mount.go"
+      ],
+      "contract": {
+        "domain": "users",
+        "operation": "updateUser"
+      },
+      "status": "core-contracted"
+    },
+    {
+      "route": "POST /utils/dotprompt_json_converter",
+      "sources": [
+        "catalog"
+      ],
+      "contract": null,
+      "status": "peripheral-unmigrated"
+    },
+    {
+      "route": "POST /utils/test_policies_and_guardrails",
+      "sources": [
+        "catalog"
+      ],
+      "contract": null,
+      "status": "peripheral-unmigrated"
+    },
+    {
+      "route": "POST /utils/token_counter",
+      "sources": [
+        "catalog",
+        "internal/gateway/tokens/tokens.go"
+      ],
+      "contract": null,
+      "status": "peripheral-unmigrated"
+    },
+    {
+      "route": "POST /utils/transform_request",
+      "sources": [
+        "catalog",
+        "internal/gateway/tokens/tokens.go"
+      ],
+      "contract": null,
+      "status": "peripheral-unmigrated"
+    },
+    {
+      "route": "POST /v1/a2a/{agent_id}/message/send",
+      "sources": [
+        "catalog"
+      ],
+      "contract": null,
+      "status": "peripheral-unmigrated"
+    },
+    {
+      "route": "POST /v1/a2a/discover",
+      "sources": [
+        "catalog"
+      ],
+      "contract": null,
+      "status": "peripheral-unmigrated"
+    },
+    {
+      "route": "POST /v1/access_group",
+      "sources": [
+        "catalog"
+      ],
+      "contract": null,
+      "status": "peripheral-unmigrated"
+    },
+    {
+      "route": "POST /v1/agents",
+      "sources": [
+        "catalog"
+      ],
+      "contract": null,
+      "status": "peripheral-unmigrated"
+    },
+    {
+      "route": "POST /v1/agents/{agent_id}/make_public",
+      "sources": [
+        "catalog"
+      ],
+      "contract": null,
+      "status": "peripheral-unmigrated"
+    },
+    {
+      "route": "POST /v1/agents/make_public",
+      "sources": [
+        "catalog"
+      ],
+      "contract": null,
+      "status": "peripheral-unmigrated"
+    },
+    {
+      "route": "POST /v1/assistants",
+      "sources": [
+        "catalog"
+      ],
+      "contract": null,
+      "status": "peripheral-unmigrated"
+    },
+    {
+      "route": "POST /v1/audio/speech",
+      "sources": [
+        "catalog"
+      ],
+      "contract": null,
+      "status": "peripheral-unmigrated"
+    },
+    {
+      "route": "POST /v1/audio/transcriptions",
+      "sources": [
+        "catalog"
+      ],
+      "contract": null,
+      "status": "peripheral-unmigrated"
+    },
+    {
+      "route": "POST /v1/audio/translations",
+      "sources": [
+        "internal/gateway/routes.go"
+      ],
+      "contract": null,
+      "status": "peripheral-unmigrated"
+    },
+    {
+      "route": "POST /v1/batches",
+      "sources": [
+        "catalog"
+      ],
+      "contract": null,
+      "status": "peripheral-unmigrated"
+    },
+    {
+      "route": "POST /v1/batches/{batch_id}/cancel",
+      "sources": [
+        "catalog"
+      ],
+      "contract": null,
+      "status": "peripheral-unmigrated"
+    },
+    {
+      "route": "POST /v1/chat/completions",
+      "sources": [
+        "catalog",
+        "internal/gateway/routes.go"
+      ],
+      "contract": null,
+      "status": "peripheral-unmigrated"
+    },
+    {
+      "route": "POST /v1/completions",
+      "sources": [
+        "catalog",
+        "internal/gateway/routes.go"
+      ],
+      "contract": null,
+      "status": "peripheral-unmigrated"
+    },
+    {
+      "route": "POST /v1/containers",
+      "sources": [
+        "catalog"
+      ],
+      "contract": null,
+      "status": "peripheral-unmigrated"
+    },
+    {
+      "route": "POST /v1/embeddings",
+      "sources": [
+        "catalog",
+        "internal/gateway/routes.go"
+      ],
+      "contract": null,
+      "status": "peripheral-unmigrated"
+    },
+    {
+      "route": "POST /v1/evals",
+      "sources": [
+        "catalog"
+      ],
+      "contract": null,
+      "status": "peripheral-unmigrated"
+    },
+    {
+      "route": "POST /v1/evals/{eval_id}",
+      "sources": [
+        "catalog"
+      ],
+      "contract": null,
+      "status": "peripheral-unmigrated"
+    },
+    {
+      "route": "POST /v1/evals/{eval_id}/cancel",
+      "sources": [
+        "catalog"
+      ],
+      "contract": null,
+      "status": "peripheral-unmigrated"
+    },
+    {
+      "route": "POST /v1/evals/{eval_id}/runs",
+      "sources": [
+        "catalog"
+      ],
+      "contract": null,
+      "status": "peripheral-unmigrated"
+    },
+    {
+      "route": "POST /v1/evals/{eval_id}/runs/{run_id}",
+      "sources": [
+        "catalog"
+      ],
+      "contract": null,
+      "status": "peripheral-unmigrated"
+    },
+    {
+      "route": "POST /v1/files",
+      "sources": [
+        "catalog"
+      ],
+      "contract": null,
+      "status": "peripheral-unmigrated"
+    },
+    {
+      "route": "POST /v1/fine_tuning/jobs",
+      "sources": [
+        "catalog"
+      ],
+      "contract": null,
+      "status": "peripheral-unmigrated"
+    },
+    {
+      "route": "POST /v1/fine_tuning/jobs/{fine_tuning_job_id}/cancel",
+      "sources": [
+        "catalog"
+      ],
+      "contract": null,
+      "status": "peripheral-unmigrated"
+    },
+    {
+      "route": "POST /v1/images/edits",
+      "sources": [
+        "catalog"
+      ],
+      "contract": null,
+      "status": "peripheral-unmigrated"
+    },
+    {
+      "route": "POST /v1/images/generations",
+      "sources": [
+        "catalog"
+      ],
+      "contract": null,
+      "status": "peripheral-unmigrated"
+    },
+    {
+      "route": "POST /v1/indexes",
+      "sources": [
+        "catalog"
+      ],
+      "contract": null,
+      "status": "peripheral-unmigrated"
+    },
+    {
+      "route": "POST /v1/mcp/oauth/authorize",
+      "sources": [
+        "catalog"
+      ],
+      "contract": null,
+      "status": "peripheral-unmigrated"
+    },
+    {
+      "route": "POST /v1/mcp/oauth/token",
+      "sources": [
+        "catalog"
+      ],
+      "contract": null,
+      "status": "peripheral-unmigrated"
+    },
+    {
+      "route": "POST /v1/mcp/server/oauth/{server_id}/token",
+      "sources": [
+        "internal/gateway/routes.go"
+      ],
+      "contract": null,
+      "status": "peripheral-unmigrated"
+    },
+    {
+      "route": "POST /v1/memory",
+      "sources": [
+        "catalog"
+      ],
+      "contract": null,
+      "status": "peripheral-unmigrated"
+    },
+    {
+      "route": "POST /v1/messages",
+      "sources": [
+        "catalog",
+        "internal/gateway/routes.go"
+      ],
+      "contract": null,
+      "status": "peripheral-unmigrated"
+    },
+    {
+      "route": "POST /v1/messages/count_tokens",
+      "sources": [
+        "catalog"
+      ],
+      "contract": null,
+      "status": "peripheral-unmigrated"
+    },
+    {
+      "route": "POST /v1/moderations",
+      "sources": [
+        "catalog"
+      ],
+      "contract": null,
+      "status": "peripheral-unmigrated"
+    },
+    {
+      "route": "POST /v1/ocr",
+      "sources": [
+        "catalog"
+      ],
+      "contract": null,
+      "status": "peripheral-unmigrated"
+    },
+    {
+      "route": "POST /v1/rag/ingest",
+      "sources": [
+        "catalog"
+      ],
+      "contract": null,
+      "status": "peripheral-unmigrated"
+    },
+    {
+      "route": "POST /v1/rag/query",
+      "sources": [
+        "catalog"
+      ],
+      "contract": null,
+      "status": "peripheral-unmigrated"
+    },
+    {
+      "route": "POST /v1/realtime/calls",
+      "sources": [
+        "catalog"
+      ],
+      "contract": null,
+      "status": "peripheral-unmigrated"
+    },
+    {
+      "route": "POST /v1/realtime/client_secrets",
+      "sources": [
+        "catalog"
+      ],
+      "contract": null,
+      "status": "peripheral-unmigrated"
+    },
+    {
+      "route": "POST /v1/realtime/transcription_sessions",
+      "sources": [
+        "catalog"
+      ],
+      "contract": null,
+      "status": "peripheral-unmigrated"
+    },
+    {
+      "route": "POST /v1/rerank",
+      "sources": [
+        "catalog"
+      ],
+      "contract": null,
+      "status": "peripheral-unmigrated"
+    },
+    {
+      "route": "POST /v1/responses",
+      "sources": [
+        "catalog",
+        "internal/gateway/family/mount.go"
+      ],
+      "contract": null,
+      "status": "peripheral-unmigrated"
+    },
+    {
+      "route": "POST /v1/responses/{response_id}/cancel",
+      "sources": [
+        "catalog"
+      ],
+      "contract": null,
+      "status": "peripheral-unmigrated"
+    },
+    {
+      "route": "POST /v1/responses/compact",
+      "sources": [
+        "catalog"
+      ],
+      "contract": null,
+      "status": "peripheral-unmigrated"
+    },
+    {
+      "route": "POST /v1/responses/input_tokens",
+      "sources": [
+        "catalog"
+      ],
+      "contract": null,
+      "status": "peripheral-unmigrated"
+    },
+    {
+      "route": "POST /v1/search",
+      "sources": [
+        "catalog"
+      ],
+      "contract": null,
+      "status": "peripheral-unmigrated"
+    },
+    {
+      "route": "POST /v1/search/{search_tool_name}",
+      "sources": [
+        "catalog"
+      ],
+      "contract": null,
+      "status": "peripheral-unmigrated"
+    },
+    {
+      "route": "POST /v1/skills",
+      "sources": [
+        "catalog"
+      ],
+      "contract": null,
+      "status": "peripheral-unmigrated"
+    },
+    {
+      "route": "POST /v1/threads",
+      "sources": [
+        "catalog"
+      ],
+      "contract": null,
+      "status": "peripheral-unmigrated"
+    },
+    {
+      "route": "POST /v1/threads/{thread_id}/messages",
+      "sources": [
+        "catalog"
+      ],
+      "contract": null,
+      "status": "peripheral-unmigrated"
+    },
+    {
+      "route": "POST /v1/threads/{thread_id}/runs",
+      "sources": [
+        "catalog"
+      ],
+      "contract": null,
+      "status": "peripheral-unmigrated"
+    },
+    {
+      "route": "POST /v1/tool/policy",
+      "sources": [
+        "catalog"
+      ],
+      "contract": null,
+      "status": "peripheral-unmigrated"
+    },
+    {
+      "route": "POST /v1/vector_stores",
+      "sources": [
+        "catalog"
+      ],
+      "contract": null,
+      "status": "peripheral-unmigrated"
+    },
+    {
+      "route": "POST /v1/vector_stores/{vector_store_id}",
+      "sources": [
+        "catalog"
+      ],
+      "contract": null,
+      "status": "peripheral-unmigrated"
+    },
+    {
+      "route": "POST /v1/vector_stores/{vector_store_id}/files",
+      "sources": [
+        "catalog"
+      ],
+      "contract": null,
+      "status": "peripheral-unmigrated"
+    },
+    {
+      "route": "POST /v1/vector_stores/{vector_store_id}/files/{file_id}",
+      "sources": [
+        "catalog"
+      ],
+      "contract": null,
+      "status": "peripheral-unmigrated"
+    },
+    {
+      "route": "POST /v1/vector_stores/{vector_store_id}/search",
+      "sources": [
+        "catalog"
+      ],
+      "contract": null,
+      "status": "peripheral-unmigrated"
+    },
+    {
+      "route": "POST /v1/videos",
+      "sources": [
+        "catalog"
+      ],
+      "contract": null,
+      "status": "peripheral-unmigrated"
+    },
+    {
+      "route": "POST /v1/videos/{video_id}/remix",
+      "sources": [
+        "catalog"
+      ],
+      "contract": null,
+      "status": "peripheral-unmigrated"
+    },
+    {
+      "route": "POST /v1/videos/characters",
+      "sources": [
+        "catalog"
+      ],
+      "contract": null,
+      "status": "peripheral-unmigrated"
+    },
+    {
+      "route": "POST /v1/videos/edits",
+      "sources": [
+        "catalog"
+      ],
+      "contract": null,
+      "status": "peripheral-unmigrated"
+    },
+    {
+      "route": "POST /v1/videos/extensions",
+      "sources": [
+        "catalog"
+      ],
+      "contract": null,
+      "status": "peripheral-unmigrated"
+    },
+    {
+      "route": "POST /v1/workflows/runs",
+      "sources": [
+        "catalog"
+      ],
+      "contract": null,
+      "status": "peripheral-unmigrated"
+    },
+    {
+      "route": "POST /v1/workflows/runs/{run_id}/events",
+      "sources": [
+        "catalog"
+      ],
+      "contract": null,
+      "status": "peripheral-unmigrated"
+    },
+    {
+      "route": "POST /v1/workflows/runs/{run_id}/messages",
+      "sources": [
+        "catalog"
+      ],
+      "contract": null,
+      "status": "peripheral-unmigrated"
+    },
+    {
+      "route": "POST /v1beta/agents",
+      "sources": [
+        "catalog"
+      ],
+      "contract": null,
+      "status": "peripheral-unmigrated"
+    },
+    {
+      "route": "POST /v1beta/interactions",
+      "sources": [
+        "catalog"
+      ],
+      "contract": null,
+      "status": "peripheral-unmigrated"
+    },
+    {
+      "route": "POST /v1beta/interactions/{interaction_id}/cancel",
+      "sources": [
+        "catalog"
+      ],
+      "contract": null,
+      "status": "peripheral-unmigrated"
+    },
+    {
+      "route": "POST /v1beta/models/{model_name}:countTokens",
+      "sources": [
+        "catalog"
+      ],
+      "contract": null,
+      "status": "peripheral-unmigrated"
+    },
+    {
+      "route": "POST /v1beta/models/{model_name}:generateContent",
+      "sources": [
+        "catalog"
+      ],
+      "contract": null,
+      "status": "peripheral-unmigrated"
+    },
+    {
+      "route": "POST /v1beta/models/{model_name}:streamGenerateContent",
+      "sources": [
+        "catalog"
+      ],
+      "contract": null,
+      "status": "peripheral-unmigrated"
+    },
+    {
+      "route": "POST /v2/key/info",
+      "sources": [
+        "catalog",
+        "internal/gateway/keys/mount.go"
+      ],
+      "contract": {
+        "domain": "keys",
+        "operation": "getKeyV2"
+      },
+      "status": "core-contracted"
+    },
+    {
+      "route": "POST /v2/login",
+      "sources": [
+        "catalog",
+        "internal/gateway/routes.go"
+      ],
+      "contract": null,
+      "status": "peripheral-unmigrated"
+    },
+    {
+      "route": "POST /v2/logout",
+      "sources": [
+        "internal/gateway/routes.go"
+      ],
+      "contract": null,
+      "status": "peripheral-unmigrated"
+    },
+    {
+      "route": "POST /v2/rerank",
+      "sources": [
+        "catalog"
+      ],
+      "contract": null,
+      "status": "peripheral-unmigrated"
+    },
+    {
+      "route": "POST /v3/login",
+      "sources": [
+        "catalog",
+        "internal/gateway/routes.go"
+      ],
+      "contract": null,
+      "status": "peripheral-unmigrated"
+    },
+    {
+      "route": "POST /v3/login/exchange",
+      "sources": [
+        "catalog"
+      ],
+      "contract": null,
+      "status": "peripheral-unmigrated"
+    },
+    {
+      "route": "POST /v3/logout",
+      "sources": [
+        "internal/gateway/routes.go"
+      ],
+      "contract": null,
+      "status": "peripheral-unmigrated"
+    },
+    {
+      "route": "POST /vantage/dry-run",
+      "sources": [
+        "catalog"
+      ],
+      "contract": null,
+      "status": "peripheral-unmigrated"
+    },
+    {
+      "route": "POST /vantage/export",
+      "sources": [
+        "catalog"
+      ],
+      "contract": null,
+      "status": "peripheral-unmigrated"
+    },
+    {
+      "route": "POST /vantage/init",
+      "sources": [
+        "catalog"
+      ],
+      "contract": null,
+      "status": "peripheral-unmigrated"
+    },
+    {
+      "route": "POST /vector_store/delete",
+      "sources": [
+        "catalog"
+      ],
+      "contract": null,
+      "status": "peripheral-unmigrated"
+    },
+    {
+      "route": "POST /vector_store/info",
+      "sources": [
+        "catalog"
+      ],
+      "contract": null,
+      "status": "peripheral-unmigrated"
+    },
+    {
+      "route": "POST /vector_store/new",
+      "sources": [
+        "catalog"
+      ],
+      "contract": null,
+      "status": "peripheral-unmigrated"
+    },
+    {
+      "route": "POST /vector_store/update",
+      "sources": [
+        "catalog"
+      ],
+      "contract": null,
+      "status": "peripheral-unmigrated"
+    },
+    {
+      "route": "POST /vector_stores",
+      "sources": [
+        "catalog"
+      ],
+      "contract": null,
+      "status": "peripheral-unmigrated"
+    },
+    {
+      "route": "POST /vector_stores/{vector_store_id}",
+      "sources": [
+        "catalog"
+      ],
+      "contract": null,
+      "status": "peripheral-unmigrated"
+    },
+    {
+      "route": "POST /vector_stores/{vector_store_id}/files",
+      "sources": [
+        "catalog"
+      ],
+      "contract": null,
+      "status": "peripheral-unmigrated"
+    },
+    {
+      "route": "POST /vector_stores/{vector_store_id}/files/{file_id}",
+      "sources": [
+        "catalog"
+      ],
+      "contract": null,
+      "status": "peripheral-unmigrated"
+    },
+    {
+      "route": "POST /vector_stores/{vector_store_id}/search",
+      "sources": [
+        "catalog"
+      ],
+      "contract": null,
+      "status": "peripheral-unmigrated"
+    },
+    {
+      "route": "POST /videos",
+      "sources": [
+        "catalog"
+      ],
+      "contract": null,
+      "status": "peripheral-unmigrated"
+    },
+    {
+      "route": "POST /videos/{video_id}/remix",
+      "sources": [
+        "catalog"
+      ],
+      "contract": null,
+      "status": "peripheral-unmigrated"
+    },
+    {
+      "route": "POST /videos/characters",
+      "sources": [
+        "catalog"
+      ],
+      "contract": null,
+      "status": "peripheral-unmigrated"
+    },
+    {
+      "route": "POST /videos/edits",
+      "sources": [
+        "catalog"
+      ],
+      "contract": null,
+      "status": "peripheral-unmigrated"
+    },
+    {
+      "route": "POST /videos/extensions",
+      "sources": [
+        "catalog"
+      ],
+      "contract": null,
+      "status": "peripheral-unmigrated"
+    },
+    {
+      "route": "PUT /access_group/{access_group}/update",
+      "sources": [
+        "catalog"
+      ],
+      "contract": null,
+      "status": "peripheral-unmigrated"
+    },
+    {
+      "route": "PUT /admin/archive/kodo",
+      "sources": [
+        "internal/gateway/directory.go"
+      ],
+      "contract": null,
+      "status": "peripheral-unmigrated"
+    },
+    {
+      "route": "PUT /admin/directory/connections/{connection_id}",
+      "sources": [
+        "internal/gateway/directory.go"
+      ],
+      "contract": null,
+      "status": "peripheral-unmigrated"
+    },
+    {
+      "route": "PUT /admin/directory/mappings",
+      "sources": [
+        "internal/gateway/directory.go"
+      ],
+      "contract": null,
+      "status": "peripheral-unmigrated"
+    },
+    {
+      "route": "PUT /admin/directory/users/{user_id}/assignment",
+      "sources": [
+        "internal/gateway/directory.go"
+      ],
+      "contract": null,
+      "status": "peripheral-unmigrated"
+    },
+    {
+      "route": "PUT /admin/enterprise/sso/{connection_id}",
+      "sources": [
+        "internal/gateway/directory.go"
+      ],
+      "contract": null,
+      "status": "peripheral-unmigrated"
+    },
+    {
+      "route": "PUT /claude-code/plugins/{plugin_name}",
+      "sources": [
+        "catalog"
+      ],
+      "contract": null,
+      "status": "peripheral-unmigrated"
+    },
+    {
+      "route": "PUT /cloudzero/settings",
+      "sources": [
+        "catalog"
+      ],
+      "contract": null,
+      "status": "peripheral-unmigrated"
+    },
+    {
+      "route": "PUT /guardrails/{guardrail_id}",
+      "sources": [
+        "catalog"
+      ],
+      "contract": null,
+      "status": "peripheral-unmigrated"
+    },
+    {
+      "route": "PUT /model/default",
+      "sources": [
+        "internal/gateway/models/mount.go"
+      ],
+      "contract": null,
+      "status": "peripheral-unmigrated"
+    },
+    {
+      "route": "PUT /model/fallback",
+      "sources": [
+        "internal/gateway/models/mount.go"
+      ],
+      "contract": null,
+      "status": "peripheral-unmigrated"
+    },
+    {
+      "route": "PUT /policies/{policy_id}",
+      "sources": [
+        "catalog"
+      ],
+      "contract": null,
+      "status": "peripheral-unmigrated"
+    },
+    {
+      "route": "PUT /policies/{policy_id}/status",
+      "sources": [
+        "catalog"
+      ],
+      "contract": null,
+      "status": "peripheral-unmigrated"
+    },
+    {
+      "route": "PUT /prompts/{prompt_id}",
+      "sources": [
+        "catalog"
+      ],
+      "contract": null,
+      "status": "peripheral-unmigrated"
+    },
+    {
+      "route": "PUT /search_tools/{search_tool_id}",
+      "sources": [
+        "catalog"
+      ],
+      "contract": null,
+      "status": "peripheral-unmigrated"
+    },
+    {
+      "route": "PUT /server",
+      "sources": [
+        "catalog"
+      ],
+      "contract": null,
+      "status": "peripheral-unmigrated"
+    },
+    {
+      "route": "PUT /server/{server_id}/approve",
+      "sources": [
+        "catalog"
+      ],
+      "contract": null,
+      "status": "peripheral-unmigrated"
+    },
+    {
+      "route": "PUT /server/{server_id}/reject",
+      "sources": [
+        "catalog"
+      ],
+      "contract": null,
+      "status": "peripheral-unmigrated"
+    },
+    {
+      "route": "PUT /toolset",
+      "sources": [
+        "catalog"
+      ],
+      "contract": null,
+      "status": "peripheral-unmigrated"
+    },
+    {
+      "route": "PUT /v1/access_group/{access_group_id}",
+      "sources": [
+        "catalog"
+      ],
+      "contract": null,
+      "status": "peripheral-unmigrated"
+    },
+    {
+      "route": "PUT /v1/agents/{agent_id}",
+      "sources": [
+        "catalog"
+      ],
+      "contract": null,
+      "status": "peripheral-unmigrated"
+    },
+    {
+      "route": "PUT /v1/memory/{key}",
+      "sources": [
+        "catalog"
+      ],
+      "contract": null,
+      "status": "peripheral-unmigrated"
+    },
+    {
+      "route": "PUT /vantage/settings",
+      "sources": [
+        "catalog"
+      ],
+      "contract": null,
+      "status": "peripheral-unmigrated"
+    },
+    {
+      "route": "WEBSOCKET /openai_passthrough/{endpoint}",
+      "sources": [
+        "catalog"
+      ],
+      "contract": null,
+      "status": "peripheral-unmigrated"
+    },
+    {
+      "route": "WEBSOCKET /openai/{endpoint}",
+      "sources": [
+        "catalog"
+      ],
+      "contract": null,
+      "status": "peripheral-unmigrated"
+    },
+    {
+      "route": "WEBSOCKET /openai/v1/realtime",
+      "sources": [
+        "catalog"
+      ],
+      "contract": null,
+      "status": "peripheral-unmigrated"
+    },
+    {
+      "route": "WEBSOCKET /realtime",
+      "sources": [
+        "catalog"
+      ],
+      "contract": null,
+      "status": "peripheral-unmigrated"
+    },
+    {
+      "route": "WEBSOCKET /responses",
+      "sources": [
+        "catalog"
+      ],
+      "contract": null,
+      "status": "peripheral-unmigrated"
+    },
+    {
+      "route": "WEBSOCKET /v1/realtime",
+      "sources": [
+        "catalog"
+      ],
+      "contract": null,
+      "status": "peripheral-unmigrated"
+    },
+    {
+      "route": "WEBSOCKET /v1/responses",
+      "sources": [
+        "catalog"
+      ],
+      "contract": null,
+      "status": "peripheral-unmigrated"
+    },
+    {
+      "route": "WEBSOCKET /vertex_ai/live",
+      "sources": [
+        "catalog"
+      ],
+      "contract": null,
+      "status": "peripheral-unmigrated"
+    }
+  ]
+}

@@ -2,7 +2,7 @@
 
 [English](../en/interface-integrity-roadmap.md) | [开发指南](README.md)
 
-更新日期：2026-10-24。分析基线：`185726e37e8f456fa62b8df33560cda153b959d8`。状态：实施规划，以下阶段尚未完成验收。
+更新日期：2026-10-24。分析基线：`185726e37e8f456fa62b8df33560cda153b959d8`。状态：分阶段实施；核心契约及未迁移边界见下文，代码提交、合入主分支和生产部署分别验收。
 
 XHub 已在线上提供服务。本计划保留现有功能、页面和兼容入口，先保证接口完整可用、测试结果可信、前后端契约一致，再逐步收拢兼容层和执行链。衡量改善的标准是一次行为修改是否更容易理解、验证和回退，而不是删除了多少行代码。
 
@@ -149,7 +149,7 @@ OpenAPI 描述入口、认证、错误包络和可描述的字段；它不能单
 
 已有既定行为的错误用 BUG 跟踪；新增文档入口、检查级别语义或契约流程用 Proposal；跨模块方案按仓库规范使用 Architecture-Design。本文不代替这些具体变更的验收记录。
 
-实际阶段 2 首个试点选择已完成持久化反例测试的供应商管理：[契约试点与范围](supplier-contract-pilot.md)（Proposal #149）。用户与 Key 的核心批次已分别完成，见[用户契约](user-contract.md)和[Key契约](key-contract.md)。第三阶段新增[模型与端点契约批次](model-contract.md)（Proposal #159）；日志及各域明确排除的接口尚未迁移，阶段3尚未整体完成，不代表兼容层已重构。
+实际阶段 2 首个试点选择供应商管理（Proposal #149），随后扩展用户、Key、模型与端点（#159）。第三阶段核心收尾以 #161 的 48 个操作为边界，包含日志/日报、密码重置和 Key 生命周期；详见[核心契约收尾](core-contract-completion.md)。#162 合入已关闭的 #160 来源分支，未随 #160 进入 main，因此需重新向 main 提交收尾代码。最终完成条件是收尾提交进入 main、契约兼容和真实测试全部通过，而不是 PR 显示 merged。外围接口仍单列未迁移，不计入核心完成。
 
 ## 每批变更的验收与发布
 
@@ -197,3 +197,6 @@ npm run test:types
 借鉴 LiteLLM 的[请求生命周期](https://docs.litellm.ai/docs/proxy/architecture)、[路由职责](https://docs.litellm.ai/docs/routing)和 [Responses 适配接口](https://github.com/BerriAI/litellm/blob/main/litellm/llms/base_llm/responses/transformation.py)，重点是职责分离与兼容性验证。其[原生 Responses 配置](https://docs.litellm.ai/docs/response_api_native_passthrough)说明能力与执行路径需要明确声明；不据此推断 XHub 当前供应商能力，也不复制其全部功能或商业版限制。
 
 实施时固定参考版本或提交，记录借鉴范围。保留 XHub 已有可靠账务、权限与历史约束；无需引入 Python 服务或更改当前功能集合。
+
+
+第三阶段核心集合的收尾范围、真实证据入口及外围未迁移边界见[核心契约收尾](core-contract-completion.md)。提交不代表合并或部署。

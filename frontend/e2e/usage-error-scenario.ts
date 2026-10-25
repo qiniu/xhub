@@ -3,6 +3,7 @@ import {readFileSync} from "node:fs";
 import {join} from "node:path";
 import {translate} from "../src/i18n/translate";
 import {GATEWAY,UPSTREAM,MASTER,login,loginAdmin,sessionBearer,stableGoto} from "./helpers";
+import {isSuccessfulGatewayGet} from "./gateway-response";
 
 /** 注册用量失败恢复闭环；locale 为界面语言，前置真实浏览器、网关和隔离数据库。
  * 真实推理后删除旧库列制造 HTTP 500，验证失败非零值、迁移后重试、聚合回退及实际跨日分页不完整；finally 恢复故障并删除资源，运行器删 schema。 */
@@ -77,10 +78,19 @@ export function registerUsageErrorScenario(locale:"en"|"zh-CN"){
    await expect(page.getByPlaceholder(tr("Search teams by alias..."),{exact:true})).toBeVisible();
    await expect(page.getByRole("button",{name:tr("Export Data"),exact:true})).toBeDisabled();
    expect((await page.request.post(control+"/usage/migrate")).status()).toBe(200);legacy=false;
-   await page.getByRole("button",{name:tr("usageLoad.retry"),exact:true}).click();
+   // 发布模式经 /gw 代理，本地可直连；两种路径均观察真实 GET，不拦截或伪造响应。
+   // 先注册再点击，并在局部 15 秒内失败，避免耗尽整条测试预算后由清理错误掩盖原因。
+   const [teamRecovered]=await Promise.all([
+    page.waitForResponse(r=>isSuccessfulGatewayGet({url:r.url(),method:r.request().method(),status:r.status()},"/team/daily/activity/aggregated"),{timeout:15000}),
+    page.getByRole("button",{name:tr("usageLoad.retry"),exact:true}).click(),
+   ]);
+   const teamBody=await teamRecovered.json();
+   expect(teamBody.metadata.total_api_requests).toBeGreaterThan(0);
+   expect(Array.isArray(teamBody.results)).toBe(true);
    await expect(page.getByRole("button",{name:tr("Export Data"),exact:true})).toBeEnabled();
    await expect(page.getByRole("tab",{name:tr("Key Activity"),exact:true})).toHaveAttribute("aria-selected","true");
-   await info.attach("usage-recovery",{body:JSON.stringify({realDatabaseFailure:500,fallback:true,partialPages:[1,2],recovered:true,emptyRange:true}),contentType:"application/json"});
+   const recoveryEvidence={realDatabaseFailure:500,fallback:true,partialPages:[1,2],recovered:true,emptyRange:true,teamRecoveryPath:new URL(teamRecovered.url()).pathname};
+   await info.attach("usage-recovery",{body:JSON.stringify(recoveryEvidence),contentType:"application/json"});
   }finally{
    test.setTimeout(test.info().timeout+30000);
    await fault("");if(legacy)expect((await page.request.post(control+"/usage/migrate")).status()).toBe(200);

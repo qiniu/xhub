@@ -170,10 +170,10 @@ test('key contract requires generation, permissions and real budget regression',
   assert.equal(artifact.with['if-no-files-found'], 'error');
 });
 
-/** 四个真实 HTTP/PG 契约作业必须产出各自覆盖率并上传 backend，避免处理器执行证据遗漏。
+/** 五个真实 HTTP/PG 契约作业必须产出各自覆盖率并上传 backend，避免处理器执行证据遗漏。
  * 前置真实 YAML；检查插桩、报告校验、精确上传与诊断归档，失败不允许跳过，纯配置测试无数据需清理。 */
 test('real contract regression coverage is validated archived and uploaded', () => {
-  for (const area of ['supplier', 'user', 'key', 'model']) {
+  for (const area of ['supplier', 'user', 'key', 'model', 'usage']) {
     const job = `${area}-contract`;
     const profile = `coverage/${area}-contract.out`;
     const run = step(job, `Run real ${area} contract regression`);
@@ -205,7 +205,7 @@ test('real contract regression coverage is validated archived and uploaded', () 
 /** 执行工作流中的真实 shell 校验，确认缺失、空文件和损坏的覆盖率报告均失败。
  * 前置本机 Go/bash；每个作业在临时目录注入报告故障，验证非零退出；finally 删除目录，无仓库或数据库副作用。 */
 test('regression coverage validation rejects missing empty and malformed reports', () => {
-  for (const area of ['supplier', 'user', 'key', 'model']) {
+  for (const area of ['supplier', 'user', 'key', 'model', 'usage']) {
     const directory = mkdtempSync(join(tmpdir(), 'xhub-coverage-gate-'));
     try {
       mkdirSync(join(directory, 'coverage'));
@@ -234,4 +234,24 @@ test('model contract requires generated types and real deployment regression', (
   assert.equal(step('model-contract', 'Run real model contract regression').run, "bash scripts/regression.sh '^Test(ModelContract|OfficialCredentialSupportsNativeModel)'");
   assert.ok(job.steps.every(item => !item['continue-on-error']));
   assert.equal(job.steps.find(item => item.run === 'docker compose down -v').if, 'always()');
+});
+
+/** 日志契约作业必须实际执行HTTP/PG验证及清单漂移检查；只读YAML，不接触线上。 */
+test('usage contract includes real traffic and inventory gates', () => {
+ assert.equal(step('usage-contract', 'Run real usage contract regression').run, "bash scripts/regression.sh '^TestUsageContractRealTraffic$'");
+ assert.match(step('usage-contract', 'Check core migration inventory').run, /contract-inventory.mjs --check/);
+});
+
+/** 兼容门禁必须读取真实历史、固定工具、运行失败反例并阻断WARN；只读，不降低原覆盖率门槛。 */
+test('compatibility gate compares historical contracts with real pinned checker', () => {
+  const job = workflow.jobs['contract-compatibility'];
+  assert.equal(job.steps.find(s => s.uses === 'actions/checkout@v4').with['fetch-depth'], 0);
+  assert.equal(step('contract-compatibility', 'Install pinned compatibility checker').run,
+    'go install github.com/oasdiff/oasdiff@v1.11.7');
+  assert.match(step('contract-compatibility', 'Test compatibility failure gates').run, /node --test .*compatibility.test.mjs/);
+  const comparison = step('contract-compatibility', 'Compare contracts with baseline');
+  assert.match(comparison.env.CONTRACT_BASE, /pull_request.base.sha/);
+  assert.match(comparison.run, /set -euo pipefail/);
+  assert.match(comparison.run, /check-contract-compatibility.mjs "\$base"/);
+  assert.equal(codecov.coverage.status.patch.default.target, '70%');
 });
