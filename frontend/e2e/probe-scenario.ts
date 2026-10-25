@@ -57,8 +57,8 @@ async function exerciseProbe(ctx: ProbeContext) {
   const result = page.getByTestId("probe-result");
   if (domain === "prompts") {
     expect(outbound.path).toBe("/v1/chat/completions");
-    expect(outbound.body.messages).toEqual([{ role: "user", content: "Write a greeting for Original 用户输入." }]);
-    await expect(result).toContainText("Rendered: Write a greeting for Original 用户输入.");
+    expect(outbound.body.messages).toEqual([{ role: "user", content: "Write an updated greeting for Original 用户输入." }]);
+    await expect(result).toContainText("Rendered: Write an updated greeting for Original 用户输入.");
     const callID = response.headers()["x-litellm-call-id"];
     expect(callID, "提示词执行应关联真实日志和费用").toBeTruthy();
     await expect.poll(async () => {
@@ -133,11 +133,21 @@ async function runProbeFlow(page: Page, domain: Domain, operation: Operation, lo
     expect((await detail.json()).name).toBe(name);
     if (operation !== "创建") {
       await page.getByLabel(tr("probes.name"), { exact: true }).fill(name + "-updated");
+      if (domain === "prompts") {
+        // 编辑模板正文而非只改显示名称，刷新后真实推理必须采用新模板。
+        await page.getByRole("textbox", { name: tr("probes.messages"), exact: true }).fill(JSON.stringify([{ role: "user", content: "Write an updated greeting for {{name}}." }]));
+      }
       await saveProbe(ctx, domain === "prompts" ? "PATCH" : "PUT", "probes.save");
       await page.reload();
       await page.getByRole("combobox", { name: tr("probes.record"), exact: true }).selectOption(ctx.id);
       await expect(page.getByLabel(tr("probes.name"), { exact: true })).toHaveValue(name + "-updated");
       if (domain === "search_tools") await expect(page.getByLabel(tr("probes.apiKey"), { exact: true })).toHaveValue("");
+      if (domain === "prompts") {
+        const messages = page.getByRole("textbox", { name: tr("probes.messages"), exact: true });
+        expect(JSON.parse(await messages.inputValue())).toEqual([{ role: "user", content: "Write an updated greeting for {{name}}." }]);
+        const rejected = await page.request.patch(`${GATEWAY}/prompts/${ctx.id}`, { headers: { ...ctx.headers, "Content-Type": "application/json" }, data: '{"messages":' });
+        expect(rejected.status(), "非法编辑必须失败且不得覆盖保存模板").toBe(400);
+      }
     }
     if (domain === "search_tools" && (operation === "测试" || operation === "测试连接")) {
       // 详情掩码整体回传后再测试保存配置，避免仅测临时输入或重新填 Key 掩盖错误。

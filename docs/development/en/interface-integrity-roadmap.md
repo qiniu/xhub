@@ -170,6 +170,14 @@ Preserve legacy namespaces, same-ID replacement, missing-record upsert, non-tran
 
 Acceptance covers storage failures, nested masks, actual search authentication, invalid credentials, recovery, bilingual pages, and cleanup. Real PostgreSQL regression coverage is uploaded by CI and bilingual search E2E flows run in release verification. Revert this service and adapter batch without data rollback; PR submission, merging, and deployment remain separate acceptance events.
 
+## Stage 4: prompt configuration service
+
+[Proposal #174](https://github.com/qiniu/xhub/issues/174) moves prompt configuration CRUD and defaults into `internal/gateway/promptconfig`. Compatibility adapters retain routing, authorization, strict JSON parsing, and HTTP envelopes. Prompt tests keep reading the `prompts` store and using the existing inference pipeline.
+
+Preserve same-ID replacement, missing-record upsert, shallow patches, nested creation expansion, non-transactional deletion, and null/zero/extension fields. Variable rendering, permissions, budgets, guardrails, routing, logs, and billing remain unchanged, with no database migration. `version` remains existing metadata; the test executor accepts only the default version. This batch does not implement version history, Dotprompt, or new capabilities, or expand stage-three contract coverage.
+
+Acceptance covers real SQL failures, edited saved templates, actual outbound content, usage/cost, bilingual failure/recovery flows, and cleanup. Revert this service and its adapters without data rollback; merging and deployment remain separate decisions.
+
 ## Acceptance and release for each batch
 
 Each report must identify the commit, affected APIs, old and new behavior, test layers, commands, pass/fail/skip/exclusion/rerun counts, report paths, cleanup results, and external dependency boundaries. Tests not executed must say “not run.” A command that matches no cases must not be reported as passing. Count Go top-level tests and subtests separately. Reports retain only request IDs and redacted structures, not real keys, passwords, or chat contents.

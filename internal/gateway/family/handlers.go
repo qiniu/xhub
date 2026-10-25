@@ -18,6 +18,7 @@ import (
 	"github.com/sunqirui1987/xhub/internal/catalog"
 	dpusage "github.com/sunqirui1987/xhub/internal/dataplane/usage"
 	"github.com/sunqirui1987/xhub/internal/gateway/guard"
+	"github.com/sunqirui1987/xhub/internal/gateway/promptconfig"
 	"github.com/sunqirui1987/xhub/internal/gateway/searchconfig"
 	"github.com/sunqirui1987/xhub/internal/gateway/suppliers"
 	"github.com/sunqirui1987/xhub/internal/util"
@@ -584,7 +585,7 @@ func writeCatalogPersist(s Host, w http.ResponseWriter, r *http.Request, body ma
 }
 
 // Freeze 为旧兼容响应补齐资源必需字段；kind 为资源族，obj 为可修改的 JSON 对象。
-// 无返回值；保留已有非 nil 字段并删除 password，不写数据库。供应商及搜索配置字段交给各自独立服务规范化。
+// 无返回值；保留已有非 nil 字段并删除 password，不写数据库。供应商、搜索及提示词字段交给各自独立服务规范化。
 // gateway/access.go 及旧目录适配器调用；新资源业务逻辑不应继续加入此通用分支。
 func Freeze(kind string, obj map[string]any) {
 	if kind == "credentials" || kind == "credential" {
@@ -593,6 +594,10 @@ func Freeze(kind string, obj map[string]any) {
 	}
 	if kind == "search_tools" || kind == "search_tool" || kind == "search-tools" {
 		searchconfig.Normalize(kind, obj)
+		return
+	}
+	if kind == "prompts" {
+		promptconfig.Normalize(obj)
 		return
 	}
 	delete(obj, "password")
@@ -670,9 +675,6 @@ func Freeze(kind string, obj map[string]any) {
 		setDefault(obj, "object", "eval")
 		setDefault(obj, "name", "")
 		setDefault(obj, "status", "created")
-	case "prompts":
-		setDefault(obj, "version", 1)
-		setDefault(obj, "prompt_id", id)
 	case "workflows":
 		setDefault(obj, "run_id", id)
 		setDefault(obj, "status", "completed")

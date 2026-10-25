@@ -403,3 +403,12 @@ test('search configuration release gate includes bilingual real flows', () => {
     assert.ok(existsSync(join(__dirname, '../frontend/e2e', file)));
   }
 });
+
+/** 发布验证需执行中英文提示词编辑到推理与用量的真实流程；只读登记和命令，无外部清理。 */
+test('prompt configuration release gate includes bilingual execution flows', () => {
+  const command = workflow.jobs.verify.steps.find(item => item.run?.startsWith('bash scripts/e2e.sh '))?.run;
+  for (const file of ['scenarios/columns/prompts-test.test.ts', 'scenarios/regression/prompts-probe-en.test.ts']) {
+    assert.ok(command?.split(' ').includes(file), '提示词真实流程缺失：' + file);
+    assert.ok(existsSync(join(__dirname, '../frontend/e2e', file)));
+  }
+});
