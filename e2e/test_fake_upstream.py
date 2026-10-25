@@ -202,6 +202,22 @@ class ArkUpstreamTest(unittest.TestCase):
                 self.assertEqual(error.exception.code, 400)
                 error.exception.close()
 
+    def test_short_key_provider_fixture(self):
+        """本地 HTTP 验证五字节 Key 夹具严格鉴权和协议；成功带真实用量，掩码/长 Key/空 Key 被拒绝，tearDown 清理。"""
+        body = {"model": "e2e-short-key-chat", "messages": [{"role": "user", "content": "Check saved credentials."}]}
+        result = self.request("/v1/chat/completions", body, "Bearer abcde")
+        self.assertEqual(result["choices"][0]["message"]["content"], "e2e-source")
+        self.assertEqual(result["usage"], {"prompt_tokens": 8, "completion_tokens": 2})
+        for key in ("Bearer ab*de", "Bearer sk-fake", ""):
+            with self.subTest(key=key), self.assertRaises(HTTPError) as error:
+                self.request("/v1/chat/completions", body, key)
+            self.assertEqual(error.exception.code, 401)
+            error.exception.close()
+        with self.assertRaises(HTTPError) as error:
+            self.request("/v1/responses", body, "Bearer abcde")
+        self.assertEqual(error.exception.code, 400)
+        error.exception.close()
+
     def test_item_id_model_switch_fixture(self):
         """目的：验证 Chat源/严格原生目标夹具的成功、错误ID、协议及鉴权；前置本机服务，tearDown关闭，无真实凭据。"""
         source = self.request("/v1/chat/completions", {"model": "e2e-item-id-chat", "messages": []})

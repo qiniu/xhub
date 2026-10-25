@@ -31,7 +31,7 @@ func Normalize(obj map[string]any) {
 }
 
 // mergePatch 将普通字段覆盖到 dst，并按字段合并 credential_values；仅 Update 调用，无返回值。
-// password 忽略；非对象凭据补丁忽略，空/非字符串/含掩码秘密保留旧值，普通字段允许 null 和零。
+// password 忽略；非对象凭据补丁忽略，空/非字符串/旧连续星号或当前值回显掩码保留旧值，普通字段允许 null 和零。
 func mergePatch(dst, body map[string]any) {
 	for k, v := range body {
 		if k != "password" && k != "credential_values" {
@@ -50,6 +50,11 @@ func mergePatch(dst, body map[string]any) {
 		if credentialfields.Sensitive(k) {
 			secret, _ := v.(string)
 			if strings.TrimSpace(secret) == "" || strings.Contains(secret, "**") {
+				continue
+			}
+			// 五字节秘密的回显只有一个星号，不能只检查连续 **。
+			// 只与当前存储值的实际掩码比较，避免把其他含单个 * 的真实新 Key 一并忽略。
+			if current, ok := cur[k].(string); ok && secret == maskSecret(current) {
 				continue
 			}
 		}
