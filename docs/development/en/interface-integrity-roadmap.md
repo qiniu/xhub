@@ -162,6 +162,14 @@ Stage 2 piloted supplier contracts (#149), followed by users, keys, and model/en
 - Model execution still reads the original `credentials` records. Real regression covers address/key rotation, mask preservation, upstream 401, recovery, and billing; English and Chinese E2E covers UI editing through inference.
 - Reverting this batch restores the previous implementation without database rollback. This batch is PR-only; merge and deployment are separate decisions. Other resources migrate individually; native protocol execution is outside this batch.
 
+## Stage 4, second batch: search configuration service
+
+[Proposal #172](https://github.com/qiniu/xhub/issues/172) moves search configuration CRUD, defaults, recursive secret patches, and response redaction into `internal/gateway/searchconfig`. Compatibility adapters retain routing, authorization, JSON parsing, and HTTP envelopes. Connection probes keep reading the original `search_tools` storage and sending real upstream requests.
+
+Preserve legacy namespaces, same-ID replacement, missing-record upsert, non-transactional deletion, and null/zero/extension fields. Search execution, permissions, and budgets remain unchanged; no cache or database migration. Public routes still follow the existing registry: internal legacy namespaces do not introduce public APIs or expand stage-three OpenAPI coverage.
+
+Acceptance covers storage failures, nested masks, actual search authentication, invalid credentials, recovery, bilingual pages, and cleanup. Real PostgreSQL regression coverage is uploaded by CI and bilingual search E2E flows run in release verification. Revert this service and adapter batch without data rollback; PR submission, merging, and deployment remain separate acceptance events.
+
 ## Stage 4: prompt configuration service
 
 [Proposal #174](https://github.com/qiniu/xhub/issues/174) moves prompt configuration CRUD and defaults into `internal/gateway/promptconfig`. Compatibility adapters retain routing, authorization, strict JSON parsing, and HTTP envelopes. Prompt tests keep reading the `prompts` store and using the existing inference pipeline.
