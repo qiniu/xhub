@@ -2,7 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { readFile, mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
-import { loadReferences, validateReference, referencePage } from "../src/reference.mjs";
+import { loadReferences, validateReference, referencePage, legacyOperationLinks, referenceRedirect } from "../src/reference.mjs";
 import { localizedSpec, normalizeGateway, swaggerOptions } from "../src/reference-runtime.mjs";
 import { documentSpace, referenceDomain } from "../src/document-space.mjs";
 import { documentPage, header } from "../src/templates.mjs";
@@ -97,4 +97,38 @@ test("product developer and API reference spaces remain separate", () => {
     assert.ok(sidebar.includes(doc.source.replace(".md", ".html")));
     for (const other of docs.filter(x => documentSpace(x.source) !== documentSpace(doc.source))) assert.ok(!sidebar.includes(other.source.replace(".md", ".html")));
   }
+});
+
+/** 验证实际日志契约的多段中英元数据完整切换；原始JSON和示例不变，单语及含斜线边界保持，不需清理。 */
+test("multi-clause metadata uses the selected language without losing behavior", () => {
+  const raw = entries.find(e => e.domain === "usage").raw;
+  const spec = JSON.parse(raw);
+  for (const field of ["summary", "description"]) {
+    const en = localizedSpec(spec, "en").paths["/spend/logs/session/ui"].get[field];
+    const zh = localizedSpec(spec, "zh").paths["/spend/logs/session/ui"].get[field];
+    assert.doesNotMatch(en, /[\u4e00-\u9fff]/);
+    assert.match(en, /Scoped logs.*Empty session_id/);
+    assert.match(zh, /权限范围内日志.*session_id空时/);
+    assert.doesNotMatch(zh, /Scoped logs|Empty session_id/);
+  }
+  assert.equal(JSON.stringify(spec), JSON.stringify(JSON.parse(raw)));
+  for (const text of ["只有中文", "Only English / Path", "字段 / mixed中文"]) {
+    assert.equal(localizedSpec({description:text}, "en").description, text);
+  }
+});
+
+/** 验证书签映射使用契约operationId且HTML不执行嵌入数据；正常/未知锚点由浏览器测试补充，无外部资源。 */
+test("legacy operation bookmarks map to Swagger deep links safely", () => {
+  const links = legacyOperationLinks(JSON.parse(entries.find(e => e.domain === "users").raw));
+  assert.equal(links["post-usernew"], "#/default/createUser");
+  assert.equal(links["get-userinfo"], "#/default/getUser");
+  assert.equal(links["unknown"], undefined);
+  assert.deepEqual(legacyOperationLinks({paths:{}}), {});
+  const tagged = legacyOperationLinks({paths:{"/demo":{get:{operationId:"get/demo",tags:["custom tag"]}}}});
+  assert.equal(tagged["get-demo"], "#/custom%20tag/get%2Fdemo");
+  const html = referenceRedirect("en", "../reference/en/index.html?domain=users", {...links, x:"</script>"}, ["post-usernew"]);
+  assert.equal((html.match(/<\/script>/g)||[]).length,1);
+  assert.match(html, /location.replace/);
+  assert.match(html, /post-usernew/);
+  assert.throws(() => referenceRedirect("bad", "", {}, []));
 });

@@ -7,8 +7,11 @@ test("CI builds current Swagger resources and executes both real gateway scenari
   const website = readFileSync(new URL("../../.github/workflows/website.yml", import.meta.url), "utf8");
   const release = readFileSync(new URL("../../.github/workflows/release.yml", import.meta.url), "utf8");
   assert.equal((website.match(/"contracts\/\*\*"/g) || []).length, 2, "push 和 PR 都需监视契约来源");
-  const build = release.indexOf("npm ci --prefix website && npm run build --prefix website");
-  const e2e = release.indexOf("run: bash scripts/e2e.sh");
+  const runner = readFileSync(new URL("../../scripts/e2e.sh", import.meta.url), "utf8");
+  const build = runner.indexOf('npm run build --prefix "$ROOT/website"');
+  const e2e = runner.indexOf('npx playwright test "$@"');
+  const install = runner.indexOf('npm ci --prefix "$ROOT/website"');
+  assert.ok(install > 0 && install < build);
   assert.ok(build > 0 && build < e2e, "真实浏览器回归前必须构建当前契约和 Swagger");
   for (const lang of ["en", "zh-CN"]) assert.ok(release.includes(`scenarios/regression/swagger-reference-${lang}.test.ts`));
   assert.match(website, /if: github.event_name != 'pull_request' && github.ref == 'refs\/heads\/main'/);

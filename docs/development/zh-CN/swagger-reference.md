@@ -25,4 +25,4 @@ npm run test:e2e --prefix website
 
 Swagger UI固定版本随站点打包，无运行时CDN或外部验证服务。OpenAPI仍在版本库接受CI校验，不增加线上校验中间件。旧生成Markdown链接保留迁移页，导航与搜索不再重复列出字段表；产品与开发资料侧栏分离。
 
-真实网关测试入口为 `swagger-reference-en.test.ts` 和 `swagger-reference-zh-CN.test.ts`，使用隔离PG验证浏览器401→授权→创建用户→读回、授权清除与清理。发布工作流先构建站点再执行这两条。商业上游、生产SSO和线上反向代理不在测试范围。
+真实网关测试入口为 `swagger-reference-en.test.ts` 和 `swagger-reference-zh-CN.test.ts`，使用隔离PG验证浏览器401→授权→创建用户→读回、授权清除与清理。公共 `scripts/e2e.sh` 入口会安装锁定依赖并重建当前站点，再执行浏览器测试；本地与 CI 均不依赖已有 `website/dist`。双语场景已登记到覆盖清单。旧生成文档的操作书签会定位到 Swagger 对应操作。商业上游、生产SSO和线上反向代理不在测试范围。

@@ -26,3 +26,5 @@ npm run test:e2e --prefix website
 Pinned Swagger UI assets ship with the site, without runtime CDN or external validation calls. OpenAPI stays in version control and CI; no production validation middleware is added. Old generated Markdown URLs lead to migration pages. Navigation and search no longer duplicate field tables, and product and developer sidebars are separated.
 
 The real gateway tests are `swagger-reference-en.test.ts` and `swagger-reference-zh-CN.test.ts`. Isolated PostgreSQL verifies browser 401 → authorization → user creation → readback, authorization clearing and cleanup. Release CI builds the site before these tests. Commercial providers, production SSO and production reverse proxies are outside this verification scope.
+
+The shared `scripts/e2e.sh` runner installs locked website dependencies and rebuilds the current reference before browser tests, in both local and CI runs. Both language scenarios are registered in the coverage catalog. Legacy generated-reference operation bookmarks open the corresponding Swagger operation.

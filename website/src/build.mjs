@@ -1,5 +1,5 @@
 import { referenceCopy } from "./reference-copy.mjs";
-import { loadReferences, referencePage } from "./reference.mjs";
+import { loadReferences, referencePage, legacyOperationLinks, referenceRedirect } from "./reference.mjs";
 import { documentSpace, referenceDomain } from "./document-space.mjs";
 import { publicMarkdownSources } from "./document-links.mjs";
 import { consoleDocuments } from "./console-docs.mjs";
@@ -50,9 +50,9 @@ for (const document of documents) {
   if (documentSpace(document.source) === "reference") {
     const prefix = "../".repeat(documentPath(document.source).split("/").length - 1);
     const target = `${prefix}reference/${document.lang}/index.html?domain=${referenceDomain(document.source)}`;
-    // 保留旧地址及锚点以兼容已有链接，字段参考只在独立入口展示，不复制一份可漂移正文。
-    const anchors = document.headings.map(h => `<span id="${h.id}"></span>`).join("");
-    await emit(documentPath(document.source), `<!doctype html><html lang="${document.lang === "zh" ? "zh-CN" : "en"}"><meta charset="utf-8"><meta http-equiv="refresh" content="0;url=${target}"><title>${referenceCopy[document.lang].title} · XHub</title>${anchors}<a href="${target}">${referenceCopy[document.lang].open}</a></html>`);
+    // 旧操作书签必须定位到新页面的真实操作；空span仅用于保留静态链接审计入口。
+    const entry = references.find(item => item.domain === referenceDomain(document.source));
+    await emit(documentPath(document.source), referenceRedirect(document.lang, target, legacyOperationLinks(JSON.parse(entry.raw)), document.headings.map(h => h.id)));
     continue;
   }
   await emit(documentPath(document.source), documentPage({ ...document, documents, alternate: document.source.startsWith("center/") ? document.source.replace("/" + document.lang + "/", document.lang === "zh" ? "/en/" : "/zh/") : alternate, centerGroups: synced.groups }));

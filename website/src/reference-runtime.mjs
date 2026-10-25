@@ -6,6 +6,20 @@ export function normalizeGateway(input, pageProtocol = "http:") {
   return url.href.replace(/\/$/, "");
 }
 
+/** 选择契约元数据的成对中英文说明；text 为描述，locale 为 zh/en，返回展示文本。
+ * 支持“中文 / English；下一中文 / Next English”；不匹配的格式原样保留，避免猜测或截断协议内容。 */
+export function localizedMetadata(text, locale) {
+  const separator = text.indexOf(" / ");
+  if (separator < 0) return text;
+  const chinese = text.slice(0, separator), rest = text.slice(separator + 3);
+  if (!/[\u4e00-\u9fff]/.test(chinese)) return text;
+  const boundary = rest.search(/；(?=[^；]*[\u4e00-\u9fff])/);
+  const english = boundary < 0 ? rest : rest.slice(0, boundary);
+  if (/[\u4e00-\u9fff]/.test(english)) return text;
+  const selected = locale === "zh" ? chinese : english;
+  return boundary < 0 ? selected : selected + (locale === "zh" ? "；" : "; ") + localizedMetadata(rest.slice(boundary + 1), locale);
+}
+
 /** 对已知描述元数据选择语言，返回独立副本；仅处理 description/summary/title，
  * 保留字段名、示例、默认值和枚举，避免翻译用户实际输入；不改变原始契约。 */
 export function localizedSpec(spec, locale) {
@@ -17,8 +31,7 @@ export function localizedSpec(spec, locale) {
     return Object.fromEntries(Object.entries(value).map(([key, child]) => {
       if (["example", "examples", "default", "enum", "const"].includes(key)) return [key, structuredClone(child)];
       if (["description", "summary", "title"].includes(key) && typeof child === "string") {
-        const parts = child.split(" / ");
-        if (parts.length === 2 && /[\u4e00-\u9fff]/.test(parts[0]) && !/[\u4e00-\u9fff]/.test(parts[1])) return [key, parts[locale === "zh" ? 0 : 1]];
+        return [key, localizedMetadata(child, locale)];
       }
       return [key, visit(child)];
     }));

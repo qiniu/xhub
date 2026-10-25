@@ -1,5 +1,5 @@
 import { readFile } from "node:fs/promises";
-import { escapeHTML as e } from "./core.mjs";
+import { escapeHTML as e, headingSlug } from "./core.mjs";
 import { referenceCopy, referenceDomains } from "./reference-copy.mjs";
 
 export const methods = ["get", "post", "put", "patch", "delete", "options", "head", "trace"];
@@ -55,4 +55,23 @@ export function referencePage(lang, entries) {
 <form id="target-form"><label for="gateway">${e(t.gateway)}</label><input id="gateway" type="text" placeholder="http://localhost:4000" autocomplete="off"><button type="submit">${e(t.connect)}</button><button id="disconnect" type="button">${e(t.disconnect)}</button><p>${e(t.targetHelp)}</p></form>
 <p id="status" role="status">${e(t.readOnly)}</p><p id="error" role="alert" hidden></p><p>${e(t.vendor)}</p><div id="swagger-ui"></div></main>
 <script src="../assets/swagger-ui-bundle.js"></script><script type="module" src="../assets/reference-app.js"></script></body></html>`;
+}
+
+/** 为旧生成文档构造操作锚点到 Swagger 深链接的映射；spec 为已验证契约，返回纯对象。
+ * 构建器用于迁移书签；沿用 Markdown 锚点算法及 Swagger 首标签/default 规则，不访问网络。 */
+export function legacyOperationLinks(spec) {
+  return Object.fromEntries(Object.entries(spec.paths).flatMap(([path, item]) =>
+    methods.filter(method => item[method]).map(method => {
+      const op = item[method];
+      return [headingSlug(`${method.toUpperCase()} ${path}`), `#/${encodeURIComponent(op.tags?.[0] || "default")}/${encodeURIComponent(op.operationId)}`];
+    })));
+}
+
+/** 构造旧字段参考的安全跳转 HTML；target 为站内目标，links 为操作映射，anchors 为旧标题。
+ * 浏览器将已知操作定位至真实 Swagger 操作；未知书签回退领域首页，无脚本输入拼接或凭据传递。 */
+export function referenceRedirect(lang, target, links, anchors) {
+  const title = referenceCopy[lang];
+  if (!title) throw new Error("Invalid reference language");
+  const data = JSON.stringify({ target, links }).replaceAll("<", "\\u003c");
+  return `<!doctype html><html lang="${lang === "zh" ? "zh-CN" : "en"}"><meta charset="utf-8"><title>${e(title.title)} · XHub</title>${anchors.map(id => `<span id="${e(id)}"></span>`).join("")}<a href="${e(target)}">${e(title.open)}</a><script>const migration=${data};let anchor="";try{anchor=decodeURIComponent(location.hash.slice(1))}catch{}location.replace(migration.target+(Object.hasOwn(migration.links,anchor)?migration.links[anchor]:""))</script></html>`;
 }
