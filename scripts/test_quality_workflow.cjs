@@ -184,7 +184,7 @@ test('real contract regression coverage is validated archived and uploaded', () 
     assert.ok(check.run.includes(`go tool cover -func=${profile}`), '报告必须可以被 Go 解析');
     const upload = step(job, 'Upload regression coverage');
     assert.equal(upload.uses, 'codecov/codecov-action@v5');
-    assert.equal(upload.with.files, profile);
+    assert.equal(upload.with.files, area === 'supplier' ? profile + ',coverage/search-config.out' : profile);
     assert.equal(upload.with.flags, 'backend');
     assert.equal(upload.with.name, job);
     assert.equal(upload.with.disable_search, true);
@@ -254,4 +254,17 @@ test('compatibility gate compares historical contracts with real pinned checker'
   assert.match(comparison.run, /set -euo pipefail/);
   assert.match(comparison.run, /check-contract-compatibility.mjs "\$base"/);
   assert.equal(codecov.coverage.status.patch.default.target, '70%');
+});
+
+/** 搜索配置服务复用真实数据库作业；验证回归与覆盖率上传不可遗漏，不降低门禁，只读无需清理。 */
+test('search configuration service requires real regression coverage', () => {
+  const run = step('supplier-contract', 'Run real search configuration regression');
+  assert.equal(run.run, "bash scripts/regression.sh '^Test(SearchConfigService|SearchProbe|CatalogIntegrity)'");
+  assert.equal(run.env.XHUB_REGRESSION_COVERPROFILE, 'coverage/search-config.out');
+  assert.match(step('supplier-contract', 'Validate regression coverage').run, /test -s coverage\/search-config.out/);
+  const upload = step('supplier-contract', 'Upload regression coverage');
+  assert.ok(upload.with.files.split(',').includes('coverage/search-config.out'));
+  assert.equal(upload.with.fail_ci_if_error, true);
+  const artifact = workflow.jobs['supplier-contract'].steps.find(item => item.uses === 'actions/upload-artifact@v4');
+  assert.ok(artifact.with.path.includes('coverage/search-config.out'));
 });

@@ -202,16 +202,22 @@ jobs:
         env:
           XHUB_REGRESSION_COVERPROFILE: coverage/supplier-contract.out
         run: bash scripts/regression.sh '^TestSupplier(Contract|Service)'
+      - name: Run real search configuration regression
+        env:
+          XHUB_REGRESSION_COVERPROFILE: coverage/search-config.out
+        run: bash scripts/regression.sh '^Test(SearchConfigService|SearchProbe|CatalogIntegrity)'
       - name: Validate regression coverage
         shell: bash
         run: |
           set -euo pipefail
+          test -s coverage/search-config.out
+          go tool cover -func=coverage/search-config.out | tail -1
           test -s coverage/supplier-contract.out
           go tool cover -func=coverage/supplier-contract.out | tail -1
       - name: Upload regression coverage
         uses: codecov/codecov-action@v5
         with:
-          files: coverage/supplier-contract.out
+          files: coverage/supplier-contract.out,coverage/search-config.out
           flags: backend
           name: supplier-contract
           disable_search: true
@@ -224,6 +230,7 @@ jobs:
           path: |
             .e2e/runs/
             coverage/supplier-contract.out
+            coverage/search-config.out
           if-no-files-found: error
       - run: docker compose down -v
         if: always()

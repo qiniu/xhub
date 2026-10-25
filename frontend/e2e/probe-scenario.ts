@@ -140,6 +140,34 @@ async function runProbeFlow(page: Page, domain: Domain, operation: Operation, lo
       await expect(page.getByLabel(tr("probes.name"), { exact: true })).toHaveValue(name + "-updated");
       if (domain === "search_tools") await expect(page.getByLabel(tr("probes.apiKey"), { exact: true })).toHaveValue("");
     }
+    if (domain === "search_tools" && (operation === "测试" || operation === "测试连接")) {
+      // 详情掩码整体回传后再测试保存配置，避免仅测临时输入或重新填 Key 掩盖错误。
+      const saved = await page.request.get(`${GATEWAY}/${domain}/${ctx.id}`, { headers: ctx.headers });
+      expect(saved.status()).toBe(200);
+      const masked = await saved.json();
+      expect(masked.litellm_params.api_key).toBe("********");
+      const roundTrip = await page.request.put(`${GATEWAY}/${domain}/${ctx.id}`, { headers: ctx.headers, data: masked });
+      expect(roundTrip.status()).toBe(200);
+      const retained = await page.request.post(GATEWAY + "/search_tools/test_connection", { headers: ctx.headers, data: { search_tool_id: ctx.id } });
+      expect(retained.status(), "回传掩码后必须仍使用原始 Key").toBe(200);
+      expect((await retained.json()).results_count).toBe(1);
+      // 页面将错误 Key 保存到真实服务，按记录探测必须实际得到上游 401；恢复后沿用同一记录。
+      await page.getByLabel(tr("probes.apiKey"), { exact: true }).fill("invalid-fixture-key");
+      await saveProbe(ctx, "PUT", "probes.save");
+      const before = fixture.requests.length;
+      const failure = page.waitForResponse(r => new URL(r.url()).pathname === "/search_tools/test_connection" && r.request().method() === "POST");
+      await page.getByRole("button", { name: tr("probes.test"), exact: true }).click();
+      expect((await failure).status()).toBe(401);
+      expect(fixture.requests.length).toBe(before + 1);
+      expect(fixture.requests[before].authorization).toBe("Bearer invalid-fixture-key");
+      await expect(page.getByRole("main").getByRole("alert")).toBeVisible();
+      await expect(page.getByTestId("probe-result")).toHaveCount(0);
+      await page.getByLabel(tr("probes.apiKey"), { exact: true }).fill("fixture-probe-key");
+      await saveProbe(ctx, "PUT", "probes.save");
+      await page.reload();
+      await page.getByRole("combobox", { name: tr("probes.record"), exact: true }).selectOption(ctx.id);
+      await expect(page.getByLabel(tr("probes.apiKey"), { exact: true })).toHaveValue("");
+    }
     if (operation === "测试" || operation === "测试连接") {
       if (domain === "prompts") await page.getByRole("textbox", { name: tr("probes.variables"), exact: true }).fill(JSON.stringify({ name: "Original 用户输入" }));
       else await page.getByLabel(tr("probes.query"), { exact: true }).fill("Find the official API documentation.");

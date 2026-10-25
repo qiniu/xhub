@@ -394,3 +394,12 @@ test('test gates require PostgreSQL, self-tests and structured evidence', () => 
   assert.ok(paths.includes('.e2e/release/cleanup-status.json'));
   assert.ok(paths.includes('.e2e/release-agent-reliability/cleanup-status.json'));
 });
+
+/** 搜索配置服务发布前必须执行双语真实页面流程；检查登记文件存在且纳入实际 E2E 命令，无外部清理。 */
+test('search configuration release gate includes bilingual real flows', () => {
+  const command = workflow.jobs.verify.steps.find(item => item.run?.startsWith('bash scripts/e2e.sh '))?.run;
+  for (const file of ['scenarios/columns/search-tools-connection.test.ts', 'scenarios/regression/search_tools-probe-en.test.ts']) {
+    assert.ok(command?.split(' ').includes(file), '真实搜索页面门禁缺失：' + file);
+    assert.ok(existsSync(join(__dirname, '../frontend/e2e', file)));
+  }
+});
