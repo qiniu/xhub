@@ -385,7 +385,7 @@ test('test gates require PostgreSQL, self-tests and structured evidence', () => 
   const unit = steps.findIndex(item => item.run === 'go test ./internal/... ./cmd/regression/testsupport/...');
   assert.ok(database >= 0 && database < unit, '数据库必须先于全部 DB 夹具测试启动');
   const commands = steps.map(item => item.run || '').join('\n');
-  for (const name of ['scripts.test_regression_results', 'scripts.test_test_gates', 'scripts.test_e2e_summary', 'scripts.test_e2e_model_endpoints', 'frontend/e2e/checklist-reporter.test.cjs']) {
+  for (const name of ['scripts.test_regression_results', 'scripts.test_test_gates', 'scripts.test_e2e_summary', 'scripts.test_e2e_model_endpoints', 'frontend/e2e/checklist-reporter.test.cjs', 'frontend/e2e/gateway-response.test.cjs']) {
     assert.ok(commands.includes(name), `缺少门禁测试 ${name}`);
   }
   const paths = steps.filter(item => item.uses === 'actions/upload-artifact@v4').map(item => item.with.path).join('\n');

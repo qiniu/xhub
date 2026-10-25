@@ -168,7 +168,7 @@ jobs:
           cache-dependency-path: frontend/package-lock.json
       - run: npm ci
         working-directory: frontend
-      - run: node --test scripts/test_quality_workflow.cjs scripts/test_release_workflow.cjs scripts/test_dependabot.cjs frontend/tests/check-eslint-error-budget.test.mjs frontend/e2e/checklist-reporter.test.cjs
+      - run: node --test scripts/test_quality_workflow.cjs scripts/test_release_workflow.cjs scripts/test_dependabot.cjs frontend/tests/check-eslint-error-budget.test.mjs frontend/e2e/checklist-reporter.test.cjs frontend/e2e/gateway-response.test.cjs
       - run: python3 -m unittest scripts.test_deploy_build scripts.test_regression_output scripts.test_makefile scripts.test_regression_results scripts.test_test_gates scripts.test_e2e_summary scripts.test_e2e_model_endpoints -v
 
   supplier-contract:
