@@ -178,6 +178,14 @@ Preserve same-ID replacement, missing-record upsert, shallow patches, nested cre
 
 Acceptance covers real SQL failures, edited saved templates, actual outbound content, usage/cost, bilingual failure/recovery flows, and cleanup. Revert this service and its adapters without data rollback; merging and deployment remain separate decisions.
 
+## Stage 4: guardrail configuration management service
+
+[Proposal #176](https://github.com/qiniu/xhub/issues/176) moves configuration reads, patch merging, validation, name conflict checks and persistence from `guard.Manage` into a package-local `managementService` with a narrow KV store interface. Existing validation and response redaction remain shared; execution uses the same rule-list implementation.
+
+The HTTP adapter retains authorization prerequisites, routing, JSON parsing, YAML read-only checks, error mapping and the global mutation lock. That lock still spans reading, parsing and saving, preserving error precedence and preventing concurrent duplicate names or lost credential updates. This batch neither tightens legacy JSON parsing nor declares internal branches to be public routes.
+
+The `guardrails` namespace, masked/empty credential preservation, explicit null deletion, extension fields, list aliases and existing 400/404/409/503 responses remain unchanged. No data migration or changes to permissions, budgets, trials, execution, usage or unsupported capabilities. Real HTTP/PostgreSQL tests cover concurrency, storage failures and execution; bilingual browser tests cover create, trial, redaction, edit, block and delete. Regression coverage is uploaded separately; the 70% gate remains unchanged. Reverting the service and adapter commit requires no data rollback. Merge and deployment remain separate decisions.
+
 ## Acceptance and release for each batch
 
 Each report must identify the commit, affected APIs, old and new behavior, test layers, commands, pass/fail/skip/exclusion/rerun counts, report paths, cleanup results, and external dependency boundaries. Tests not executed must say “not run.” A command that matches no cases must not be reported as passing. Count Go top-level tests and subtests separately. Reports retain only request IDs and redacted structures, not real keys, passwords, or chat contents.

@@ -261,6 +261,35 @@ jobs:
             .e2e/runs/
             coverage/prompt-config.out
           if-no-files-found: error
+      # 护栏真实回归独立采集覆盖率，不扩大第三阶段契约范围。
+      - name: Run real guard management regression
+        env:
+          XHUB_REGRESSION_COVERPROFILE: coverage/guard-management.out
+        run: bash scripts/regression.sh '^Test(GuardManagementService|Guardrail|XGoGuardrail)'
+      - name: Validate guard regression coverage
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -s coverage/guard-management.out
+          go tool cover -func=coverage/guard-management.out | tail -1
+      - name: Upload guard regression coverage
+        uses: codecov/codecov-action@v5
+        with:
+          files: coverage/guard-management.out
+          flags: backend
+          name: guard-management
+          disable_search: true
+          fail_ci_if_error: true
+          use_oidc: true
+      - name: Archive guard regression evidence
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: guard-management-regression
+          path: |
+            .e2e/runs/
+            coverage/guard-management.out
+          if-no-files-found: error
       - run: docker compose down -v
         if: always()
 

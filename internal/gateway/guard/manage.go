@@ -7,7 +7,6 @@ import (
 	"net/http"
 	"strings"
 	"sync"
-	"time"
 
 	"github.com/sunqirui1987/xhub/internal/util"
 )
@@ -79,7 +78,14 @@ func Manage(s Host, w http.ResponseWriter, r *http.Request) bool {
 		util.WriteError(w, 503, "unavailable", "guardrail store unavailable")
 		return true
 	}
+	service := managementService{Store: s.RecordStore(), Configured: func() []map[string]any { return configuredRules(s) }}
+	// 业务校验可以公开；底层存储错误仍使用既有统一文案，不能泄露连接信息。
 	fail := func(err error) {
+		var business *managementError
+		if errors.As(err, &business) {
+			util.WriteError(w, business.Status, business.Code, business.Message)
+			return
+		}
 		if errors.Is(err, sql.ErrNoRows) {
 			util.WriteError(w, 404, "not_found", "guardrail not found")
 		} else {
@@ -87,7 +93,7 @@ func Manage(s Host, w http.ResponseWriter, r *http.Request) bool {
 		}
 	}
 	if path == "/guardrails/list" || path == "/v2/guardrails/list" {
-		rows, err := storedRules(s)
+		rows, err := service.List()
 		if err != nil {
 			fail(err)
 			return true
@@ -103,11 +109,10 @@ func Manage(s Host, w http.ResponseWriter, r *http.Request) bool {
 		util.WriteError(w, 404, "not_found", "unknown guardrail operation")
 		return true
 	}
-	kind := "guardrails"
 	var row map[string]any
 	if id != "" {
 		var err error
-		row, err = s.RecordStore().GetKV(kind, id)
+		row, err = service.Get(id)
 		if err != nil {
 			fail(err)
 			return true
@@ -125,7 +130,7 @@ func Manage(s Host, w http.ResponseWriter, r *http.Request) bool {
 			util.WriteError(w, 400, "invalid_request", "guardrail id required")
 			return true
 		}
-		if err := s.RecordStore().DeleteKV(kind, id); err != nil {
+		if err := service.Delete(id); err != nil {
 			fail(err)
 			return true
 		}
@@ -136,73 +141,12 @@ func Manage(s Host, w http.ResponseWriter, r *http.Request) bool {
 			util.WriteError(w, 400, "invalid_request", "JSON object required")
 			return true
 		}
-		if inner, ok := body["guardrail"].(map[string]any); ok {
-			body = inner
-		}
-		if row == nil {
-			row = map[string]any{"created_at": time.Now().UTC().Format(time.RFC3339)}
-		}
-		for key, value := range body {
-			if key == "id" || key == "guardrail_id" || key == "created_at" || key == "guardrail_definition_location" {
-				continue
-			}
-			if key == "litellm_params" {
-				patch, ok := value.(map[string]any)
-				if !ok {
-					util.WriteError(w, 400, "invalid_request", "litellm_params must be an object")
-					return true
-				}
-				params, _ := row[key].(map[string]any)
-				if params == nil {
-					params = map[string]any{}
-				}
-				for name, v := range patch {
-					// 浏览器拿到的掩码或留空表示保留原凭据；显式 null 才删除。
-					if secretFields[name] && (v == credentialMask || v == "") && params[name] != nil {
-						continue
-					}
-					if v == nil {
-						delete(params, name)
-					} else {
-						params[name] = v
-					}
-				}
-				row[key] = params
-			} else {
-				row[key] = value
-			}
-		}
-		if err := Validate(row); err != nil {
-			util.WriteError(w, 400, "invalid_request", err.Error())
-			return true
-		}
-		rows, err := storedRules(s)
+		result, err := service.Save(id, row, body)
 		if err != nil {
 			fail(err)
 			return true
 		}
-		for _, existing := range rows {
-			if ruleIdentifies(existing, findingName(row)) && str(existing["guardrail_id"]) != id {
-				util.WriteError(w, 409, "conflict", "guardrail name conflicts with an existing name or id")
-				return true
-			}
-		}
-		if id == "" {
-			id = "guardrail_" + util.CallID()[:12]
-		}
-		row["id"], row["guardrail_id"] = id, id
-		row["updated_at"] = time.Now().UTC().Format(time.RFC3339)
-		row["guardrail_definition_location"] = "db"
-		raw, err := json.Marshal(row)
-		if err != nil {
-			util.WriteError(w, 400, "invalid_request", err.Error())
-			return true
-		}
-		if err := s.RecordStore().PutKV(kind, id, string(raw)); err != nil {
-			fail(err)
-			return true
-		}
-		util.WriteJSON(w, 200, publicRule(normalizeRule(row)))
+		util.WriteJSON(w, 200, result)
 	default:
 		util.WriteError(w, 405, "method_not_allowed", "method not allowed")
 	}
@@ -236,14 +180,5 @@ func normalizeRule(row map[string]any) map[string]any {
 // 调用：Manage、listGuardrails。
 // 测试：engine_test.go、internal/gateway/guardrail_manage_test.go。
 func storedRules(s Host) ([]map[string]any, error) {
-	out := configuredRules(s)
-	rows, err := s.RecordStore().ListKV("guardrails")
-	if err != nil {
-		return nil, err
-	}
-	for _, row := range rows {
-		out = append(out, normalizeRule(row))
-	}
-	sortRules(out)
-	return out, nil
+	return (managementService{Store: s.RecordStore(), Configured: func() []map[string]any { return configuredRules(s) }}).List()
 }
