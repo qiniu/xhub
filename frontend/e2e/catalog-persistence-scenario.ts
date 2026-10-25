@@ -6,7 +6,7 @@ import { GATEWAY, UPSTREAM, loginAdmin, sessionBearer, stableGoto, uiPath } from
 /**
  * 注册供应商目录持久化的双语完整流程；locale 为页面语言，无返回值。
  * 前置隔离数据库、真实网关、生产构建控制台和本地上游；页面创建/编辑/删除供应商，
- * 接口回读后经调试台验证配置真实用于推理，覆盖空 Key/null 扩展与列表别名，并验证非法 JSON/RPC 不覆盖已保存配置，OAuth 占位入口明确失败且不影响已登录会话。
+ * 接口回读后验证错误 Key 轮换真实拒绝、恢复后经调试台推理成功，覆盖空 Key/null 扩展与列表别名，并验证非法 JSON/RPC 不覆盖已保存配置，OAuth 占位入口明确失败且不影响已登录会话。
  * 回调页验证双语提示和真实跳转，不将收到回调当作授权成功；临时无脚本上下文仅用于观察跳转前的服务端页面文案。
  * 不拦截或伪造后台响应；finally 清理部署和凭据，运行器另行回收专属 schema。
  */
@@ -146,6 +146,29 @@ export function registerCatalogPersistence(locale: Locale) {
       const model = await page.request.get(GATEWAY + "/v2/model/info?modelId=" + encodeURIComponent(modelID), { headers });
       expect(model.status(), "部署保存后应可独立回读").toBe(200);
       expect((await model.json()).data[0].litellm_params.litellm_credential_name).toBe(name);
+
+      // 页面轮换成错误 Key 后，真实数据面必须拒绝；恢复正确 Key 后沿用原部署完成页面推理。
+      // 这样既验证编辑持久化，又避免旧缓存凭据让错误配置看起来仍可用。
+      await page.getByTestId("credential-actions-" + name).click();
+      await page.getByTestId("credential-action-edit").click();
+      await edit.getByLabel("OpenAI API Key", { exact: true }).fill("sk-invalid-rotation");
+      const rejectedKeySave = page.waitForResponse(response => new URL(response.url()).pathname === "/credentials/" + name && response.request().method() === "PATCH");
+      await edit.getByRole("button", { name: tr("Save model provider"), exact: true }).click();
+      expect((await rejectedKeySave).status()).toBe(200);
+      await expect(edit).toHaveCount(0);
+      const rejectedInference = await page.request.post(GATEWAY + "/v1/chat/completions", {
+        headers, data: { model: modelName, messages: [{ role: "user", content: "Verify invalid provider credentials are rejected." }] },
+      });
+      expect(rejectedInference.status(), "新 Key 必须立即用于真实上游，不能复用旧 Key 伪成功").toBe(401);
+      expect((await page.request.get(GATEWAY + "/auth/me", { headers })).status(), "供应商 Key 错误不得退出管理会话").toBe(200);
+      await page.reload();
+      await page.getByTestId("credential-actions-" + name).click();
+      await page.getByTestId("credential-action-edit").click();
+      await edit.getByLabel("OpenAI API Key", { exact: true }).fill("sk-fake");
+      const restoredKeySave = page.waitForResponse(response => new URL(response.url()).pathname === "/credentials/" + name && response.request().method() === "PATCH");
+      await edit.getByRole("button", { name: tr("Save model provider"), exact: true }).click();
+      expect((await restoredKeySave).status()).toBe(200);
+      await expect(edit).toHaveCount(0);
 
       await stableGoto(page, "/playground");
       await page.getByPlaceholder(tr("Select a Model"), { exact: true }).click();

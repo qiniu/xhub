@@ -110,7 +110,7 @@ test('quality runs the real Go selection and cleanup gate checks', () => {
   }
 });
 
-/** 前置真实质量工作流；契约漂移和真实数据库回归必须独立阻断，不能 continue-on-error，产物与清理必须保留；只读无清理。 */
+/** 前置真实质量工作流；契约和供应商轮换的真实数据库回归必须独立阻断，不能 continue-on-error，产物与清理必须保留；只读无清理。 */
 test('supplier pilot requires generation, schema validation and real HTTP regression', () => {
   const job = workflow.jobs['supplier-contract'];
   assert.ok(job, '必须注册供应商契约作业');
@@ -121,7 +121,7 @@ test('supplier pilot requires generation, schema validation and real HTTP regres
   assert.equal(step('supplier-contract', 'Validate OpenAPI and Go types').run, 'go test -race ./contracts/suppliers');
   assert.match(step('supplier-contract', 'Prepare contract database').run, /docker compose up -d --wait postgres redis/);
   assert.equal(step('supplier-contract', 'Run real supplier contract regression').run,
-    "bash scripts/regression.sh '^TestSupplierContract'");
+    "bash scripts/regression.sh '^TestSupplier(Contract|Service)'");
   assert.ok(job.steps.every(item => !item['continue-on-error']), '门禁不得忽略失败');
   const cleanup = job.steps.find(item => item.run === 'docker compose down -v');
   assert.equal(cleanup.if, 'always()');

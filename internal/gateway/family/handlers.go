@@ -18,6 +18,7 @@ import (
 	"github.com/sunqirui1987/xhub/internal/catalog"
 	dpusage "github.com/sunqirui1987/xhub/internal/dataplane/usage"
 	"github.com/sunqirui1987/xhub/internal/gateway/guard"
+	"github.com/sunqirui1987/xhub/internal/gateway/suppliers"
 	"github.com/sunqirui1987/xhub/internal/util"
 )
 
@@ -581,133 +582,14 @@ func writeCatalogPersist(s Host, w http.ResponseWriter, r *http.Request, body ma
 	writeCatalogStore(st, w, r, body)
 }
 
-// mergeCredentialPatch merges a credential the way LiteLLM update_db_credential does. Incoming credential_values overlay the existing fields. A masked secret that contains a run of * does not overwritethe original, or an edit form that sends the mask back would store the real secret as asterisks.
-// 参数 dst（map[string]any）：合并凭据Patch读到的 JSON 对象。缺键表示没有该字段；body（map[string]any）：已经解析的 JSON 对象。缺字段表示上游或调用方没有给这项。
-// 返回：无。正文里的普通字段已覆盖到凭据上。password 和 credential_values 不在这里整段覆盖。
-// 调用：仅在 handlers.go 内使用
-// 测试：无直接单测
-func mergeCredentialPatch(dst, body map[string]any) {
-	for k, v := range body {
-		if k == "password" || k == "credential_values" {
-			continue
-		}
-		dst[k] = v
-	}
-	incoming, ok := body["credential_values"].(map[string]any)
-	if !ok {
+// Freeze 为旧兼容响应补齐资源必需字段；kind 为资源族，obj 为可修改的 JSON 对象。
+// 无返回值；保留已有非 nil 字段并删除 password，不写数据库。供应商字段交给独立服务规范化。
+// gateway/access.go 及旧目录适配器调用；新资源业务逻辑不应继续加入此通用分支。
+func Freeze(kind string, obj map[string]any) {
+	if kind == "credentials" || kind == "credential" {
+		suppliers.Normalize(obj)
 		return
 	}
-	cur, _ := dst["credential_values"].(map[string]any)
-	if cur == nil {
-		cur = map[string]any{}
-	}
-	for k, v := range incoming {
-		if isSensitiveCredentialKey(k) {
-			s, _ := v.(string)
-			if strings.TrimSpace(s) == "" || strings.Contains(s, "**") {
-				continue
-			}
-		}
-		cur[k] = v
-	}
-	dst["credential_values"] = cur
-}
-
-// redactCredentialObject masks secret fields on a credential object. When showValues is false the original text is not returned.
-// 参数 kind（string）：分类名，用来选择限额主体、日志类型或官方端点；obj（map[string]any）：打码凭据对象读到的 JSON 对象。缺键表示没有该字段；showValues（bool）：为真时走showValues这一支。为假时保持原来的路径。
-// 返回 map[string]any（map[string]any）：打码凭据对象的字段表。缺键表示上游或库里没有这个字段。
-// 调用：仅在 handlers.go 内使用
-// 测试：无直接单测
-func redactCredentialObject(kind string, obj map[string]any, showValues bool) map[string]any {
-	if kind != "credentials" && kind != "credential" {
-		return obj
-	}
-	vals, ok := obj["credential_values"].(map[string]any)
-	if !ok {
-		return obj
-	}
-	out := make(map[string]any, len(obj))
-	for k, v := range obj {
-		if k == "credential_values" {
-			continue
-		}
-		out[k] = v
-	}
-	if showValues {
-		out["credential_values"] = maskCredentialValues(vals)
-	}
-	return out
-}
-
-// redactCredentialList masks each credential in a list.
-// 参数 kind（string）：分类名，用来选择限额主体、日志类型或官方端点；list（[]map[string]any）：打码凭据列表使用的map[string]any；showValues（bool）：为真时走showValues这一支。为假时保持原来的路径。
-// 返回 []map[string]any（[]map[string]any）：一组map[string]any。没有匹配时为空切片，不是 nil 分页。
-// 调用：仅在 handlers.go 内使用
-// 测试：无直接单测
-func redactCredentialList(kind string, list []map[string]any, showValues bool) []map[string]any {
-	if kind != "credentials" && kind != "credential" {
-		return list
-	}
-	out := make([]map[string]any, len(list))
-	for i, m := range list {
-		out[i] = redactCredentialObject(kind, m, showValues)
-	}
-	return out
-}
-
-// isSensitiveCredentialKey reports whether a field name looks like a key, token, or password. Those fields are masked by default.
-// 参数 k（string）：是否敏感凭据密钥使用的k。空串表示调用方没有提供这项。
-// 返回 bool（bool）：字段名看起来像密钥、令牌或口令时返回真。这类字段默认打码。
-// 调用：仅在 handlers.go 内使用
-// 测试：无直接单测
-func isSensitiveCredentialKey(k string) bool {
-	l := strings.ToLower(k)
-	for _, w := range []string{"authorization", "token", "key", "secret", "password", "passwd", "credential"} {
-		if strings.Contains(l, w) {
-			return true
-		}
-	}
-	return false
-}
-
-// maskCredentialValues 把凭据对象里像密钥、令牌或口令的字段换成掩码，避免明文出现在响应里。
-// 参数 in（map[string]any）：mask凭据Values读到的 JSON 对象。缺键表示没有该字段。
-// 返回 map[string]any（map[string]any）：mask凭据Values的字段表。缺键表示上游或库里没有这个字段。
-// 调用：仅在 handlers.go 内使用
-// 测试：无直接单测
-func maskCredentialValues(in map[string]any) map[string]any {
-	out := make(map[string]any, len(in))
-	for k, v := range in {
-		s, ok := v.(string)
-		if !ok || !isSensitiveCredentialKey(k) {
-			out[k] = v
-			continue
-		}
-		out[k] = maskSecret(s)
-	}
-	return out
-}
-
-// maskSecret keeps a few characters at each end of a secret. An empty string stays empty.
-// 参数 v（string）：mask秘密使用的值。空串表示调用方没有提供这项。
-// 返回 string（string）：固定文本 "*****"。
-// 调用：仅在 handlers.go 内使用
-// 测试：无直接单测
-func maskSecret(v string) string {
-	const unmasked = 4
-	if len(v) <= unmasked {
-		return "*****"
-	}
-	head := unmasked / 2
-	return v[:head] + strings.Repeat("*", len(v)-unmasked) + v[len(v)-head:]
-}
-
-// Freeze fills fields the public contract for this resource family requires. An existing value is not overwritten.
-// 参数 kind（string）：分类名，用来选择限额主体、日志类型或官方端点；obj（map[string]any）：Freeze读到的 JSON 对象。缺键表示没有该字段。
-// 返回：无。这个资源族对外必须有的字段已补上。已经有值的字段不覆盖，password 会被删掉。
-// 调用：gateway/access.go
-// 测试：无直接单测
-func Freeze(kind string, obj map[string]any) {
 	delete(obj, "password")
 	now := time.Now().UTC().Format(time.RFC3339)
 	if obj["id"] == nil {
@@ -844,9 +726,6 @@ func Freeze(kind string, obj map[string]any) {
 		setDefault(obj, "name", id)
 		setDefault(obj, "tag_name", obj["name"])
 		setDefault(obj, "spend", 0)
-	case "credentials", "credential":
-		setDefault(obj, "credential_name", id)
-		setDefault(obj, "credential_info", map[string]any{})
 	case "guardrails", "apply_guardrail":
 		setDefault(obj, "guardrail_id", id)
 		setDefault(obj, "guardrail_name", "")

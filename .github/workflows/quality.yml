@@ -201,7 +201,7 @@ jobs:
       - name: Run real supplier contract regression
         env:
           XHUB_REGRESSION_COVERPROFILE: coverage/supplier-contract.out
-        run: bash scripts/regression.sh '^TestSupplierContract'
+        run: bash scripts/regression.sh '^TestSupplier(Contract|Service)'
       - name: Validate regression coverage
         shell: bash
         run: |

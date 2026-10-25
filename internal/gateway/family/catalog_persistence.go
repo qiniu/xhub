@@ -21,7 +21,7 @@ type catalogRecordStore interface {
 }
 
 // writeCatalogStore 处理已鉴权、已解析的通用目录读写；st 为存储，w/r 为 HTTP 输出及路径，body 为请求对象。
-// 由 writeCatalogPersist 调用，结果直接写入 w；保持合法响应及缺失记录更新时的 upsert，仅真实持久化成功才能返回成功。
+// 由 writeCatalogPersist 调用，结果直接写入 w；供应商委派独立服务，其余目录保持旧 CRUD/upsert，仅真实持久化成功才能返回成功。
 // 顶层JSON-RPC信封明确拒绝，普通token资源名不得触发令牌签发；非事务批量删除失败时不回滚已删除项，但必须返回错误。
 func writeCatalogStore(st catalogRecordStore, w http.ResponseWriter, r *http.Request, body map[string]any) {
 	path := r.URL.Path
@@ -42,6 +42,10 @@ func writeCatalogStore(st catalogRecordStore, w http.ResponseWriter, r *http.Req
 		} else if alt := str(body["id"]); alt != "" && id == "" {
 			id = alt
 		}
+	}
+	if kind == "credentials" || kind == "credential" {
+		writeSupplierStore(st, w, r, kind, action, id, body)
+		return
 	}
 	switch action {
 	case "list":
@@ -103,9 +107,7 @@ func writeCatalogStore(st catalogRecordStore, w http.ResponseWriter, r *http.Req
 			// 只在确认不存在时沿用更新即创建的契约，故障读取不得覆盖已有记录。
 			m = map[string]any{"id": id, idField(kind): id, "created_at": time.Now().UTC().Format(time.RFC3339)}
 		}
-		if kind == "credentials" || kind == "credential" {
-			mergeCredentialPatch(m, body)
-		} else if kind == "search_tools" || kind == "search_tool" || kind == "search-tools" {
+		if kind == "search_tools" || kind == "search_tool" || kind == "search-tools" {
 			mergeSearchToolPatch(m, body)
 		} else {
 			for k, v := range body {

@@ -1,6 +1,11 @@
 package family
 
-import "strings"
+import (
+	"strings"
+
+	"github.com/sunqirui1987/xhub/internal/credentialfields"
+	"github.com/sunqirui1987/xhub/internal/gateway/suppliers"
+)
 
 // mergeSearchToolPatch 合并已保存搜索配置；dst 是存储读回对象，body 是更新正文，供通用目录更新调用。
 // 无返回值，修改 dst；省略、留空或回传掩码的秘密保留原值，普通参数只覆盖明确提交的字段，避免编辑地址时丢失 Key。
@@ -26,7 +31,7 @@ func mergeSearchToolPatch(dst, body map[string]any) {
 // 目录编辑回传嵌套headers的掩码时必须保留原秘密；数组含掩码时保留旧数组，避免按位置错误关联秘密。
 func mergeSearchParams(dst, incoming map[string]any) {
 	for key, value := range incoming {
-		if isSensitiveCredentialKey(key) {
+		if credentialfields.Sensitive(key) {
 			secret, _ := value.(string)
 			if strings.TrimSpace(secret) == "" || strings.Contains(secret, "**") {
 				continue
@@ -75,7 +80,10 @@ func redactCatalogObject(kind string, obj map[string]any, showValues bool) map[s
 	if kind == "search_tools" || kind == "search_tool" || kind == "search-tools" {
 		return redactSearchFields(obj).(map[string]any)
 	}
-	return redactCredentialObject(kind, obj, showValues)
+	if kind == "credentials" || kind == "credential" {
+		return suppliers.Redact(obj, showValues)
+	}
+	return obj
 }
 
 // redactCatalogList 对目录列表逐项应用响应脱敏；参数为资源种类、存储结果与凭据显示策略，返回独立列表。
@@ -95,7 +103,7 @@ func redactSearchFields(value any) any {
 	case map[string]any:
 		out := make(map[string]any, len(typed))
 		for key, item := range typed {
-			if isSensitiveCredentialKey(key) && item != nil && item != "" {
+			if credentialfields.Sensitive(key) && item != nil && item != "" {
 				out[key] = "********"
 			} else {
 				out[key] = redactSearchFields(item)
