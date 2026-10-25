@@ -162,6 +162,14 @@ Stage 2 piloted supplier contracts (#149), followed by users, keys, and model/en
 - Model execution still reads the original `credentials` records. Real regression covers address/key rotation, mask preservation, upstream 401, recovery, and billing; English and Chinese E2E covers UI editing through inference.
 - Reverting this batch restores the previous implementation without database rollback. This batch is PR-only; merge and deployment are separate decisions. Other resources migrate individually; native protocol execution is outside this batch.
 
+## Stage 4: prompt configuration service
+
+[Proposal #174](https://github.com/qiniu/xhub/issues/174) moves prompt configuration CRUD and defaults into `internal/gateway/promptconfig`. Compatibility adapters retain routing, authorization, strict JSON parsing, and HTTP envelopes. Prompt tests keep reading the `prompts` store and using the existing inference pipeline.
+
+Preserve same-ID replacement, missing-record upsert, shallow patches, nested creation expansion, non-transactional deletion, and null/zero/extension fields. Variable rendering, permissions, budgets, guardrails, routing, logs, and billing remain unchanged, with no database migration. `version` remains existing metadata; the test executor accepts only the default version. This batch does not implement version history, Dotprompt, or new capabilities, or expand stage-three contract coverage.
+
+Acceptance covers real SQL failures, edited saved templates, actual outbound content, usage/cost, bilingual failure/recovery flows, and cleanup. Revert this service and its adapters without data rollback; merging and deployment remain separate decisions.
+
 ## Acceptance and release for each batch
 
 Each report must identify the commit, affected APIs, old and new behavior, test layers, commands, pass/fail/skip/exclusion/rerun counts, report paths, cleanup results, and external dependency boundaries. Tests not executed must say “not run.” A command that matches no cases must not be reported as passing. Count Go top-level tests and subtests separately. Reports retain only request IDs and redacted structures, not real keys, passwords, or chat contents.

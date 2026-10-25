@@ -225,6 +225,35 @@ jobs:
             .e2e/runs/
             coverage/supplier-contract.out
           if-no-files-found: error
+      # 与供应商契约共用隔离数据库基础设施，提示词报告独立采集，不扩大契约覆盖声明。
+      - name: Run real prompt configuration regression
+        env:
+          XHUB_REGRESSION_COVERPROFILE: coverage/prompt-config.out
+        run: bash scripts/regression.sh '^Test(PromptConfigService|PromptProbe)'
+      - name: Validate prompt regression coverage
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -s coverage/prompt-config.out
+          go tool cover -func=coverage/prompt-config.out | tail -1
+      - name: Upload prompt regression coverage
+        uses: codecov/codecov-action@v5
+        with:
+          files: coverage/prompt-config.out
+          flags: backend
+          name: prompt-config
+          disable_search: true
+          fail_ci_if_error: true
+          use_oidc: true
+      - name: Archive prompt regression evidence
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: prompt-config-regression
+          path: |
+            .e2e/runs/
+            coverage/prompt-config.out
+          if-no-files-found: error
       - run: docker compose down -v
         if: always()
 
