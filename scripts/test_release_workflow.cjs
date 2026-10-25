@@ -385,7 +385,7 @@ test('test gates require PostgreSQL, self-tests and structured evidence', () => 
   const unit = steps.findIndex(item => item.run === 'go test ./internal/... ./cmd/regression/testsupport/...');
   assert.ok(database >= 0 && database < unit, '数据库必须先于全部 DB 夹具测试启动');
   const commands = steps.map(item => item.run || '').join('\n');
-  for (const name of ['scripts.test_regression_results', 'scripts.test_test_gates', 'scripts.test_e2e_summary', 'scripts.test_e2e_model_endpoints', 'frontend/e2e/checklist-reporter.test.cjs']) {
+  for (const name of ['scripts.test_regression_results', 'scripts.test_test_gates', 'scripts.test_e2e_summary', 'scripts.test_e2e_model_endpoints', 'frontend/e2e/checklist-reporter.test.cjs', 'frontend/e2e/gateway-response.test.cjs']) {
     assert.ok(commands.includes(name), `缺少门禁测试 ${name}`);
   }
   const paths = steps.filter(item => item.uses === 'actions/upload-artifact@v4').map(item => item.with.path).join('\n');
@@ -393,4 +393,13 @@ test('test gates require PostgreSQL, self-tests and structured evidence', () => 
   assert.ok(paths.includes('.e2e/runs/regression-*/summary.json'));
   assert.ok(paths.includes('.e2e/release/cleanup-status.json'));
   assert.ok(paths.includes('.e2e/release-agent-reliability/cleanup-status.json'));
+});
+
+/** 搜索配置服务发布前必须执行双语真实页面流程；检查登记文件存在且纳入实际 E2E 命令，无外部清理。 */
+test('search configuration release gate includes bilingual real flows', () => {
+  const command = workflow.jobs.verify.steps.find(item => item.run?.startsWith('bash scripts/e2e.sh '))?.run;
+  for (const file of ['scenarios/columns/search-tools-connection.test.ts', 'scenarios/regression/search_tools-probe-en.test.ts']) {
+    assert.ok(command?.split(' ').includes(file), '真实搜索页面门禁缺失：' + file);
+    assert.ok(existsSync(join(__dirname, '../frontend/e2e', file)));
+  }
 });
