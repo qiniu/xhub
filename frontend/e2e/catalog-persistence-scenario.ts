@@ -4,19 +4,22 @@ import { translate, type Locale } from "../src/i18n/translate";
 import { GATEWAY, UPSTREAM, loginAdmin, sessionBearer, stableGoto, uiPath } from "./helpers";
 
 /**
- * 注册供应商目录持久化的双语完整流程；locale 为页面语言，无返回值。
+ * 注册供应商目录持久化的双语完整流程；locale 为页面语言，shortKey 选择五字节单星号边界（默认长 Key），无返回值。
  * 前置隔离数据库、真实网关、生产构建控制台和本地上游；页面创建/编辑/删除供应商，
  * 接口回读后验证错误 Key 轮换真实拒绝、恢复后经调试台推理成功，覆盖空 Key/null 扩展与列表别名，并验证非法 JSON/RPC 不覆盖已保存配置，OAuth 占位入口明确失败且不影响已登录会话。
  * 回调页验证双语提示和真实跳转，不将收到回调当作授权成功；临时无脚本上下文仅用于观察跳转前的服务端页面文案。
  * 不拦截或伪造后台响应；finally 清理部署和凭据，运行器另行回收专属 schema。
  */
-export function registerCatalogPersistence(locale: Locale) {
-  test("catalog persistence survives reload and rejects invalid updates " + locale, async ({ page, browser }) => {
+export function registerCatalogPersistence(locale: Locale, shortKey = false) {
+  const credentialKey = shortKey ? "abcde" : "sk-fake";
+  const keyMask = shortKey ? "ab*de" : "sk***ke";
+  const upstreamModel = shortKey ? "e2e-short-key-chat" : "e2e-item-id-chat";
+  test("catalog persistence survives reload and rejects invalid updates " + locale + (shortKey ? " short key" : ""), async ({ page, browser }) => {
     test.setTimeout(120_000);
     const tr = (key: string) => translate(locale, key);
     // token是合法供应商名，必须走真实CRUD，不能被路径后缀误判成OAuth令牌交换。
     const name = "token";
-    const modelName = "e2e-catalog-integrity-" + locale + "-model";
+    const modelName = "e2e-catalog-integrity-" + locale + (shortKey ? "-short-model" : "-model");
     let credentialExists = false;
     let modelID = "";
     await loginAdmin(page);
@@ -67,7 +70,7 @@ export function registerCatalogPersistence(locale: Locale) {
       await page.getByRole("option").filter({ has: page.getByText("OpenAI", { exact: true }) }).click();
       await create.getByLabel(tr("Provider name")).fill(name);
       await create.getByLabel("API Base", { exact: true }).fill(UPSTREAM);
-      await create.getByLabel("OpenAI API Key", { exact: true }).fill("sk-fake");
+      await create.getByLabel("OpenAI API Key", { exact: true }).fill(credentialKey);
       const creation = page.waitForResponse(response => new URL(response.url()).pathname === "/credentials" && response.request().method() === "POST");
       await create.getByRole("button", { name: tr("Add model provider"), exact: true }).click();
       const created = await creation;
@@ -78,7 +81,7 @@ export function registerCatalogPersistence(locale: Locale) {
       expect(created.request().postDataJSON()).toMatchObject({
         credential_name: name,
         credential_info: { custom_llm_provider: "openai" },
-        credential_values: { api_base: UPSTREAM, api_key: "sk-fake" },
+        credential_values: { api_base: UPSTREAM, api_key: credentialKey },
       });
       await expect(create).toHaveCount(0);
       await page.reload();
@@ -86,7 +89,7 @@ export function registerCatalogPersistence(locale: Locale) {
       await page.getByTestId("credential-action-edit").click();
       const edit = page.getByRole("dialog", { name: tr("Edit model provider"), exact: true });
       await expect(edit.getByLabel("API Base", { exact: true })).toHaveValue(UPSTREAM);
-      await expect(edit.getByLabel("OpenAI API Key", { exact: true })).toHaveValue("sk***ke");
+      await expect(edit.getByLabel("OpenAI API Key", { exact: true })).toHaveValue(keyMask);
       await edit.getByLabel("API Base", { exact: true }).fill(UPSTREAM + "/v1");
       const update = page.waitForResponse(response => new URL(response.url()).pathname === "/credentials/" + name && response.request().method() === "PATCH");
       await edit.getByRole("button", { name: tr("Save model provider"), exact: true }).click();
@@ -109,7 +112,7 @@ export function registerCatalogPersistence(locale: Locale) {
       expect(stored.status(), "刷新后的供应商应能通过独立接口回读").toBe(200);
       expect(await stored.json()).toMatchObject({
         credential_name: name,
-        credential_values: { api_base: UPSTREAM + "/v1", api_key: "sk***ke" },
+        credential_values: { api_base: UPSTREAM + "/v1", api_key: keyMask },
       });
       // 截断 JSON 是 HTTP 契约失败，不能被当作空补丁返回成功或清空现有地址。
       const invalid = await page.request.patch(GATEWAY + "/credentials/" + name, {
@@ -129,14 +132,14 @@ export function registerCatalogPersistence(locale: Locale) {
       await page.getByTestId("credential-actions-" + name).click();
       await page.getByTestId("credential-action-edit").click();
       await expect(edit.getByLabel("API Base", { exact: true })).toHaveValue(UPSTREAM + "/v1");
-      await expect(edit.getByLabel("OpenAI API Key", { exact: true })).toHaveValue("sk***ke");
+      await expect(edit.getByLabel("OpenAI API Key", { exact: true })).toHaveValue(keyMask);
       await edit.getByRole("button", { name: tr("Cancel"), exact: true }).click();
 
       // 部署仅引用命名凭据，不另填 api_base/api_key，随后实际调用才能证明持久化配置被执行链读取。
       const deployment = await page.request.post(GATEWAY + "/model/new", { headers, data: {
         model_name: modelName,
         litellm_params: {
-          model: "e2e-item-id-chat", custom_llm_provider: "openai", litellm_credential_name: name,
+          model: upstreamModel, custom_llm_provider: "openai", litellm_credential_name: name,
           input_cost_per_token: 0.000001, output_cost_per_token: 0.000002,
         },
         model_info: { transport: "bypass_openai_chat", endpoint_types: ["chat"], pricing_source: "manual" },
@@ -146,6 +149,13 @@ export function registerCatalogPersistence(locale: Locale) {
       const model = await page.request.get(GATEWAY + "/v2/model/info?modelId=" + encodeURIComponent(modelID), { headers });
       expect(model.status(), "部署保存后应可独立回读").toBe(200);
       expect((await model.json()).data[0].litellm_params.litellm_credential_name).toBe(name);
+
+      // 在重新输入任何真实 Key 前调用，单看回读掩码无法区分原值与已被错误保存的掩码。
+      const preservedInference = await page.request.post(GATEWAY + "/v1/chat/completions", {
+        headers, data: { model: modelName, messages: [{ role: "user", content: "Verify unchanged masked credentials still authenticate." }] },
+      });
+      expect(preservedInference.status(), "页面保存回传掩码后，原始供应商 Key 必须仍可鉴权").toBe(200);
+      expect((await preservedInference.json()).choices[0].message.content).toBe("e2e-source");
 
       // 页面轮换成错误 Key 后，真实数据面必须拒绝；恢复正确 Key 后沿用原部署完成页面推理。
       // 这样既验证编辑持久化，又避免旧缓存凭据让错误配置看起来仍可用。
@@ -164,7 +174,7 @@ export function registerCatalogPersistence(locale: Locale) {
       await page.reload();
       await page.getByTestId("credential-actions-" + name).click();
       await page.getByTestId("credential-action-edit").click();
-      await edit.getByLabel("OpenAI API Key", { exact: true }).fill("sk-fake");
+      await edit.getByLabel("OpenAI API Key", { exact: true }).fill(credentialKey);
       const restoredKeySave = page.waitForResponse(response => new URL(response.url()).pathname === "/credentials/" + name && response.request().method() === "PATCH");
       await edit.getByRole("button", { name: tr("Save model provider"), exact: true }).click();
       expect((await restoredKeySave).status()).toBe(200);
@@ -190,7 +200,7 @@ export function registerCatalogPersistence(locale: Locale) {
       const after = await page.request.get(UPSTREAM + "/e2e/request-count");
       expect(after.status()).toBe(200);
       expect((await after.json()).requests, "一次页面推理必须真实抵达上游一次").toBe(count + 1);
-      // 专属上游型号同时校验 Bearer sk-fake；编辑时回传的脱敏值不能覆盖真实凭据。
+      // 专属上游型号严格校验当前长/五字节原始 Key；编辑时回传的脱敏值不能覆盖真实凭据。
       const callID = answer.headers()["x-litellm-call-id"];
       expect(callID, "页面调用必须可追踪至真实用量记录").toBeTruthy();
       await expect.poll(async () => {

@@ -371,12 +371,13 @@ class Handler(BaseHTTPRequestHandler):
                 "[DONE]",
             ])
             return
-        if model in ("e2e-item-id-chat", "e2e-item-id-native", "e2e-item-id-grok", "e2e-item-id-tracked"):
-            # 严格原生夹具按真实 GPT 的 item 类型检查 ID，浏览器必须回放真实桥接产物而非手工修正。
-            if self.headers.get("Authorization") != "Bearer sk-fake":
+        if model in ("e2e-short-key-chat", "e2e-item-id-chat", "e2e-item-id-native", "e2e-item-id-grok", "e2e-item-id-tracked"):
+            # 严格原生夹具按真实 GPT 的 item 类型检查 ID；短 Key 型号只接受原值，不能把掩码也当合法凭据。
+            expected_key = "abcde" if model == "e2e-short-key-chat" else "sk-fake"
+            if self.headers.get("Authorization") != "Bearer " + expected_key:
                 self.send_error(401)
                 return
-            if model == "e2e-item-id-chat":
+            if model in ("e2e-item-id-chat", "e2e-short-key-chat"):
                 if "chat/completions" not in self.path:
                     self.send_error(400, "Chat source received wrong protocol")
                     return

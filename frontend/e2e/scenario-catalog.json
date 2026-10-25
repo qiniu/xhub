@@ -3021,5 +3021,19 @@
     "title": "Swagger reference real user lifecycle zh",
     "kind": "implemented",
     "environment": "default offline"
+  },
+  {
+    "id": "REG-catalog-short-key-en",
+    "file": "e2e/scenarios/regression/catalog-short-key-en.test.ts",
+    "title": "catalog persistence survives reload and rejects invalid updates en short key",
+    "kind": "implemented",
+    "environment": "default offline"
+  },
+  {
+    "id": "REG-catalog-short-key-zh-CN",
+    "file": "e2e/scenarios/regression/catalog-short-key-zh-CN.test.ts",
+    "title": "catalog persistence survives reload and rejects invalid updates zh-CN short key",
+    "kind": "implemented",
+    "environment": "default offline"
   }
 ]
