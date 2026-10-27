@@ -3063,5 +3063,19 @@
     "title": "policy configuration persistence and isolation zh-CN",
     "kind": "implemented",
     "environment": "default offline"
+  },
+  {
+    "id": "REG-vector-config-service-en",
+    "file": "e2e/scenarios/regression/vector-config-service-en.test.ts",
+    "title": "vector configuration persistence and isolation en",
+    "kind": "implemented",
+    "environment": "default offline"
+  },
+  {
+    "id": "REG-vector-config-service-zh-CN",
+    "file": "e2e/scenarios/regression/vector-config-service-zh-CN.test.ts",
+    "title": "vector configuration persistence and isolation zh-CN",
+    "kind": "implemented",
+    "environment": "default offline"
   }
 ]
