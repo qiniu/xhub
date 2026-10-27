@@ -7,6 +7,7 @@ import { pageDescriptionsZhCN } from "./pageDescriptions.zh-CN";
 import { routeTemplatesZhCN } from "./routeTemplates.zh-CN";
 
 export const zhCN = {
+  tagSelector: { loadFailed: "无法读取已保存的标签，请刷新页面重试。" },
   probes: probesZhCN,
   mcpOAuthCallback: {
     title: "MCP 授权回调",

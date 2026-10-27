@@ -13,43 +13,61 @@ interface TagSelectorProps {
   accessToken: string;
 }
 
+/** 调试台标签选择器：props保留用户选中值与原文；只为管理身份读取配置。
+ * 读取失败显示本地化提示，空配置不报错；卸载或身份改变后旧请求不能覆盖新状态，无预算或权限副作用。 */
 const TagSelector: React.FC<TagSelectorProps> = ({ onChange, value, className, accessToken }) => {
   const t = useT();
   const { userRole } = useAuthorized();
   const [tags, setTags] = useState<Tag[]>([]);
   const [loading, setLoading] = useState(false);
+  const [failed, setFailed] = useState(false);
 
   useEffect(() => {
+    let active = true;
+    /** 读取当前管理身份的标签；无参数和返回值，失败更新提示，失效请求不写入组件状态。 */
     const fetchTags = async () => {
       if (!accessToken || !canAccessManagement(userRole)) return;
       setLoading(true);
+      setFailed(false);
       try {
         const response = await tagListCall(accessToken);
-        setTags(Object.values(response));
+        if (active) setTags(Object.values(response));
       } catch {
-        setTags([]);
+        if (active) {
+          setTags([]);
+          setFailed(true);
+        }
       } finally {
-        setLoading(false);
+        if (active) setLoading(false);
       }
     };
-
-    fetchTags();
+    void fetchTags();
+    return () => {
+      active = false;
+    };
   }, [accessToken, userRole]);
 
   return (
-    <MultiSelect
-      placeholder={t("Select or create tags")}
-      onValueChange={onChange}
-      value={value}
-      loading={loading}
-      className={className}
-      allowCustomValues
-      options={tags.map((tag) => ({
-        label: tag.name,
-        value: tag.name,
-        description: tag.description || undefined,
-      }))}
-    />
+    <>
+      {failed && (
+        <p role="alert" className="mb-2 text-sm text-destructive">
+          {t("tagSelector.loadFailed")}
+        </p>
+      )}
+      <MultiSelect
+        placeholder={t("Select or create tags")}
+        onValueChange={onChange}
+        value={value}
+        loading={loading}
+        className={className}
+        allowCustomValues
+        options={tags.map((tag) => ({
+          label: tag.name,
+          value: tag.name,
+          description: tag.description || undefined,
+        }))}
+      />
+    </>
   );
 };
 

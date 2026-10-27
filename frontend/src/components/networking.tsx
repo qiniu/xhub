@@ -4960,47 +4960,16 @@ const formatYmd = (value: Date): string => {
   return `${year}-${month}-${day}`;
 };
 
+/** 读取真实标签配置；accessToken为现有管理身份，日期为兼容查询参数，返回名称字典。
+ * 供标签选择器与查询hook使用；HTTP/解析/网络错误必须reject，不能将失败伪装为空配置，不改变权限判断。 */
 export const tagListCall = async (
   accessToken: string,
   startTime?: Date | null,
   endTime?: Date | null,
-): Promise<TagListResponse> => {
-  try {
-    let url = proxyBaseUrl ? `${proxyBaseUrl}/tag/list` : `/tag/list`;
-
-    if (startTime && endTime) {
-      const params = new URLSearchParams({
-        start_date: formatYmd(startTime),
-        end_date: formatYmd(endTime),
-      });
-      url = `${url}?${params.toString()}`;
-    }
-
-    const response = await fetch(url, {
-      method: "GET",
-      headers: {
-        [globalLitellmHeaderName]: `Bearer ${accessToken}`,
-      },
-    });
-
-    if (!response.ok) {
-      const errorData = await response.text();
-      if (isQuietAccessDenial(errorData)) {
-        return {};
-      }
-      await handleError(errorData);
-      return {};
-    }
-
-    const data = await response.json();
-    return data as TagListResponse;
-  } catch (error) {
-    if (!isQuietAccessDenial(error)) {
-      console.error("Error listing tags:", error instanceof Error ? error.message : error);
-    }
-    throw error;
-  }
-};
+): Promise<TagListResponse> => apiClient.get("/tag/list", {
+  accessToken,
+  query: startTime && endTime ? { start_date: formatYmd(startTime), end_date: formatYmd(endTime) } : undefined,
+});
 
 export const tagDeleteCall = async (accessToken: string, tagName: string): Promise<void> => {
   try {
