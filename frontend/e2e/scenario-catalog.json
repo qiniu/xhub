@@ -3035,5 +3035,19 @@
     "title": "catalog persistence survives reload and rejects invalid updates zh-CN short key",
     "kind": "implemented",
     "environment": "default offline"
+  },
+  {
+    "id": "REG-guard-management-service-en",
+    "file": "e2e/scenarios/regression/guard-management-service-en.test.ts",
+    "title": "guard management service lifecycle en",
+    "kind": "implemented",
+    "environment": "default offline"
+  },
+  {
+    "id": "REG-guard-management-service-zh-CN",
+    "file": "e2e/scenarios/regression/guard-management-service-zh-CN.test.ts",
+    "title": "guard management service lifecycle zh-CN",
+    "kind": "implemented",
+    "environment": "default offline"
   }
 ]

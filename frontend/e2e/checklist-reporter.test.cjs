@@ -194,3 +194,21 @@ test('Swagger双语场景登记且失败不能假通过', () => {
   results[0].status='failed';
   assert.equal(evaluateScenarios(catalog,results).passed,1);
 });
+
+/** 护栏双语闭环必须进入固定全量分母；前置真实目录，验证精确文件/标题与未知项拒绝，无外部数据。 */
+test('护栏管理双语场景登记且不漏入全量分母', () => {
+  const fs = require('node:fs');
+  const path = require('node:path');
+  const catalog = require('./scenario-catalog.json');
+  const {evaluateScenarios} = require('./scenario-coverage.cjs');
+  const results = ['en','zh-CN'].map(locale => ({
+    file: `e2e/scenarios/regression/guard-management-service-${locale}.test.ts`,
+    title: 'guard management service lifecycle ' + locale, status: 'passed',
+  }));
+  for (const result of results) assert.ok(fs.existsSync(path.join(__dirname,'..',result.file)));
+  const report = evaluateScenarios(catalog, results);
+  assert.deepEqual(report.unregistered, []);
+  assert.equal(report.passed, 2);
+  assert.equal(catalog.filter(row => results.some(result => result.file === row.file && result.title === row.title)).length, 2);
+  assert.equal(evaluateScenarios(catalog, [{...results[0],title:'unknown guard scenario'}]).unregistered.length, 1);
+});
