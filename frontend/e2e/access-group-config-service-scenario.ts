@@ -19,13 +19,34 @@ async function cleanupAccessResources(api: APIRequestContext, state: Resources) 
     }));
     failures.push(...results.filter(result => result.status === "rejected"));
   } catch (error) { failures.push(error); }
-  // 即便组清理失败也继续删用户，避免首个错误导致剩余测试资源泄漏。
-  if (state.userID) {
-    try {
-      const deleted = await api.post(GATEWAY + "/user/delete", { headers: state.headers, data: { user_id: state.userID } });
+  // 创建可能已经提交却丢失响应；按本测试专属邮箱分页找回，不能仅依赖成功解析的ID。
+  try {
+    const ids = new Set(state.userID ? [state.userID] : []);
+    if (!state.userID) {
+      const email = state.name + "@example.invalid";
+      let pages = 1;
+      for (let page = 1; page <= pages; page++) {
+        const response = await api.get(GATEWAY + "/user/list", {
+          headers: state.headers, params: { user_email: email, page, page_size: 100 },
+        });
+        expect(response.status(), "找回测试用户必须成功").toBe(200);
+        const result = await response.json();
+        expect(Array.isArray(result.users), "用户列表结构必须有效").toBe(true);
+        expect(Number.isInteger(result.total_pages) && result.total_pages >= 0, "用户分页必须有效").toBe(true);
+        pages = result.total_pages;
+        // 查询是模糊过滤；删除前仍需精确匹配，避免清理相近邮箱。
+        for (const user of result.users.filter((row: { user_email: string }) => row.user_email === email)) {
+          expect(typeof user.user_id === "string" && user.user_id.length > 0, "找回用户必须有ID").toBe(true);
+          ids.add(user.user_id);
+        }
+      }
+    }
+    const results = await Promise.allSettled([...ids].map(async id => {
+      const deleted = await api.post(GATEWAY + "/user/delete", { headers: state.headers, data: { user_id: id } });
       expect(deleted.status(), "用户及Key清理须成功").toBe(200);
-    } catch (error) { failures.push(error); }
-  }
+    }));
+    failures.push(...results.filter(result => result.status === "rejected"));
+  } catch (error) { failures.push(error); }
   expect(failures, "所有独占资源均须清理").toEqual([]);
 }
 
@@ -62,7 +83,8 @@ export function registerAccessGroupConfigService(locale: Locale) {
       user_email: email, password: "access-test-password", user_role: "user", max_budget: 500,
     } });
     expect(user.status(), await user.text()).toBe(200);
-    resources.userID = (await user.json()).user_id;
+    // 英文场景故意不保存响应ID，真实数据库清理由邮箱找回；中文保留已知ID路径。
+    if (locale === "zh-CN") resources.userID = (await user.json()).user_id;
     const created = await page.request.post(GATEWAY + "/access_group/new", { headers, data: {
       name: resources.name, models: ["not-a-granted-model"], access_model_names: ["not-a-granted-model"], budget_id: "no-budget",
     } });
