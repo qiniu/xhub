@@ -9,19 +9,25 @@ const path = require("node:path");
 /** 启动真实 Playwright 子进程验证 fixture 生命周期；mode 为正常、抛错或超时。
  * 只启动本机标签清理端点，不使用浏览器/数据库或生产凭据；验证业务状态与独立 teardown 请求，finally 删临时文件并关闭监听。
  */
-async function exerciseTagTeardown(mode) {
+async function exerciseTagTeardown(mode, customers = false) {
   const calls = [];
   const server = createServer((req, res) => {
     let body = "";
     req.on("data", (chunk) => (body += chunk));
     req.on("end", () => {
-      const name = JSON.parse(body).name;
-      calls.push(req.method + " " + req.url + " " + name);
-      const deleting = req.url === "/tag/delete";
-      res.writeHead(mode === "cleanupFailure" && deleting ? 500 : deleting ? 200 : mode === "leftover" ? 200 : 404, {
-        "Content-Type": "application/json",
-      });
-      res.end(JSON.stringify(deleting ? { deleted: 1 } : {}));
+      const input = body ? JSON.parse(body) : {};
+      const name = input.name || input.user_id || "";
+      calls.push(req.method + " " + req.url + (name ? " " + name : ""));
+      const deleting = req.url.endsWith("/delete");
+      const listing = req.url === "/customer/list";
+      let status = 404;
+      if (deleting || listing || mode === "leftover") status = 200;
+      if (mode === "cleanupFailure" && deleting) status = 500;
+      let payload = {};
+      if (deleting) payload = { deleted: 1 };
+      if (listing) payload = { data: mode === "leftover" ? [{ user_id: "owned-tag" }] : [] };
+      res.writeHead(status, { "Content-Type": "application/json" });
+      res.end(JSON.stringify(payload));
     });
   });
   await new Promise((resolve) => server.listen(0, "127.0.0.1", resolve));
@@ -35,7 +41,7 @@ async function exerciseTagTeardown(mode) {
 import {test} from ${JSON.stringify(fixturePath)};
 test('fixture lifecycle',async({tagResource:r})=>{
  test.setTimeout(300);
- r.name='owned-tag';r.headers={Authorization:'Bearer test'};
+ r.name='owned-tag';r.headers={Authorization:'Bearer test'};r.customers=${customers};
  ${{ timeout: "await new Promise(()=>{});", failure: 'throw new Error("intentional test failure");', success: "", cleanupFailure: "", leftover: "" }[mode]}
 });
 `,
@@ -76,6 +82,8 @@ test('fixture lifecycle',async({tagResource:r})=>{
     );
     const expected = ["POST /tag/delete owned-tag", "POST /tag/delete owned-tag-collision"];
     if (mode !== "cleanupFailure") expected.push("POST /tag/info owned-tag", "POST /tag/info owned-tag-collision");
+    if (customers)
+      expected.push("POST /customer/delete owned-tag", "POST /end_user/delete owned-tag", "GET /customer/list");
     assert.deepEqual(calls.sort(), expected.sort());
   } finally {
     server.closeAllConnections();
@@ -86,3 +94,7 @@ test('fixture lifecycle',async({tagResource:r})=>{
 /** 正常、异常和超时都要走独立清理，清理500或删除后仍有数据也必须失败；子进程使用真实 HTTP 调用，故意失败不等于业务 E2E 通过。 */
 for (const mode of ["success", "failure", "timeout", "cleanupFailure", "leftover"])
   test("tag fixture teardown after " + mode, () => exerciseTagTeardown(mode));
+
+/** 同样在业务失败、超时、清理失败时验证两个客户空间均被尝试清理；客户残留不能因标签已删而被掩盖。 */
+for (const mode of ["success", "failure", "timeout", "cleanupFailure", "leftover"])
+  test("metadata fixture teardown after " + mode, () => exerciseTagTeardown(mode, true));

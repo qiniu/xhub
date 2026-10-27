@@ -3077,5 +3077,19 @@
     "title": "tag catalog read after write zh-CN",
     "kind": "implemented",
     "environment": "default offline"
+  },
+  {
+    "id": "REG-metadata-config-service-en",
+    "file": "e2e/scenarios/regression/metadata-config-service-en.test.ts",
+    "title": "metadata configuration lifecycle en",
+    "kind": "implemented",
+    "environment": "default offline"
+  },
+  {
+    "id": "REG-metadata-config-service-zh-CN",
+    "file": "e2e/scenarios/regression/metadata-config-service-zh-CN.test.ts",
+    "title": "metadata configuration lifecycle zh-CN",
+    "kind": "implemented",
+    "environment": "default offline"
   }
 ]

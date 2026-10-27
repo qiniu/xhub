@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"time"
 
+	"github.com/sunqirui1987/xhub/internal/gateway/metadataconfig"
 	"github.com/sunqirui1987/xhub/internal/util"
 )
 
@@ -21,7 +22,7 @@ type catalogRecordStore interface {
 }
 
 // writeCatalogStore 处理已鉴权、已解析的通用目录读写；st 为存储，w/r 为 HTTP 输出及路径，body 为请求对象。
-// 由 writeCatalogPersist 调用，结果直接写入 w；供应商、搜索、提示词及策略配置委派独立服务，其余目录保持旧 CRUD/upsert，仅真实持久化成功才能返回成功。
+// 由 writeCatalogPersist 调用，结果直接写入 w；供应商、搜索、提示词、策略及标签/客户CRUD委派独立服务，其余目录保持旧 CRUD/upsert，仅真实持久化成功才能返回成功。
 // 顶层JSON-RPC信封明确拒绝，普通token资源名不得触发令牌签发；非事务批量删除失败时不回滚已删除项，但必须返回错误。
 func writeCatalogStore(st catalogRecordStore, w http.ResponseWriter, r *http.Request, body map[string]any) {
 	path := r.URL.Path
@@ -57,6 +58,11 @@ func writeCatalogStore(st catalogRecordStore, w http.ResponseWriter, r *http.Req
 	}
 	if kind == "policies" || kind == "policy" {
 		writePolicyConfigStore(st, w, r, kind, action, id, body)
+		return
+	}
+	// 只迁移明确的CRUD入口；block/unblock和统计等执行型旧路径不因此获得新的业务语义。
+	if metadataconfig.Supports(kind) && metadataCRUDPath(path) {
+		writeMetadataConfigStore(st, w, r, kind, action, id, body)
 		return
 	}
 	switch action {

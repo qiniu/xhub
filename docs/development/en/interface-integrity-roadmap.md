@@ -245,3 +245,15 @@ See [core contract completion](core-contract-completion.md) for stage3 scope, ev
 - Unit tests cover normal, boundary, failure and namespace behavior. Real HTTP/PostgreSQL regressions cover permissions, SQL read/write faults, recovery and cleanup; real local-provider calls verify unchanged billing and zero-budget denial. The same regressions also run against the pre-refactor management implementation as a compatibility baseline.
 - Browser tests in both console locale environments cover page creation, reload, HTTP updates, rejection/recovery, model calls and deletion. The legacy policy page still uses its existing Chinese controls; this backend extraction does not claim to fix that localization debt. Independent request contexts clean up after success, failure and timeout; cleanup errors fail tests. CI uploads real regression coverage without lowering the 70% gate.
 - No data migration or production deployment. Reverting the service and adapter restores the old implementation over the same stored records.
+
+## Stage 4: tag and end-customer configuration
+
+[Proposal #189](https://github.com/qiniu/xhub/issues/189) builds on the tag read/write fix in #188. The narrow KV service `metadataconfig` owns CRUD, legacy defaults and list projections for `tag`, `tags`, `customer` and `end_user`. Existing adapters retain authentication, request parsing, envelopes and error mapping. Public scope is new/info/update/delete/list under `/tag`, `/customer` and `/end_user`; internal `tags` compatibility does not add public endpoints.
+
+Customer lists still combine two independent namespaces and expose only user_id/spend/blocked/max_budget. Identical IDs remain two rows rather than one identity. A failure reading either namespace now returns a sanitized 500 instead of a misleading empty or partial 200; an empty database still returns an empty list. Tags retain their name dictionary. Customer GET detail currently reads user_id from a JSON body; query-only behavior is unchanged.
+
+blocked/max_budget remain configuration metadata. This batch adds no authorization, blocking or budget enforcement. block/unblock, statistics and other execution-shaped legacy endpoints are excluded and require a separate semantic audit. Registration or successful storage does not prove their operation. Swagger support claims are unchanged.
+
+Real HTTP/PostgreSQL tests run before and after extraction. Customer read faults fail before the fix and pass after it; CRUD, namespace isolation, permissions, model calls and billing remain covered. English/Chinese browser tests exercise customer persistence and tag refresh/error recovery/chat/deletion. Real Playwright subprocesses verify cleanup after failures and timeouts. CI separately collects regression coverage without lowering the 70% gate.
+
+No database migration is needed; reverting the service and adapters preserves existing data. This batch depends on #188 and is not a claim of merge, deployment or completion of stage 4. Live providers, production SSO and reverse proxies are outside the offline boundary.
