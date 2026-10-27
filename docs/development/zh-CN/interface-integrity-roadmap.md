@@ -245,3 +245,28 @@ npm run test:types
 - 单元验证正常、边界、失败和命名空间；真实 HTTP/PostgreSQL 回归验证权限、SQL 读写故障、恢复与清理，配置更新前后真实本地模型调用、费用和零预算拦截保持原规则。同组回归也在重构前的管理实现上执行，作为兼容基线。
 - 双语控制台环境验证页面创建、刷新读回、HTTP 更新/错误后恢复、模型通路和删除。旧策略页面仍使用原有中文控件，本次无前端产品文案变更，不声称修复了其国际化欠账。测试独立请求上下文在正常、失败和超时后清理，清理失败阻止通过；CI 采集上传真实回归覆盖率，70% 门禁不变。
 - 无数据库迁移。回退服务及 HTTP 适配器即可继续读取原记录；不合并或部署生产。
+
+## 第四阶段预算配置与组织、团队旧入口
+
+[提案 #191](https://github.com/qiniu/xhub/issues/191) 将预算配置的 KV 读写和默认字段移至 `internal/gateway/budgetconfig`。HTTP 适配层保留原管理鉴权、路径/ID 解析和响应包络。`budget` 与 `budgets` 命名空间仍分离；创建覆盖、浅层补丁、缺失 upsert、null/零值、历史嵌套字段展开及非事务删除计数保持原样。
+
+`/budget/*` 的配置记录不是账号预算账本：保存 `max_budget: 0` 不会自动赋予组织、团队、用户或 Key 零预算。真实 IAM 额度、继承、软预算、刷新和预留对账仍由原处理器负责，本轮不连接两种概念，也不扩张第三阶段 OpenAPI 支持声明。
+
+以下 20 个已登记旧入口没有 IAM 执行器。旧实现曾写入不生效的 KV、返回无关对象或缺失错误；现在原管理鉴权通过后统一返回 `501` / `unsupported_iam_operation`，不再读取或写入目录：
+
+| 方法 | 路径 |
+| --- | --- |
+| POST | `/organization/info` |
+| PATCH | `/organization/member_update`、`/v2/organization/{organization_id}` |
+| GET | `/organization/spend/report` |
+| POST | `/team/block`、`/team/unblock`、`/team/bulk_member_add`、`/team/key/bulk_update` |
+| POST | `/team/model/add`、`/team/model/delete`、`/team/permissions_bulk_update`、`/team/permissions_update` |
+| POST | `/team/{team_id}/disable_logging`、`/team/{team_id}/member/{user_id}/reset_spend` |
+| PATCH | `/team/{team_id}` |
+| GET | `/team/filter/ui`、`/team/metadata_schema`、`/team/permissions_list`、`/team/spend/report`、`/team/{team_id}/members/me` |
+
+兼容影响仅针对这些未实现的入口：调用方应处理明确不支持，不能再把旧 200 当作修改成功。真实组织/团队创建、编辑、成员管理、列表、详情和 `/team/spend/by_user` 仍由原模块执行；已删除 callback 路由仍为 404。匿名 401、普通成员 403 不变。
+
+验收包含迁移前预算正向基线、旧入口假成功红测、真实 PostgreSQL 读写故障注入与恢复、20 个旧入口的权限/501/无误写、实际对话及费用、原组织/团队零预算拒绝。浏览器在中英文控制台环境验证预算创建、编辑、刷新、错误后恢复、旧入口拒绝、模型调用及删除；旧预算页中文控件未在本轮重做。独立夹具在正常、失败和超时后清理，清理失败阻止通过。CI 上传该组真实回归覆盖率，70% 门禁保持不变。
+
+不迁移或删除旧 KV。预算服务可单独回退，原数据继续可读；不应以恢复旧入口假成功作为故障回退。测试仅使用隔离 PostgreSQL 和本地协议上游，不证明外部模型供应商可用；PR 不自动合并或部署。

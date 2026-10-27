@@ -17,6 +17,7 @@ import (
 
 	"github.com/sunqirui1987/xhub/internal/catalog"
 	dpusage "github.com/sunqirui1987/xhub/internal/dataplane/usage"
+	"github.com/sunqirui1987/xhub/internal/gateway/budgetconfig"
 	"github.com/sunqirui1987/xhub/internal/gateway/guard"
 	"github.com/sunqirui1987/xhub/internal/gateway/policyconfig"
 	"github.com/sunqirui1987/xhub/internal/gateway/promptconfig"
@@ -558,10 +559,14 @@ func ServeMixed(s Host, w http.ResponseWriter, r *http.Request) {
 }
 
 // ServeMgmt 先鉴权再执行管理目录操作；s 为宿主，w/r 为 HTTP 响应和请求，由 gateway/catalog.go 调用。
-// 返回结果直接写入 w；护栏仍使用自己的处理器，通用目录仅接受空正文或一个完整 JSON 对象，解析失败不触碰存储。
+// 返回结果直接写入 w；未接入IAM的组织/团队旧目录在鉴权后拒绝，不能冒充真实业务操作；护栏仍使用自己的处理器，通用目录仅接受空正文或一个完整 JSON 对象，解析失败不触碰存储。
 // 测试：catalog_persistence_test.go；不放宽任何权限，不改变空 GET/DELETE 正文语义。
 func ServeMgmt(s Host, w http.ResponseWriter, r *http.Request) {
 	if s.RequireManage(w, r) == nil {
+		return
+	}
+	if isIAMFallbackPath(r.URL.Path) {
+		util.WriteError(w, http.StatusNotImplemented, "unsupported_iam_operation", "this legacy organization or team operation is not implemented")
 		return
 	}
 	if guard.Manage(s, w, r) {
@@ -586,9 +591,13 @@ func writeCatalogPersist(s Host, w http.ResponseWriter, r *http.Request, body ma
 }
 
 // Freeze 为旧兼容响应补齐资源必需字段；kind 为资源族，obj 为可修改的 JSON 对象。
-// 无返回值；保留已有非 nil 字段并删除 password，不写数据库。供应商、搜索、提示词及策略字段交给各自独立服务规范化。
+// 无返回值；保留已有非 nil 字段并删除 password，不写数据库。供应商、搜索、提示词、策略及预算配置字段交给各自独立服务规范化。
 // gateway/access.go 及旧目录适配器调用；新资源业务逻辑不应继续加入此通用分支。
 func Freeze(kind string, obj map[string]any) {
+	if kind == "budget" || kind == "budgets" {
+		budgetconfig.Normalize(kind, obj)
+		return
+	}
 	if kind == "policies" || kind == "policy" {
 		policyconfig.Normalize(kind, obj)
 		return
@@ -816,26 +825,6 @@ func Freeze(kind string, obj map[string]any) {
 		setDefault(obj, "name", "")
 		setDefault(obj, "version", "1")
 		setDefault(obj, "enabled", true)
-	case "budget", "budgets":
-		setDefault(obj, "budget_id", id)
-		if _, ok := obj["max_budget"]; !ok {
-			obj["max_budget"] = nil
-		}
-		if _, ok := obj["soft_budget"]; !ok {
-			obj["soft_budget"] = nil
-		}
-		if _, ok := obj["tpm_limit"]; !ok {
-			obj["tpm_limit"] = nil
-		}
-		if _, ok := obj["rpm_limit"]; !ok {
-			obj["rpm_limit"] = nil
-		}
-		if _, ok := obj["budget_duration"]; !ok {
-			obj["budget_duration"] = nil
-		}
-		if _, ok := obj["budget_reset_at"]; !ok {
-			obj["budget_reset_at"] = nil
-		}
 	}
 }
 

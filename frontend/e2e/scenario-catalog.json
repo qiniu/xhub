@@ -3063,5 +3063,19 @@
     "title": "policy configuration persistence and isolation zh-CN",
     "kind": "implemented",
     "environment": "default offline"
+  },
+  {
+    "id": "REG-budget-iam-en",
+    "file": "e2e/scenarios/regression/budget-iam-en.test.ts",
+    "title": "budget configuration and IAM boundary en",
+    "kind": "implemented",
+    "environment": "default offline"
+  },
+  {
+    "id": "REG-budget-iam-zh-CN",
+    "file": "e2e/scenarios/regression/budget-iam-zh-CN.test.ts",
+    "title": "budget configuration and IAM boundary zh-CN",
+    "kind": "implemented",
+    "environment": "default offline"
   }
 ]

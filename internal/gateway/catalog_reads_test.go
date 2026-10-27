@@ -60,6 +60,19 @@ func TestCatalogReads(t *testing.T) {
 				}
 				return
 			}
+			// 仅这些尚未接入IAM的旧读取入口拒绝；真实组织/团队查询仍必须遵守下方成功契约。
+			switch rt.Path {
+			case "/organization/spend/report", "/team/spend/report", "/team/permissions_list", "/team/filter/ui", "/team/metadata_schema", "/team/{team_id}/members/me":
+				var probe map[string]any
+				if status != http.StatusNotImplemented || json.Unmarshal(body, &probe) != nil {
+					t.Fatalf("unsupported IAM status %d %s", status, trim(body))
+				}
+				errObj, _ := probe["error"].(map[string]any)
+				if errObj["type"] != "unsupported_iam_operation" {
+					t.Fatalf("unsupported IAM contract %s", trim(body))
+				}
+				return
+			}
 			if (strings.Contains(path, "/threads/") && strings.HasSuffix(path, "/messages")) ||
 				strings.HasPrefix(path, "/guardrails/submissions/") ||
 				path == "/authorize/flow" || path == "/guardrails/ui/major_airlines" || strings.HasPrefix(path, "/guardrails/ui/category_yaml/") {

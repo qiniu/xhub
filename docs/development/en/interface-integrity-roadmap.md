@@ -245,3 +245,28 @@ See [core contract completion](core-contract-completion.md) for stage3 scope, ev
 - Unit tests cover normal, boundary, failure and namespace behavior. Real HTTP/PostgreSQL regressions cover permissions, SQL read/write faults, recovery and cleanup; real local-provider calls verify unchanged billing and zero-budget denial. The same regressions also run against the pre-refactor management implementation as a compatibility baseline.
 - Browser tests in both console locale environments cover page creation, reload, HTTP updates, rejection/recovery, model calls and deletion. The legacy policy page still uses its existing Chinese controls; this backend extraction does not claim to fix that localization debt. Independent request contexts clean up after success, failure and timeout; cleanup errors fail tests. CI uploads real regression coverage without lowering the 70% gate.
 - No data migration or production deployment. Reverting the service and adapter restores the old implementation over the same stored records.
+
+## Stage 4: budget configuration and legacy organization/team endpoints
+
+[Proposal #191](https://github.com/qiniu/xhub/issues/191) moves budget configuration persistence and defaults into `internal/gateway/budgetconfig`. The HTTP adapter retains authorization, path/ID parsing and response envelopes. Separate `budget`/`budgets` namespaces, overwrite-on-create, shallow patches, missing-record upsert, null/zero values, legacy nested-field expansion and non-transactional deletion counts remain unchanged.
+
+These configuration records are not account budget ledgers. Saving `max_budget: 0` does not automatically assign that limit to an organization, team, user or Key. Existing IAM limits, inheritance, soft budgets, renewals and reservation reconciliation keep their original handlers. This change does not connect the two concepts or expand Stage 3 OpenAPI support claims.
+
+The following 20 registered legacy endpoints have no IAM executor. Previously they could write ineffective KV records, return unrelated objects or report a missing catalog record. After the existing management authorization, they now return `501` / `unsupported_iam_operation`, without reading or writing the generic catalog:
+
+| Method | Paths |
+| --- | --- |
+| POST | `/organization/info` |
+| PATCH | `/organization/member_update`, `/v2/organization/{organization_id}` |
+| GET | `/organization/spend/report` |
+| POST | `/team/block`, `/team/unblock`, `/team/bulk_member_add`, `/team/key/bulk_update` |
+| POST | `/team/model/add`, `/team/model/delete`, `/team/permissions_bulk_update`, `/team/permissions_update` |
+| POST | `/team/{team_id}/disable_logging`, `/team/{team_id}/member/{user_id}/reset_spend` |
+| PATCH | `/team/{team_id}` |
+| GET | `/team/filter/ui`, `/team/metadata_schema`, `/team/permissions_list`, `/team/spend/report`, `/team/{team_id}/members/me` |
+
+Clients of these unimplemented endpoints must handle the explicit rejection instead of treating a historical 200 as a successful IAM mutation. Real organization/team creation, editing, membership, lists, details and `/team/spend/by_user` retain their existing handlers. Removed callback routes remain 404. Anonymous 401 and member 403 responses are unchanged.
+
+Validation includes the pre-extraction budget baseline, false-success reproduction, real PostgreSQL read/write failures and recovery, all 20 legacy endpoints, unchanged IAM data, real local-provider inference and charges, and existing zero-budget denial. Browser tests run in both console locales through budget creation, editing, refresh, failure/recovery, legacy rejection, inference and deletion. The old budget controls remain Chinese; this batch does not claim to fix their existing localization debt. Independent fixtures clean up after success, failure and timeout; cleanup failures fail the tests. CI uploads real regression coverage and retains the 70% gate.
+
+No KV migration or deletion is required. Budget service extraction can be reverted independently while retaining stored records; restoring false success is not a valid recovery strategy. Tests use isolated PostgreSQL and a local protocol provider, not external model credentials. Creating the PR does not merge or deploy it.
