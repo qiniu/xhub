@@ -235,3 +235,13 @@ Pin the reference version or commit during implementation and record what is bei
 
 
 See [core contract completion](core-contract-completion.md) for stage3 scope, evidence and explicit unmigrated boundaries. Submission does not mean merge or deployment.
+
+## Phase 4: policy configuration management service
+
+[Proposal #179](https://github.com/qiniu/xhub/issues/179) moves policy configuration into `internal/gateway/policyconfig`. HTTP adapters retain authentication, path parsing, response envelopes and error mapping. The service only depends on KV storage, not authorization, budgets, guardrail execution or model execution.
+
+- Preserve the separate `policy` / `policies` namespaces, legacy `policie_` IDs and `policie_alias`, replacement creates, shallow updates, missing-record upserts, nested expansion, extension fields, null/zero values and non-transactional deletion counts.
+- `status` and `version` remain configuration metadata. Existing generic dispatch for attachment, resolution and version-history paths is preserved; it is not evidence of a complete policy engine. No new capability or phase-3 OpenAPI coverage is claimed.
+- Unit tests cover normal, boundary, failure and namespace behavior. Real HTTP/PostgreSQL regressions cover permissions, SQL read/write faults, recovery and cleanup; real local-provider calls verify unchanged billing and zero-budget denial. The same regressions also run against the pre-refactor management implementation as a compatibility baseline.
+- Browser tests in both console locale environments cover page creation, reload, HTTP updates, rejection/recovery, model calls and deletion. The legacy policy page still uses its existing Chinese controls; this backend extraction does not claim to fix that localization debt. Independent request contexts clean up after success, failure and timeout; cleanup errors fail tests. CI uploads real regression coverage without lowering the 70% gate.
+- No data migration or production deployment. Reverting the service and adapter restores the old implementation over the same stored records.

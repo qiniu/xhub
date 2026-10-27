@@ -18,6 +18,7 @@ import (
 	"github.com/sunqirui1987/xhub/internal/catalog"
 	dpusage "github.com/sunqirui1987/xhub/internal/dataplane/usage"
 	"github.com/sunqirui1987/xhub/internal/gateway/guard"
+	"github.com/sunqirui1987/xhub/internal/gateway/policyconfig"
 	"github.com/sunqirui1987/xhub/internal/gateway/promptconfig"
 	"github.com/sunqirui1987/xhub/internal/gateway/searchconfig"
 	"github.com/sunqirui1987/xhub/internal/gateway/suppliers"
@@ -585,9 +586,13 @@ func writeCatalogPersist(s Host, w http.ResponseWriter, r *http.Request, body ma
 }
 
 // Freeze 为旧兼容响应补齐资源必需字段；kind 为资源族，obj 为可修改的 JSON 对象。
-// 无返回值；保留已有非 nil 字段并删除 password，不写数据库。供应商、搜索及提示词字段交给各自独立服务规范化。
+// 无返回值；保留已有非 nil 字段并删除 password，不写数据库。供应商、搜索、提示词及策略字段交给各自独立服务规范化。
 // gateway/access.go 及旧目录适配器调用；新资源业务逻辑不应继续加入此通用分支。
 func Freeze(kind string, obj map[string]any) {
+	if kind == "policies" || kind == "policy" {
+		policyconfig.Normalize(kind, obj)
+		return
+	}
 	if kind == "credentials" || kind == "credential" {
 		suppliers.Normalize(obj)
 		return
@@ -721,11 +726,6 @@ func Freeze(kind string, obj map[string]any) {
 		if _, ok := obj["budget_id"]; !ok {
 			obj["budget_id"] = nil
 		}
-	case "policies", "policy":
-		setDefault(obj, "policy_id", id)
-		setDefault(obj, "policy_name", "")
-		setDefault(obj, "version", 1)
-		setDefault(obj, "status", "active")
 	case "tags", "tag":
 		if n := str(obj["tag_name"]); n != "" {
 			obj["name"] = n
