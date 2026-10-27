@@ -245,3 +245,7 @@ See [core contract completion](core-contract-completion.md) for stage3 scope, ev
 - Unit tests cover normal, boundary, failure and namespace behavior. Real HTTP/PostgreSQL regressions cover permissions, SQL read/write faults, recovery and cleanup; real local-provider calls verify unchanged billing and zero-budget denial. The same regressions also run against the pre-refactor management implementation as a compatibility baseline.
 - Browser tests in both console locale environments cover page creation, reload, HTTP updates, rejection/recovery, model calls and deletion. The legacy policy page still uses its existing Chinese controls; this backend extraction does not claim to fix that localization debt. Independent request contexts clean up after success, failure and timeout; cleanup errors fail tests. CI uploads real regression coverage without lowering the 70% gate.
 - No data migration or production deployment. Reverting the service and adapter restores the old implementation over the same stored records.
+
+## Phase 4 remaining-scope review
+
+The [compatibility-layer ownership audit](compatibility-layer-audit.md) supplements the static contract inventory with actual module registration, distinguishing main, pending PRs and generic catalog entries. Extracted configuration services do not complete Phase 4: remaining management semantics require individual verification, while data-plane lifecycle work remains Phase 5.
