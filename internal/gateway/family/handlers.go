@@ -17,6 +17,7 @@ import (
 
 	"github.com/sunqirui1987/xhub/internal/catalog"
 	dpusage "github.com/sunqirui1987/xhub/internal/dataplane/usage"
+	"github.com/sunqirui1987/xhub/internal/gateway/accessgroupconfig"
 	"github.com/sunqirui1987/xhub/internal/gateway/guard"
 	"github.com/sunqirui1987/xhub/internal/gateway/policyconfig"
 	"github.com/sunqirui1987/xhub/internal/gateway/promptconfig"
@@ -586,9 +587,13 @@ func writeCatalogPersist(s Host, w http.ResponseWriter, r *http.Request, body ma
 }
 
 // Freeze 为旧兼容响应补齐资源必需字段；kind 为资源族，obj 为可修改的 JSON 对象。
-// 无返回值；保留已有非 nil 字段并删除 password，不写数据库。供应商、搜索、提示词及策略字段交给各自独立服务规范化。
+// 无返回值；保留已有非 nil 字段并删除 password，不写数据库。供应商、搜索、提示词、策略及访问组字段交给各自独立服务规范化。
 // gateway/access.go 及旧目录适配器调用；新资源业务逻辑不应继续加入此通用分支。
 func Freeze(kind string, obj map[string]any) {
+	if kind == "access_group" || kind == "access_groups" {
+		accessgroupconfig.Normalize(kind, obj)
+		return
+	}
 	if kind == "policies" || kind == "policy" {
 		policyconfig.Normalize(kind, obj)
 		return
@@ -696,36 +701,6 @@ func Freeze(kind string, obj map[string]any) {
 	case "memory":
 		setDefault(obj, "key", id)
 		setDefault(obj, "value", "")
-	case "access_group", "access_groups":
-		setDefault(obj, "access_group_id", id)
-		if str(obj["access_group_name"]) == "" {
-			if n := str(obj["name"]); n != "" {
-				obj["access_group_name"] = n
-			} else {
-				obj["access_group_name"] = id
-			}
-		}
-		setDefault(obj, "description", "")
-		setDefault(obj, "models", []any{})
-		setDefault(obj, "access_model_names", []any{})
-		setDefault(obj, "access_mcp_server_ids", []any{})
-		setDefault(obj, "access_agent_ids", []any{})
-		setDefault(obj, "assigned_key_ids", []any{})
-		setDefault(obj, "assigned_team_ids", []any{})
-		setDefault(obj, "access_mcp_servers", []any{})
-		setDefault(obj, "access_agents", []any{})
-		setDefault(obj, "assigned_keys", []any{})
-		setDefault(obj, "assigned_teams", []any{})
-		setDefault(obj, "updated_at", obj["created_at"])
-		if _, ok := obj["created_by"]; !ok {
-			obj["created_by"] = nil
-		}
-		if _, ok := obj["updated_by"]; !ok {
-			obj["updated_by"] = nil
-		}
-		if _, ok := obj["budget_id"]; !ok {
-			obj["budget_id"] = nil
-		}
 	case "tags", "tag":
 		if n := str(obj["tag_name"]); n != "" {
 			obj["name"] = n

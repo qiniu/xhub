@@ -3063,5 +3063,19 @@
     "title": "policy configuration persistence and isolation zh-CN",
     "kind": "implemented",
     "environment": "default offline"
+  },
+  {
+    "id": "REG-access-group-config-service-en",
+    "file": "e2e/scenarios/regression/access-group-config-service-en.test.ts",
+    "title": "access group configuration persistence and isolation en",
+    "kind": "implemented",
+    "environment": "default offline"
+  },
+  {
+    "id": "REG-access-group-config-service-zh-CN",
+    "file": "e2e/scenarios/regression/access-group-config-service-zh-CN.test.ts",
+    "title": "access group configuration persistence and isolation zh-CN",
+    "kind": "implemented",
+    "environment": "default offline"
   }
 ]
