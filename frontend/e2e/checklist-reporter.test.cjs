@@ -212,3 +212,19 @@ test('护栏管理双语场景登记且不漏入全量分母', () => {
   assert.equal(catalog.filter(row => results.some(result => result.file === row.file && result.title === row.title)).length, 2);
   assert.equal(evaluateScenarios(catalog, [{...results[0],title:'unknown guard scenario'}]).unregistered.length, 1);
 });
+
+/** 策略双语场景须登记精确标题，防止局部通过而全量漏测；只读清单无待清理资源。 */
+test('policy configuration scenarios are registered', () => {
+  const fs = require('node:fs');
+  const path = require('node:path');
+  const {evaluateScenarios} = require('./scenario-coverage.cjs');
+  const catalog = require('./scenario-catalog.json');
+  const results = ['en','zh-CN'].map(locale => {
+    const file = `e2e/scenarios/regression/policy-config-service-${locale}.test.ts`;
+    assert.ok(fs.existsSync(path.join(__dirname, '..', file)));
+    return {file, title: 'policy configuration persistence and isolation ' + locale, status: 'passed'};
+  });
+  const report = evaluateScenarios(catalog, results);
+  assert.deepEqual(report.unregistered, []);
+  assert.equal(report.passed, 2);
+});
