@@ -319,6 +319,35 @@ jobs:
             .e2e/runs/
             coverage/guard-management.out
           if-no-files-found: error
+      # 旧推理别名拒绝与原生协议保留的真实回归，不降低覆盖率门禁。
+      - name: Run real legacy inference regression
+        env:
+          XHUB_REGRESSION_COVERPROFILE: coverage/legacy-inference.out
+        run: bash scripts/regression.sh '^Test(LegacyInferenceBoundary|EndpointRedesignNativeLifecycle|EndpointGoogleGuardrails)$'
+      - name: Validate legacy inference regression coverage
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -s coverage/legacy-inference.out
+          go tool cover -func=coverage/legacy-inference.out | tail -1
+      - name: Upload legacy inference regression coverage
+        uses: codecov/codecov-action@v5
+        with:
+          files: coverage/legacy-inference.out
+          flags: backend
+          name: legacy-inference
+          disable_search: true
+          fail_ci_if_error: true
+          use_oidc: true
+      - name: Archive legacy inference regression evidence
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: legacy-inference-regression
+          path: |
+            .e2e/runs/
+            coverage/legacy-inference.out
+          if-no-files-found: error
       - run: docker compose down -v
         if: always()
 

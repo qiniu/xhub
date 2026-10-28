@@ -3063,5 +3063,19 @@
     "title": "policy configuration persistence and isolation zh-CN",
     "kind": "implemented",
     "environment": "default offline"
+  },
+  {
+    "id": "REG-legacy-inference-en",
+    "file": "e2e/scenarios/regression/legacy-inference-en.test.ts",
+    "title": "legacy inference aliases reject false success en",
+    "kind": "implemented",
+    "environment": "default offline"
+  },
+  {
+    "id": "REG-legacy-inference-zh-CN",
+    "file": "e2e/scenarios/regression/legacy-inference-zh-CN.test.ts",
+    "title": "legacy inference aliases reject false success zh-CN",
+    "kind": "implemented",
+    "environment": "default offline"
   }
 ]
