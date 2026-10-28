@@ -260,3 +260,13 @@ test('vector configuration scenarios are registered', () => {
   assert.deepEqual(report.unregistered, []);
   assert.equal(report.passed, 2);
 });
+
+/** 双语标签真实场景必须登记独立文件和真实标题，避免新测试通过却未进入业务清单；纯内存校验无需清理。 */
+test('tag catalog scenarios are registered independently', () => {
+ const {evaluateScenarios}=require('./scenario-coverage.cjs');
+ const catalog=require('./scenario-catalog.json');
+ const results=['en','zh-CN'].map(locale=>({file:`e2e/scenarios/regression/tag-catalog-${locale}.test.ts`,title:`tag catalog read after write ${locale}`,status:'passed'}));
+ const report=evaluateScenarios(catalog,results);
+ assert.deepEqual(report.unregistered,[]);
+ assert.equal(report.passed,2);
+});

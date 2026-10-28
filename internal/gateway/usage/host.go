@@ -16,12 +16,16 @@ import (
 	"github.com/sunqirui1987/xhub/internal/authz"
 	"github.com/sunqirui1987/xhub/internal/config"
 	"github.com/sunqirui1987/xhub/internal/iam"
+	"github.com/sunqirui1987/xhub/internal/store"
 	"github.com/sunqirui1987/xhub/internal/util"
 )
 
 // Host is what the usage handlers ask the process for. *gateway.Server implements
 // it. This package does not import gateway.
 type Host interface {
+	// RecordStore 提供标签配置所在的KV库；仅在RequireManage通过后读取，不参与身份或预算判断。
+	// 返回nil表示配置存储不可用，由标签列表返回503；调用TagList，无写入副作用。
+	RecordStore() *store.Store
 	// RequireManage requires a platform administrator session. The global spend reports use it: they are a platform-wide view by definition.
 	// 参数 w（http.ResponseWriter）：调用方的 HTTP 响应，状态码和正文写在这里；r（*http.Request）：入站 HTTP 请求，用来读路径、头和正文。
 	// 返回 *auth.Principal（*auth.Principal）：已经解析的调用方，含用户、团队和密钥。

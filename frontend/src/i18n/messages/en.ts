@@ -6,6 +6,7 @@ import { pageDescriptionsEn } from "./pageDescriptions.en";
 import { routeTemplatesEn } from "./routeTemplates.en";
 
 export const en = {
+  tagSelector: { loadFailed: "Unable to load saved tags. Refresh the page to retry." },
   probes: probesEn,
   mcpOAuthCallback: {
     title: "MCP authorization callback",

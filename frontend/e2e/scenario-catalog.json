@@ -3091,5 +3091,19 @@
     "title": "vector configuration persistence and isolation zh-CN",
     "kind": "implemented",
     "environment": "default offline"
+  },
+  {
+    "id": "REG-tag-catalog-en",
+    "file": "e2e/scenarios/regression/tag-catalog-en.test.ts",
+    "title": "tag catalog read after write en",
+    "kind": "implemented",
+    "environment": "default offline"
+  },
+  {
+    "id": "REG-tag-catalog-zh-CN",
+    "file": "e2e/scenarios/regression/tag-catalog-zh-CN.test.ts",
+    "title": "tag catalog read after write zh-CN",
+    "kind": "implemented",
+    "environment": "default offline"
   }
 ]

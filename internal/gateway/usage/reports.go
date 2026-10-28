@@ -983,18 +983,6 @@ func Users(s Host, w http.ResponseWriter, r *http.Request) {
 	util.WriteJSON(w, 200, out)
 }
 
-// TagList returns the tag catalog read by the usage filter and the key form. Tags are not part of the new model, so the catalog is empty rather than a key-value namespace that nothing writes.
-// 参数 s（Host）：Tag列表使用的数据面宿主；w（http.ResponseWriter）：调用方的 HTTP 响应，状态和正文写在这里；r（*http.Request）：入站 HTTP 请求。
-// 返回：无。状态码和正文写进调用方的响应。
-// 调用：gateway/usage/mount.go
-// 测试：无直接单测
-func TagList(s Host, w http.ResponseWriter, r *http.Request) {
-	if s.RequireManage(w, r) == nil {
-		return
-	}
-	util.WriteJSON(w, 200, map[string]any{})
-}
-
 // Tags totals spend by tag.
 // 参数 s（Host）：Tags使用的数据面宿主；w（http.ResponseWriter）：调用方的 HTTP 响应，状态和正文写在这里；r（*http.Request）：入站 HTTP 请求。
 // 返回：无。状态码和正文写进调用方的响应。

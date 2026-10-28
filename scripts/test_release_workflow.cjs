@@ -421,3 +421,10 @@ test('guard management release gate includes bilingual execution flows', () => {
     assert.ok(existsSync(join(__dirname, '../frontend/e2e', file)));
   }
 });
+
+/** 发布校验必须运行双语标签读写与真实聊天流程；只检查工作流声明，不代替浏览器结果，无外部副作用。 */
+test('release verifies tag catalog browser flows', () => {
+ const browser=workflow.jobs.verify.steps.find(s=>s.run?.startsWith('bash scripts/e2e.sh scenarios/legacy/login/sc-056.test.ts'));
+ assert.ok(browser);
+ for(const locale of ['en','zh-CN']) assert.ok(browser.run.includes(`scenarios/regression/tag-catalog-${locale}.test.ts`));
+});
