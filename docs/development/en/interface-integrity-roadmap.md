@@ -266,3 +266,7 @@ See [core contract completion](core-contract-completion.md) for stage3 scope, ev
 - Run the same real HTTP/PostgreSQL regressions before and after extraction: all five operations, permissions, SQL read/write/delete faults, recovery and cleanup. Real local-provider calls verify unchanged costs and zero-budget rejection.
 - Both console locale environments cover page creation/reload, API update/invalid-input/recovery, unsupported-operation rejection, model calls and deletion. Existing Chinese controls remain unchanged; this backend extraction does not claim to fix legacy localization debt. Independent cleanup tests cover business failures, timeout, cleanup errors and zero deletions.
 - CI collects and uploads real regression coverage without lowering the 70% gate. No expansion of phase-3 OpenAPI coverage or change to authorization/budgets. Revert the service and adapter to reuse the same records; merging and deployment remain separate decisions.
+
+## Phase 4 remaining-scope review
+
+The [compatibility-layer ownership audit](compatibility-layer-audit.md) supplements the static contract inventory with actual module registration, distinguishing main, pending PRs and generic catalog entries. Extracted configuration services do not complete Phase 4: remaining management semantics require individual verification, while data-plane lifecycle work remains Phase 5.
