@@ -248,6 +248,9 @@ func call(client *http.Client, base, method, path, token string, body any) (int,
 
 // typedUnsupported 只接受目录明确声明的未实现契约；参数为方法、路径和响应正文，返回是否可作为预期 501。
 // 调用：live catalog sweep；customer/tag 维度只接受专用错误类型，其他路径仍只接受通用 not_implemented。
+// typedUnsupported 供目录扫描器校验501响应；method/path为真实请求，raw为响应JSON。
+// 返回是否匹配已声明的拒绝契约；精确运维及归因接口不能接受其他错误类型，非法或空消息返回false。
+// 仅解析响应，不发送请求或改变状态；未知路径保留原not_implemented契约，不泛化放行unsupported_operation。
 func typedUnsupported(method, path, raw string) bool {
 	var body map[string]any
 	if json.Unmarshal([]byte(raw), &body) != nil {
