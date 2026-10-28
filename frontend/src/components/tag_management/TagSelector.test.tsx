@@ -1,5 +1,5 @@
 import userEvent from "@testing-library/user-event";
-import { render, screen, cleanup } from "@testing-library/react";
+import { render, screen, cleanup, act } from "@testing-library/react";
 import { beforeEach, afterEach, describe, expect, it, vi } from "vitest";
 import TagSelector from "./TagSelector";
 import { tagListCall } from "../networking";
@@ -59,4 +59,23 @@ describe("TagSelector", () => {
     await vi.waitFor(() => expect(tagListCall).toHaveBeenCalledWith("token"));
     expect(screen.queryByRole("alert")).not.toBeInTheDocument();
   });
+});
+
+/** 管理员读取未完成时切换普通身份，输入必须恢复且旧响应不能泄漏标签；组件替身仅控制时序，卸载清理。 */
+it("releases pending loading when management identity is lost", async () => {
+  let complete!: (value: Awaited<ReturnType<typeof tagListCall>>) => void;
+  vi.mocked(tagListCall).mockReturnValueOnce(new Promise(resolve => { complete = resolve; }));
+  const changed = vi.fn();
+  const view = render(<TagSelector onChange={changed} accessToken="admin" />);
+  const input = screen.getByRole("combobox");
+  expect(input).toBeDisabled();
+  identity.role = "Internal User";
+  view.rerender(<TagSelector onChange={changed} accessToken="member" />);
+  expect(input).toBeEnabled();
+  await act(async () => { complete({ private: { name: "private", description: "", models: [], created_at: "", updated_at: "" } }); });
+  expect(screen.queryByText("private")).not.toBeInTheDocument();
+  await userEvent.setup().type(input, "custom");
+  await userEvent.setup().click(await screen.findByRole("option", { name: /custom/ }));
+  expect(changed).toHaveBeenCalledWith(["custom"]);
+  expect(tagListCall).toHaveBeenCalledTimes(1);
 });

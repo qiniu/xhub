@@ -26,7 +26,13 @@ const TagSelector: React.FC<TagSelectorProps> = ({ onChange, value, className, a
     let active = true;
     /** 读取当前管理身份的标签；无参数和返回值，失败更新提示，失效请求不写入组件状态。 */
     const fetchTags = async () => {
-      if (!accessToken || !canAccessManagement(userRole)) return;
+      if (!accessToken || !canAccessManagement(userRole)) {
+        // 身份切换会使上一请求失效；当前身份仍可输入自定义标签，不能保留旧loading或管理标签。
+        setLoading(false);
+        setFailed(false);
+        setTags([]);
+        return;
+      }
       setLoading(true);
       setFailed(false);
       try {
