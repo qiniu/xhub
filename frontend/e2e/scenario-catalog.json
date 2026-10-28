@@ -3259,5 +3259,19 @@
     "title": "skill resource boundaries preserve configuration and chat zh-CN",
     "kind": "implemented",
     "environment": "default offline"
+  },
+  {
+    "id": "REG-skill-hub-support-en",
+    "file": "e2e/scenarios/regression/skill-hub-support-en.test.ts",
+    "title": "skill hub reports unsupported discovery and preserves chat en",
+    "kind": "implemented",
+    "environment": "default offline"
+  },
+  {
+    "id": "REG-skill-hub-support-zh-CN",
+    "file": "e2e/scenarios/regression/skill-hub-support-zh-CN.test.ts",
+    "title": "skill hub reports unsupported discovery and preserves chat zh-CN",
+    "kind": "implemented",
+    "environment": "default offline"
   }
 ]

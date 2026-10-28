@@ -1683,17 +1683,18 @@ export const mcpHubPublicServersCall = async () => {
   return response.json();
 };
 
+/** 读取公开Skill目录；不传凭据。非2xx、非法JSON或缺失列表必须抛错，调用页面展示失败而不是空目录。
+ * 返回经过最低结构检查的原始对象，不翻译名称或配置；不触发登录清理或推断安装能力。
+ */
 export const skillHubPublicCall = async () => {
   const url = proxyBaseUrl ? `${proxyBaseUrl}/public/skill_hub` : `/public/skill_hub`;
-  const response = await fetch(url, {
-    method: "GET",
-    headers: { "Content-Type": "application/json" },
-  });
-  if (!response.ok) {
-    console.error(`skillHubPublicCall failed with status ${response.status}`);
-    return { plugins: [] };
+  const response = await fetch(url);
+  if (!response.ok) throw new Error(`Skill directory request failed (HTTP ${response.status})`);
+  const data = await response.json();
+  if (!data || !Array.isArray(data.plugins) || data.plugins.some((item: unknown) => !item || typeof item !== "object" || typeof (item as {name?: unknown}).name !== "string")) {
+    throw new Error("Invalid Skill directory response");
   }
-  return response.json();
+  return data;
 };
 
 export const modelHubCall = async (accessToken: string) => {

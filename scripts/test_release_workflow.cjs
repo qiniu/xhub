@@ -542,3 +542,12 @@ test('skill resource release gate includes bilingual real flows', () => {
     assert.equal(catalog.find(item => item.file === 'e2e/' + file)?.kind, 'implemented');
   }
 });
+
+/** 发布验证需执行中英文Skill目录失败提示到推理的真实流程；只读登记和命令，无外部清理。 */
+test('SkillHub support release gate includes bilingual execution flows', () => {
+  const command = workflow.jobs.verify.steps.find(item => item.run?.startsWith('bash scripts/e2e.sh '))?.run;
+  for (const file of ['scenarios/regression/skill-hub-support-zh-CN.test.ts', 'scenarios/regression/skill-hub-support-en.test.ts']) {
+    assert.ok(command?.split(' ').includes(file), 'SkillHub真实流程缺失：' + file);
+    assert.ok(existsSync(join(__dirname, '../frontend/e2e', file)));
+  }
+});

@@ -724,6 +724,35 @@ jobs:
             .e2e/runs/
             coverage/guard-management.out
           if-no-files-found: error
+      # SkillHub支持边界真实回归独立采集覆盖率，不扩大第三阶段契约范围。
+      - name: Run real SkillHub support regression
+        env:
+          XHUB_REGRESSION_COVERPROFILE: coverage/skill-hub-support.out
+        run: bash scripts/regression.sh '^TestSkillHubSupport'
+      - name: Validate SkillHub support regression coverage
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -s coverage/skill-hub-support.out
+          go tool cover -func=coverage/skill-hub-support.out | tail -1
+      - name: Upload SkillHub support regression coverage
+        uses: codecov/codecov-action@v5
+        with:
+          files: coverage/skill-hub-support.out
+          flags: backend
+          name: skill-hub-support
+          disable_search: true
+          fail_ci_if_error: true
+          use_oidc: true
+      - name: Archive SkillHub support regression evidence
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: skill-hub-support-regression
+          path: |
+            .e2e/runs/
+            coverage/skill-hub-support.out
+          if-no-files-found: error
       - run: docker compose down -v
         if: always()
 
