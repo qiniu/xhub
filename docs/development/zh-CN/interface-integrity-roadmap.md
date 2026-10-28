@@ -420,3 +420,11 @@ npm run test:types
 - `/v1/rag/*`、`/v1/ocr` 保留既有数据面拒绝；Gemini `/v1beta/models/*`、Vertex `/vertex/v1/models/*` 和 Bypass 继续由原协议模块执行。普通模型读取与配置 CRUD 不迁移。
 - 真实 HTTP/PostgreSQL 回归验证配置快照不变、零上游副作用、原生协议调用、护栏、正常对话计费、零预算拦截和清理；双语浏览器验证登录、旧请求拒绝后调试台仍能真实对话。使用本地可计数协议上游，不代表外部供应商验收。
 - 不增加 RAG/OCR 执行器，不扩张 Swagger 支持清单，不做数据迁移或删除既有误写记录；CI 收集真实回归覆盖率并维持 70% 门禁。回退代码可恢复旧行为，但会恢复假成功，不作为默认故障处理。提交不代表合并或部署。
+
+## 第四阶段旧供应商批处理边界
+
+[Bug #219](https://github.com/qiniu/xhub/issues/219) 用真实 HTTP/PostgreSQL 复现：`/{provider}/v1/batches` 的 GET/POST、`/{provider}/v1/batches/{batch_id}` 的 GET、`/{provider}/v1/batches/{batch_id}/cancel` 的 POST，在落入管理目录时，把供应商名当作公共配置命名空间。创建/取消会覆盖 `batches`/`cancel` 配置，查询会回显同名配置，全部没有上游任务执行。
+
+修复在既有管理鉴权与 JSON 验证后明确返回 `501 unsupported_operation` 和 `Cache-Control: no-store`，不读取或写入公共配置、不调用上游。匿名 401、普通会话/Key 403、非法 JSON/JSON-RPC 400 保持；标准 `/v1/batches`、`/batches` 和 `/openai/v1/batches` 继续使用原数据面鉴权及拒绝逻辑。没有增加批处理能力或扩大 Swagger 支持清单。
+
+真实回归验证四种操作、配置快照、标准入口、正常推理计费、零预算拦截与清理。双语浏览器验证登录后旧接口明确拒绝，随后调试台选择模型和 Chat 端点完成真实本地对话。测试使用隔离数据库和本地 HTTP 上游，不代表外部供应商验收；CI 上传真实回归覆盖率，70% 门禁不变。无数据库迁移、不删除既有配置；提交不等于合并或部署。

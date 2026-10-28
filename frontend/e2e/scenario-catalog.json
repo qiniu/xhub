@@ -3301,5 +3301,19 @@
     "title": "legacy inference aliases reject false success zh-CN",
     "kind": "implemented",
     "environment": "default offline"
+  },
+  {
+    "id": "REG-provider-batch-en",
+    "file": "e2e/scenarios/regression/provider-batch-en.test.ts",
+    "title": "provider batch aliases reject false success en",
+    "kind": "implemented",
+    "environment": "default offline"
+  },
+  {
+    "id": "REG-provider-batch-zh-CN",
+    "file": "e2e/scenarios/regression/provider-batch-zh-CN.test.ts",
+    "title": "provider batch aliases reject false success zh-CN",
+    "kind": "implemented",
+    "environment": "default offline"
   }
 ]

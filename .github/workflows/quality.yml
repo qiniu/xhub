@@ -782,6 +782,35 @@ jobs:
             .e2e/runs/
             coverage/legacy-inference.out
           if-no-files-found: error
+      # 旧批处理真实回归独立采集覆盖率，拒绝伪任务且保留权限预算规则。
+      - name: Run real provider batch regression
+        env:
+          XHUB_REGRESSION_COVERPROFILE: coverage/provider-batch.out
+        run: bash scripts/regression.sh '^TestProviderBatchBoundary$'
+      - name: Validate provider batch regression coverage
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -s coverage/provider-batch.out
+          go tool cover -func=coverage/provider-batch.out | tail -1
+      - name: Upload provider batch regression coverage
+        uses: codecov/codecov-action@v5
+        with:
+          files: coverage/provider-batch.out
+          flags: backend
+          name: provider-batch
+          disable_search: true
+          fail_ci_if_error: true
+          use_oidc: true
+      - name: Archive provider batch regression evidence
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: provider-batch-regression
+          path: |
+            .e2e/runs/
+            coverage/provider-batch.out
+          if-no-files-found: error
       - run: docker compose down -v
         if: always()
 
