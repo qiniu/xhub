@@ -6,6 +6,9 @@ const { matchesGatewayResponse } = require('./gateway-response.cjs');
 test('直连与 /gw 代理的同一管理请求都能匹配', () => {
   for (const base of ['http://127.0.0.1:4100', 'http://xhub-http.test:3100/gw']) {
     assert.equal(matchesGatewayResponse(base + '/search_tools', 'POST', '/search_tools', 'POST'), true, base);
+    assert.equal(matchesGatewayResponse(base + '/chat/completions', 'POST', '/chat/completions', 'POST'), true, base);
+    assert.equal(matchesGatewayResponse(base + '/policies', 'POST', '/policies', 'POST'), true, base);
+    assert.equal(matchesGatewayResponse(base + '/v1/chat/completions', 'POST', '/v1/chat/completions', 'POST'), true, base);
     assert.equal(matchesGatewayResponse(base + '/prompts/test', 'POST', '/prompts/test', 'POST'), true, base);
   }
 });
