@@ -450,3 +450,29 @@ test('metadata configuration has real regression coverage and cleanup', () => {
   assert.ok(job.steps.every(item => !item['continue-on-error']));
   assert.equal(job.steps.find(item => item.run === 'docker compose down -v').if, 'always()');
 });
+
+/** 预算配置与IAM真实数据库回归必须产出并上传有效覆盖率，失败不得忽略；配置只读，无清理。 */
+test('budget configuration has real regression coverage and cleanup', () => {
+  const job = workflow.jobs['supplier-contract'];
+  const run = step('supplier-contract', 'Run real budget configuration regression');
+  assert.equal(run.run, "bash scripts/regression.sh '^Test(BudgetConfigService|BudgetConfigurationBoundary|LegacyIAMNoFalseSuccess)'");
+  assert.equal(run.env.XHUB_REGRESSION_COVERPROFILE, 'coverage/budget-config.out');
+  const check = step('supplier-contract', 'Validate budget regression coverage');
+  assert.match(check.run, /set -euo pipefail/);
+  assert.match(check.run, /test -s coverage\/budget-config.out/);
+  assert.match(check.run, /go tool cover -func=coverage\/budget-config.out/);
+  const upload = step('supplier-contract', 'Upload budget regression coverage');
+  assert.equal(upload.with.files, 'coverage/budget-config.out');
+  assert.equal(upload.with.fail_ci_if_error, true);
+  assert.equal(upload.with.disable_search, true);
+  assert.equal(upload.with.flags, 'backend');
+  assert.ok(job.steps.indexOf(run) < job.steps.indexOf(check));
+  assert.ok(job.steps.indexOf(check) < job.steps.indexOf(upload));
+  assert.ok(!upload.if || upload.if === 'success()');
+  const artifact = step('supplier-contract', 'Archive budget regression evidence');
+  assert.equal(artifact.if, 'always()');
+  assert.match(artifact.with.path, /coverage\/budget-config.out/);
+  assert.equal(artifact.with['if-no-files-found'], 'error');
+  assert.ok(job.steps.every(item => !item['continue-on-error']));
+  assert.equal(job.steps.find(item => item.run === 'docker compose down -v').if, 'always()');
+});

@@ -435,3 +435,9 @@ test('release verifies metadata configuration browser flows', () => {
  assert.ok(browser);
  for(const locale of ['en','zh-CN']) assert.ok(browser.run.includes(`scenarios/regression/metadata-config-service-${locale}.test.ts`));
 });
+
+/** 发布验证必须包含预算页面与IAM旧入口的双语真实浏览器场景；只检查配置，不启动生产服务。 */
+test('budget IAM boundary browser regressions remain in release gate', () => {
+  const text = require('node:fs').readFileSync(require('node:path').join(__dirname, '../.github/workflows/release.yml'), 'utf8');
+  for (const locale of ['en', 'zh-CN']) assert.ok(text.includes('scenarios/regression/budget-iam-' + locale + '.test.ts'));
+});
