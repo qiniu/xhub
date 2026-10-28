@@ -254,11 +254,19 @@ func typedUnsupported(method, path, raw string) bool {
 		return false
 	}
 	err, _ := body["error"].(map[string]any)
-	if err["message"] == "" {
+	if message, ok := err["message"].(string); !ok || strings.TrimSpace(message) == "" {
 		return false
 	}
 	if method == http.MethodGet && (path == "/customer/daily/activity" || path == "/tag/daily/activity") {
 		return err["type"] == "unsupported_usage_dimension"
+	}
+	// 运维接口没有执行器时仅接受明确声明的方法和路径，避免将真实服务端失败整体豁免。
+	switch method + " " + strings.TrimSuffix(path, "/") {
+	case "GET /coordination_redis/settings", "POST /coordination_redis/settings", "POST /coordination_redis/settings/test",
+		"GET /debug/asyncio-tasks", "GET /debug/memory/details", "GET /debug/memory/summary", "POST /debug/memory/gc/configure",
+		"GET /memory-usage", "GET /memory-usage-in-mem-cache", "GET /memory-usage-in-mem-cache-items",
+		"GET /health/backlog", "GET /health/drain", "GET /health/history", "GET /health/license", "GET /health/shared-status", "GET /health/services":
+		return err["type"] == "unsupported_operation"
 	}
 	return err["type"] == "not_implemented"
 }

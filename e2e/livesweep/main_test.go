@@ -1,6 +1,7 @@
 package main
 
 import (
+	"strings"
 	"testing"
 )
 
@@ -45,5 +46,27 @@ func TestTypedUnsupported(t *testing.T) {
 	}
 	if typedUnsupported("GET", "/customer/daily/activity", generic) {
 		t.Fatal("customer dimension accepted the wrong error type")
+	}
+}
+
+// TestOperationalUnsupported 验证精确运维契约被扫描器识别；无网络前置，其他路径、方法和缺失消息仍必须失败，无清理副作用。
+func TestOperationalUnsupported(t *testing.T) {
+	body := `{"error":{"type":"unsupported_operation","message":"unavailable"}}`
+	for _, route := range []string{"GET /coordination_redis/settings", "POST /coordination_redis/settings", "POST /coordination_redis/settings/test", "GET /debug/asyncio-tasks", "GET /debug/memory/details", "GET /debug/memory/summary", "POST /debug/memory/gc/configure", "GET /memory-usage", "GET /memory-usage-in-mem-cache", "GET /memory-usage-in-mem-cache-items", "GET /health/backlog", "GET /health/drain", "GET /health/history", "GET /health/license", "GET /health/shared-status", "GET /health/services"} {
+		parts := strings.SplitN(route, " ", 2)
+		if !typedUnsupported(parts[0], parts[1], body) {
+			t.Errorf("明确拒绝契约未识别: %s", route)
+		}
+	}
+	for _, route := range []string{"DELETE /health/drain", "GET /health", "GET /health/readiness", "POST /health/services", "GET /health/drain/other"} {
+		parts := strings.SplitN(route, " ", 2)
+		if typedUnsupported(parts[0], parts[1], body) {
+			t.Errorf("未声明的失败被吞掉: %s", route)
+		}
+	}
+	for _, invalid := range []string{`{"error":{"type":"unsupported_operation"}}`, `{"error":{"type":"unsupported_operation","message":""}}`, `{"error":{"type":"unsupported_operation","message":123}}`, `{`} {
+		if typedUnsupported("GET", "/health/services", invalid) {
+			t.Errorf("损坏错误响应被接受: %s", invalid)
+		}
 	}
 }
