@@ -447,3 +447,12 @@ test('operations boundary browser regressions remain in release gate', () => {
   const text = require('node:fs').readFileSync(require('node:path').join(__dirname, '../.github/workflows/release.yml'), 'utf8');
   for (const locale of ['en', 'zh-CN']) assert.ok(text.includes('scenarios/regression/operations-boundary-' + locale + '.test.ts'));
 });
+
+/** 缓存双语清理与真实数据面必须进入发布门禁；只读无清理。 */
+test('cache management release gate includes bilingual execution flows', () => {
+  const command = workflow.jobs.verify.steps.find(item => item.run?.startsWith('bash scripts/e2e.sh '))?.run;
+  for (const file of ['scenarios/columns/caching-save.test.ts', 'scenarios/columns/caching-flush.test.ts']) {
+    assert.ok(command?.split(' ').includes(file), '缓存真实流程缺失：' + file);
+    assert.ok(existsSync(join(__dirname, '../frontend/e2e', file)));
+  }
+});

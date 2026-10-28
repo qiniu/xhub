@@ -4026,7 +4026,8 @@
     {
       "route": "POST /cache/settings/test",
       "sources": [
-        "catalog"
+        "catalog",
+        "internal/gateway/routes.go"
       ],
       "contract": null,
       "status": "peripheral-unmigrated"
@@ -4316,7 +4317,8 @@
     {
       "route": "POST /delete",
       "sources": [
-        "catalog"
+        "catalog",
+        "internal/gateway/routes.go"
       ],
       "contract": null,
       "status": "peripheral-unmigrated"

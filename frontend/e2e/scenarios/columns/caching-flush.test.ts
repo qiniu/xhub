@@ -1,3 +1,3 @@
-/** 目的：独立验证 caching 清空；真实页面后台和隔离数据；finally 或脚本回收测试数据。 */
-import { registerColumnScenario } from "../../column-scenario";
-registerColumnScenario("/caching", "清空", false);
+/** 验证英文缓存生命周期及错误恢复；隔离资源由注册器与运行器清理。 */
+import { registerCacheManagement } from "../../cache-management-scenario";
+registerCacheManagement("en");

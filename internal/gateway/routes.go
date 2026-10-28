@@ -157,7 +157,7 @@ func ingressModule(s *Server) util.Module {
 	})
 }
 
-// accessModule serves cache probes and customers. Email events, IP allow-lists, and SCIM are gone.
+// accessModule 注册缓存管理和客户等旧入口；缓存交给独立管理边界，不再进入通用目录假执行。
 // 参数 s（*Server）：accessModule使用的网关进程。
 // 返回 util.Module（util.Module）：可挂到网关上的模块。
 // 调用：仅在 routes.go 内使用
@@ -165,16 +165,18 @@ func ingressModule(s *Server) util.Module {
 func accessModule(s *Server) util.Module {
 	return util.Bind("access", func(reg util.Registrar) {
 		reg.Handle("POST /route_template/preview", s.routePreview)
-		reg.Handle("POST /flushall", s.flushCache)
-		reg.Handle("GET /cache/settings", s.cacheSettings)
-		reg.Handle("POST /cache/settings", s.cacheSettings)
+		reg.Handle("POST /flushall", s.cacheManagement)
+		reg.Handle("GET /cache/settings", s.cacheManagement)
+		reg.Handle("POST /cache/settings", s.cacheManagement)
+		reg.Handle("POST /cache/settings/test", s.cacheManagement)
+		reg.Handle("POST /delete", s.cacheManagement)
 		reg.Handle("GET /get/ui_theme_settings", s.uiTheme)
 		reg.Handle("PATCH /update/ui_theme_settings", s.uiTheme)
 		reg.Handle("POST /upload/logo", s.uiTheme)
 		reg.Handle("POST /prompts/test", s.promptTest)
 		reg.Handle("POST /search_tools/test_connection", s.searchToolTest)
-		reg.Handle("GET /cache/ping", s.cachePing)
-		reg.Handle("GET /ping", s.cachePing)
+		reg.Handle("GET /cache/ping", s.cacheManagement)
+		reg.Handle("GET /ping", s.cacheManagement)
 		reg.Handle("GET /customer/list", s.customerList)
 		reg.Handle("GET /end_user/list", s.customerList)
 	})

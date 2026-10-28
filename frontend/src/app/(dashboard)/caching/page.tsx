@@ -1,12 +1,10 @@
 "use client";
 
-import { ColumnWriteSurface } from "@/components/column_write_surface";
+import useAuthorized from "@/app/(dashboard)/hooks/useAuthorized";
+import { CacheManagement } from "@/components/CacheManagement";
 
+/** 缓存页面使用当前会话展示真实运行状态；无参数，返回管理视图；权限仍由既有后台校验。 */
 export default function Page() {
-  return (
-    <ColumnWriteSurface title="缓存" emptyText="还没有缓存设置" listPath="/cache/settings" actions={[
-      { label: "保存", method: "POST", path: "/cache/settings", body: ({ name }) => ({ type: "local", name }) },
-      { label: "清空", method: "POST", path: "/flushall", body: () => ({}) },
-    ]} />
-  );
+  const { accessToken } = useAuthorized();
+  return <CacheManagement accessToken={accessToken} />;
 }
