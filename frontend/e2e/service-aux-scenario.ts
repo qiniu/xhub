@@ -1,3 +1,4 @@
+import { matchesGatewayResponse } from "./gateway-response.cjs";
 import { expect } from "@playwright/test";
 import { test } from "./policy-config-service-scenario";
 import { GATEWAY, UPSTREAM, loginAdmin, sessionBearer, stableGoto } from "./helpers";
@@ -46,7 +47,7 @@ export function registerServiceAuxBoundary(locale: Locale) {
     await stableGoto(page, "/policies");
     // 当前生产策略页仅为配置表单，沿用现有名称；本批不替换页面或恢复旧模拟器。
     await page.getByLabel("名称", { exact: true }).fill(resources.name);
-    const pending = page.waitForResponse(r => new URL(r.url()).pathname === "/policies" && r.request().method() === "POST");
+    const pending = page.waitForResponse(r => matchesGatewayResponse(r.url(), r.request().method(), "/policies", "POST"));
     await page.getByRole("button", { name: "创建", exact: true }).click();
     const created = await pending;
     expect(created.status()).toBe(200);
@@ -82,7 +83,7 @@ export function registerServiceAuxBoundary(locale: Locale) {
     await page.getByRole("option").filter({ hasText: /\/v1\/chat\/completions$/ }).click();
     const prompt = "Verify ordinary chat after unavailable management operations.";
     await page.getByTestId("chat-composer-input").fill(prompt);
-    const chat = page.waitForResponse(r => new URL(r.url()).pathname.endsWith("/chat/completions") && r.request().method() === "POST");
+    const chat = page.waitForResponse(r => ["/v1/chat/completions", "/chat/completions"].some(endpoint => matchesGatewayResponse(r.url(), r.request().method(), endpoint, "POST")));
     await page.getByTestId("chat-send-button").click();
     expect((await chat).status()).toBe(200);
     await expect(page.getByTestId("message-surface").filter({ hasText: "e2e-ok" })).toBeVisible();

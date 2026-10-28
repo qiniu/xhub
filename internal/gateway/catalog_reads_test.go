@@ -24,8 +24,32 @@ func TestCatalogReads(t *testing.T) {
 	for _, rt := range catalogGets(t) {
 		rt := rt
 		t.Run(rt.Method+" "+rt.Path, func(t *testing.T) {
+			// C1已审计的辅助操作必须明确拒绝；独立枚举模板，不能放宽所有目录的状态码。
+			unsupportedAux := map[string]bool{
+				"/credentials/by_model/{model_id}":          true,
+				"/credentials/migrate-encryption/check":     true,
+				"/policies/attachments/list":                true,
+				"/policies/attachments/{attachment_id}":     true,
+				"/policies/compare":                         true,
+				"/policies/name/{policy_name}/versions":     true,
+				"/policies/usage/overview":                  true,
+				"/policies/{policy_id}/resolved-guardrails": true,
+				"/policy/templates":                         true,
+				"/prompts/{prompt_id}/versions":             true,
+			}
 			path := fillCatalogPath(rt.Path)
 			status, body := authed(t, base, key, http.MethodGet, path, nil)
+			if unsupportedAux[rt.Path] {
+				var probe map[string]any
+				if status != 501 || json.Unmarshal(body, &probe) != nil {
+					t.Fatalf("辅助操作必须明确501: %d %s", status, trim(body))
+				}
+				errObj, _ := probe["error"].(map[string]any)
+				if errObj["type"] != "unsupported_operation" {
+					t.Fatalf("辅助操作错误契约: %s", trim(body))
+				}
+				return
+			}
 			if path == "/customer/daily/activity" || path == "/tag/daily/activity" {
 				var probe map[string]any
 				if status != http.StatusNotImplemented || json.Unmarshal(body, &probe) != nil {
