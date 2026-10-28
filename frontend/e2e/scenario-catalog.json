@@ -3063,5 +3063,19 @@
     "title": "policy configuration persistence and isolation zh-CN",
     "kind": "implemented",
     "environment": "default offline"
+  },
+  {
+    "id": "REG-medical-alias-en",
+    "file": "e2e/scenarios/regression/medical-alias-en.test.ts",
+    "title": "medical aliases reject false success en",
+    "kind": "implemented",
+    "environment": "default offline"
+  },
+  {
+    "id": "REG-medical-alias-zh-CN",
+    "file": "e2e/scenarios/regression/medical-alias-zh-CN.test.ts",
+    "title": "medical aliases reject false success zh-CN",
+    "kind": "implemented",
+    "environment": "default offline"
   }
 ]
