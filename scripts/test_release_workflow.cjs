@@ -421,3 +421,12 @@ test('guard management release gate includes bilingual execution flows', () => {
     assert.ok(existsSync(join(__dirname, '../frontend/e2e', file)));
   }
 });
+
+/** C1辅助操作失败后仍可创建配置并对话；发布命令必须包含双语真实流程，检查只读且不产生业务数据。 */
+test('service auxiliary release gate includes bilingual real flows', () => {
+  const command = workflow.jobs.verify.steps.find(item => item.run?.startsWith('bash scripts/e2e.sh '))?.run;
+  for (const file of ['scenarios/regression/service-aux-en.test.ts', 'scenarios/regression/service-aux-zh-CN.test.ts']) {
+    assert.ok(command?.split(' ').includes(file), '辅助接口真实回归缺失：' + file);
+    assert.ok(existsSync(join(__dirname, '../frontend/e2e', file)));
+  }
+});

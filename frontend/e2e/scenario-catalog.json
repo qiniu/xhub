@@ -3063,5 +3063,19 @@
     "title": "policy configuration persistence and isolation zh-CN",
     "kind": "implemented",
     "environment": "default offline"
+  },
+  {
+    "id": "REG-service-aux-en",
+    "file": "e2e/scenarios/regression/service-aux-en.test.ts",
+    "title": "service auxiliary boundaries preserve configuration and chat en",
+    "kind": "implemented",
+    "environment": "default offline"
+  },
+  {
+    "id": "REG-service-aux-zh-CN",
+    "file": "e2e/scenarios/regression/service-aux-zh-CN.test.ts",
+    "title": "service auxiliary boundaries preserve configuration and chat zh-CN",
+    "kind": "implemented",
+    "environment": "default offline"
   }
 ]

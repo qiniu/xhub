@@ -228,3 +228,20 @@ test('policy configuration scenarios are registered', () => {
   assert.deepEqual(report.unregistered, []);
   assert.equal(report.passed, 2);
 });
+
+/** C1双语流程必须进入固定业务分母；检查精确标题、文件和失败不可计通过，无业务数据需清理。 */
+test('service auxiliary scenarios are registered and failures stay failures', () => {
+  const fs = require('node:fs');
+  const path = require('node:path');
+  const {evaluateScenarios} = require('./scenario-coverage.cjs');
+  const catalog = require('./scenario-catalog.json');
+  const results = ['en','zh-CN'].map(locale => {
+    const file = `e2e/scenarios/regression/service-aux-${locale}.test.ts`;
+    assert.ok(fs.existsSync(path.join(__dirname, '..', file)));
+    return {file, title: 'service auxiliary boundaries preserve configuration and chat ' + locale, status: 'passed'};
+  });
+  assert.deepEqual(evaluateScenarios(catalog, results).unregistered, []);
+  assert.equal(evaluateScenarios(catalog, results).passed, 2);
+  results[0].status = 'failed';
+  assert.equal(evaluateScenarios(catalog, results).passed, 1);
+});
