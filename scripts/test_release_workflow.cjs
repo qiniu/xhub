@@ -421,3 +421,13 @@ test('guard management release gate includes bilingual execution flows', () => {
     assert.ok(existsSync(join(__dirname, '../frontend/e2e', file)));
   }
 });
+
+/** Key旧控件清理必须保留双语真实编辑与数据面验证；只读工作流和用例文件，无外部副作用。 */
+test('key basic editor release gate includes bilingual permission preservation flows', () => {
+  const command = workflow.jobs.verify.steps.find(item => item.run?.startsWith('bash scripts/e2e.sh '))?.run;
+  for (const locale of ['en', 'zh-CN']) {
+    const file = `scenarios/regression/key-basic-edit-${locale}.test.ts`;
+    assert.ok(command?.split(' ').includes(file), '缺少真实Key编辑流程：' + file);
+    assert.ok(existsSync(join(__dirname, '../frontend/e2e', file)));
+  }
+});

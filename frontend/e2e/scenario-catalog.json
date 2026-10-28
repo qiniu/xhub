@@ -3063,5 +3063,19 @@
     "title": "policy configuration persistence and isolation zh-CN",
     "kind": "implemented",
     "environment": "default offline"
+  },
+  {
+    "id": "REG-key-basic-edit-en",
+    "file": "e2e/scenarios/regression/key-basic-edit-en.test.ts",
+    "title": "basic key editor preserves permissions and budget en",
+    "kind": "implemented",
+    "environment": "default offline"
+  },
+  {
+    "id": "REG-key-basic-edit-zh-CN",
+    "file": "e2e/scenarios/regression/key-basic-edit-zh-CN.test.ts",
+    "title": "basic key editor preserves permissions and budget zh-CN",
+    "kind": "implemented",
+    "environment": "default offline"
   }
 ]

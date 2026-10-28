@@ -376,7 +376,7 @@ describe("KeyInfoView handleKeyUpdate mcp_toolsets", () => {
 });
 
 describe("KeyInfoView handleKeyUpdate skills", () => {
-  it("should omit skills because the dedicated permission flow persists them", async () => {
+  it("should omit unsupported skills from basic key updates", async () => {
     renderView(true);
 
     fireEvent.click(screen.getByText("Settings"));
@@ -391,7 +391,7 @@ describe("KeyInfoView handleKeyUpdate skills", () => {
     await waitFor(() => expect(keyUpdateCallMock).toHaveBeenCalled());
 
     const [, sentPayload] = keyUpdateCallMock.mock.calls[0];
-    // skills 已由权限保存流程处理，普通 key/update 只负责剔除临时表单字段。
+    // 当前精简编辑器不提供Skill授权；这里只验证字段被剔除，不能据此声称存在独立保存流程。
     expect(sentPayload).not.toHaveProperty("object_permission");
     expect(sentPayload).not.toHaveProperty("skills");
   });
@@ -411,7 +411,7 @@ describe("KeyInfoView handleKeyUpdate skills", () => {
     await waitFor(() => expect(keyUpdateCallMock).toHaveBeenCalled());
 
     const [, sentPayload] = keyUpdateCallMock.mock.calls[0];
-    // 空列表同样由权限保存流程处理，避免 key/update 覆盖对象权限。
+    // 空列表也属于隐藏字段；省略它不能被解释成Skill权限已清空或保存。
     expect(sentPayload).not.toHaveProperty("object_permission");
     expect(sentPayload).not.toHaveProperty("skills");
   });

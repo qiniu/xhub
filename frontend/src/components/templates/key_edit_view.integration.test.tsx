@@ -3,12 +3,13 @@ import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { chooseSelectOption, renderWithProviders } from "../../../tests/test-utils";
 import { I18nProvider, useI18n, translate, setActiveLocale, LOCALE_COOKIE } from "@/i18n";
-import { modelAvailableCall } from "../networking";
+import { getClaudeCodePluginsList, modelAvailableCall } from "../networking";
 import { KeyResponse } from "../key_team_helpers/key_list";
 import { KeyEditView } from "./key_edit_view";
 
 vi.mock("../networking", async (load) => ({
   ...(await load<typeof import("../networking")>()),
+  getClaudeCodePluginsList: vi.fn(),
   modelAvailableCall: vi.fn().mockResolvedValue({ data: [{ id: "gpt-4" }, { id: "gpt-4o-mini" }] }),
   getRouteTemplatesCall: vi.fn().mockResolvedValue([{ id: "template-1", name: "User template" }]),
   getRouteTemplateBindingCall: vi
@@ -27,7 +28,7 @@ const key = {
   tpm_limit: 1000,
   auto_rotate: false,
   metadata: { guardrails: ["existing"] },
-  object_permission: { agents: ["agent"] },
+  object_permission: { agents: ["agent"], skills: ["legacy-skill"] },
 } as unknown as KeyResponse;
 
 /** 提供真实编辑器和可控保存回调；参数覆盖密钥快照，返回渲染及保存函数，DOM 由框架清理。 */
@@ -84,6 +85,7 @@ describe("simplified key editor", () => {
       key_alias: "updated 用户",
       models: ["gpt-4"],
     });
+    expect(getClaudeCodePluginsList).not.toHaveBeenCalled();
     for (const field of [
       "metadata",
       "object_permission",
@@ -92,6 +94,8 @@ describe("simplified key editor", () => {
       "duration",
       "rotation_interval",
       "soft_budget",
+      "skills",
+      "allowed_skills",
     ])
       expect(payload).not.toHaveProperty(field);
   });
