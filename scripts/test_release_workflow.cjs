@@ -421,3 +421,9 @@ test('guard management release gate includes bilingual execution flows', () => {
     assert.ok(existsSync(join(__dirname, '../frontend/e2e', file)));
   }
 });
+
+/** 身份旧接口双语真实浏览器场景必须加入发布门禁，不可只在本地运行；仅静态读取工作流，无资源清理。 */
+test('release includes identity alias real browser regressions', () => {
+  const source = require('node:fs').readFileSync(require('node:path').join(__dirname, '../.github/workflows/release.yml'), 'utf8');
+  for (const locale of ['en','zh-CN']) assert.ok(source.includes(`scenarios/regression/identity-alias-${locale}.test.ts`));
+});

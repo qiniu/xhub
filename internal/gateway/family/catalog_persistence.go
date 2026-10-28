@@ -31,6 +31,10 @@ func writeCatalogStore(st catalogRecordStore, w http.ResponseWriter, r *http.Req
 		util.WriteError(w, http.StatusBadRequest, "unsupported_protocol", "JSON-RPC is not supported by this REST management endpoint")
 		return
 	}
+	// 旧身份别名没有签发或邀请执行器，不能落入公共KV后伪装成业务成功。
+	if rejectIdentityAlias(w, r) {
+		return
+	}
 	kind, action, id := parseMgmt(r.Method, path, body)
 	if st == nil {
 		util.WriteError(w, http.StatusServiceUnavailable, "unavailable", "catalog store unavailable")

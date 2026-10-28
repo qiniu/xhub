@@ -352,7 +352,7 @@ jobs:
       - name: Run real user contract regression
         env:
           XHUB_REGRESSION_COVERPROFILE: coverage/user-contract.out
-        run: bash scripts/regression.sh '^Test(UserContract|UserBulkBudget|UserMonthlyBudget|UserEnterpriseIdentity|SoftBudgetAllocationHTTP)'
+        run: bash scripts/regression.sh '^Test(IdentityAliasBoundary|UserContract|UserBulkBudget|UserMonthlyBudget|UserEnterpriseIdentity|SoftBudgetAllocationHTTP)'
       - name: Validate regression coverage
         shell: bash
         run: |

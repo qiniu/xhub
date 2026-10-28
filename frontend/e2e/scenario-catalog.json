@@ -3063,5 +3063,19 @@
     "title": "policy configuration persistence and isolation zh-CN",
     "kind": "implemented",
     "environment": "default offline"
+  },
+  {
+    "id": "REG-identity-alias-en",
+    "file": "e2e/scenarios/regression/identity-alias-en.test.ts",
+    "title": "identity aliases reject false success without breaking login and chat en",
+    "kind": "implemented",
+    "environment": "default offline"
+  },
+  {
+    "id": "REG-identity-alias-zh-CN",
+    "file": "e2e/scenarios/regression/identity-alias-zh-CN.test.ts",
+    "title": "identity aliases reject false success without breaking login and chat zh-CN",
+    "kind": "implemented",
+    "environment": "default offline"
   }
 ]
