@@ -3161,5 +3161,19 @@
     "title": "legacy server OAuth rejects false success and preserves chat zh-CN",
     "kind": "implemented",
     "environment": "default offline"
+  },
+  {
+    "id": "REG-server-runtime-en",
+    "file": "e2e/scenarios/regression/server-runtime-en.test.ts",
+    "title": "legacy server runtime helpers preserve configuration and chat en",
+    "kind": "implemented",
+    "environment": "default offline"
+  },
+  {
+    "id": "REG-server-runtime-zh-CN",
+    "file": "e2e/scenarios/regression/server-runtime-zh-CN.test.ts",
+    "title": "legacy server runtime helpers preserve configuration and chat zh-CN",
+    "kind": "implemented",
+    "environment": "default offline"
   }
 ]

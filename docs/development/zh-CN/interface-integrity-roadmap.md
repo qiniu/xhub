@@ -340,3 +340,12 @@ npm run test:types
 - 不增加 OAuth 功能，不扩大第三阶段契约/Swagger 已支持范围。普通 server 配置只表示保存记录；health、普通 user-credential、user-env-vars、plugins/skills 等其他旧别名仍需分别核对，本批不代表第四阶段全部完成。
 - 先红后绿的真实回归核对数据库快照、普通 CRUD、会话、本地上游调用与计费、零预算拦截；另跑企业 SAML 真实回归。双语浏览器验证旧入口拒绝后仍可在调试台完成对话，并严格清理临时配置。CI 上传独立真实回归覆盖率，70% 门禁不变。
 - 无数据迁移，不主动清理既有 KV。回退本批处理器即可恢复旧分派，但会重新暴露上述错误行为；只在确认需要时回退。不自动合并或部署。
+
+## 第四阶段旧 server 健康与个人配置边界
+
+[Bug #199](https://github.com/qiniu/xhub/issues/199) 通过真实 HTTP/PostgreSQL 复现：`GET /server/health` 只是返回带 `status=ok` 的配置列表，没有探测；`user-credential` / `user-env-vars` 子路径被通用 KV 当成同名公共 server，能回显/保存秘密，删除还能误删普通配置。
+
+- 精确拒绝六个操作：`GET /server/health`；`POST`、`DELETE /server/{server_id}/user-credential`；`GET`、`POST`、`DELETE /server/{server_id}/user-env-vars`。保留原管理鉴权（匿名401、普通用户403）及JSON对象校验（损坏正文400）；管理员合法请求返回501/unsupported_operation和no-store，不访问存储或外部服务。
+- 普通 server CRUD，包括名为 user-credential/user-env-vars 的资源，仍按原存储格式工作。保留原企业SSO、已移除的MCP前缀与独立技能接口；本次不添加个人秘密存储、不恢复MCP、不修改权限/预算规则，不扩大Swagger已支持范围。
+- 先红后绿的真实回归验证数据库快照、名称碰撞、鉴权、错误响应、普通CRUD、会话、模型调用/计费和零预算拦截；目录遍历精确校验两个读取入口的501。双语浏览器验证配置回读、拒绝操作、调试台真实本地上游回复及严格清理。CI独立采集/上传后台覆盖率，发布门禁包含双语场景，70%不变。
+- 无数据库迁移，不主动改写历史记录。回退此边界会恢复原分派及原有缺陷。server导入/审批、插件、技能消费者和死分支仍需逐项核对，不能把本批当成第四阶段完成；已存在的独立技能处理器不能因目录中还有路由名就被误判为占位。

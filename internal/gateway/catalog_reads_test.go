@@ -37,6 +37,18 @@ func TestCatalogReads(t *testing.T) {
 				}
 				return
 			}
+			// 精确核对未实现的旧server运行时读取，不能泛化接受所有501。
+			if rt.Path == "/server/health" || rt.Path == "/server/{server_id}/user-env-vars" {
+				var probe struct {
+					Error struct {
+						Type string `json:"type"`
+					} `json:"error"`
+				}
+				if status != http.StatusNotImplemented || json.Unmarshal(body, &probe) != nil || probe.Error.Type != "unsupported_operation" {
+					t.Fatalf("旧server运行时拒绝契约错误: status=%d body=%s", status, trim(body))
+				}
+				return
+			}
 			if IsRemovedColumn(rt.Path) || IsRemovedColumn(path) {
 				if status != http.StatusNotFound {
 					t.Fatalf("removed status %d %s", status, trim(body))
