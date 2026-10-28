@@ -1,5 +1,7 @@
 # Phase 4: compatibility-layer ownership audit
 
+> Update 2026-10-28: use the [fixed closure inventory](phase4-closure.md) for current remaining work. Below is the original registration audit and historical verification record.
+
 This audit is based on `939e0d6c` (#180 on main). **Phase 4 is not complete.** Supplier, search-tool, prompt, guardrail and policy configuration have separate boundaries. Access-group #182 and vector-store configuration #184 are still pending PRs. Passing tests, merging and deploying are separate states.
 
 This change adds tests, a snapshot and development documentation only. It does not change APIs, permissions, budgets or storage, lower the 70% coverage gate, merge or deploy.
