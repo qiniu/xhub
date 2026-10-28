@@ -70,6 +70,7 @@ interface SkillHubTableColumnsDeps {
   onSkillClick: (skill: Plugin) => void;
 }
 
+/** 生成元数据表格列；onSkillClick打开详情，enabled仅展示配置状态，不推断公开权限或安装能力，无存储副作用。 */
 export const getSkillHubTableColumns = ({ onSkillClick }: SkillHubTableColumnsDeps): ColumnDef<Plugin>[] => [
   {
     id: "name",
@@ -154,7 +155,7 @@ export const getSkillHubTableColumns = ({ onSkillClick }: SkillHubTableColumnsDe
     cell: ({ row }) => (
       <StatusBadge
         tone={row.original.enabled ? "success" : "neutral"}
-        label={row.original.enabled ? t("Public") : t("Draft")}
+        label={t(row.original.enabled ? "skillHub.configEnabled" : "skillHub.configDisabled")}
       />
     ),
   },

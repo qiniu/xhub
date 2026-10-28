@@ -245,3 +245,9 @@ See [core contract completion](core-contract-completion.md) for stage3 scope, ev
 - Unit tests cover normal, boundary, failure and namespace behavior. Real HTTP/PostgreSQL regressions cover permissions, SQL read/write faults, recovery and cleanup; real local-provider calls verify unchanged billing and zero-budget denial. The same regressions also run against the pre-refactor management implementation as a compatibility baseline.
 - Browser tests in both console locale environments cover page creation, reload, HTTP updates, rejection/recovery, model calls and deletion. The legacy policy page still uses its existing Chinese controls; this backend extraction does not claim to fix that localization debt. Independent request contexts clean up after success, failure and timeout; cleanup errors fail tests. CI uploads real regression coverage without lowering the 70% gate.
 - No data migration or production deployment. Reverting the service and adapter restores the old implementation over the same stored records.
+
+## Stage 4: SkillHub support status
+
+[Issue #213](https://github.com/qiniu/xhub/issues/213) separates failed public discovery from a valid empty list. The enabled field describes configuration only, not publication, installation or inference authorization. Detail and support dialogs no longer generate unsupported installation instructions or report publication success. Original names, descriptions and metadata remain visible, with English and Chinese UI.
+
+Real HTTP/PostgreSQL regression checks public discovery 404, management permissions, unchanged stored configuration, billing and zero-budget rejection. Browser E2E uses the real gateway to verify the error display followed by successful inference. CI collects regression coverage without lowering the 70% gate. No public publisher is added and no OpenAPI support scope is expanded. The legacy Key Skill selector still needs a separate audit; this does not complete all of stage 4.
