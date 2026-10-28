@@ -7,6 +7,8 @@ import { ApiError } from "@/lib/http/client";
 import { SAML_IDENTITY_CLAIM, SAML_METADATA_URL } from "@/lib/enterpriseSSO";
 import EnterpriseConfiguration from "./EnterpriseConfiguration";
 
+// 独立刷新子表单由 SAMLRefresh.test.tsx 验证，避免父表单测试混入调度读取。
+vi.mock("./SAMLRefresh", () => ({default: () => null}));
 vi.mock("@/lib/http/enterprise");
 
 /** 创建已保存 SAML 的脱密快照；无参数，返回独立对象，测试可修改边界，无外部服务或持久资源。 */

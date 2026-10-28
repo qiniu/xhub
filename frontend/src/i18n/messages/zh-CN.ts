@@ -1,3 +1,4 @@
+import { samlRefresh } from "./samlRefresh.zh-CN";
 import { budgetReconciliationZhCN } from "./budgetReconciliation.zh-CN";
 import { probesZhCN } from "./probes.zh-CN";
 import { docsZhCN } from "./docs.zh-CN";
@@ -7,6 +8,7 @@ import { pageDescriptionsZhCN } from "./pageDescriptions.zh-CN";
 import { routeTemplatesZhCN } from "./routeTemplates.zh-CN";
 
 export const zhCN = {
+  samlRefresh,
   probes: probesZhCN,
   mcpOAuthCallback: {
     title: "MCP 授权回调",

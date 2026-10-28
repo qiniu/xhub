@@ -1,3 +1,4 @@
+import { samlRefresh } from "./samlRefresh.en";
 import { budgetReconciliationEn } from "./budgetReconciliation.en";
 import { probesEn } from "./probes.en";
 import { docsEn } from "./docs.en";
@@ -6,6 +7,7 @@ import { pageDescriptionsEn } from "./pageDescriptions.en";
 import { routeTemplatesEn } from "./routeTemplates.en";
 
 export const en = {
+  samlRefresh,
   probes: probesEn,
   mcpOAuthCallback: {
     title: "MCP authorization callback",

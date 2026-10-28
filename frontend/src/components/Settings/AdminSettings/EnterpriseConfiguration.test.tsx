@@ -4,6 +4,8 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { I18nProvider } from "@/i18n";
 import * as api from "@/lib/http/enterprise";
 import EnterpriseConfiguration from "./EnterpriseConfiguration";
+// 独立刷新子表单由 SAMLRefresh.test.tsx 验证，避免父表单测试混入调度读取。
+vi.mock("./SAMLRefresh", () => ({default: () => null}));
 vi.mock("@/lib/http/enterprise");
 describe("EnterpriseConfiguration", () => {
  beforeEach(() => { vi.resetAllMocks(); localStorage.clear(); document.cookie = "xhub_locale=; max-age=0; path=/"; });

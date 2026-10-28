@@ -6,6 +6,7 @@ import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
 import {type DirectoryOrganization} from "@/lib/http/directory";
 import { enterpriseSSOOrigin, SAML_IDENTITY_CLAIM, SAML_METADATA_URL, samlConfigurationIssue, samlFailureKey, ssoSaveConfiguration } from "@/lib/enterpriseSSO";
+import SAMLRefresh from "./SAMLRefresh";
 import SettingsSelect from "./SettingsSelect";
 import { useT } from "@/i18n";
 import { archiveAction, createSSO, readEnterprise, readSSOMetadata, saveEnterprise, type ArchiveStatus, type EnterpriseConfiguration as Configuration } from "@/lib/http/enterprise";
@@ -128,6 +129,7 @@ export default function EnterpriseConfiguration({ id, sso = false, organizations
    <div className="flex flex-wrap items-center justify-between gap-3 border-t pt-4 sm:col-span-2"><label className="!flex-row items-center"><Switch checked={!!value.enabled} onCheckedChange={(checked) => setValue((old) => ({ ...old, enabled: checked }))} />{t("enterprise.enabled")}</label>
    <Button type="submit" disabled={busy}>{t("enterprise.save")}</Button></div>
   </form>
+  {saml && savedSAML && savedID && <SAMLRefresh key={savedID} id={savedID} />}
   {!oidc && <div className="flex flex-wrap gap-2"><Button variant="outline" type="button" disabled={busy} onClick={() => action("test")}>{t("enterprise.test")}</Button><Button variant="outline" type="button" disabled={busy} onClick={() => action("retry")}>{t("enterprise.retry")}</Button></div>}
   {certificateExpired && <p className="mt-3 text-sm text-destructive" role="alert">{t("enterprise.samlCertificateExpired")}</p>}
   {validation && !(certificateExpired && validation === "enterprise.samlCertificateExpired") && <p className="mt-3 text-sm text-destructive" role="alert">{t(validation)}</p>}

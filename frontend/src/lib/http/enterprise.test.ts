@@ -1,11 +1,13 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 const get = vi.hoisted(() => vi.fn());
-vi.mock("./client", () => ({createApiClient: () => ({get})}));
+const post = vi.hoisted(() => vi.fn());
+vi.mock("./client", () => ({createApiClient: () => ({get,post})}));
 vi.mock("./runtime", () => ({getAuthHeaderName: () => "Authorization", getAuthToken: () => "test-admin-token", getRequestBaseUrl: () => "/gw"}));
-import { readSSOMetadata } from "./enterprise";
+import { refreshSSOMetadata, readSSOMetadata } from "./enterprise";
+
+afterEach(() => vi.resetAllMocks());
 
 describe("SAML metadata admin contract", () => {
-  afterEach(() => vi.resetAllMocks());
   // 前置管理员接口返回XML；验证配置ID编码、鉴权和原文保持，纯mock无需外部清理。
   it("reads saved XML through the authenticated metadata endpoint", async () => {
     const xml = '<EntityDescriptor entityID="urn:original"/>';
@@ -23,4 +25,14 @@ describe("SAML metadata admin contract", () => {
     get.mockRejectedValue(new Error("denied"));
     await expect(readSSOMetadata("saved")).rejects.toThrow("denied");
   });
+});
+
+// 管理员立即刷新使用编码连接 ID 和真实认证入口；接口失败原样抛出，不重复请求，mock 在用例后清理。
+it("refreshes metadata through authenticated POST without retries", async () => {
+ post.mockResolvedValue({last_success:1});
+ expect(await refreshSSOMetadata("id/space here")).toEqual({last_success:1});
+ expect(post).toHaveBeenCalledWith("/admin/enterprise/sso/id%2Fspace%20here/refresh",{accessToken:"test-admin-token",body:{}});
+ post.mockRejectedValue(new Error("refresh failed"));
+ await expect(refreshSSOMetadata("saved")).rejects.toThrow("refresh failed");
+ expect(post).toHaveBeenCalledTimes(2);
 });
