@@ -208,6 +208,19 @@ func TestCatalogReads(t *testing.T) {
 				}
 				return
 			}
+			// C3旧设置读取只接受明确不支持；独立清单不放宽其他配置接口。
+			switch rt.Path {
+			case "/config/field/info", "/config/yaml", "/get/default_team_settings", "/get/internal_user_settings", "/get/ui_settings", "/get/user_banner", "/get_favicon", "/get_image", "/get_logo_url", "/settings", "/sso/get/ui_settings":
+				var probe struct {
+					Error struct {
+						Type string `json:"type"`
+					} `json:"error"`
+				}
+				if status != http.StatusNotImplemented || json.Unmarshal(body, &probe) != nil || probe.Error.Type != "unsupported_settings_operation" {
+					t.Fatalf("设置旧入口拒绝契约错误: %d %s", status, trim(body))
+				}
+				return
+			}
 			switch status {
 			case http.StatusOK:
 				if !json.Valid(body) {

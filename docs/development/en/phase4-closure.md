@@ -5,7 +5,7 @@
 - Main `e8a29c4f972e8832e1c6e02a8226d0befcc65584` includes the accumulated phase-four PRs (#182–#228, including #202). C1, C2 and C3/runtime-ops are merged.
 - This candidate addresses **15 C3/settings routes** with no actual consumer: explicit `501 unsupported_settings_operation`, no activation of legacy KV defaults, unchanged anonymous401/member403 and JSON error precedence. The independent theme read/write/logo service remains available.
 - Real coverage: every route and role, invalid bodies and unchanged KV; theme write/read, model inference and zero-budget403; bilingual browser navigation after unavailable sidebar settings, configuration create/reload and chat. The typed HTTP middleware already throws errors; tests verify it without duplicate handling. The unmounted default-user form is not claimed as a browser-verified flow.
-- This batch is not merged or deployed. After it, **56 routes remain: C4 model aliases14, C5 analytics26, C6 protocols7, C7 discovery9**, plus final integration acceptance. Main still needs these15 as well (71 total).
+- This batch is not merged or deployed. Model aliases14 are also submitted in #233:29 candidate fixes across both PRs. After them, **42 routes remain: C5 analytics26, C6 protocols7, C7 discovery9**, plus final integration acceptance. Main still needs both candidates (71 total).
 - The current inventory has301 entries; two of the historical303 moved to dedicated modules. The historical snapshot below, and JSON `main_status`/`observation`, are not current execution results. Candidate evidence is recorded separately without claiming main already contains this fix.
 
 <details><summary>Original audit snapshot (2026-10-28; historical status)</summary>
