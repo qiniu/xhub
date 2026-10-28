@@ -25,7 +25,9 @@
       "batch": "C2",
       "source": "internal/gateway/family/catalog_persistence.go",
       "conclusion": "这些精确路径仍读写KV，不是已修复的/authorize/flow或MCP OAuth；须验证令牌/身份副作用并明确支持边界。",
-      "pending_prs": []
+      "pending_prs": [
+        226
+      ]
     },
     "budget-iam": {
       "title": "预算配置与组织/团队旧入口",
