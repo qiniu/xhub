@@ -26,7 +26,7 @@ type catalogRecordStore interface {
 // 由 writeCatalogPersist 调用，结果直接写入 w；供应商、搜索、提示词、策略及向量库配置委派独立服务，其余目录保持旧 CRUD/upsert，仅真实持久化成功才能返回成功。
 // 由 writeCatalogPersist 调用，结果直接写入 w；供应商、搜索、提示词、策略及标签/客户CRUD委派独立服务，其余目录保持旧 CRUD/upsert，仅真实持久化成功才能返回成功。
 // 由 writeCatalogPersist 调用，结果直接写入 w；供应商、搜索、提示词、策略及预算配置委派独立服务，其余目录保持旧 CRUD/upsert，仅真实持久化成功才能返回成功。
-// 顶层JSON-RPC信封明确拒绝，普通token资源名不得触发令牌签发；非事务批量删除失败时不回滚已删除项，但必须返回错误。
+// 插件列表交给精确筛选适配器；顶层JSON-RPC明确拒绝，普通token资源名不签发令牌；非事务批量删除失败仍返回错误。
 func writeCatalogStore(st catalogRecordStore, w http.ResponseWriter, r *http.Request, body map[string]any) {
 	path := r.URL.Path
 	// 此入口是已鉴权的REST资源接口，没有RPC执行器。拒绝信封，而非吞掉操作并伪造空工具列表。
@@ -38,6 +38,9 @@ func writeCatalogStore(st catalogRecordStore, w http.ResponseWriter, r *http.Req
 	kind, action, id := parseMgmt(r.Method, path, body)
 	if st == nil {
 		util.WriteError(w, http.StatusServiceUnavailable, "unavailable", "catalog store unavailable")
+		return
+	}
+	if writePluginList(st, w, r) {
 		return
 	}
 	if id == "" || ((action == "update" || action == "delete") && (id == kind || id == singular(kind))) {

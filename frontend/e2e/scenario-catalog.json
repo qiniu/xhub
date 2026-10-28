@@ -3217,5 +3217,19 @@
     "title": "legacy plugin activation helpers preserve configuration and chat zh-CN",
     "kind": "implemented",
     "environment": "default offline"
+  },
+  {
+    "id": "REG-plugin-filter-en",
+    "file": "e2e/scenarios/regression/plugin-filter-en.test.ts",
+    "title": "plugin list filters configuration and preserves chat en",
+    "kind": "implemented",
+    "environment": "default offline"
+  },
+  {
+    "id": "REG-plugin-filter-zh-CN",
+    "file": "e2e/scenarios/regression/plugin-filter-zh-CN.test.ts",
+    "title": "plugin list filters configuration and preserves chat zh-CN",
+    "kind": "implemented",
+    "environment": "default offline"
   }
 ]
