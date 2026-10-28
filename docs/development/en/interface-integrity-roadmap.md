@@ -245,3 +245,13 @@ See [core contract completion](core-contract-completion.md) for stage3 scope, ev
 - Unit tests cover normal, boundary, failure and namespace behavior. Real HTTP/PostgreSQL regressions cover permissions, SQL read/write faults, recovery and cleanup; real local-provider calls verify unchanged billing and zero-budget denial. The same regressions also run against the pre-refactor management implementation as a compatibility baseline.
 - Browser tests in both console locale environments cover page creation, reload, HTTP updates, rejection/recovery, model calls and deletion. The legacy policy page still uses its existing Chinese controls; this backend extraction does not claim to fix that localization debt. Independent request contexts clean up after success, failure and timeout; cleanup errors fail tests. CI uploads real regression coverage without lowering the 70% gate.
 - No data migration or production deployment. Reverting the service and adapter restores the old implementation over the same stored records.
+
+## Phase 4: legacy server import and submission boundary
+
+[Bug #203](https://github.com/qiniu/xhub/issues/203) reproduces five false successes over real HTTP/PostgreSQL: import merely stores its body, registration has no review state machine, submissions lists ordinary configuration, and approve/reject treat the action name as the record ID.
+
+The exact five operations now return `501/unsupported_operation` with `Cache-Control: no-store`, after existing authorization and JSON validation and before storage. Ordinary server CRUD, colliding resource names, 404 responses for the unregistered `/v1/mcp/server` counterparts, permissions and budget rules stay unchanged. This does not implement MCP execution or expand the core OpenAPI inventory. No schema migration or historical record deletion is performed.
+
+Tests first reproduce all five failures, then verify no writes, error envelopes, ordinary CRUD, real local inference billing and zero-budget rejection. English and Chinese browser flows exercise the actual gateway and verify successful playground inference by upstream request count after the rejected operations. CI uploads dedicated regression coverage and selects both release flows without lowering the 70% gate. External MCP services are not exercised.
+
+Remaining work includes plugin management, skill consumers, residual management entries (including execution-looking RAG/OCR routes), obsolete branches, and a combined regression of all pending PRs on a temporary integration branch. Individual green PRs do not prove combined compatibility. SSO metadata refresh remains a separate feature for the user-selected merge batch; nothing is merged or deployed here.

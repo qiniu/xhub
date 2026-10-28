@@ -37,6 +37,18 @@ func TestCatalogReads(t *testing.T) {
 				}
 				return
 			}
+			// 旧审批列表没有执行器，不能把公共配置列表冒充审批结果。
+			if path == "/server/submissions" {
+				var probe map[string]any
+				if status != http.StatusNotImplemented || json.Unmarshal(body, &probe) != nil {
+					t.Fatalf("server submissions unsupported contract: %d %s", status, trim(body))
+				}
+				e, _ := probe["error"].(map[string]any)
+				if e["type"] != "unsupported_operation" {
+					t.Fatalf("server submissions error type: %s", trim(body))
+				}
+				return
+			}
 			if IsRemovedColumn(rt.Path) || IsRemovedColumn(path) {
 				if status != http.StatusNotFound {
 					t.Fatalf("removed status %d %s", status, trim(body))
