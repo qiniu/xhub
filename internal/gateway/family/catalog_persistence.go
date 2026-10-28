@@ -36,6 +36,9 @@ func writeCatalogStore(st catalogRecordStore, w http.ResponseWriter, r *http.Req
 		util.WriteError(w, http.StatusServiceUnavailable, "unavailable", "catalog store unavailable")
 		return
 	}
+	if writePluginRegistration(st, w, r, body) {
+		return
+	}
 	if id == "" || ((action == "update" || action == "delete") && (id == kind || id == singular(kind))) {
 		if alt := str(body[idField(kind)]); alt != "" {
 			id = alt

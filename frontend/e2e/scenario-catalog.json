@@ -3063,5 +3063,19 @@
     "title": "policy configuration persistence and isolation zh-CN",
     "kind": "implemented",
     "environment": "default offline"
+  },
+  {
+    "id": "REG-plugin-registration-en",
+    "file": "e2e/scenarios/regression/plugin-registration-en.test.ts",
+    "title": "plugin registration preserves identities and chat en",
+    "kind": "implemented",
+    "environment": "default offline"
+  },
+  {
+    "id": "REG-plugin-registration-zh-CN",
+    "file": "e2e/scenarios/regression/plugin-registration-zh-CN.test.ts",
+    "title": "plugin registration preserves identities and chat zh-CN",
+    "kind": "implemented",
+    "environment": "default offline"
   }
 ]
