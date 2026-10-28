@@ -330,3 +330,13 @@ npm run test:types
 这是旧响应语义修复：设置 GET 不再返回任意保存的 JSON，原写入或假删除的 200 改为 501。历史 KV 保留但不应用；`/cache/delete`、`/cache/flushall` 未注册，继续 404。不扩展第三阶段 OpenAPI 支持清单。控制台改为双语只读状态、范围说明与实际清理操作，不提供无效保存。
 
 真实 HTTP/PostgreSQL 先复现配置回显、假测试和假删除，再验证拒绝与无写入；内存单元测试验证就绪及清理，浏览器验证中英文、实际命中零计费、清理后再次调用本地上游并计费，以及真实鉴权失败提示和恢复。权限、预算规则、70% 门禁不变；真实回归覆盖率独立上传。无需数据库迁移，回退恢复旧行为（包括假成功），不代表建议回退。付费供应商和生产不在本次验证范围；其他旧运维接口仍按各自问题单处理。
+
+## 第四阶段旧 server OAuth 授权边界
+
+[Bug #197](https://github.com/qiniu/xhub/issues/197) 在真实 HTTP/PostgreSQL 回归中发现另一组保留别名仍落入通用 KV：授权请求返回 200/status=ok 并保存/回显提交的凭据；删除授权凭据会误删普通 server 配置。这些路径没有授权执行器，与 #144 已修的 `/authorize/*` 和 `/v1/mcp/.../token` 不同。
+
+- 明确拒绝七个未实现操作：`POST /server/oauth/session`；`GET /server/oauth/{server_id}/authorize`；`POST /server/oauth/{server_id}/register`、`POST /server/oauth/{server_id}/token`；`POST`、`DELETE /server/{server_id}/oauth-user-credential`；`GET /server/{server_id}/oauth-user-credential/status`。
+- 仍先执行原管理鉴权，匿名 401、普通用户 403；管理员得到 501/unsupported_operation 和 no-store。拒绝发生在读取正文和访问存储之前，不回显秘密、不发令牌/重定向、不新增或删除配置。普通 server CRUD、企业 SAML、模型权限与预算规则不变。
+- 不增加 OAuth 功能，不扩大第三阶段契约/Swagger 已支持范围。普通 server 配置只表示保存记录；health、普通 user-credential、user-env-vars、plugins/skills 等其他旧别名仍需分别核对，本批不代表第四阶段全部完成。
+- 先红后绿的真实回归核对数据库快照、普通 CRUD、会话、本地上游调用与计费、零预算拦截；另跑企业 SAML 真实回归。双语浏览器验证旧入口拒绝后仍可在调试台完成对话，并严格清理临时配置。CI 上传独立真实回归覆盖率，70% 门禁不变。
+- 无数据迁移，不主动清理既有 KV。回退本批处理器即可恢复旧分派，但会重新暴露上述错误行为；只在确认需要时回退。不自动合并或部署。

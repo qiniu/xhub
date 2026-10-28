@@ -3147,5 +3147,19 @@
     "title": "unsupported operations preserve real health and chat zh-CN",
     "kind": "implemented",
     "environment": "default offline"
+  },
+  {
+    "id": "REG-server-oauth-en",
+    "file": "e2e/scenarios/regression/server-oauth-en.test.ts",
+    "title": "legacy server OAuth rejects false success and preserves chat en",
+    "kind": "implemented",
+    "environment": "default offline"
+  },
+  {
+    "id": "REG-server-oauth-zh-CN",
+    "file": "e2e/scenarios/regression/server-oauth-zh-CN.test.ts",
+    "title": "legacy server OAuth rejects false success and preserves chat zh-CN",
+    "kind": "implemented",
+    "environment": "default offline"
   }
 ]

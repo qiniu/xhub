@@ -564,7 +564,7 @@ func ServeMixed(s Host, w http.ResponseWriter, r *http.Request) {
 // ServeMgmt 先鉴权再执行管理目录操作；s 为宿主，w/r 为 HTTP 响应和请求，由 gateway/catalog.go 调用。
 // 返回结果直接写入 w；未接入IAM的组织/团队旧目录在鉴权后拒绝，不能冒充真实业务操作；护栏仍使用自己的处理器，通用目录仅接受空正文或一个完整 JSON 对象，解析失败不触碰存储。
 // 返回结果直接写入 w；未实现运维目录在原鉴权后明确拒绝；护栏仍使用自己的处理器，通用目录仅接受空正文或一个完整 JSON 对象，解析失败不触碰存储。
-// 测试：catalog_persistence_test.go；不放宽任何权限，不改变空 GET/DELETE 正文语义。
+// 未实现的旧server OAuth在解析/存储前明确拒绝；不放宽权限，不改变普通CRUD的空GET/DELETE正文语义。
 func ServeMgmt(s Host, w http.ResponseWriter, r *http.Request) {
 	if s.RequireManage(w, r) == nil {
 		return
@@ -579,6 +579,9 @@ func ServeMgmt(s Host, w http.ResponseWriter, r *http.Request) {
 	// 没有运维执行器的目录必须明确拒绝；保存KV不代表连接测试、排空或GC已经执行。
 	if unsupportedOperationalPath(r.URL.Path) {
 		util.WriteError(w, http.StatusNotImplemented, "unsupported_operation", "this operational endpoint is not implemented")
+		return
+	}
+	if rejectServerOAuth(w, r) {
 		return
 	}
 	body, err := readCatalogBody(r.Body)
