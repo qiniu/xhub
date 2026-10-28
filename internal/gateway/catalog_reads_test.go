@@ -60,6 +60,18 @@ func TestCatalogReads(t *testing.T) {
 				}
 				return
 			}
+			// 这两个保留的GET授权入口没有执行器，必须精确返回501；不能把所有501加入通用允许列表。
+			if rt.Path == "/server/oauth/{server_id}/authorize" || rt.Path == "/server/{server_id}/oauth-user-credential/status" {
+				var probe struct {
+					Error struct {
+						Type string `json:"type"`
+					} `json:"error"`
+				}
+				if status != http.StatusNotImplemented || json.Unmarshal(body, &probe) != nil || probe.Error.Type != "unsupported_operation" {
+					t.Fatalf("旧server授权拒绝契约错误: status=%d body=%s", status, trim(body))
+				}
+				return
+			}
 			if (strings.Contains(path, "/threads/") && strings.HasSuffix(path, "/messages")) ||
 				strings.HasPrefix(path, "/guardrails/submissions/") ||
 				path == "/authorize/flow" || path == "/guardrails/ui/major_airlines" || strings.HasPrefix(path, "/guardrails/ui/category_yaml/") {
