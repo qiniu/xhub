@@ -245,3 +245,194 @@ npm run test:types
 - 单元验证正常、边界、失败和命名空间；真实 HTTP/PostgreSQL 回归验证权限、SQL 读写故障、恢复与清理，配置更新前后真实本地模型调用、费用和零预算拦截保持原规则。同组回归也在重构前的管理实现上执行，作为兼容基线。
 - 双语控制台环境验证页面创建、刷新读回、HTTP 更新/错误后恢复、模型通路和删除。旧策略页面仍使用原有中文控件，本次无前端产品文案变更，不声称修复了其国际化欠账。测试独立请求上下文在正常、失败和超时后清理，清理失败阻止通过；CI 采集上传真实回归覆盖率，70% 门禁不变。
 - 无数据库迁移。回退服务及 HTTP 适配器即可继续读取原记录；不合并或部署生产。
+
+## 第四阶段访问组配置管理服务
+
+[提案 #181](https://github.com/qiniu/xhub/issues/181) 将访问组配置 CRUD 和旧字段规范化迁入 `internal/gateway/accessgroupconfig`。HTTP 兼容层继续负责鉴权、路径解析、严格 JSON、响应包络和错误映射。
+
+- 范围为已注册的 11 个操作：`/access_group/list|new|{id}/info|{id}/update|{id}/delete`、`/access_groups`，以及 `/v1/access_group` 的列表/创建与 `/{id}` 详情/更新/删除。单数路径与 v1 共用 `access_group`；复数列表仍读取独立 `access_groups`，不自动合并历史数据。
+- 保留创建替换、缺失更新 upsert、浅层补丁、嵌套创建展开、数组缺省、扩展字段和非事务删除。保留名称回退、null/零/非预期类型的旧处理方式，以及 `updated_at` 沿用创建时间的旧语义。
+- 这些是历史配置记录，当前模型授权链不读取其 `models/access_model_names/assigned_key_ids/assigned_team_ids` 字段。没有已接入的独立访问组管理页面；此次不新增页面、不让字段自动授权，也不恢复已移除的预算子路由、统一访问组或 MCP 接口。不扩大第三阶段 OpenAPI 覆盖声明。
+- 同一真实 HTTP/PostgreSQL 回归在迁移前后执行，覆盖 11 个操作、真实 SQL 读写/删除故障、恢复与清理。普通用户请求真实本地模型并核对费用，配置写入不能放宽 Key 模型限制，零预算仍拒绝。
+- 双语 E2E 通过管理 API 编辑配置，再用真实普通用户登录，验证模型页、500 预算、调试台对话及删除后模型可用。独立清理夹具在成功、失败和超时后删除自有资源，清理错误不能通过；CI 采集上传真实回归覆盖率，70% 门禁不变。
+- 无数据库迁移、权限或预算规则变更。回退本批服务和适配器即可读取原记录；合并与部署另行决定。
+
+## 第四阶段向量库配置管理服务
+
+[提案 #183](https://github.com/qiniu/xhub/issues/183) 将单数 /vector_store 的 list/new/info/update/delete 五个管理操作委派给独立的 vectorconfig.Service。兼容层继续负责鉴权、路径解析、严格 JSON、响应包络和错误映射。存储仍使用 vector_store KV，无数据库迁移。
+
+- 保留创建替换、缺失更新 upsert、浅层补丁、嵌套展开、非事务删除、未知字段和 null/零值。名称、别名、status 和 file_counts 默认值保持旧规则。
+- status=completed 和 file_counts 是历史配置元数据，不能据此宣称文件已索引或可检索。复数 /vector_stores 与 /v1/vector_stores 的数据面路径不迁移，文件写入和搜索仍明确返回 501，管理配置不会出现在调用者的数据面资源列表。
+- 同组真实 HTTP/PostgreSQL 回归在迁移前后执行，覆盖五个操作、权限、真实 SQL 读写/删除故障与恢复、数据清理；本地真实模型调用、费用和零预算拦截保持原规则。
+- 中英文控制台环境验证页面创建与刷新、接口更新/非法输入/恢复、未支持操作拒绝、模型调用和删除。旧页面中文控件保持现状，本次没有产品前端改动，不声称修复其国际化欠账。独立清理夹具验证业务异常、超时、清理错误及零删除。
+- CI 采集上传真实回归覆盖率，70% 门禁不变。不扩大第三阶段 OpenAPI 覆盖，不改变权限或预算规则；回退本批服务与适配器即可读取原数据，合并和部署另行决定。
+
+## 第四阶段剩余范围复核
+
+[兼容层归属审计](compatibility-layer-audit.md) 使用真实模块注册过程补充静态契约清单，区分已进入 main、待合入和仍走通用目录的入口。配置服务拆出不等于第四阶段全部完成；管理目录仍需逐项核对业务结果，数据面执行链保持第五阶段边界。
+
+## 第四阶段：标签与终端客户配置
+
+[提案 #189](https://github.com/qiniu/xhub/issues/189) 接续标签读写修复 #188，收拢 `tag`、`tags`、`customer`、`end_user` 元数据配置。`metadataconfig` 使用窄 KV 接口负责 CRUD、旧字段默认值与列表投影；兼容入口继续负责鉴权、请求解析、响应包络和错误映射。公共范围是 `/tag`、`/customer`、`/end_user` 的 new/info/update/delete/list；内部 `tags` 兼容不代表新增公开接口。
+
+客户列表继续合并两个独立空间，只投影 user_id/spend/blocked/max_budget；同 ID 两行不会合成一个账号。修正任一空间读取失败仍返回 200 空/部分列表的问题，改为脱敏 500；正常空库仍返回空列表。标签列表继续返回名称字典。GET 客户详情目前使用 JSON 正文的 user_id，query-only 的旧行为未改变。
+
+配置中的 blocked/max_budget 仍是元数据，本批不增加授权、封禁或预算执行规则。block/unblock、统计及其他执行型旧入口未迁移，不因存在路由或保存成功而被宣称可用。已知执行语义待后续单独审计；不扩大 Swagger 支持集合。
+
+测试先在 #188 基线上固定真实 HTTP/PostgreSQL 读写，再迁移同组测试：客户列表 SQL 故障先失败后通过，正常 CRUD、命名空间、权限、真实模型请求和费用不变。中英文浏览器验证两客户空间读写、标签刷新/错误恢复/聊天/删除；超时、业务失败、清理失败由真实 Playwright 子进程验证。CI 独立采集真实回归覆盖率，70% 门禁不变。
+
+无数据库迁移，回退本批适配器与服务即可继续使用原数据。该批依赖 #188；提交 PR 不代表已合入、部署或第四阶段整体完成。外部模型、生产 SSO 和线上代理未在离线测试中验证。
+
+## 第四阶段预算配置与组织、团队旧入口
+
+[提案 #191](https://github.com/qiniu/xhub/issues/191) 将预算配置的 KV 读写和默认字段移至 `internal/gateway/budgetconfig`。HTTP 适配层保留原管理鉴权、路径/ID 解析和响应包络。`budget` 与 `budgets` 命名空间仍分离；创建覆盖、浅层补丁、缺失 upsert、null/零值、历史嵌套字段展开及非事务删除计数保持原样。
+
+`/budget/*` 的配置记录不是账号预算账本：保存 `max_budget: 0` 不会自动赋予组织、团队、用户或 Key 零预算。真实 IAM 额度、继承、软预算、刷新和预留对账仍由原处理器负责，本轮不连接两种概念，也不扩张第三阶段 OpenAPI 支持声明。
+
+以下 20 个已登记旧入口没有 IAM 执行器。旧实现曾写入不生效的 KV、返回无关对象或缺失错误；现在原管理鉴权通过后统一返回 `501` / `unsupported_iam_operation`，不再读取或写入目录：
+
+| 方法 | 路径 |
+| --- | --- |
+| POST | `/organization/info` |
+| PATCH | `/organization/member_update`、`/v2/organization/{organization_id}` |
+| GET | `/organization/spend/report` |
+| POST | `/team/block`、`/team/unblock`、`/team/bulk_member_add`、`/team/key/bulk_update` |
+| POST | `/team/model/add`、`/team/model/delete`、`/team/permissions_bulk_update`、`/team/permissions_update` |
+| POST | `/team/{team_id}/disable_logging`、`/team/{team_id}/member/{user_id}/reset_spend` |
+| PATCH | `/team/{team_id}` |
+| GET | `/team/filter/ui`、`/team/metadata_schema`、`/team/permissions_list`、`/team/spend/report`、`/team/{team_id}/members/me` |
+
+兼容影响仅针对这些未实现的入口：调用方应处理明确不支持，不能再把旧 200 当作修改成功。真实组织/团队创建、编辑、成员管理、列表、详情和 `/team/spend/by_user` 仍由原模块执行；已删除 callback 路由仍为 404。匿名 401、普通成员 403 不变。
+
+验收包含迁移前预算正向基线、旧入口假成功红测、真实 PostgreSQL 读写故障注入与恢复、20 个旧入口的权限/501/无误写、实际对话及费用、原组织/团队零预算拒绝。浏览器在中英文控制台环境验证预算创建、编辑、刷新、错误后恢复、旧入口拒绝、模型调用及删除；旧预算页中文控件未在本轮重做。独立夹具在正常、失败和超时后清理，清理失败阻止通过。CI 上传该组真实回归覆盖率，70% 门禁保持不变。
+
+不迁移或删除旧 KV。预算服务可单独回退，原数据继续可读；不应以恢复旧入口假成功作为故障回退。测试仅使用隔离 PostgreSQL 和本地协议上游，不证明外部模型供应商可用；PR 不自动合并或部署。
+
+## 第四阶段：运维接口的真实结果边界
+
+[Bug #193](https://github.com/qiniu/xhub/issues/193) 修复旧运维目录把配置保存当成操作执行、以及依赖状态未经探测就报告正常的问题。明确拒绝 15 个没有执行器的旧目录操作，另将 `/health/services` 的固定健康响应改为 `501 unsupported_operation`。范围仅包括协调 Redis 设置与测试、旧内存/调试目录、积压/排空/历史/许可证/共享状态目录。部分旧 GET 原本返回目录 404，部分返回空结果；POST 原本只写 KV。现在统一明确说明未实现，不再写入这些无效记录，也不删除历史记录。
+
+`/health/readiness/details` 每次执行数据库探测；数据库故障返回 503，正常时保留原状态、版本及详情字段。公开存活检查与真实模型连接测试保留，匿名 401、普通成员 403、预算及费用规则不变。既有告警服务查询继续返回 400。没有新增 Redis、GC 或排空执行器，也没有将这些接口加入第三阶段已支持契约清单。缓存配置/清理等其他运维入口仍待单独核对。
+
+先用真实 HTTP/PostgreSQL 复现目录假成功与断库仍 ready，再验证修复；单元覆盖路径边界与失败恢复，双语浏览器验证登录、明确失败、真实健康状态及调试台对话。CI 独立采集上传后台回归覆盖率，70% 门禁不变。无数据库迁移；回退本批代码即可，但会恢复旧接口的错误成功语义。提交不代表合并或部署，付费供应商和生产环境不在本次测试范围。
+
+## 第四阶段：缓存管理的真实效果
+
+[Bug #195](https://github.com/qiniu/xhub/issues/195) 将旧缓存管理从通用目录和客户列表文件分离到 `cacheadmin`；HTTP 适配器先执行原管理员鉴权，模块只接收实际进程缓存，不依赖配置 KV 或 Redis。
+
+| 入口 | 本批行为 |
+| --- | --- |
+| GET `/cache/settings` | 返回实际运行状态：`enabled: true`、`cache_type: memory`、`scope: process`、`configurable: false`；不再回显未生效的历史配置或凭据 |
+| GET `/cache/ping`、`/ping` | 保留进程内存缓存就绪响应；没有初始化实例时返回 503，不声称探测了 Redis |
+| POST `/flushall` | 保留原成功包络，实际清空当前进程的响应缓存；不清理其他实例、会话、用量或 Redis |
+| POST `/cache/settings`、`/cache/settings/test`、`/delete` | 原操作没有对应运行时执行器，改为明确 `501 unsupported_operation`，不保存目录记录或回显凭据 |
+
+这是旧响应语义修复：设置 GET 不再返回任意保存的 JSON，原写入或假删除的 200 改为 501。历史 KV 保留但不应用；`/cache/delete`、`/cache/flushall` 未注册，继续 404。不扩展第三阶段 OpenAPI 支持清单。控制台改为双语只读状态、范围说明与实际清理操作，不提供无效保存。
+
+真实 HTTP/PostgreSQL 先复现配置回显、假测试和假删除，再验证拒绝与无写入；内存单元测试验证就绪及清理，浏览器验证中英文、实际命中零计费、清理后再次调用本地上游并计费，以及真实鉴权失败提示和恢复。权限、预算规则、70% 门禁不变；真实回归覆盖率独立上传。无需数据库迁移，回退恢复旧行为（包括假成功），不代表建议回退。付费供应商和生产不在本次验证范围；其他旧运维接口仍按各自问题单处理。
+
+## 第四阶段旧 server OAuth 授权边界
+
+[Bug #197](https://github.com/qiniu/xhub/issues/197) 在真实 HTTP/PostgreSQL 回归中发现另一组保留别名仍落入通用 KV：授权请求返回 200/status=ok 并保存/回显提交的凭据；删除授权凭据会误删普通 server 配置。这些路径没有授权执行器，与 #144 已修的 `/authorize/*` 和 `/v1/mcp/.../token` 不同。
+
+- 明确拒绝七个未实现操作：`POST /server/oauth/session`；`GET /server/oauth/{server_id}/authorize`；`POST /server/oauth/{server_id}/register`、`POST /server/oauth/{server_id}/token`；`POST`、`DELETE /server/{server_id}/oauth-user-credential`；`GET /server/{server_id}/oauth-user-credential/status`。
+- 仍先执行原管理鉴权，匿名 401、普通用户 403；管理员得到 501/unsupported_operation 和 no-store。拒绝发生在读取正文和访问存储之前，不回显秘密、不发令牌/重定向、不新增或删除配置。普通 server CRUD、企业 SAML、模型权限与预算规则不变。
+- 不增加 OAuth 功能，不扩大第三阶段契约/Swagger 已支持范围。普通 server 配置只表示保存记录；health、普通 user-credential、user-env-vars、plugins/skills 等其他旧别名仍需分别核对，本批不代表第四阶段全部完成。
+- 先红后绿的真实回归核对数据库快照、普通 CRUD、会话、本地上游调用与计费、零预算拦截；另跑企业 SAML 真实回归。双语浏览器验证旧入口拒绝后仍可在调试台完成对话，并严格清理临时配置。CI 上传独立真实回归覆盖率，70% 门禁不变。
+- 无数据迁移，不主动清理既有 KV。回退本批处理器即可恢复旧分派，但会重新暴露上述错误行为；只在确认需要时回退。不自动合并或部署。
+
+## 第四阶段旧 server 健康与个人配置边界
+
+[Bug #199](https://github.com/qiniu/xhub/issues/199) 通过真实 HTTP/PostgreSQL 复现：`GET /server/health` 只是返回带 `status=ok` 的配置列表，没有探测；`user-credential` / `user-env-vars` 子路径被通用 KV 当成同名公共 server，能回显/保存秘密，删除还能误删普通配置。
+
+- 精确拒绝六个操作：`GET /server/health`；`POST`、`DELETE /server/{server_id}/user-credential`；`GET`、`POST`、`DELETE /server/{server_id}/user-env-vars`。保留原管理鉴权（匿名401、普通用户403）及JSON对象校验（损坏正文400）；管理员合法请求返回501/unsupported_operation和no-store，不访问存储或外部服务。
+- 普通 server CRUD，包括名为 user-credential/user-env-vars 的资源，仍按原存储格式工作。保留原企业SSO、已移除的MCP前缀与独立技能接口；本次不添加个人秘密存储、不恢复MCP、不修改权限/预算规则，不扩大Swagger已支持范围。
+- 先红后绿的真实回归验证数据库快照、名称碰撞、鉴权、错误响应、普通CRUD、会话、模型调用/计费和零预算拦截；目录遍历精确校验两个读取入口的501。双语浏览器验证配置回读、拒绝操作、调试台真实本地上游回复及严格清理。CI独立采集/上传后台覆盖率，发布门禁包含双语场景，70%不变。
+- 无数据库迁移，不主动改写历史记录。回退此边界会恢复原分派及原有缺陷。server导入/审批、插件、技能消费者和死分支仍需逐项核对，不能把本批当成第四阶段完成；已存在的独立技能处理器不能因目录中还有路由名就被误判为占位。
+
+## 第四阶段旧 server 导入与审批边界
+
+[Bug #203](https://github.com/qiniu/xhub/issues/203) 的真实 HTTP/PostgreSQL 回归确认：`POST /server/import` 仅保存正文，`POST /server/register` 没有提交状态机，`GET /server/submissions` 返回普通配置；`PUT /server/{id}/approve`、`reject` 甚至会把动作名当作资源 ID，误改同名记录。五个请求均曾返回 200。
+
+此轮在原鉴权及 JSON 解析之后、存储之前，精确返回 `501/unsupported_operation` 和 `Cache-Control: no-store`。保留普通 `/server` 配置 CRUD、同名资源、未注册的 `/v1/mcp/server` 对应入口的 404、权限及预算规则；不宣称实现了 MCP 导入或审批，不扩张核心 OpenAPI 契约清单。没有数据迁移，也不自动删除历史污染记录。
+
+回归先在修改前验证五个操作失败，再验证修改后的错误契约、无存储副作用、正常配置更新/删除、模型费用和零预算拦截。中英文自动浏览器使用真实网关，验证错误后登录态、配置和调试台模型调用保持可用；本地上游计数验证请求确实到达。工作流采集上传独立后台覆盖率并纳入双语发布 E2E，70% 门禁不变。外部 MCP 服务未连接，不声明外部兼容性。
+
+截至本轮，第四阶段仍不能标记为完成：插件管理、技能配置的实际消费者、其他管理目录入口（包括看似执行功能的 RAG/OCR 等）的真实效果和废弃分支尚待核对；最后还需在临时集成分支组合全部待合改动，重新运行契约、权限、预算、故障和清理回归。各 PR 单独通过不等于组合通过。SSO 元数据刷新作为独立功能随用户决定的批次处理，不作为第四阶段完成证据；当前不合并或部署。
+
+## 第四阶段插件启停假成功边界
+
+[Bug #205](https://github.com/qiniu/xhub/issues/205) 通过真实 HTTP/PostgreSQL 复现：`POST /claude-code/plugins/{name}/enable` 和 `/disable` 均被通用目录当作新建，写入 ID 为动作名的记录并默认 `enabled=true`，可能覆盖同名普通配置。没有发现消费该 KV 并安装、发布或加载 Claude Code 插件的执行器；保存 `enabled` 字段不代表客户端启停生效。
+
+本轮在原身份校验和 JSON 解析之后、存储之前精确拒绝这两个未实现操作，返回 `501/unsupported_operation` 和 `Cache-Control: no-store`。普通配置读写删除、同名资源和权限预算规则保持原状；既不实现插件发布，也不恢复被退役的公开技能入口。没有数据迁移，不自动删除历史动作名记录。此项没有扩大第三阶段核心契约覆盖范围。
+
+修改前回归复现两种假成功及数据污染；修复后验证无存储副作用、正常/非法 JSON、匿名/普通用户/管理员、配置 CRUD、真实本地模型推理费用和零预算拦截。英文及中文浏览器登录后调用真实启停接口并验证配置/列表不变，再通过调试台完成模型对话，上游计数验证实际执行，最后清理配置。CI 独立采集上传真实回归覆盖率并执行双语 E2E，70% 门禁不变。
+
+范围边界：本轮只完成启停假成功修复，不能宣布整个插件管理已完成。旧注册路径的名称寻址、`enabled_only` 筛选、marketplace 返回内容以及技能消费者仍需逐项核对；页面展示的配置标记不能代替客户端安装或执行证明。外部 Claude Code 安装/加载未测试。所有待合 PR 仍需组合回归，本轮不合并或部署。
+
+## 第四阶段插件列表筛选
+
+[Bug #207](https://github.com/qiniu/xhub/issues/207) 确认旧 `GET /claude-code/plugins` 忽略 `enabled_only`。本轮增加精确列表适配器：`true` 只保留按既有默认规则归一化后 `enabled=true` 的配置，`count` 与列表长度一致；缺省及 `false` 保留完整列表。旧缺失/null 标记仍默认 true，明确 false 与非布尔值不进入 true 筛选结果。参数只接受单个小写 `true`/`false`；空值、重复值、非法查询编码明确返回400，避免无效查询退化成未筛选列表。
+
+过滤发生在原管理鉴权和JSON解析之后，不写数据库，不改变配置CRUD、权限或预算；SQL读取失败仍返回脱敏500。未实现的启停边界由独立 PR #206 处理，本轮不宣称实现插件加载，也不扩张核心契约清单。
+
+测试包含旧实现失败复现、正常/边界/失败单测、真实HTTP/PostgreSQL读取故障及恢复、权限、配置快照、正常对话计费、零预算拦截和清理。双语浏览器完成登录、真实列表请求及配置标记回读，然后在调试台发送英文原始输入并核对本地上游计数；不是插件安装测试。原 Skill Hub 组件虽然调用 enabled_only，当前公开入口转入 PublicModelHub，不能用遗留组件代码声称存在已验证的插件列表页面。本轮不创建额外产品页面来补测试。
+
+注册名称寻址、marketplace 内容、旧组件与当前入口的一致性及技能消费者仍待核对；外部客户端安装/执行未验证。CI 上传真实回归覆盖率并纳入双语发布测试，70% 门禁保持原值；不合并或部署。
+
+## 第四阶段插件注册与 marketplace 边界
+
+[Bug #209](https://github.com/qiniu/xhub/issues/209) 在真实 HTTP/PostgreSQL 中复现：旧 POST 注册把不同 name 都写成 ID=plugins，重复请求覆盖原记录，按名称无法读回。修复将来源元数据按小写 kebab-case 名称原子创建，数据库主键冲突返回409；并发注册至多一个成功，不退化为普通 upsert。来源必须是非空字符串值对象，但不会联网验证或安装。保留平铺成功对象及既有默认字段，不借此迁移响应包络。
+
+注册前检查历史同名记录，包含旧 ID=plugins 的数据；冲突明确409，不自动重命名、覆盖或迁移。详情路径按名称定位，list/new/register 等名称不再被通用动作词吞掉。普通 PUT 仍浅合并/upsert，删除仍沿用原规则；这里不复制外部兼容文档中的全量替换语义。读取、创建失败明确500，非法格式400，原权限和预算不变。
+
+`GET /claude-code/marketplace.json` 没有目录生成器，现明确501/unsupported_operation；原认证仍先行（匿名401、普通用户403），不开放匿名访问，也不把同名普通KV JSON当作可安装目录。注册只证明元数据落库，启停和发现/安装仍不能据此声明可用；对应启停与筛选边界见 #206/#208。
+
+真实测试覆盖注册两个不同名称、保留词寻址、同名与旧数据冲突、原子并发、取消/SQL故障、恢复与清理、权限、正常推理费用及零预算拦截。中英文浏览器登录后调用真实注册/冲突/marketplace接口，再经调试台完成本地上游对话并核对请求计数；不是插件安装UI或外部客户端测试。工作流独立采集上传后台覆盖率并纳入双语发布E2E，70%不变。没有数据迁移，不合并或部署。
+
+## 第四阶段 Skill 资源与归档边界
+
+[Bug #211](https://github.com/qiniu/xhub/issues/211) 在真实 HTTP/PostgreSQL 中复现：`GET /v1/skills/new` 和 `register` 会进入创建分支，`list` 返回列表；`GET /v1/skills/{id}/archive` 会误读 ID 为 `archive` 的普通配置并返回200。修复让已注册的详情 GET/DELETE 按路径 ID 寻址，保留词不再解释为操作；缺失详情404，读取不改变数据库，创建/列表/删除的存储与响应规则保持原行为。
+
+当前 Skill 只有管理权限下的通用配置 CRUD，并非注释曾声称的组织级执行服务。归档没有生成器，明确返回501/unsupported_operation及no-store；认证仍先行（匿名401、普通用户与推理Key403）。公开发现入口仍按原移除规则处理，不新增安装、下载、上游执行或组织隔离能力，也不修改权限和预算。
+
+单元测试覆盖精确路径、保留词、未命中路径和读/删故障。真实后台回归核对正常配置、SQL读写/删除失败、恢复、清理、正常模型调用与费用和零预算拦截。SQL故障限定为skills行，不能让登录失败替代业务存储失败。中英文浏览器登录后调用真实配置/归档接口，再从调试台完成本地上游对话并核对请求数；无Skill管理页面可用于这条CRUD链路，不将其写成安装UI测试。
+
+本次独立采集上传真实回归覆盖率，70%门禁不变；无迁移、不合并、不部署。前端遗留SkillHub/插件说明组件仍有独立的调用与产品支持状态审计工作，配置存储修复不代表这些消费者全部可用。外部Skill源、Claude Code安装以及真实模型厂商没有验证；其余旧执行入口和全部待合入PR的组合验收仍未完成。
+
+## 第四阶段 SkillHub 支持状态
+
+[问题 #213](https://github.com/qiniu/xhub/issues/213) 修正前端误报：公开目录的 HTTP 失败与合法空列表分开显示；配置 enabled 只表示配置值，不代表发布、安装或模型执行授权。详情和支持弹窗不再生成未实现的安装指令或发出“发布成功”通知。保留原始名称、说明和配置查看，支持中英文。
+
+真实 HTTP/PostgreSQL 回归核对公开目录 404、管理权限、配置无副作用、正常计费与零预算拦截；浏览器 E2E 经真实网关验证错误提示后仍能对话。CI 收集真实回归覆盖率，70% 门禁不变。不新增公共发布服务，不扩大 OpenAPI 支持范围。旧 Key 的 Skill 选择器仍需单独核对；此项不代表第四阶段整体完成。
+
+## 第四阶段：清理不可达的 Key 扩展控件
+
+[提案 #215](https://github.com/qiniu/xhub/issues/215) 移除没有产品引用的 `KeyEditViewControls` 和仅被它引用的 `SkillSelector`。当前 Key 编辑器已使用基础表单；此项不隐藏已有可用页面，不新增 Skill 授权或执行逻辑，也不删除存储字段。旧测试中“独立权限流程保存 Skill”的说明不能作为支持证据，已纠正。
+
+先在清理前运行现有实现的基线，再删除死代码重跑：组件验证原始名称与隐藏字段省略、没有插件列表请求；真实 HTTP/PostgreSQL 和中英文浏览器验证修改名称、读回模型/路由范围/限额/期限、真实允许调用以及模型/管理越权拒绝。新后台用例纳入既有 Key 契约覆盖率采集，发布工作流登记双语 E2E，70% 门禁不变。已存在的历史测试隔离清单保持原样，不将其中用例声明为本批通过。
+
+## 第四阶段旧推理别名边界
+
+[Bug #217](https://github.com/qiniu/xhub/issues/217) 核实无版本号的 `POST /rag/ingest`、`/rag/query`、`/ocr` 以及 `/models/{model_name}:generateContent`、`:streamGenerateContent`、`:countTokens` 落入通用配置写入，未调用上游却返回 200。修复在原管理鉴权和对象 JSON 校验后明确返回 `501 unsupported_operation`、`Cache-Control: no-store`，不保存或回显请求正文。
+
+- 保留匿名 401、普通会话和推理 Key 403，以及非法 JSON/JSON-RPC 400；不将这些旧入口升级为推理权限。
+- `/v1/rag/*`、`/v1/ocr` 保留既有数据面拒绝；Gemini `/v1beta/models/*`、Vertex `/vertex/v1/models/*` 和 Bypass 继续由原协议模块执行。普通模型读取与配置 CRUD 不迁移。
+- 真实 HTTP/PostgreSQL 回归验证配置快照不变、零上游副作用、原生协议调用、护栏、正常对话计费、零预算拦截和清理；双语浏览器验证登录、旧请求拒绝后调试台仍能真实对话。使用本地可计数协议上游，不代表外部供应商验收。
+- 不增加 RAG/OCR 执行器，不扩张 Swagger 支持清单，不做数据迁移或删除既有误写记录；CI 收集真实回归覆盖率并维持 70% 门禁。回退代码可恢复旧行为，但会恢复假成功，不作为默认故障处理。提交不代表合并或部署。
+
+## 第四阶段旧供应商批处理边界
+
+[Bug #219](https://github.com/qiniu/xhub/issues/219) 用真实 HTTP/PostgreSQL 复现：`/{provider}/v1/batches` 的 GET/POST、`/{provider}/v1/batches/{batch_id}` 的 GET、`/{provider}/v1/batches/{batch_id}/cancel` 的 POST，在落入管理目录时，把供应商名当作公共配置命名空间。创建/取消会覆盖 `batches`/`cancel` 配置，查询会回显同名配置，全部没有上游任务执行。
+
+修复在既有管理鉴权与 JSON 验证后明确返回 `501 unsupported_operation` 和 `Cache-Control: no-store`，不读取或写入公共配置、不调用上游。匿名 401、普通会话/Key 403、非法 JSON/JSON-RPC 400 保持；标准 `/v1/batches`、`/batches` 和 `/openai/v1/batches` 继续使用原数据面鉴权及拒绝逻辑。没有增加批处理能力或扩大 Swagger 支持清单。
+
+真实回归验证四种操作、配置快照、标准入口、正常推理计费、零预算拦截与清理。双语浏览器验证登录后旧接口明确拒绝，随后调试台选择模型和 Chat 端点完成真实本地对话。测试使用隔离数据库和本地 HTTP 上游，不代表外部供应商验收；CI 上传真实回归覆盖率，70% 门禁不变。无数据库迁移、不删除既有配置；提交不等于合并或部署。
+
+## 第四阶段旧 Comprehend Medical 入口边界
+
+[Bug #221](https://github.com/qiniu/xhub/issues/221) 的真实 HTTP/PostgreSQL 复现表明：`POST /comprehendmedical` 和 `POST /comprehendmedical/{operation}` 没有分析执行器，却落入公共配置处理。请求正文可能被保存并回显，`info` 会读取同名配置，`delete` 会删除记录；返回 200 不代表完成上游分析。
+
+修复在原管理鉴权和对象 JSON 校验后返回 `501 unsupported_operation`、`Cache-Control: no-store`，不访问存储、不回显请求、不调用上游。匿名 401、普通会话/Key 403、非法 JSON/JSON-RPC 400，以及未登记方法和多层路径的 404 保持；不新增供应商分析能力，不扩大 Swagger 支持清单。
+
+单元测试验证精确路径、保留操作名、存储故障和正文校验；真实回归验证四种操作不改配置、正常对话计费、零预算拒绝和清理；中英文浏览器验证真实登录、明确拒绝后调试台仍能选择模型和 Chat 端点完成对话。仅使用合成文本、隔离数据库和本地 HTTP 上游，不访问实际业务正文或第三方分析服务。CI 采集上传真实覆盖率，70% 门禁不变；无数据迁移或历史配置删除，提交不等于合并或部署。

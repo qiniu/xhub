@@ -1,3 +1,4 @@
+import { samlRefresh } from "./samlRefresh.zh-CN";
 import { budgetReconciliationZhCN } from "./budgetReconciliation.zh-CN";
 import { probesZhCN } from "./probes.zh-CN";
 import { docsZhCN } from "./docs.zh-CN";
@@ -6,7 +7,26 @@ import { zhPhrases } from "./phrases.zh-CN";
 import { pageDescriptionsZhCN } from "./pageDescriptions.zh-CN";
 import { routeTemplatesZhCN } from "./routeTemplates.zh-CN";
 
+import { cacheAdminZhCN } from "./cacheAdmin.zh-CN";
+
 export const zhCN = {
+  tagSelector: { loadFailed: "无法读取已保存的标签，请刷新页面重试。" },
+  cacheAdmin: cacheAdminZhCN,
+  samlRefresh,
+  skillHub: {
+  usage: "如何使用",
+  "supportTitle": "发布与安装暂不可用",
+  "supportHelp": "当前网关仅保存 Skill 元数据。配置已启用不代表已公开、可安装或可执行，因此这里不提供 marketplace 安装指令。",
+  "supportAction": "发布支持状态",
+  "loadError": "无法加载 Skill 目录，这不代表目录为空。",
+  "empty": "暂无 Skill 元数据",
+  "configEnabled": "配置已启用",
+  "configDisabled": "配置已停用",
+  "value": "值",
+  "all": "全部 Skill 元数据",
+  "count": "显示 {visible} / {total} 条配置",
+  "emptyHelp": "保存元数据不代表 Skill 已可安装或使用。"
+},
   probes: probesZhCN,
   mcpOAuthCallback: {
     title: "MCP 授权回调",

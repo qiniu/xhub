@@ -40,6 +40,7 @@ func TestRateTestWindowDelay(t *testing.T) {
 		{"minute start", time.Unix(120, 0), 0},
 		{"safe window", time.Unix(169, 0), 0},
 		{"ten second boundary", time.Unix(170, 0), 10*time.Second + 50*time.Millisecond},
+		{"CI rejection crossed 05:09:59 to 05:10:00", time.Date(2026, 10, 28, 5, 9, 59, 0, time.UTC), time.Second + 50*time.Millisecond},
 		{"last nanosecond", time.Unix(179, 999999999), 50*time.Millisecond + time.Nanosecond},
 	} {
 		t.Run(tc.name, func(t *testing.T) {

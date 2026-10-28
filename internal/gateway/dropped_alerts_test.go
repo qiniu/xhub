@@ -6,9 +6,8 @@ import (
 	"testing"
 )
 
-// TestDroppedAlertsAreGone checks the products that left the logging page.
-// CloudZero, email events, and alerting settings answer 404. Saving an alert
-// destination or probing one answers 400. Vantage stays mounted。
+// TestDroppedAlertsAreGone 验证已移除告警入口为404、告警配置/探测为400，仍注册但无执行器的Vantage明确501。
+// 前置隔离网关与管理员，断言真实HTTP错误契约；测试结束关闭服务，bootGateway回收数据库。
 func TestDroppedAlertsAreGone(t *testing.T) {
 	srv, base, db := bootGateway(t)
 	defer srv.Close()
@@ -62,8 +61,13 @@ func TestDroppedAlertsAreGone(t *testing.T) {
 	}
 
 	status, body = authed(t, base, key, http.MethodGet, "/vantage/settings", nil)
-	if status != http.StatusOK {
-		t.Fatalf("vantage status %d %s", status, trim(body))
+	var unsupported struct {
+		Error struct {
+			Type string `json:"type"`
+		} `json:"error"`
+	}
+	if status != http.StatusNotImplemented || json.Unmarshal(body, &unsupported) != nil || unsupported.Error.Type != "unsupported_operation" {
+		t.Fatalf("Vantage没有执行器不能假成功: %d %s", status, trim(body))
 	}
 	status, body = authed(t, base, key, http.MethodGet, "/alerting/settings", nil)
 	if status != http.StatusNotFound {

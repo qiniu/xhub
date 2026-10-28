@@ -168,7 +168,7 @@ jobs:
           cache-dependency-path: frontend/package-lock.json
       - run: npm ci
         working-directory: frontend
-      - run: node --test scripts/test_quality_workflow.cjs scripts/test_release_workflow.cjs scripts/test_dependabot.cjs frontend/tests/check-eslint-error-budget.test.mjs frontend/e2e/checklist-reporter.test.cjs frontend/e2e/gateway-response.test.cjs frontend/e2e/guard-resource-cleanup.test.cjs frontend/e2e/guard-resource-fixture.test.cjs frontend/e2e/policy-config-fixture.test.cjs
+      - run: node --test scripts/test_quality_workflow.cjs scripts/test_release_workflow.cjs scripts/test_dependabot.cjs frontend/tests/check-eslint-error-budget.test.mjs frontend/e2e/checklist-reporter.test.cjs frontend/e2e/gateway-response.test.cjs frontend/e2e/guard-resource-cleanup.test.cjs frontend/e2e/guard-resource-fixture.test.cjs frontend/e2e/policy-config-fixture.test.cjs frontend/e2e/access-group-config-fixture.test.cjs frontend/e2e/vector-config-fixture.test.cjs frontend/e2e/tag-catalog-fixture.test.cjs frontend/e2e/budget-iam-fixture.test.cjs
       - run: python3 -m unittest scripts.test_deploy_build scripts.test_regression_output scripts.test_makefile scripts.test_regression_results scripts.test_test_gates scripts.test_e2e_summary scripts.test_e2e_model_endpoints -v
 
   supplier-contract:
@@ -232,6 +232,180 @@ jobs:
             coverage/supplier-contract.out
             coverage/search-config.out
           if-no-files-found: error
+      # 与供应商契约共用隔离数据库基础设施，Skill资源报告独立采集，不扩大契约覆盖声明。
+      - name: Run real skill resource boundary regression
+        env:
+          XHUB_REGRESSION_COVERPROFILE: coverage/skill-boundary.out
+        run: bash scripts/regression.sh '^TestSkillBoundary'
+      - name: Validate skill resource regression coverage
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -s coverage/skill-boundary.out
+          go tool cover -func=coverage/skill-boundary.out | tail -1
+      - name: Upload skill resource regression coverage
+        uses: codecov/codecov-action@v5
+        with:
+          files: coverage/skill-boundary.out
+          flags: backend
+          name: skill-boundary
+          disable_search: true
+          fail_ci_if_error: true
+          use_oidc: true
+      - name: Archive skill resource regression evidence
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: skill-boundary-regression
+          path: |
+            .e2e/runs/
+            coverage/skill-boundary.out
+          if-no-files-found: error
+      # 与供应商契约共用隔离数据库基础设施，插件注册报告独立采集，不扩大契约覆盖声明。
+      - name: Run real plugin registration boundary regression
+        env:
+          XHUB_REGRESSION_COVERPROFILE: coverage/plugin-registration.out
+        run: bash scripts/regression.sh '^TestPluginRegistration'
+      - name: Validate plugin registration regression coverage
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -s coverage/plugin-registration.out
+          go tool cover -func=coverage/plugin-registration.out | tail -1
+      - name: Upload plugin registration regression coverage
+        uses: codecov/codecov-action@v5
+        with:
+          files: coverage/plugin-registration.out
+          flags: backend
+          name: plugin-registration
+          disable_search: true
+          fail_ci_if_error: true
+          use_oidc: true
+      - name: Archive plugin registration regression evidence
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: plugin-registration-regression
+          path: |
+            .e2e/runs/
+            coverage/plugin-registration.out
+          if-no-files-found: error
+      # 与供应商契约共用隔离数据库基础设施，插件筛选报告独立采集，不扩大契约覆盖声明。
+      - name: Run real plugin filter boundary regression
+        env:
+          XHUB_REGRESSION_COVERPROFILE: coverage/plugin-filter.out
+        run: bash scripts/regression.sh '^TestPluginFilter'
+      - name: Validate plugin filter regression coverage
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -s coverage/plugin-filter.out
+          go tool cover -func=coverage/plugin-filter.out | tail -1
+      - name: Upload plugin filter regression coverage
+        uses: codecov/codecov-action@v5
+        with:
+          files: coverage/plugin-filter.out
+          flags: backend
+          name: plugin-filter
+          disable_search: true
+          fail_ci_if_error: true
+          use_oidc: true
+      - name: Archive plugin filter regression evidence
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: plugin-filter-regression
+          path: |
+            .e2e/runs/
+            coverage/plugin-filter.out
+          if-no-files-found: error
+      # 与供应商契约共用隔离数据库基础设施，插件启停报告独立采集，不扩大契约覆盖声明。
+      - name: Run real plugin activation boundary regression
+        env:
+          XHUB_REGRESSION_COVERPROFILE: coverage/plugin-activation.out
+        run: bash scripts/regression.sh '^TestPluginActivationBoundary$'
+      - name: Validate plugin activation regression coverage
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -s coverage/plugin-activation.out
+          go tool cover -func=coverage/plugin-activation.out | tail -1
+      - name: Upload plugin activation regression coverage
+        uses: codecov/codecov-action@v5
+        with:
+          files: coverage/plugin-activation.out
+          flags: backend
+          name: plugin-activation
+          disable_search: true
+          fail_ci_if_error: true
+          use_oidc: true
+      - name: Archive plugin activation regression evidence
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: plugin-activation-regression
+          path: |
+            .e2e/runs/
+            coverage/plugin-activation.out
+          if-no-files-found: error
+      # 与供应商契约共用隔离数据库基础设施，旧server审批报告独立采集，不扩大契约覆盖声明。
+      - name: Run real server submission boundary regression
+        env:
+          XHUB_REGRESSION_COVERPROFILE: coverage/server-submission.out
+        run: bash scripts/regression.sh '^TestServerSubmissionBoundary$'
+      - name: Validate server submission regression coverage
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -s coverage/server-submission.out
+          go tool cover -func=coverage/server-submission.out | tail -1
+      - name: Upload server submission regression coverage
+        uses: codecov/codecov-action@v5
+        with:
+          files: coverage/server-submission.out
+          flags: backend
+          name: server-submission
+          disable_search: true
+          fail_ci_if_error: true
+          use_oidc: true
+      - name: Archive server submission regression evidence
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: server-submission-regression
+          path: |
+            .e2e/runs/
+            coverage/server-submission.out
+          if-no-files-found: error
+      # 与供应商契约共用隔离数据库基础设施，旧server运行时报告独立采集，不扩大契约覆盖声明。
+      - name: Run real server runtime boundary regression
+        env:
+          XHUB_REGRESSION_COVERPROFILE: coverage/server-runtime.out
+        run: bash scripts/regression.sh '^TestServerRuntimeBoundary$'
+      - name: Validate server runtime regression coverage
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -s coverage/server-runtime.out
+          go tool cover -func=coverage/server-runtime.out | tail -1
+      - name: Upload server runtime regression coverage
+        uses: codecov/codecov-action@v5
+        with:
+          files: coverage/server-runtime.out
+          flags: backend
+          name: server-runtime
+          disable_search: true
+          fail_ci_if_error: true
+          use_oidc: true
+      - name: Archive server runtime regression evidence
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: server-runtime-regression
+          path: |
+            .e2e/runs/
+            coverage/server-runtime.out
+          if-no-files-found: error
       # 与供应商契约共用隔离数据库基础设施，提示词报告独立采集，不扩大契约覆盖声明。
       - name: Run real prompt configuration regression
         env:
@@ -265,7 +439,7 @@ jobs:
       - name: Run real policy configuration regression
         env:
           XHUB_REGRESSION_COVERPROFILE: coverage/policy-config.out
-        run: bash scripts/regression.sh '^TestPolicyConfigService'
+        run: bash scripts/regression.sh '^Test(PolicyConfigService|ServiceAuxBoundary|RuntimeOperationBoundary)'
       - name: Validate policy regression coverage
         shell: bash
         run: |
@@ -289,6 +463,237 @@ jobs:
           path: |
             .e2e/runs/
             coverage/policy-config.out
+          if-no-files-found: error
+      # 与供应商契约共用隔离数据库基础设施，访问组报告独立采集，不扩大契约覆盖声明。
+      - name: Run real access group configuration regression
+        env:
+          XHUB_REGRESSION_COVERPROFILE: coverage/access-group-config.out
+        run: bash scripts/regression.sh '^TestAccessGroupConfigService'
+      - name: Validate access group regression coverage
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -s coverage/access-group-config.out
+          go tool cover -func=coverage/access-group-config.out | tail -1
+      - name: Upload access group regression coverage
+        uses: codecov/codecov-action@v5
+        with:
+          files: coverage/access-group-config.out
+          flags: backend
+          name: access-group-config
+          disable_search: true
+          fail_ci_if_error: true
+          use_oidc: true
+      - name: Archive access group regression evidence
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: access-group-config-regression
+          path: |
+            .e2e/runs/
+            coverage/access-group-config.out
+          if-no-files-found: error
+      # 与供应商契约共用隔离数据库基础设施，向量库配置报告独立采集，不扩大契约覆盖声明。
+      - name: Run real vector configuration regression
+        env:
+          XHUB_REGRESSION_COVERPROFILE: coverage/vector-config.out
+        run: bash scripts/regression.sh '^TestVectorConfigService'
+      - name: Validate vector regression coverage
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -s coverage/vector-config.out
+          go tool cover -func=coverage/vector-config.out | tail -1
+      - name: Upload vector regression coverage
+        uses: codecov/codecov-action@v5
+        with:
+          files: coverage/vector-config.out
+          flags: backend
+          name: vector-config
+          disable_search: true
+          fail_ci_if_error: true
+          use_oidc: true
+      - name: Archive vector regression evidence
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: vector-config-regression
+          path: |
+            .e2e/runs/
+            coverage/vector-config.out
+          if-no-files-found: error
+      # 与供应商契约共用隔离数据库基础设施，标签报告独立采集，不扩大契约覆盖声明。
+      - name: Run real tag configuration regression
+        env:
+          XHUB_REGRESSION_COVERPROFILE: coverage/tag-catalog.out
+        run: bash scripts/regression.sh '^TestTagCatalog'
+      - name: Validate tag regression coverage
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -s coverage/tag-catalog.out
+          go tool cover -func=coverage/tag-catalog.out | tail -1
+      - name: Upload tag regression coverage
+        uses: codecov/codecov-action@v5
+        with:
+          files: coverage/tag-catalog.out
+          flags: backend
+          name: tag-catalog
+          disable_search: true
+          fail_ci_if_error: true
+          use_oidc: true
+      - name: Archive tag regression evidence
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: tag-catalog-regression
+          path: |
+            .e2e/runs/
+            coverage/tag-catalog.out
+          if-no-files-found: error
+      # 与供应商契约共用隔离数据库基础设施，元数据配置报告独立采集，不扩大契约覆盖声明。
+      - name: Run real metadata configuration regression
+        env:
+          XHUB_REGRESSION_COVERPROFILE: coverage/metadata-config.out
+        run: bash scripts/regression.sh '^Test(MetadataConfig|CustomerListReadFailure)'
+      - name: Validate metadata regression coverage
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -s coverage/metadata-config.out
+          go tool cover -func=coverage/metadata-config.out | tail -1
+      - name: Upload metadata regression coverage
+        uses: codecov/codecov-action@v5
+        with:
+          files: coverage/metadata-config.out
+          flags: backend
+          name: metadata-config
+          disable_search: true
+          fail_ci_if_error: true
+          use_oidc: true
+      - name: Archive metadata regression evidence
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: metadata-config-regression
+          path: |
+            .e2e/runs/
+            coverage/metadata-config.out
+          if-no-files-found: error
+      # 预算配置与IAM旧入口使用真实HTTP/PostgreSQL回归，覆盖率报告独立上传。
+      - name: Run real budget configuration regression
+        env:
+          XHUB_REGRESSION_COVERPROFILE: coverage/budget-config.out
+        run: bash scripts/regression.sh '^Test(BudgetConfigService|BudgetConfigurationBoundary|LegacyIAMNoFalseSuccess)'
+      - name: Validate budget regression coverage
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -s coverage/budget-config.out
+          go tool cover -func=coverage/budget-config.out | tail -1
+      - name: Upload budget regression coverage
+        uses: codecov/codecov-action@v5
+        with:
+          files: coverage/budget-config.out
+          flags: backend
+          name: budget-config
+          disable_search: true
+          fail_ci_if_error: true
+          use_oidc: true
+      - name: Archive budget regression evidence
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: budget-config-regression
+          path: |
+            .e2e/runs/
+            coverage/budget-config.out
+          if-no-files-found: error
+      # 运维假成功修复使用真实HTTP和数据库故障验证，覆盖率独立上传。
+      - name: Run real operations boundary regression
+        env:
+          XHUB_REGRESSION_COVERPROFILE: coverage/operations-config.out
+        run: bash scripts/regression.sh '^Test(OperationsNoFalseSuccess|ReadinessDetailsDatabaseFailure|HealthTestConnectionContract)$'
+      - name: Validate operations regression coverage
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -s coverage/operations-config.out
+          go tool cover -func=coverage/operations-config.out | tail -1
+      - name: Upload operations regression coverage
+        uses: codecov/codecov-action@v5
+        with:
+          files: coverage/operations-config.out
+          flags: backend
+          name: operations-config
+          disable_search: true
+          fail_ci_if_error: true
+          use_oidc: true
+      - name: Archive operations regression evidence
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: operations-config-regression
+          path: |
+            .e2e/runs/
+            coverage/operations-config.out
+          if-no-files-found: error
+      - name: Run real cache management regression
+        env:
+          XHUB_REGRESSION_COVERPROFILE: coverage/cache-config.out
+        run: bash scripts/regression.sh '^Test(CacheManagementTruth|CacheUnavailableManagement|CacheHitIsFreeAndLoggedAsOne)$'
+      - name: Validate cache regression coverage
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -s coverage/cache-config.out
+          go tool cover -func=coverage/cache-config.out | tail -1
+      - name: Upload cache regression coverage
+        uses: codecov/codecov-action@v5
+        with:
+          files: coverage/cache-config.out
+          flags: backend
+          name: cache-config
+          disable_search: true
+          fail_ci_if_error: true
+          use_oidc: true
+      - name: Archive cache regression evidence
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: cache-config-regression
+          path: |
+            .e2e/runs/
+            coverage/cache-config.out
+          if-no-files-found: error
+      # 与供应商契约共用隔离数据库基础设施，旧server OAuth报告独立采集，不扩大契约覆盖声明。
+      - name: Run real server OAuth boundary regression
+        env:
+          XHUB_REGRESSION_COVERPROFILE: coverage/server-oauth.out
+        run: bash scripts/regression.sh '^TestServerOAuthBoundary$'
+      - name: Validate server OAuth regression coverage
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -s coverage/server-oauth.out
+          go tool cover -func=coverage/server-oauth.out | tail -1
+      - name: Upload server OAuth regression coverage
+        uses: codecov/codecov-action@v5
+        with:
+          files: coverage/server-oauth.out
+          flags: backend
+          name: server-oauth
+          disable_search: true
+          fail_ci_if_error: true
+          use_oidc: true
+      - name: Archive server OAuth regression evidence
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: server-oauth-regression
+          path: |
+            .e2e/runs/
+            coverage/server-oauth.out
           if-no-files-found: error
       # 护栏真实回归独立采集覆盖率，不扩大第三阶段契约范围。
       - name: Run real guard management regression
@@ -318,6 +723,122 @@ jobs:
           path: |
             .e2e/runs/
             coverage/guard-management.out
+          if-no-files-found: error
+      # SkillHub支持边界真实回归独立采集覆盖率，不扩大第三阶段契约范围。
+      - name: Run real SkillHub support regression
+        env:
+          XHUB_REGRESSION_COVERPROFILE: coverage/skill-hub-support.out
+        run: bash scripts/regression.sh '^TestSkillHubSupport'
+      - name: Validate SkillHub support regression coverage
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -s coverage/skill-hub-support.out
+          go tool cover -func=coverage/skill-hub-support.out | tail -1
+      - name: Upload SkillHub support regression coverage
+        uses: codecov/codecov-action@v5
+        with:
+          files: coverage/skill-hub-support.out
+          flags: backend
+          name: skill-hub-support
+          disable_search: true
+          fail_ci_if_error: true
+          use_oidc: true
+      - name: Archive SkillHub support regression evidence
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: skill-hub-support-regression
+          path: |
+            .e2e/runs/
+            coverage/skill-hub-support.out
+          if-no-files-found: error
+      # 旧推理别名拒绝与原生协议保留的真实回归，不降低覆盖率门禁。
+      - name: Run real legacy inference regression
+        env:
+          XHUB_REGRESSION_COVERPROFILE: coverage/legacy-inference.out
+        run: bash scripts/regression.sh '^Test(LegacyInferenceBoundary|EndpointRedesignNativeLifecycle|EndpointGoogleGuardrails)$'
+      - name: Validate legacy inference regression coverage
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -s coverage/legacy-inference.out
+          go tool cover -func=coverage/legacy-inference.out | tail -1
+      - name: Upload legacy inference regression coverage
+        uses: codecov/codecov-action@v5
+        with:
+          files: coverage/legacy-inference.out
+          flags: backend
+          name: legacy-inference
+          disable_search: true
+          fail_ci_if_error: true
+          use_oidc: true
+      - name: Archive legacy inference regression evidence
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: legacy-inference-regression
+          path: |
+            .e2e/runs/
+            coverage/legacy-inference.out
+          if-no-files-found: error
+      # 旧批处理真实回归独立采集覆盖率，拒绝伪任务且保留权限预算规则。
+      - name: Run real provider batch regression
+        env:
+          XHUB_REGRESSION_COVERPROFILE: coverage/provider-batch.out
+        run: bash scripts/regression.sh '^TestProviderBatchBoundary$'
+      - name: Validate provider batch regression coverage
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -s coverage/provider-batch.out
+          go tool cover -func=coverage/provider-batch.out | tail -1
+      - name: Upload provider batch regression coverage
+        uses: codecov/codecov-action@v5
+        with:
+          files: coverage/provider-batch.out
+          flags: backend
+          name: provider-batch
+          disable_search: true
+          fail_ci_if_error: true
+          use_oidc: true
+      - name: Archive provider batch regression evidence
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: provider-batch-regression
+          path: |
+            .e2e/runs/
+            coverage/provider-batch.out
+          if-no-files-found: error
+      # 旧分析入口真实回归独立采集覆盖率，保留权限与预算规则。
+      - name: Run real medical alias regression
+        env:
+          XHUB_REGRESSION_COVERPROFILE: coverage/medical-alias.out
+        run: bash scripts/regression.sh '^TestMedicalAliasBoundary$'
+      - name: Validate medical alias regression coverage
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -s coverage/medical-alias.out
+          go tool cover -func=coverage/medical-alias.out | tail -1
+      - name: Upload medical alias regression coverage
+        uses: codecov/codecov-action@v5
+        with:
+          files: coverage/medical-alias.out
+          flags: backend
+          name: medical-alias
+          disable_search: true
+          fail_ci_if_error: true
+          use_oidc: true
+      - name: Archive medical alias regression evidence
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: medical-alias-regression
+          path: |
+            .e2e/runs/
+            coverage/medical-alias.out
           if-no-files-found: error
       - run: docker compose down -v
         if: always()
@@ -352,7 +873,7 @@ jobs:
       - name: Run real user contract regression
         env:
           XHUB_REGRESSION_COVERPROFILE: coverage/user-contract.out
-        run: bash scripts/regression.sh '^Test(UserContract|UserBulkBudget|UserMonthlyBudget|UserEnterpriseIdentity|SoftBudgetAllocationHTTP)'
+        run: bash scripts/regression.sh '^Test(IdentityAliasBoundary|UserContract|UserBulkBudget|UserMonthlyBudget|UserEnterpriseIdentity|SoftBudgetAllocationHTTP)'
       - name: Validate regression coverage
         shell: bash
         run: |

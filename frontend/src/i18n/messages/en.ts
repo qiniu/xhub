@@ -1,3 +1,4 @@
+import { samlRefresh } from "./samlRefresh.en";
 import { budgetReconciliationEn } from "./budgetReconciliation.en";
 import { probesEn } from "./probes.en";
 import { docsEn } from "./docs.en";
@@ -5,7 +6,26 @@ import { enPhrases } from "./phrases.en";
 import { pageDescriptionsEn } from "./pageDescriptions.en";
 import { routeTemplatesEn } from "./routeTemplates.en";
 
+import { cacheAdminEn } from "./cacheAdmin.en";
+
 export const en = {
+  tagSelector: { loadFailed: "Unable to load saved tags. Refresh the page to retry." },
+  cacheAdmin: cacheAdminEn,
+  samlRefresh,
+  skillHub: {
+  usage: "How to Use",
+  "supportTitle": "Publishing and installation are unavailable",
+  "supportHelp": "This gateway currently stores Skill metadata only. An enabled configuration does not confirm public access, installation, or execution. No marketplace installation commands are provided.",
+  "supportAction": "Publishing support status",
+  "loadError": "Unable to load the Skill directory. This does not mean the directory is empty.",
+  "empty": "No Skill metadata found",
+  "configEnabled": "Configuration enabled",
+  "configDisabled": "Configuration disabled",
+  "value": "Value",
+  "all": "All Skill metadata",
+  "count": "Showing {visible} of {total} configurations",
+  "emptyHelp": "Saved metadata does not confirm that a Skill can be installed or used."
+},
   probes: probesEn,
   mcpOAuthCallback: {
     title: "MCP authorization callback",

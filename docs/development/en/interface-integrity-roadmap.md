@@ -245,3 +245,194 @@ See [core contract completion](core-contract-completion.md) for stage3 scope, ev
 - Unit tests cover normal, boundary, failure and namespace behavior. Real HTTP/PostgreSQL regressions cover permissions, SQL read/write faults, recovery and cleanup; real local-provider calls verify unchanged billing and zero-budget denial. The same regressions also run against the pre-refactor management implementation as a compatibility baseline.
 - Browser tests in both console locale environments cover page creation, reload, HTTP updates, rejection/recovery, model calls and deletion. The legacy policy page still uses its existing Chinese controls; this backend extraction does not claim to fix that localization debt. Independent request contexts clean up after success, failure and timeout; cleanup errors fail tests. CI uploads real regression coverage without lowering the 70% gate.
 - No data migration or production deployment. Reverting the service and adapter restores the old implementation over the same stored records.
+
+## Phase 4: access-group configuration management service
+
+[Proposal #181](https://github.com/qiniu/xhub/issues/181) moves access-group CRUD and legacy normalization into `internal/gateway/accessgroupconfig`. HTTP adapters retain authentication, path parsing, strict JSON, response envelopes and error mapping.
+
+- Scope is the 11 registered operations: `/access_group/list|new|{id}/info|{id}/update|{id}/delete`, `/access_groups`, and list/create plus item get/update/delete under `/v1/access_group`. Singular and v1 routes share `access_group` storage; the plural list still reads the separate `access_groups` namespace.
+- Preserve replacement creates, missing-record upserts, shallow patches, nested expansion on creation, array defaults, extension fields and non-transactional deletion. Keep legacy name fallback, null/zero/unexpected-type handling, and the existing creation-time fallback for `updated_at`.
+- These are legacy configuration records. Current model authorization does not consume their `models/access_model_names/assigned_key_ids/assigned_team_ids` fields. There is no active standalone access-group management page. This change adds no page or grants, does not restore removed budget, unified-access-group or MCP routes, and does not expand phase-3 OpenAPI coverage claims.
+- Run the same real HTTP/PostgreSQL regressions before and after extraction, covering all 11 operations, real SQL read/write/delete faults, recovery and cleanup. Real local-provider requests verify billing, unchanged Key model restrictions and zero-budget denial.
+- Both console locale E2Es edit configuration through management APIs, then log in as a real ordinary user and verify the model page, 500 budget, playground conversation and model availability after deletion. Independent cleanup runs after success, failure and timeout; cleanup errors fail tests. CI uploads actual regression coverage with the 70% gate unchanged.
+- No database migration, permission or budget-rule change. Revert the service and adapter to use the same stored records; merging and deployment remain separate decisions.
+
+## Phase 4: vector-store configuration management service
+
+[Proposal #183](https://github.com/qiniu/xhub/issues/183) delegates the five singular /vector_store management operations (list/new/info/update/delete) to vectorconfig.Service. HTTP adapters retain authentication, path parsing, strict JSON, response envelopes and error mapping. Storage remains in the vector_store KV namespace, with no migration.
+
+- Preserve replacement creates, missing-record upserts, shallow patches, nested expansion, non-transactional deletion, extension fields and null/zero values. Name, alias, status and file_counts defaults follow the old behavior.
+- status=completed and file_counts are legacy configuration metadata, not proof of indexing or retrieval. The plural /vector_stores and /v1/vector_stores data-plane paths are not migrated. File writes and search still return 501; management configuration does not appear in caller-owned data-plane resource lists.
+- Run the same real HTTP/PostgreSQL regressions before and after extraction: all five operations, permissions, SQL read/write/delete faults, recovery and cleanup. Real local-provider calls verify unchanged costs and zero-budget rejection.
+- Both console locale environments cover page creation/reload, API update/invalid-input/recovery, unsupported-operation rejection, model calls and deletion. Existing Chinese controls remain unchanged; this backend extraction does not claim to fix legacy localization debt. Independent cleanup tests cover business failures, timeout, cleanup errors and zero deletions.
+- CI collects and uploads real regression coverage without lowering the 70% gate. No expansion of phase-3 OpenAPI coverage or change to authorization/budgets. Revert the service and adapter to reuse the same records; merging and deployment remain separate decisions.
+
+## Phase 4 remaining-scope review
+
+The [compatibility-layer ownership audit](compatibility-layer-audit.md) supplements the static contract inventory with actual module registration, distinguishing main, pending PRs and generic catalog entries. Extracted configuration services do not complete Phase 4: remaining management semantics require individual verification, while data-plane lifecycle work remains Phase 5.
+
+## Stage 4: tag and end-customer configuration
+
+[Proposal #189](https://github.com/qiniu/xhub/issues/189) builds on the tag read/write fix in #188. The narrow KV service `metadataconfig` owns CRUD, legacy defaults and list projections for `tag`, `tags`, `customer` and `end_user`. Existing adapters retain authentication, request parsing, envelopes and error mapping. Public scope is new/info/update/delete/list under `/tag`, `/customer` and `/end_user`; internal `tags` compatibility does not add public endpoints.
+
+Customer lists still combine two independent namespaces and expose only user_id/spend/blocked/max_budget. Identical IDs remain two rows rather than one identity. A failure reading either namespace now returns a sanitized 500 instead of a misleading empty or partial 200; an empty database still returns an empty list. Tags retain their name dictionary. Customer GET detail currently reads user_id from a JSON body; query-only behavior is unchanged.
+
+blocked/max_budget remain configuration metadata. This batch adds no authorization, blocking or budget enforcement. block/unblock, statistics and other execution-shaped legacy endpoints are excluded and require a separate semantic audit. Registration or successful storage does not prove their operation. Swagger support claims are unchanged.
+
+Real HTTP/PostgreSQL tests run before and after extraction. Customer read faults fail before the fix and pass after it; CRUD, namespace isolation, permissions, model calls and billing remain covered. English/Chinese browser tests exercise customer persistence and tag refresh/error recovery/chat/deletion. Real Playwright subprocesses verify cleanup after failures and timeouts. CI separately collects regression coverage without lowering the 70% gate.
+
+No database migration is needed; reverting the service and adapters preserves existing data. This batch depends on #188 and is not a claim of merge, deployment or completion of stage 4. Live providers, production SSO and reverse proxies are outside the offline boundary.
+
+## Stage 4: budget configuration and legacy organization/team endpoints
+
+[Proposal #191](https://github.com/qiniu/xhub/issues/191) moves budget configuration persistence and defaults into `internal/gateway/budgetconfig`. The HTTP adapter retains authorization, path/ID parsing and response envelopes. Separate `budget`/`budgets` namespaces, overwrite-on-create, shallow patches, missing-record upsert, null/zero values, legacy nested-field expansion and non-transactional deletion counts remain unchanged.
+
+These configuration records are not account budget ledgers. Saving `max_budget: 0` does not automatically assign that limit to an organization, team, user or Key. Existing IAM limits, inheritance, soft budgets, renewals and reservation reconciliation keep their original handlers. This change does not connect the two concepts or expand Stage 3 OpenAPI support claims.
+
+The following 20 registered legacy endpoints have no IAM executor. Previously they could write ineffective KV records, return unrelated objects or report a missing catalog record. After the existing management authorization, they now return `501` / `unsupported_iam_operation`, without reading or writing the generic catalog:
+
+| Method | Paths |
+| --- | --- |
+| POST | `/organization/info` |
+| PATCH | `/organization/member_update`, `/v2/organization/{organization_id}` |
+| GET | `/organization/spend/report` |
+| POST | `/team/block`, `/team/unblock`, `/team/bulk_member_add`, `/team/key/bulk_update` |
+| POST | `/team/model/add`, `/team/model/delete`, `/team/permissions_bulk_update`, `/team/permissions_update` |
+| POST | `/team/{team_id}/disable_logging`, `/team/{team_id}/member/{user_id}/reset_spend` |
+| PATCH | `/team/{team_id}` |
+| GET | `/team/filter/ui`, `/team/metadata_schema`, `/team/permissions_list`, `/team/spend/report`, `/team/{team_id}/members/me` |
+
+Clients of these unimplemented endpoints must handle the explicit rejection instead of treating a historical 200 as a successful IAM mutation. Real organization/team creation, editing, membership, lists, details and `/team/spend/by_user` retain their existing handlers. Removed callback routes remain 404. Anonymous 401 and member 403 responses are unchanged.
+
+Validation includes the pre-extraction budget baseline, false-success reproduction, real PostgreSQL read/write failures and recovery, all 20 legacy endpoints, unchanged IAM data, real local-provider inference and charges, and existing zero-budget denial. Browser tests run in both console locales through budget creation, editing, refresh, failure/recovery, legacy rejection, inference and deletion. The old budget controls remain Chinese; this batch does not claim to fix their existing localization debt. Independent fixtures clean up after success, failure and timeout; cleanup failures fail the tests. CI uploads real regression coverage and retains the 70% gate.
+
+No KV migration or deletion is required. Budget service extraction can be reverted independently while retaining stored records; restoring false success is not a valid recovery strategy. Tests use isolated PostgreSQL and a local protocol provider, not external model credentials. Creating the PR does not merge or deploy it.
+
+## Phase 4: truthful operational results
+
+[Bug #193](https://github.com/qiniu/xhub/issues/193) addresses legacy operations that treated KV persistence as execution and dependency health that was reported without probing. Fifteen catalog operations without executors now reject explicitly; `/health/services` also replaces its fixed healthy response with `501 unsupported_operation`. Scope is limited to coordination Redis settings/testing, legacy memory/debug entries, and backlog/drain/history/license/shared-status entries. Some old GETs returned catalog 404s, others empty results; POSTs only stored KV. These paths now state that they are unimplemented without writing ineffective records or deleting existing ones.
+
+`/health/readiness/details` probes the database on every request, returning 503 on failure while preserving successful status, version and detail fields. Public liveness and real model connection probes remain unchanged, as do anonymous 401, member 403, budgets and billing. Retired alert-service queries retain 400. No Redis, GC or drain executor is added and no phase-3 supported contract coverage is claimed. Other operations, including cache configuration/flush, still need a separate audit.
+
+Real HTTP/PostgreSQL tests first reproduce false success and readiness after database disconnection, then verify the fix. Unit tests cover path boundaries and recovery; browser tests in both locales cover login, explicit failures, real health status and playground chat. CI separately collects/uploads regression coverage; the 70% gate stays unchanged. No migration is required. Reverting this batch restores the old implementation, including its incorrect success semantics. Submission does not mean merge or deployment; paid providers and production are outside this validation.
+
+## Phase 4: real cache-management effects
+
+[Bug #195](https://github.com/qiniu/xhub/issues/195) separates cache management from the generic catalog and customer-list file into `cacheadmin`. The HTTP adapter retains administrator authorization; the module receives the actual process cache without configuration KV or Redis dependencies.
+
+| Endpoint | Behavior in this batch |
+| --- | --- |
+| GET `/cache/settings` | Reports actual runtime state: `enabled: true`, `cache_type: memory`, `scope: process`, `configurable: false`; no ineffective saved configuration or credentials are echoed |
+| GET `/cache/ping`, `/ping` | Retains the process-memory readiness response; an uninitialized cache returns 503, without claiming a Redis probe |
+| POST `/flushall` | Retains the success envelope and really clears the current process response cache; other instances, sessions, usage and Redis are unaffected |
+| POST `/cache/settings`, `/cache/settings/test`, `/delete` | No runtime executor exists for these operations; return `501 unsupported_operation` without writing catalog records or echoing credentials |
+
+Compatibility changes are intentional: settings GET no longer returns arbitrary persisted JSON, and ineffective writes/deletes change from 200 to 501. Historical KV records remain stored but unused. `/cache/delete` and `/cache/flushall` remain unregistered (404). No phase-3 OpenAPI coverage is added. The bilingual console shows runtime state, scope and real clearing, with no ineffective save action.
+
+Real HTTP/PostgreSQL tests first reproduce configuration echo, false connection tests and false deletion, then verify explicit rejection without writes. Unit tests exercise actual memory readiness/clearing. Browser flows cover both languages, free hits, billed local-upstream calls after clearing, and real authorization failure/recovery. Permissions, budgets and the 70% gate stay unchanged; regression coverage is uploaded separately. No migration is needed. Reverting restores the old behavior, including false success; that is not a recommendation to revert. Paid providers and production are outside this validation; other legacy operations remain tracked separately.
+
+## Stage 4: legacy server OAuth boundary
+
+[Bug #197](https://github.com/qiniu/xhub/issues/197) reproduces a separate set of aliases reaching generic KV storage: authorization returns 200/status=ok, stores/echoes submitted credentials, and credential deletion deletes the ordinary server record. No OAuth executor exists for these aliases. They differ from the `/authorize/*` and `/v1/mcp/.../token` paths fixed by #144.
+
+- Reject seven unimplemented operations: `POST /server/oauth/session`; `GET /server/oauth/{server_id}/authorize`; `POST /server/oauth/{server_id}/register` and `/server/oauth/{server_id}/token`; `POST` and `DELETE /server/{server_id}/oauth-user-credential`; `GET /server/{server_id}/oauth-user-credential/status`.
+- Keep the existing management authorization first: anonymous 401, ordinary user 403, administrator 501/unsupported_operation with no-store. Reject before reading the body or accessing storage; no secret echo, token, redirect, record creation or deletion. Ordinary server CRUD, enterprise SAML, model access and budget rules remain unchanged.
+- This does not implement OAuth or expand Stage 3 OpenAPI/Swagger support. Ordinary server configuration only stores records. Other legacy health, user-credential, user-env-vars, plugins/skills aliases still require separate audits; Stage 4 is not complete.
+- Red/green real HTTP/PostgreSQL tests compare storage snapshots, ordinary CRUD, sessions, local upstream inference and billing, and zero-budget rejection. A separate real enterprise SAML regression protects login. English and Chinese browser flows verify that rejected OAuth operations leave playground inference usable and strictly clean their records. CI uploads separate real regression coverage; the 70% gate remains unchanged.
+- No migration or automatic cleanup of existing KV records. Reverting this handler restores old dispatch but also reintroduces the defects; rollback requires that tradeoff to be considered. No automatic merge or production deployment.
+
+## Stage 4: legacy server health and per-user configuration boundary
+
+[Bug #199](https://github.com/qiniu/xhub/issues/199) is reproduced with real HTTP/PostgreSQL: `GET /server/health` only lists configuration with `status=ok`, without probing. Generic KV dispatch treats `user-credential` / `user-env-vars` child paths as ordinary server IDs, stores/echoes secrets and can delete unrelated ordinary configuration.
+
+- Reject exactly six operations: `GET /server/health`; `POST` and `DELETE /server/{server_id}/user-credential`; `GET`, `POST` and `DELETE /server/{server_id}/user-env-vars`. Keep management authorization (anonymous401, ordinary user403) and JSON object validation (malformed400). Valid administrator requests return501/unsupported_operation with no-store, without touching storage or external services.
+- Ordinary server CRUD, including records named user-credential/user-env-vars, retains its storage format. Enterprise SSO, removed MCP prefixes and dedicated skill handlers keep their existing paths. No new personal secret store or MCP executor, permission/budget rule change, or expansion of Swagger support.
+- Red/green real regression compares database snapshots and checks name collisions, authorization/errors, ordinary CRUD, sessions, inference/billing and zero-budget denial. Catalog traversal asserts the two read operations' precise501 contract. Bilingual browser tests verify configuration readback, rejection, real local upstream playground replies and strict cleanup. CI separately collects/uploads regression coverage and runs both browser scenarios; the70% gate remains unchanged.
+- No migration or automatic cleanup of historical records. Reverting this boundary restores old dispatch and its defects. Server import/approval, plugins, skill consumers and dead branches still require individual audits; this batch does not complete Stage4. Existing dedicated skill handlers must not be mistaken for placeholders merely because their paths appear in the catalog.
+
+## Phase 4: legacy server import and submission boundary
+
+[Bug #203](https://github.com/qiniu/xhub/issues/203) reproduces five false successes over real HTTP/PostgreSQL: import merely stores its body, registration has no review state machine, submissions lists ordinary configuration, and approve/reject treat the action name as the record ID.
+
+The exact five operations now return `501/unsupported_operation` with `Cache-Control: no-store`, after existing authorization and JSON validation and before storage. Ordinary server CRUD, colliding resource names, 404 responses for the unregistered `/v1/mcp/server` counterparts, permissions and budget rules stay unchanged. This does not implement MCP execution or expand the core OpenAPI inventory. No schema migration or historical record deletion is performed.
+
+Tests first reproduce all five failures, then verify no writes, error envelopes, ordinary CRUD, real local inference billing and zero-budget rejection. English and Chinese browser flows exercise the actual gateway and verify successful playground inference by upstream request count after the rejected operations. CI uploads dedicated regression coverage and selects both release flows without lowering the 70% gate. External MCP services are not exercised.
+
+Remaining work includes plugin management, skill consumers, residual management entries (including execution-looking RAG/OCR routes), obsolete branches, and a combined regression of all pending PRs on a temporary integration branch. Individual green PRs do not prove combined compatibility. SSO metadata refresh remains a separate feature for the user-selected merge batch; nothing is merged or deployed here.
+
+## Phase 4: plugin activation false-success boundary
+
+[Bug #205](https://github.com/qiniu/xhub/issues/205) reproduces both activation operations over real HTTP/PostgreSQL. POST `/claude-code/plugins/{name}/enable` and `/disable` create records keyed by the action name, default enabled to true and can overwrite ordinary records. No executor consumes this KV namespace to install, publish or load Claude Code plugins; persisting an enabled field is not proof of activation.
+
+The exact two operations now return `501/unsupported_operation` and `Cache-Control: no-store`, after existing authentication and JSON validation and before storage. Ordinary configuration CRUD, colliding names, permissions and budget rules are preserved. No plugin publisher or retired public skill endpoint is introduced; no migration or historical record deletion occurs. The core contract inventory is not expanded.
+
+Tests reproduce both false successes before the fix, then verify unchanged storage, invalid JSON, all identity classes, ordinary CRUD, real local inference billing and zero-budget rejection. English and Chinese browser flows log in, call the real rejected operations, verify unchanged configuration/list, complete playground inference with an upstream call-count assertion and clean up their records. CI independently uploads real regression coverage and selects both E2E flows without lowering the 70% gate.
+
+This completes activation false-success handling only. Registration name addressing, enabled_only filtering, marketplace output and skill consumers still need auditing; UI metadata is not client execution evidence. External Claude Code installation/loading is not tested. Pending PRs still require combined regression; nothing is merged or deployed.
+
+## Phase 4: plugin list filtering
+
+[Bug #207](https://github.com/qiniu/xhub/issues/207) confirms that GET `/claude-code/plugins` ignored `enabled_only`. The exact list adapter now filters normalized enabled=true metadata when requested and reports the filtered count. Omitted/false retains the full list. Existing missing/null defaults remain true; explicit false and non-boolean values are excluded. Only one lowercase true/false value is accepted; empty, duplicated or malformed queries return 400 rather than silently returning an unfiltered list.
+
+Existing authorization and JSON validation remain first. Reads do not persist defaults; SQL errors remain sanitized 500 responses. CRUD, permissions and budget rules are unchanged. Activation handling belongs to separate PR #206, and this change does not prove plugin execution or extend core contract coverage.
+
+Tests reproduce the old failure, cover deterministic boundaries, real HTTP/PostgreSQL faults and recovery, state snapshots, permissions, inference billing, zero-budget rejection and cleanup. English/Chinese browser flows log in, make real filtered requests, verify configuration changes by rereading, then execute playground inference with a local upstream count assertion. This is not an installation test. Although the legacy Skill Hub component requests enabled_only, the current public entry switches to PublicModelHub; unused component code is not evidence of a verified plugin listing page. No new product page is introduced for testing.
+
+Registration addressing, marketplace output, old component/current entry consistency and skill consumers remain pending. External installation/execution is untested. CI uploads real regression coverage and selects both release browser flows; the 70% gate is unchanged. Nothing is merged or deployed.
+
+## Phase 4: plugin registration and marketplace boundary
+
+[Bug #209](https://github.com/qiniu/xhub/issues/209) reproduces registrations with different names overwriting the same plugins record and failing lookup by name. Registration now atomically creates source metadata by lowercase kebab-case name; duplicate/concurrent names return 409 without upsert. Sources must be nonempty objects with string values; no remote validation or installation occurs. Existing flat success objects and default fields remain unchanged.
+
+Legacy records with the same name, including the old plugins ID, cause explicit conflicts instead of silent duplication or migration. Detail paths treat reserved words such as list/new/register as plugin names. Existing PUT shallow merge/upsert and deletion semantics remain; external full-replacement descriptions are not adopted here. Invalid input is 400 and storage failure 500; permissions and budgets are unchanged.
+
+GET `/claude-code/marketplace.json` has no manifest generator and now returns 501/unsupported_operation after existing authorization (anonymous 401, ordinary user 403). No anonymous publication is added, and ordinary KV JSON cannot masquerade as an installable manifest. Metadata registration does not establish activation, discovery or installation support; see separate #206/#208 boundaries.
+
+Tests cover distinct and reserved names, duplicate/legacy collisions, atomic concurrency, cancellation/SQL faults, recovery, cleanup, permissions, real local inference billing and zero-budget rejection. English/Chinese browsers log in, call actual registration/conflict/marketplace endpoints, then execute playground inference with an upstream request-count assertion. External installation and plugin UI execution are not tested. CI uploads real regression coverage and selects both release flows without lowering the 70% gate. No migration, merge or deployment is performed.
+
+## Phase 4: Skill resource and archive boundary
+
+[Bug #211](https://github.com/qiniu/xhub/issues/211) was reproduced with real HTTP/PostgreSQL: GET `/v1/skills/new` and `register` entered creation, `list` returned the collection, and GET `/v1/skills/{id}/archive` could return an unrelated configuration whose ID was `archive`. The fix resolves registered detail GET/DELETE routes by their resource ID, including reserved words. Missing details return404; reads cannot mutate records. Existing creation/list/deletion persistence and response semantics are preserved.
+
+Skill currently provides generic configuration CRUD under management authorization, not the organization-scoped execution service claimed by old comments. No archive generator exists: downloads return501/unsupported_operation with no-store after the original authentication (anonymous401, ordinary users and inference keys403). Public discovery remains removed. Installation, download generation, upstream execution and organization isolation are not added; permissions and budgets are unchanged.
+
+Unit tests cover exact paths, reserved IDs, nonmatching routes and read/delete failures. Real backend regression covers persistence, selective SQL read/write/delete failures, recovery, cleanup, successful inference and spend, and zero-budget blocking. SQL failures target skills rows so an authentication failure cannot substitute for a storage-failure test. English/Chinese browser sessions call real resource/archive APIs and then complete a playground conversation against a counted local upstream. There is no management page for this CRUD path, so these are not plugin installation UI tests.
+
+Real regression coverage is collected and uploaded independently; the70% gate is unchanged. No migration, merge or deployment. Legacy frontend SkillHub/plugin instruction consumers still require a separate call-path and support-state audit; this configuration fix does not establish their usability. External Skill repositories, Claude Code installation and live model vendors were not tested. Other legacy execution endpoints and combined acceptance of all pending PRs remain outstanding.
+
+## Stage 4: SkillHub support status
+
+[Issue #213](https://github.com/qiniu/xhub/issues/213) separates failed public discovery from a valid empty list. The enabled field describes configuration only, not publication, installation or inference authorization. Detail and support dialogs no longer generate unsupported installation instructions or report publication success. Original names, descriptions and metadata remain visible, with English and Chinese UI.
+
+Real HTTP/PostgreSQL regression checks public discovery 404, management permissions, unchanged stored configuration, billing and zero-budget rejection. Browser E2E uses the real gateway to verify the error display followed by successful inference. CI collects regression coverage without lowering the 70% gate. No public publisher is added and no OpenAPI support scope is expanded. The legacy Key Skill selector still needs a separate audit; this does not complete all of stage 4.
+
+## Stage 4: remove unreachable Key extension controls
+
+[Proposal #215](https://github.com/qiniu/xhub/issues/215) removes `KeyEditViewControls`, which has no product callers, and its otherwise-unused `SkillSelector`. The active Key editor already uses basic fields. This does not hide a working page, add Skill authorization/execution, or remove stored fields. The obsolete test claim that a separate flow saves Skill permissions is corrected; it is not support evidence.
+
+Run the existing implementation as a baseline before deletion, then repeat verification. Component tests preserve original text, omit hidden fields and make no plugin discovery call. Real HTTP/PostgreSQL and bilingual browser tests rename a Key, read back model/route limits, budget, rates and expiry, then verify allowed inference and denied model/management access. Existing Key contract CI collects the new regression coverage, and release CI runs both E2E cases without lowering the 70% gate. The pre-existing known-failure quarantine stays unchanged and is not claimed to pass.
+
+## Stage 4 legacy inference alias boundary
+
+[Bug #217](https://github.com/qiniu/xhub/issues/217) confirms that unversioned `POST /rag/ingest`, `/rag/query`, `/ocr`, and `/models/{model_name}:generateContent`, `:streamGenerateContent`, `:countTokens` stored requests as generic configuration and returned 200 without contacting an upstream. After the existing management authorization and object-JSON validation, these unsupported operations now return `501 unsupported_operation` with `Cache-Control: no-store`, without persisting or echoing request bodies.
+
+- Anonymous 401, ordinary session/inference-key 403, and malformed JSON/JSON-RPC 400 remain unchanged. These aliases do not acquire inference permissions.
+- `/v1/rag/*` and `/v1/ocr` retain their existing data-plane rejection. Gemini `/v1beta/models/*`, Vertex `/vertex/v1/models/*`, and Bypass retain their protocol handlers. Ordinary model reads and configuration CRUD are not migrated.
+- Real HTTP/PostgreSQL regression verifies unchanged configuration, no upstream side effects, native protocol execution, guardrails, chat billing, zero-budget denial, and cleanup. Bilingual browser tests verify login and working playground inference after explicit rejection. Local counted protocol servers do not certify external providers.
+- No RAG/OCR implementation, Swagger coverage expansion, migration, or deletion of previously miswritten records. CI collects real regression coverage and retains the 70% gate. A code rollback restores the old false success and is not the default recovery strategy. Submission does not mean merge or deployment.
+
+## Stage 4 legacy provider batch boundary
+
+[Bug #219](https://github.com/qiniu/xhub/issues/219) reproduces with real HTTP/PostgreSQL that GET/POST `/{provider}/v1/batches`, GET `/{provider}/v1/batches/{batch_id}`, and POST `/{provider}/v1/batches/{batch_id}/cancel`, when handled by the management catalog, treat the provider as a public configuration namespace. Create/cancel overwrite `batches`/`cancel` records and reads echo matching configuration, with no upstream task execution.
+
+After existing management authorization and JSON validation, these aliases explicitly return `501 unsupported_operation` and `Cache-Control: no-store`, without accessing configuration or contacting an upstream. Anonymous 401, ordinary session/key 403, and invalid JSON/JSON-RPC 400 remain unchanged. Standard `/v1/batches`, `/batches`, and `/openai/v1/batches` keep their data-plane authorization and rejection. This does not add batch execution or expand Swagger support.
+
+Real regression covers all four operations, configuration snapshots, standard routes, working inference/billing, zero-budget denial, and cleanup. Bilingual browser tests log in, verify explicit rejection, then select a model and Chat endpoint in the playground for real local inference. Isolated databases and local HTTP providers do not certify external vendors. CI uploads real regression coverage and retains the 70% gate. No migration or deletion of existing configuration; submission does not mean merge or deployment.
+
+## Stage 4 legacy Comprehend Medical boundary
+
+Real HTTP/PostgreSQL reproduction for [Bug #221](https://github.com/qiniu/xhub/issues/221) shows that `POST /comprehendmedical` and `POST /comprehendmedical/{operation}` have no analysis executor but enter public configuration handling. Bodies may be saved and echoed; `info` reads a matching record and `delete` removes it. HTTP 200 does not represent upstream analysis.
+
+After existing management authorization and object-JSON validation, these aliases return `501 unsupported_operation` and `Cache-Control: no-store`, without storage access, body echo, or upstream calls. Anonymous 401, ordinary session/key 403, invalid JSON/JSON-RPC 400, and unregistered method/nested-path 404 remain unchanged. No provider analysis implementation or Swagger support expansion is introduced.
+
+Unit tests cover exact paths, reserved operation names, storage failures, and JSON validation. Real regression verifies four operations leave configuration intact, normal chat billing, zero-budget denial, and cleanup. Bilingual browsers perform real login, explicit rejection, and working playground inference with a model and Chat endpoint. Only synthetic text, isolated databases, and local HTTP upstreams are used; actual business content and third-party analysis services are not accessed. CI collects/uploads real coverage and retains the 70% gate. No migration or historical record deletion; submission does not mean merge or deployment.

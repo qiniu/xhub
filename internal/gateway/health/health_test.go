@@ -62,3 +62,39 @@ func TestProbeBoundaries(t *testing.T) {
 		t.Fatal("缺省地址错误")
 	}
 }
+
+// TestReadinessDetailsTruth 验证详情每次实际探测数据库、失败脱敏503、恢复后原成功字段不变；纯内存，无外部清理。
+func TestReadinessDetailsTruth(t *testing.T) {
+	calls := 0
+	offline := false
+	h := handler{version: "test-version", ping: func() error {
+		calls++
+		if offline {
+			return errors.New("private-dsn-password")
+		}
+		return nil
+	}}
+	for _, failed := range []bool{false, true, false} {
+		offline = failed
+		w := httptest.NewRecorder()
+		h.healthDetails(w, httptest.NewRequest("GET", "/health/readiness/details", nil))
+		var body map[string]any
+		if err := json.Unmarshal(w.Body.Bytes(), &body); err != nil {
+			t.Fatal(err)
+		}
+		if failed {
+			if w.Code != 503 {
+				t.Fatal("数据库失败仍报告就绪", w.Body.String())
+			}
+			e, _ := body["error"].(map[string]any)
+			if e["type"] != "not_ready" || e["message"] != "database is not ready" {
+				t.Fatal("错误应脱敏", body)
+			}
+		} else if w.Code != 200 || body["status"] != "ready" || body["litellm_version"] != "test-version" || body["healthy_count"] != float64(1) || body["unhealthy_count"] != float64(0) {
+			t.Fatal("成功契约改变", body)
+		}
+	}
+	if calls != 3 {
+		t.Fatal("详情未逐次探测数据库", calls)
+	}
+}

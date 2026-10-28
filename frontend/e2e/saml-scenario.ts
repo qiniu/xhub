@@ -1,3 +1,4 @@
+import {exerciseSAMLRefresh} from "./saml-refresh-scenario";
 import fs from "node:fs";
 import path from "node:path";
 import { expect, test } from "@playwright/test";
@@ -5,9 +6,10 @@ import { translate, type Locale } from "../src/i18n/translate";
 import { GATEWAY, loginAdmin, sessionBearer, stableGoto } from "./helpers";
 
 /** 注册真实 SAML 浏览器流程；locale 与 secure 选择界面语言和控制台协议，mode 选择合法或拒绝路径。
+ * refresh 额外验证在途登录期间刷新元数据及错误恢复，不用 mock 代替 IdP 下载。
  * 使用独立 SCIM 用户、本地 HTTP/TLS IdP、真实 Next /auth 代理及后台会话；finally 删除本例配置和身份，外层脚本回收 schema。 */
-export function registerSAMLScenario(locale: Locale, secure: boolean, mode: "valid" | "unknown" | "tamper" | "replay" | "expired") {
-  test(`SAML ${secure ? "HTTPS" : "HTTP"} ${mode} ${locale}`, async ({ page, browser, baseURL }) => {
+export function registerSAMLScenario(locale: Locale, secure: boolean, mode: "valid" | "unknown" | "tamper" | "replay" | "expired", refresh = false) {
+  test(`${refresh ? "SAML refresh" : "SAML"} ${secure ? "HTTPS" : "HTTP"} ${mode} ${locale}`, async ({ page, browser, baseURL }) => {
     test.setTimeout(120_000);
     const f = JSON.parse(fs.readFileSync(path.join(process.env.E2E_RUN_DIR!, "enterprise-fixture.json"), "utf8"));
     const tr = (key: string, vars?: Record<string, unknown>) => translate(locale, key, vars);
@@ -93,6 +95,7 @@ export function registerSAMLScenario(locale: Locale, secure: boolean, mode: "val
       await visitor.goto(origin + "/ui/login/");
       await visitor.getByRole("link").filter({ hasText: name }).click();
       await expect(visitor.getByLabel("Employee")).toBeVisible();
+      if (refresh) await exerciseSAMLRefresh(page,{locale,name,id:identity.connection_id,source:f.saml_refresh_source+(mode === "expired" ? "/expired" : "/http"),headers});
       const acsPromise = visitor.waitForResponse(r => new URL(r.url()).pathname === "/auth/enterprise/saml/acs");
       const finishPromise = mode !== "tamper" ? visitor.waitForResponse(r => new URL(r.url()).pathname === "/auth/enterprise/saml/finish") : null;
       await visitor.getByRole("button", { name: "Sign in to identity provider" }).click();

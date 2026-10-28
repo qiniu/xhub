@@ -24,8 +24,32 @@ func TestCatalogReads(t *testing.T) {
 	for _, rt := range catalogGets(t) {
 		rt := rt
 		t.Run(rt.Method+" "+rt.Path, func(t *testing.T) {
+			// C1已审计的辅助操作必须明确拒绝；独立枚举模板，不能放宽所有目录的状态码。
+			unsupportedAux := map[string]bool{
+				"/credentials/by_model/{model_id}":          true,
+				"/credentials/migrate-encryption/check":     true,
+				"/policies/attachments/list":                true,
+				"/policies/attachments/{attachment_id}":     true,
+				"/policies/compare":                         true,
+				"/policies/name/{policy_name}/versions":     true,
+				"/policies/usage/overview":                  true,
+				"/policies/{policy_id}/resolved-guardrails": true,
+				"/policy/templates":                         true,
+				"/prompts/{prompt_id}/versions":             true,
+			}
 			path := fillCatalogPath(rt.Path)
 			status, body := authed(t, base, key, http.MethodGet, path, nil)
+			if unsupportedAux[rt.Path] {
+				var probe map[string]any
+				if status != 501 || json.Unmarshal(body, &probe) != nil {
+					t.Fatalf("辅助操作必须明确501: %d %s", status, trim(body))
+				}
+				errObj, _ := probe["error"].(map[string]any)
+				if errObj["type"] != "unsupported_operation" {
+					t.Fatalf("辅助操作错误契约: %s", trim(body))
+				}
+				return
+			}
 			if path == "/customer/daily/activity" || path == "/tag/daily/activity" {
 				var probe map[string]any
 				if status != http.StatusNotImplemented || json.Unmarshal(body, &probe) != nil {
@@ -34,6 +58,41 @@ func TestCatalogReads(t *testing.T) {
 				errObj, _ := probe["error"].(map[string]any)
 				if errObj["type"] != "unsupported_usage_dimension" {
 					t.Fatalf("unsupported usage dimension contract %s", trim(body))
+				}
+				return
+			}
+			if path == "/claude-code/marketplace.json" {
+				var probe map[string]any
+				if status != 501 || json.Unmarshal(body, &probe) != nil {
+					t.Fatalf("marketplace boundary: %d %s", status, trim(body))
+				}
+				e, _ := probe["error"].(map[string]any)
+				if e["type"] != "unsupported_operation" {
+					t.Fatalf("marketplace error: %s", trim(body))
+				}
+				return
+			}
+			// 旧审批列表没有执行器，不能把公共配置列表冒充审批结果。
+			if path == "/server/submissions" {
+				var probe map[string]any
+				if status != http.StatusNotImplemented || json.Unmarshal(body, &probe) != nil {
+					t.Fatalf("server submissions unsupported contract: %d %s", status, trim(body))
+				}
+				e, _ := probe["error"].(map[string]any)
+				if e["type"] != "unsupported_operation" {
+					t.Fatalf("server submissions error type: %s", trim(body))
+				}
+				return
+			}
+			// 精确核对未实现的旧server运行时读取，不能泛化接受所有501。
+			if rt.Path == "/server/health" || rt.Path == "/server/{server_id}/user-env-vars" {
+				var probe struct {
+					Error struct {
+						Type string `json:"type"`
+					} `json:"error"`
+				}
+				if status != http.StatusNotImplemented || json.Unmarshal(body, &probe) != nil || probe.Error.Type != "unsupported_operation" {
+					t.Fatalf("旧server运行时拒绝契约错误: status=%d body=%s", status, trim(body))
 				}
 				return
 			}
@@ -60,6 +119,46 @@ func TestCatalogReads(t *testing.T) {
 				}
 				return
 			}
+			// 仅这些尚未接入IAM的旧读取入口拒绝；真实组织/团队查询仍必须遵守下方成功契约。
+			switch rt.Path {
+			case "/organization/spend/report", "/team/spend/report", "/team/permissions_list", "/team/filter/ui", "/team/metadata_schema", "/team/{team_id}/members/me":
+				var probe map[string]any
+				if status != http.StatusNotImplemented || json.Unmarshal(body, &probe) != nil {
+					t.Fatalf("unsupported IAM status %d %s", status, trim(body))
+				}
+				errObj, _ := probe["error"].(map[string]any)
+				if errObj["type"] != "unsupported_iam_operation" {
+					t.Fatalf("unsupported IAM contract %s", trim(body))
+				}
+				return
+			}
+			// 这些旧运维接口没有执行器，不接受空目录或固定healthy作为成功；真实存活/就绪继续走原模块。
+			switch rt.Path {
+			case "/coordination_redis/settings", "/debug/asyncio-tasks", "/debug/memory/details", "/debug/memory/summary",
+				"/memory-usage", "/memory-usage-in-mem-cache", "/memory-usage-in-mem-cache-items",
+				"/health/backlog", "/health/drain", "/health/history", "/health/license", "/health/shared-status", "/health/services":
+				var probe map[string]any
+				if status != http.StatusNotImplemented || json.Unmarshal(body, &probe) != nil {
+					t.Fatalf("unsupported operation status %d %s", status, trim(body))
+				}
+				errObj, _ := probe["error"].(map[string]any)
+				if errObj["type"] != "unsupported_operation" {
+					t.Fatalf("unsupported operation contract %s", trim(body))
+				}
+				return
+			}
+			// 这两个保留的GET授权入口没有执行器，必须精确返回501；不能把所有501加入通用允许列表。
+			if rt.Path == "/server/oauth/{server_id}/authorize" || rt.Path == "/server/{server_id}/oauth-user-credential/status" {
+				var probe struct {
+					Error struct {
+						Type string `json:"type"`
+					} `json:"error"`
+				}
+				if status != http.StatusNotImplemented || json.Unmarshal(body, &probe) != nil || probe.Error.Type != "unsupported_operation" {
+					t.Fatalf("旧server授权拒绝契约错误: status=%d body=%s", status, trim(body))
+				}
+				return
+			}
 			if (strings.Contains(path, "/threads/") && strings.HasSuffix(path, "/messages")) ||
 				strings.HasPrefix(path, "/guardrails/submissions/") ||
 				path == "/authorize/flow" || path == "/guardrails/ui/major_airlines" || strings.HasPrefix(path, "/guardrails/ui/category_yaml/") {
@@ -70,6 +169,42 @@ func TestCatalogReads(t *testing.T) {
 				errObj, _ := probe["error"].(map[string]any)
 				if errObj["type"] != "not_implemented" {
 					t.Fatalf("501 contract %s", trim(body))
+				}
+				return
+			}
+			if rt.Path == "/v1/skills/{skill_id}/archive" {
+				var probe map[string]any
+				if status != http.StatusNotImplemented || json.Unmarshal(body, &probe) != nil {
+					t.Fatalf("Skill归档应明确未实现: %d %s", status, trim(body))
+				}
+				errObj, _ := probe["error"].(map[string]any)
+				if errObj["type"] != "unsupported_operation" {
+					t.Fatalf("Skill归档错误类型不正确: %s", trim(body))
+				}
+				return
+			}
+			// 独立列出本批八条读取别名；不把其他接口的意外501当成通过。
+			switch rt.Path {
+			case "/authorize", "/discover", "/enabled", "/invitation/info", "/jwt/key/mapping/info", "/jwt/key/mapping/list", "/onboarding/get_token", "/token/generate":
+				var probe struct {
+					Error struct {
+						Type string `json:"type"`
+					} `json:"error"`
+				}
+				if status != http.StatusNotImplemented || json.Unmarshal(body, &probe) != nil || probe.Error.Type != "unsupported_operation" {
+					t.Fatalf("旧身份别名必须明确拒绝: status=%d body=%s", status, trim(body))
+				}
+				return
+			}
+			// 独立列举两条无执行器的运维GET，不能全局接受未知501。
+			if rt.Path == "/vantage/settings" || rt.Path == "/schedule/anthropic_beta_headers_reload/status" {
+				var probe struct {
+					Error struct {
+						Type string `json:"type"`
+					} `json:"error"`
+				}
+				if status != http.StatusNotImplemented || json.Unmarshal(body, &probe) != nil || probe.Error.Type != "unsupported_operation" {
+					t.Fatalf("运维入口没有执行器，必须明确失败: %d %s", status, trim(body))
 				}
 				return
 			}

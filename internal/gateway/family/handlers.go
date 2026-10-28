@@ -17,11 +17,15 @@ import (
 
 	"github.com/sunqirui1987/xhub/internal/catalog"
 	dpusage "github.com/sunqirui1987/xhub/internal/dataplane/usage"
+	"github.com/sunqirui1987/xhub/internal/gateway/accessgroupconfig"
+	"github.com/sunqirui1987/xhub/internal/gateway/budgetconfig"
 	"github.com/sunqirui1987/xhub/internal/gateway/guard"
+	"github.com/sunqirui1987/xhub/internal/gateway/metadataconfig"
 	"github.com/sunqirui1987/xhub/internal/gateway/policyconfig"
 	"github.com/sunqirui1987/xhub/internal/gateway/promptconfig"
 	"github.com/sunqirui1987/xhub/internal/gateway/searchconfig"
 	"github.com/sunqirui1987/xhub/internal/gateway/suppliers"
+	"github.com/sunqirui1987/xhub/internal/gateway/vectorconfig"
 	"github.com/sunqirui1987/xhub/internal/util"
 )
 
@@ -544,11 +548,9 @@ func singular(kind string) string {
 	}
 }
 
-// ServeMixed answers the catalog's "mixed" paths, such as /v1/agents, /v1/skills and /v1/workflows. These were removed from the product and only remain in the catalog. They are refused rather than served: the generic store behind them is one shared key-value namespace keyed by resource kind, with no owner and no team column, so serving them let any signed-in member — and any inference key — create records that every other principal could then list. Refusing is what the classification has always described; this makes the code match. The identity is still required before the refusal, so an anonymous caller learns nothing beyond the fact that the path exists.
-// 参数 s（Host）：处理混合使用的数据面宿主；w（http.ResponseWriter）：调用方的 HTTP 响应，状态和正文写在这里；r（*http.Request）：入站 HTTP 请求。
-// 返回：无。状态码和正文写进调用方的响应。
-// 调用：gateway/catalog.go
-// 测试：无直接单测
+// ServeMixed 拒绝仍列在兼容目录的退役混合身份接口，例如agents、memory和workflows。
+// s提供身份检查，w/r为入站HTTP；先验证身份再返回410，无存储副作用。目录KV没有资源归属隔离，不能恢复给普通成员共享读写。
+// 网关目录分派调用；/v1/skills不属于该分类，其管理配置CRUD与未实现的归档边界另行处理。
 func ServeMixed(s Host, w http.ResponseWriter, r *http.Request) {
 	if s.RequireMixed(w, r) == nil {
 		return
@@ -558,13 +560,26 @@ func ServeMixed(s Host, w http.ResponseWriter, r *http.Request) {
 }
 
 // ServeMgmt 先鉴权再执行管理目录操作；s 为宿主，w/r 为 HTTP 响应和请求，由 gateway/catalog.go 调用。
-// 返回结果直接写入 w；护栏仍使用自己的处理器，通用目录仅接受空正文或一个完整 JSON 对象，解析失败不触碰存储。
-// 测试：catalog_persistence_test.go；不放宽任何权限，不改变空 GET/DELETE 正文语义。
+// 返回结果直接写入 w；未接入IAM的组织/团队旧目录在鉴权后拒绝，不能冒充真实业务操作；护栏仍使用自己的处理器，通用目录仅接受空正文或一个完整 JSON 对象，解析失败不触碰存储。
+// 返回结果直接写入 w；未实现运维目录在原鉴权后明确拒绝；护栏仍使用自己的处理器，通用目录仅接受空正文或一个完整 JSON 对象，解析失败不触碰存储。
+// 未实现的旧server OAuth在解析/存储前明确拒绝；不放宽权限，不改变普通CRUD的空GET/DELETE正文语义。
 func ServeMgmt(s Host, w http.ResponseWriter, r *http.Request) {
 	if s.RequireManage(w, r) == nil {
 		return
 	}
+	if isIAMFallbackPath(r.URL.Path) {
+		util.WriteError(w, http.StatusNotImplemented, "unsupported_iam_operation", "this legacy organization or team operation is not implemented")
+		return
+	}
 	if guard.Manage(s, w, r) {
+		return
+	}
+	// 没有运维执行器的目录必须明确拒绝；保存KV不代表连接测试、排空或GC已经执行。
+	if unsupportedOperationalPath(r.URL.Path) {
+		util.WriteError(w, http.StatusNotImplemented, "unsupported_operation", "this operational endpoint is not implemented")
+		return
+	}
+	if rejectServerOAuth(w, r) {
 		return
 	}
 	body, err := readCatalogBody(r.Body)
@@ -576,8 +591,24 @@ func ServeMgmt(s Host, w http.ResponseWriter, r *http.Request) {
 }
 
 // writeCatalogPersist 将通用目录请求交给窄存储接口；s 提供已授权上下文，w/r 为 HTTP 响应和请求，body 为已解析对象。
-// 由 ServeMgmt 调用，返回值写入 w；不更改 Host、鉴权或资源路径语义，无存储时由处理器返回 503。
+// 由 ServeMgmt 在原鉴权之后调用；server执行、插件启停/市场及Skill归档先明确拒绝。
+// 其他资源委派配置服务或旧目录存储；缺失存储返回503，不改变权限和预算规则。
 func writeCatalogPersist(s Host, w http.ResponseWriter, r *http.Request, body map[string]any) {
+	if rejectServerRuntime(w, r) {
+		return
+	}
+	if rejectServerSubmission(w, r) {
+		return
+	}
+	if rejectPluginActivation(w, r) {
+		return
+	}
+	if rejectPluginMarketplace(w, r) {
+		return
+	}
+	if rejectSkillArchive(w, r) {
+		return
+	}
 	var st catalogRecordStore
 	if recordStore := s.RecordStore(); recordStore != nil {
 		st = recordStore
@@ -586,9 +617,25 @@ func writeCatalogPersist(s Host, w http.ResponseWriter, r *http.Request, body ma
 }
 
 // Freeze 为旧兼容响应补齐资源必需字段；kind 为资源族，obj 为可修改的 JSON 对象。
-// 无返回值；保留已有非 nil 字段并删除 password，不写数据库。供应商、搜索、提示词及策略字段交给各自独立服务规范化。
-// gateway/access.go 及旧目录适配器调用；新资源业务逻辑不应继续加入此通用分支。
+// 无返回值；保留已有非 nil 字段并删除 password，不写数据库；已迁移资源由各自服务规范化。
+// 旧目录适配器调用；新资源业务逻辑不应继续加入此通用分支。
 func Freeze(kind string, obj map[string]any) {
+	if kind == "access_group" || kind == "access_groups" {
+		accessgroupconfig.Normalize(kind, obj)
+		return
+	}
+	if kind == "vector_store" {
+		vectorconfig.Normalize(obj)
+		return
+	}
+	if metadataconfig.Supports(kind) {
+		metadataconfig.Normalize(kind, obj)
+		return
+	}
+	if kind == "budget" || kind == "budgets" {
+		budgetconfig.Normalize(kind, obj)
+		return
+	}
 	if kind == "policies" || kind == "policy" {
 		policyconfig.Normalize(kind, obj)
 		return
@@ -634,7 +681,8 @@ func Freeze(kind string, obj map[string]any) {
 			setDefault(obj, "name", "")
 			setDefault(obj, "status", "ready")
 		}
-	case "vector_stores", "vector_store":
+	// 数据面复数资源保留旧分支；本轮只迁移单数管理配置，不改变推理资源支持边界。
+	case "vector_stores":
 		setDefault(obj, "object", "vector_store")
 		setDefault(obj, "name", "")
 		setDefault(obj, "status", "completed")
@@ -696,54 +744,10 @@ func Freeze(kind string, obj map[string]any) {
 	case "memory":
 		setDefault(obj, "key", id)
 		setDefault(obj, "value", "")
-	case "access_group", "access_groups":
-		setDefault(obj, "access_group_id", id)
-		if str(obj["access_group_name"]) == "" {
-			if n := str(obj["name"]); n != "" {
-				obj["access_group_name"] = n
-			} else {
-				obj["access_group_name"] = id
-			}
-		}
-		setDefault(obj, "description", "")
-		setDefault(obj, "models", []any{})
-		setDefault(obj, "access_model_names", []any{})
-		setDefault(obj, "access_mcp_server_ids", []any{})
-		setDefault(obj, "access_agent_ids", []any{})
-		setDefault(obj, "assigned_key_ids", []any{})
-		setDefault(obj, "assigned_team_ids", []any{})
-		setDefault(obj, "access_mcp_servers", []any{})
-		setDefault(obj, "access_agents", []any{})
-		setDefault(obj, "assigned_keys", []any{})
-		setDefault(obj, "assigned_teams", []any{})
-		setDefault(obj, "updated_at", obj["created_at"])
-		if _, ok := obj["created_by"]; !ok {
-			obj["created_by"] = nil
-		}
-		if _, ok := obj["updated_by"]; !ok {
-			obj["updated_by"] = nil
-		}
-		if _, ok := obj["budget_id"]; !ok {
-			obj["budget_id"] = nil
-		}
-	case "tags", "tag":
-		if n := str(obj["tag_name"]); n != "" {
-			obj["name"] = n
-		}
-		setDefault(obj, "name", id)
-		setDefault(obj, "tag_name", obj["name"])
-		setDefault(obj, "spend", 0)
 	case "guardrails", "apply_guardrail":
 		setDefault(obj, "guardrail_id", id)
 		setDefault(obj, "guardrail_name", "")
 		setDefault(obj, "litellm_params", map[string]any{})
-	case "customer", "end_user":
-		setDefault(obj, "user_id", id)
-		setDefault(obj, "spend", 0)
-		setDefault(obj, "blocked", false)
-		if _, ok := obj["max_budget"]; !ok {
-			obj["max_budget"] = nil
-		}
 	case "invitation":
 		setDefault(obj, "user_id", "")
 		setDefault(obj, "is_accepted", false)
@@ -816,26 +820,6 @@ func Freeze(kind string, obj map[string]any) {
 		setDefault(obj, "name", "")
 		setDefault(obj, "version", "1")
 		setDefault(obj, "enabled", true)
-	case "budget", "budgets":
-		setDefault(obj, "budget_id", id)
-		if _, ok := obj["max_budget"]; !ok {
-			obj["max_budget"] = nil
-		}
-		if _, ok := obj["soft_budget"]; !ok {
-			obj["soft_budget"] = nil
-		}
-		if _, ok := obj["tpm_limit"]; !ok {
-			obj["tpm_limit"] = nil
-		}
-		if _, ok := obj["rpm_limit"]; !ok {
-			obj["rpm_limit"] = nil
-		}
-		if _, ok := obj["budget_duration"]; !ok {
-			obj["budget_duration"] = nil
-		}
-		if _, ok := obj["budget_reset_at"]; !ok {
-			obj["budget_reset_at"] = nil
-		}
 	}
 }
 
@@ -850,12 +834,26 @@ func setDefault(obj map[string]any, key string, val any) {
 	}
 }
 
-// parseMgmt reads the resource kind, action, and id from the method and path.
-// 参数 method（string）：HTTP 方法，例如 GET 或 POST；path（string）：解析Mgmt要定位的路径。可能是 URL，也可能是字段路径；body（map[string]any）：已解析或原始的 JSON。
-// 返回 kind（string）：固定文本 "misc"；action（string）：固定文本 "misc"；id（string）：固定文本 "misc"。
-// 调用：仅在 handlers.go 内使用
-// 测试：无直接单测
+// parseMgmt 根据已注册路径、HTTP方法及JSON正文解析目录种类、动作与资源ID，供通用存储适配器调用。
+// 插件详情按路径名称寻址，避免保留词被当作动作；其他资源沿用旧解析与正文ID回退，无存储或授权副作用。
+// parseMgmt 按已注册路径、HTTP方法及正文解析目录种类、动作、ID，供目录读写调用；无存储副作用。
+// Skill详情优先按资源ID寻址，避免GET误执行保留词动作；其余路径和正文ID回退保持原行为。
 func parseMgmt(method, path string, body map[string]any) (kind, action, id string) {
+	// 注册的插件详情路径以名称为资源身份，list/new/register等名字也不能被通用动作词吞掉。
+	pluginParts := strings.Split(strings.TrimSuffix(path, "/"), "/")
+	if len(pluginParts) == 4 && pluginParts[0] == "" && pluginParts[1] == "claude-code" && pluginParts[2] == "plugins" && pluginParts[3] != "" {
+		switch method {
+		case http.MethodGet:
+			return "claude-code", "info", pluginParts[3]
+		case http.MethodPut:
+			return "claude-code", "update", pluginParts[3]
+		case http.MethodDelete:
+			return "claude-code", "delete", pluginParts[3]
+		}
+	}
+	if action, id, matched := skillResourceAction(method, path); matched {
+		return "skills", action, id
+	}
 	parts := catalog.Split(strings.TrimSuffix(path, "/"))
 	filtered := []string{}
 	for _, p := range parts {

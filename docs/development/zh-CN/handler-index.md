@@ -21,6 +21,9 @@ x-litellm-call-id 关联调用与日志，x-litellm-response-cost 表示这次�
 | `POST /admin/archive/kodo/test` | `archiveAdmin` | [directory.go](../../../internal/gateway/directory.go) |
 | `POST /admin/archive/kodo/retry` | `archiveAdmin` | [directory.go](../../../internal/gateway/directory.go) |
 | `GET /admin/enterprise/sso` | `enterpriseOIDCAdmin` | [directory.go](../../../internal/gateway/directory.go) |
+| `GET /admin/enterprise/sso/{connection_id}/refresh` | `enterpriseSAMLRefreshAdmin` | [directory.go](../../../internal/gateway/directory.go) |
+| `PUT /admin/enterprise/sso/{connection_id}/refresh` | `enterpriseSAMLRefreshAdmin` | [directory.go](../../../internal/gateway/directory.go) |
+| `POST /admin/enterprise/sso/{connection_id}/refresh` | `enterpriseSAMLRefreshAdmin` | [directory.go](../../../internal/gateway/directory.go) |
 | `POST /admin/enterprise/sso` | `enterpriseOIDCAdmin` | [directory.go](../../../internal/gateway/directory.go) |
 | `GET /admin/enterprise/sso/{connection_id}` | `enterpriseOIDCAdmin` | [directory.go](../../../internal/gateway/directory.go) |
 | `PUT /admin/enterprise/sso/{connection_id}` | `enterpriseOIDCAdmin` | [directory.go](../../../internal/gateway/directory.go) |
@@ -62,16 +65,18 @@ x-litellm-call-id 关联调用与日志，x-litellm-response-cost 表示这次�
 | `POST /v1/audio/translations` | `audioTranslations` | [routes.go](../../../internal/gateway/routes.go) |
 | `POST /audio/translations` | `audioTranslations` | [routes.go](../../../internal/gateway/routes.go) |
 | `POST /route_template/preview` | `routePreview` | [routes.go](../../../internal/gateway/routes.go) |
-| `POST /flushall` | `flushCache` | [routes.go](../../../internal/gateway/routes.go) |
-| `GET /cache/settings` | `cacheSettings` | [routes.go](../../../internal/gateway/routes.go) |
-| `POST /cache/settings` | `cacheSettings` | [routes.go](../../../internal/gateway/routes.go) |
+| `POST /flushall` | `cacheManagement` | [routes.go](../../../internal/gateway/routes.go) |
+| `GET /cache/settings` | `cacheManagement` | [routes.go](../../../internal/gateway/routes.go) |
+| `POST /cache/settings` | `cacheManagement` | [routes.go](../../../internal/gateway/routes.go) |
+| `POST /cache/settings/test` | `cacheManagement` | [routes.go](../../../internal/gateway/routes.go) |
+| `POST /delete` | `cacheManagement` | [routes.go](../../../internal/gateway/routes.go) |
 | `GET /get/ui_theme_settings` | `uiTheme` | [routes.go](../../../internal/gateway/routes.go) |
 | `PATCH /update/ui_theme_settings` | `uiTheme` | [routes.go](../../../internal/gateway/routes.go) |
 | `POST /upload/logo` | `uiTheme` | [routes.go](../../../internal/gateway/routes.go) |
 | `POST /prompts/test` | `promptTest` | [routes.go](../../../internal/gateway/routes.go) |
 | `POST /search_tools/test_connection` | `searchToolTest` | [routes.go](../../../internal/gateway/routes.go) |
-| `GET /cache/ping` | `cachePing` | [routes.go](../../../internal/gateway/routes.go) |
-| `GET /ping` | `cachePing` | [routes.go](../../../internal/gateway/routes.go) |
+| `GET /cache/ping` | `cacheManagement` | [routes.go](../../../internal/gateway/routes.go) |
+| `GET /ping` | `cacheManagement` | [routes.go](../../../internal/gateway/routes.go) |
 | `GET /customer/list` | `customerList` | [routes.go](../../../internal/gateway/routes.go) |
 | `GET /end_user/list` | `customerList` | [routes.go](../../../internal/gateway/routes.go) |
 

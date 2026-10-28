@@ -1683,17 +1683,18 @@ export const mcpHubPublicServersCall = async () => {
   return response.json();
 };
 
+/** 读取公开Skill目录；不传凭据。非2xx、非法JSON或缺失列表必须抛错，调用页面展示失败而不是空目录。
+ * 返回经过最低结构检查的原始对象，不翻译名称或配置；不触发登录清理或推断安装能力。
+ */
 export const skillHubPublicCall = async () => {
   const url = proxyBaseUrl ? `${proxyBaseUrl}/public/skill_hub` : `/public/skill_hub`;
-  const response = await fetch(url, {
-    method: "GET",
-    headers: { "Content-Type": "application/json" },
-  });
-  if (!response.ok) {
-    console.error(`skillHubPublicCall failed with status ${response.status}`);
-    return { plugins: [] };
+  const response = await fetch(url);
+  if (!response.ok) throw new Error(`Skill directory request failed (HTTP ${response.status})`);
+  const data = await response.json();
+  if (!data || !Array.isArray(data.plugins) || data.plugins.some((item: unknown) => !item || typeof item !== "object" || typeof (item as {name?: unknown}).name !== "string")) {
+    throw new Error("Invalid Skill directory response");
   }
-  return response.json();
+  return data;
 };
 
 export const modelHubCall = async (accessToken: string) => {
@@ -4960,47 +4961,16 @@ const formatYmd = (value: Date): string => {
   return `${year}-${month}-${day}`;
 };
 
+/** 读取真实标签配置；accessToken为现有管理身份，日期为兼容查询参数，返回名称字典。
+ * 供标签选择器与查询hook使用；HTTP/解析/网络错误必须reject，不能将失败伪装为空配置，不改变权限判断。 */
 export const tagListCall = async (
   accessToken: string,
   startTime?: Date | null,
   endTime?: Date | null,
-): Promise<TagListResponse> => {
-  try {
-    let url = proxyBaseUrl ? `${proxyBaseUrl}/tag/list` : `/tag/list`;
-
-    if (startTime && endTime) {
-      const params = new URLSearchParams({
-        start_date: formatYmd(startTime),
-        end_date: formatYmd(endTime),
-      });
-      url = `${url}?${params.toString()}`;
-    }
-
-    const response = await fetch(url, {
-      method: "GET",
-      headers: {
-        [globalLitellmHeaderName]: `Bearer ${accessToken}`,
-      },
-    });
-
-    if (!response.ok) {
-      const errorData = await response.text();
-      if (isQuietAccessDenial(errorData)) {
-        return {};
-      }
-      await handleError(errorData);
-      return {};
-    }
-
-    const data = await response.json();
-    return data as TagListResponse;
-  } catch (error) {
-    if (!isQuietAccessDenial(error)) {
-      console.error("Error listing tags:", error instanceof Error ? error.message : error);
-    }
-    throw error;
-  }
-};
+): Promise<TagListResponse> => apiClient.get("/tag/list", {
+  accessToken,
+  query: startTime && endTime ? { start_date: formatYmd(startTime), end_date: formatYmd(endTime) } : undefined,
+});
 
 export const tagDeleteCall = async (accessToken: string, tagName: string): Promise<void> => {
   try {

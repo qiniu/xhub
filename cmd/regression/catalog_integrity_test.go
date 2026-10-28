@@ -198,7 +198,7 @@ func TestCatalogIntegrityBatchDelete(t *testing.T) {
 		catalogSQL(t, h, `DROP FUNCTION IF EXISTS integrity_batch_reject()`)
 	})
 	assertCatalogStorageFailure(t, h.do(http.MethodPost, "/tag/delete", admin, map[string]any{"tags": names}))
-	// /tag/list 是用量聚合的专用读取；用真正的目录详情接口核对逐项持久化状态。
+	// 用标签详情逐项核对部分删除结果；列表现在读取同一配置库，由标签生命周期回归另行验证。
 	for i, name := range names {
 		got := h.do(http.MethodPost, "/tag/info", admin, map[string]any{"name": name})
 		if i == 0 && got.status != 404 {

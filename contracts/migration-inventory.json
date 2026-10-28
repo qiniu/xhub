@@ -646,6 +646,14 @@
       "status": "peripheral-unmigrated"
     },
     {
+      "route": "GET /admin/enterprise/sso/{connection_id}/refresh",
+      "sources": [
+        "internal/gateway/directory.go"
+      ],
+      "contract": null,
+      "status": "peripheral-unmigrated"
+    },
+    {
       "route": "GET /agent/daily/activity",
       "sources": [
         "catalog"
@@ -3877,6 +3885,14 @@
       "status": "peripheral-unmigrated"
     },
     {
+      "route": "POST /admin/enterprise/sso/{connection_id}/refresh",
+      "sources": [
+        "internal/gateway/directory.go"
+      ],
+      "contract": null,
+      "status": "peripheral-unmigrated"
+    },
+    {
       "route": "POST /api/event_logging/batch",
       "sources": [
         "catalog"
@@ -4026,7 +4042,8 @@
     {
       "route": "POST /cache/settings/test",
       "sources": [
-        "catalog"
+        "catalog",
+        "internal/gateway/routes.go"
       ],
       "contract": null,
       "status": "peripheral-unmigrated"
@@ -4316,7 +4333,8 @@
     {
       "route": "POST /delete",
       "sources": [
-        "catalog"
+        "catalog",
+        "internal/gateway/routes.go"
       ],
       "contract": null,
       "status": "peripheral-unmigrated"
@@ -6753,6 +6771,14 @@
     },
     {
       "route": "PUT /admin/enterprise/sso/{connection_id}",
+      "sources": [
+        "internal/gateway/directory.go"
+      ],
+      "contract": null,
+      "status": "peripheral-unmigrated"
+    },
+    {
+      "route": "PUT /admin/enterprise/sso/{connection_id}/refresh",
       "sources": [
         "internal/gateway/directory.go"
       ],

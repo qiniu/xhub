@@ -30,14 +30,6 @@ vi.mock("./mcp_server_management/MCPServerSelector", () => ({
   ),
 }));
 
-vi.mock("./skills/SkillSelector", () => ({
-  default: ({ onChange }: { onChange: (selected: string[]) => void }) => (
-    <button type="button" data-testid="select-private-skill" onClick={() => onChange(["private-skill"])}>
-      Select private skill
-    </button>
-  ),
-}));
-
 const can = vi.fn();
 vi.mock("@/app/(dashboard)/hooks/useCan", () => ({
   default: (...args: unknown[]) => can(...args),

@@ -270,6 +270,20 @@ func TestBrowserEnterpriseFixture(t *testing.T) {
 	samlIDP := samltest.New(t)
 	httpSAMLIDP := samltest.NewHTTP(t)
 	expiredSAMLIDP := samltest.NewExpired(t)
+	// 刷新下载走独立真实 TLS 服务；只返回本地 IdP 的公开元数据，故障端点用于观察保留旧配置。
+	refreshSource := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if strings.HasSuffix(r.URL.Path, "/fail") {
+			w.WriteHeader(503)
+			return
+		}
+		w.Header().Set("Content-Type", "application/samlmetadata+xml")
+		if r.URL.Path == "/expired" {
+			_, _ = io.WriteString(w, expiredSAMLIDP.Metadata())
+		} else {
+			_, _ = io.WriteString(w, httpSAMLIDP.Metadata())
+		}
+	}))
+	defer refreshSource.Close()
 	identities := map[string]string{}
 	spoolControl, closeSpoolControl := newBrowserUsageSpoolControl(s, dir)
 	defer closeSpoolControl()
@@ -549,7 +563,7 @@ func TestBrowserEnterpriseFixture(t *testing.T) {
 		}
 	}))
 	defer control.Close()
-	metadata, _ := json.Marshal(map[string]string{"issuer": issuer, "console": consoleServer.URL, "control": control.URL, "saml_console": samlConsole.URL, "saml_metadata": samlIDP.Metadata(), "saml_metadata_http": httpSAMLIDP.Metadata(), "saml_metadata_expired": expiredSAMLIDP.Metadata()})
+	metadata, _ := json.Marshal(map[string]string{"issuer": issuer, "console": consoleServer.URL, "control": control.URL, "saml_console": samlConsole.URL, "saml_refresh_source": refreshSource.URL, "saml_metadata": samlIDP.Metadata(), "saml_metadata_http": httpSAMLIDP.Metadata(), "saml_metadata_expired": expiredSAMLIDP.Metadata()})
 	if err = os.WriteFile(filepath.Join(dir, "enterprise-fixture.json"), metadata, 0600); err != nil {
 		t.Fatal(err)
 	}

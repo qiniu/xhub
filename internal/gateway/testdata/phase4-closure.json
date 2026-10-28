@@ -1,0 +1,5354 @@
+{
+  "baseline": "939e0d6c0ba174bd03d6dad4c1035da8bf0be8cd",
+  "reviewed_at": "2026-10-28",
+  "scope": "Catalog-owned management declarations after stage-4 integration; observations retain the historical baseline. POST /delete and POST /cache/settings/test moved to cache administration with real regression coverage; three SAML refresh routes belong to the identity module. This inventory is not a completion claim.",
+  "groups": {
+    "access-vector": {
+      "title": "访问组与向量库配置",
+      "batch": "integration",
+      "source": "internal/gateway/family/catalog_persistence.go",
+      "conclusion": "现有通用配置存储；独立服务在待合入PR，配置保存不证明授权/索引生效。",
+      "pending_prs": [
+        182,
+        184
+      ]
+    },
+    "analytics": {
+      "title": "统计、支出与日志旧别名",
+      "batch": "C5",
+      "source": "internal/gateway/family/handlers.go",
+      "conclusion": "通用KV读写/空统计不能证明真实账单查询或重置，须用有消费数据的夹具逐条验收。",
+      "pending_prs": []
+    },
+    "auth-alias": {
+      "title": "OAuth、邀请、JWT映射、引导旧入口",
+      "batch": "C2",
+      "source": "internal/gateway/family/catalog_persistence.go",
+      "conclusion": "这些精确路径仍读写KV，不是已修复的/authorize/flow或MCP OAuth；须验证令牌/身份副作用并明确支持边界。",
+      "pending_prs": [
+        226
+      ]
+    },
+    "budget-iam": {
+      "title": "预算配置与组织/团队旧入口",
+      "batch": "integration",
+      "source": "internal/gateway/family/catalog_persistence.go",
+      "conclusion": "预算配置独立服务及无执行器旧IAM入口拒绝待合入；不改变真实权限预算服务。",
+      "pending_prs": [
+        192
+      ]
+    },
+    "cache": {
+      "title": "缓存管理",
+      "batch": "integration",
+      "source": "internal/gateway/access.go",
+      "conclusion": "缓存设置不生效的修复待合入；真实Flush仍保留。",
+      "pending_prs": [
+        196
+      ]
+    },
+    "discovery": {
+      "title": "根页、路由/注册表及辅助目录",
+      "batch": "C7",
+      "source": "internal/gateway/family/handlers.go",
+      "conclusion": "返回通用KV不证明目录与已注册路由一致；现有前端/SDK调用方需核对。",
+      "pending_prs": []
+    },
+    "guard": {
+      "title": "护栏管理与明确不支持分支",
+      "batch": "retain",
+      "source": "internal/gateway/guard/manage.go",
+      "conclusion": "本地规则有运行时验收；远程提交及部分UI能力明确拒绝。",
+      "pending_prs": []
+    },
+    "legacy-inference": {
+      "title": "旧RAG/OCR/Google操作别名",
+      "batch": "integration",
+      "source": "internal/gateway/family/catalog_persistence.go",
+      "conclusion": "无推理执行器却写KV；拒绝修复待合入，原生推理不受影响。",
+      "pending_prs": [
+        218
+      ]
+    },
+    "medical": {
+      "title": "旧医学文本操作",
+      "batch": "integration",
+      "source": "internal/gateway/family/catalog_persistence.go",
+      "conclusion": "操作名被当作公共配置ID，修复待合入。",
+      "pending_prs": [
+        222
+      ]
+    },
+    "metadata": {
+      "title": "标签、客户和终端用户配置",
+      "batch": "integration",
+      "source": "internal/gateway/family/catalog_persistence.go",
+      "conclusion": "标签/客户配置修复待合入；终端用户封禁是否消费不能由KV记录证明。",
+      "pending_prs": [
+        188,
+        190
+      ]
+    },
+    "model-alias": {
+      "title": "模型信息、fallback、封禁和公开旧别名",
+      "batch": "C4",
+      "source": "internal/gateway/family/catalog_persistence.go",
+      "conclusion": "与专用模型模块不同；不应由同名前缀推断真实路由/公开权限已修改。",
+      "pending_prs": []
+    },
+    "operations": {
+      "title": "运维旧操作",
+      "batch": "integration",
+      "source": "internal/gateway/family/catalog_persistence.go",
+      "conclusion": "占位运维接口的明确拒绝及readiness修复待合入。",
+      "pending_prs": [
+        194
+      ]
+    },
+    "plugin": {
+      "title": "插件注册、启停、筛选、marketplace",
+      "batch": "integration",
+      "source": "internal/gateway/family/catalog_persistence.go",
+      "conclusion": "分别提交的注册、筛选、启停边界需组合回归，不能将启用标志视为执行器。",
+      "pending_prs": [
+        206,
+        208,
+        210
+      ]
+    },
+    "preflight": {
+      "title": "健康路径OPTIONS",
+      "batch": "retain",
+      "source": "internal/gateway/server.go",
+      "conclusion": "观测204仅证明预检，不证明数据库就绪或健康检查成功。",
+      "pending_prs": []
+    },
+    "protocol-alias": {
+      "title": "文件及WebSocket兼容入口",
+      "batch": "C6",
+      "source": "internal/gateway/ingress.go",
+      "conclusion": "非openai文件入口落到管理KV；passthrough只计算URL，realtime只写握手。协议执行不得伪报成功；不能改现有原生数据面。",
+      "pending_prs": []
+    },
+    "provider-batch": {
+      "title": "供应商批处理别名",
+      "batch": "integration",
+      "source": "internal/gateway/family/catalog_persistence.go",
+      "conclusion": "非openai供应商落到管理KV；修复待合入，须保留openai数据面分支。",
+      "pending_prs": [
+        220
+      ]
+    },
+    "resource-config": {
+      "title": "供应商、搜索、提示词和策略基本配置",
+      "batch": "retain",
+      "source": "internal/gateway/family/catalog_persistence.go",
+      "conclusion": "仅已有真实回归覆盖的配置CRUD；不推出同前缀的执行、版本或统计能力已支持。",
+      "pending_prs": []
+    },
+    "runtime-ops": {
+      "title": "调度、预热、事件、Vantage集成",
+      "batch": "C3",
+      "source": "internal/gateway/family/catalog_persistence.go",
+      "conclusion": "注册存在但只做KV读写，未接相应调度、热加载、事件或外部导出执行器。",
+      "pending_prs": [
+        228
+      ]
+    },
+    "server": {
+      "title": "server资源、OAuth、个人配置及导入审批",
+      "batch": "integration",
+      "source": "internal/gateway/family/catalog_persistence.go",
+      "conclusion": "子操作拒绝边界待合入，基本server配置不等于MCP运行时。",
+      "pending_prs": [
+        198,
+        200,
+        204
+      ]
+    },
+    "service-aux": {
+      "title": "已拆分服务下的辅助操作",
+      "batch": "C1",
+      "source": "internal/gateway/family/handlers.go",
+      "conclusion": "策略执行/解析/附件/版本/状态、凭据迁移/按模型查询、提示词版本仍经parseMgmt映射CRUD；需语义级修复，不能沿用配置已验证结论。 C1修复与补充验收见#224，仍待合入；main状态不提前更改。",
+      "pending_prs": [
+        224
+      ]
+    },
+    "settings": {
+      "title": "旧设置、品牌、配置导出",
+      "batch": "C3",
+      "source": "internal/gateway/family/handlers.go",
+      "conclusion": "get/update使用不同命名空间，设置列表还会返回硬编码空值；需核对消费者及读写一致性。",
+      "pending_prs": []
+    },
+    "skills": {
+      "title": "Skill资源与归档",
+      "batch": "integration",
+      "source": "internal/gateway/family/handlers.go",
+      "conclusion": "资源CRUD及归档明确拒绝修复待合入；SkillHub另有模块补充项。",
+      "pending_prs": [
+        212,
+        214
+      ]
+    }
+  },
+  "routes": [
+    {
+      "route": "DELETE /access_group/{access_group}/delete",
+      "owner": "catalog:serveFamilyRoute:manage",
+      "group": "access-vector",
+      "main_status": "needs_verification",
+      "evidence": [
+        "internal/gateway/family/catalog_persistence.go"
+      ],
+      "observation": {
+        "route": "DELETE /access_group/{access_group}/delete",
+        "anonymous": 401,
+        "user": 403,
+        "admin": 200,
+        "kv_changed": false,
+        "upstream_calls": 0
+      }
+    },
+    {
+      "route": "DELETE /claude-code/plugins/{plugin_name}",
+      "owner": "catalog:serveFamilyRoute:manage",
+      "group": "plugin",
+      "main_status": "needs_verification",
+      "evidence": [
+        "internal/gateway/family/catalog_persistence.go"
+      ],
+      "observation": {
+        "route": "DELETE /claude-code/plugins/{plugin_name}",
+        "anonymous": 401,
+        "user": 403,
+        "admin": 200,
+        "kv_changed": false,
+        "upstream_calls": 0
+      }
+    },
+    {
+      "route": "DELETE /credentials/{credential_name}",
+      "owner": "catalog:serveFamilyRoute:manage",
+      "group": "resource-config",
+      "main_status": "verified",
+      "evidence": [
+        "cmd/regression/catalog_integrity_test.go"
+      ],
+      "observation": {
+        "route": "DELETE /credentials/{credential_name}",
+        "anonymous": 401,
+        "user": 403,
+        "admin": 200,
+        "kv_changed": false,
+        "upstream_calls": 0
+      }
+    },
+    {
+      "route": "DELETE /fallback/{model}",
+      "owner": "catalog:serveFamilyRoute:manage",
+      "group": "model-alias",
+      "main_status": "needs_verification",
+      "evidence": [
+        "internal/gateway/family/catalog_persistence.go"
+      ],
+      "observation": {
+        "route": "DELETE /fallback/{model}",
+        "anonymous": 401,
+        "user": 403,
+        "admin": 200,
+        "kv_changed": false,
+        "upstream_calls": 0
+      }
+    },
+    {
+      "route": "DELETE /guardrails/{guardrail_id}",
+      "owner": "catalog:serveFamilyRoute:manage",
+      "group": "guard",
+      "main_status": "needs_verification",
+      "evidence": [
+        "internal/gateway/guard/manage.go"
+      ],
+      "observation": {
+        "route": "DELETE /guardrails/{guardrail_id}",
+        "anonymous": 401,
+        "user": 403,
+        "admin": 404,
+        "kv_changed": false,
+        "upstream_calls": 0
+      }
+    },
+    {
+      "route": "DELETE /policies/attachments/{attachment_id}",
+      "owner": "catalog:serveFamilyRoute:manage",
+      "group": "service-aux",
+      "main_status": "needs_fix",
+      "evidence": [
+        "internal/gateway/family/handlers.go"
+      ],
+      "observation": {
+        "route": "DELETE /policies/attachments/{attachment_id}",
+        "anonymous": 401,
+        "user": 403,
+        "admin": 200,
+        "kv_changed": false,
+        "upstream_calls": 0
+      }
+    },
+    {
+      "route": "DELETE /policies/name/{policy_name}/all-versions",
+      "owner": "catalog:serveFamilyRoute:manage",
+      "group": "service-aux",
+      "main_status": "needs_fix",
+      "evidence": [
+        "internal/gateway/family/handlers.go"
+      ],
+      "observation": {
+        "route": "DELETE /policies/name/{policy_name}/all-versions",
+        "anonymous": 401,
+        "user": 403,
+        "admin": 200,
+        "kv_changed": false,
+        "upstream_calls": 0
+      }
+    },
+    {
+      "route": "DELETE /policies/{policy_id}",
+      "owner": "catalog:serveFamilyRoute:manage",
+      "group": "resource-config",
+      "main_status": "verified",
+      "evidence": [
+        "cmd/regression/policy_config_service_test.go"
+      ],
+      "observation": {
+        "route": "DELETE /policies/{policy_id}",
+        "anonymous": 401,
+        "user": 403,
+        "admin": 200,
+        "kv_changed": false,
+        "upstream_calls": 0
+      }
+    },
+    {
+      "route": "DELETE /prompts/{prompt_id}",
+      "owner": "catalog:serveFamilyRoute:manage",
+      "group": "resource-config",
+      "main_status": "verified",
+      "evidence": [
+        "cmd/regression/prompt_config_service_test.go"
+      ],
+      "observation": {
+        "route": "DELETE /prompts/{prompt_id}",
+        "anonymous": 401,
+        "user": 403,
+        "admin": 200,
+        "kv_changed": false,
+        "upstream_calls": 0
+      }
+    },
+    {
+      "route": "DELETE /schedule/anthropic_beta_headers_reload",
+      "owner": "catalog:serveFamilyRoute:manage",
+      "group": "runtime-ops",
+      "main_status": "needs_fix",
+      "evidence": [
+        "internal/gateway/family/catalog_persistence.go"
+      ],
+      "observation": {
+        "route": "DELETE /schedule/anthropic_beta_headers_reload",
+        "anonymous": 401,
+        "user": 403,
+        "admin": 200,
+        "kv_changed": false,
+        "upstream_calls": 0
+      }
+    },
+    {
+      "route": "DELETE /search_tools/{search_tool_id}",
+      "owner": "catalog:serveFamilyRoute:manage",
+      "group": "resource-config",
+      "main_status": "verified",
+      "evidence": [
+        "cmd/regression/search_config_service_test.go"
+      ],
+      "observation": {
+        "route": "DELETE /search_tools/{search_tool_id}",
+        "anonymous": 401,
+        "user": 403,
+        "admin": 200,
+        "kv_changed": false,
+        "upstream_calls": 0
+      }
+    },
+    {
+      "route": "DELETE /server/{server_id}",
+      "owner": "catalog:serveFamilyRoute:manage",
+      "group": "server",
+      "main_status": "needs_verification",
+      "evidence": [
+        "internal/gateway/family/catalog_persistence.go"
+      ],
+      "observation": {
+        "route": "DELETE /server/{server_id}",
+        "anonymous": 401,
+        "user": 403,
+        "admin": 200,
+        "kv_changed": false,
+        "upstream_calls": 0
+      }
+    },
+    {
+      "route": "DELETE /server/{server_id}/oauth-user-credential",
+      "owner": "catalog:serveFamilyRoute:manage",
+      "group": "server",
+      "main_status": "needs_verification",
+      "evidence": [
+        "internal/gateway/family/catalog_persistence.go"
+      ],
+      "observation": {
+        "route": "DELETE /server/{server_id}/oauth-user-credential",
+        "anonymous": 401,
+        "user": 403,
+        "admin": 200,
+        "kv_changed": false,
+        "upstream_calls": 0
+      }
+    },
+    {
+      "route": "DELETE /server/{server_id}/user-credential",
+      "owner": "catalog:serveFamilyRoute:manage",
+      "group": "server",
+      "main_status": "needs_verification",
+      "evidence": [
+        "internal/gateway/family/catalog_persistence.go"
+      ],
+      "observation": {
+        "route": "DELETE /server/{server_id}/user-credential",
+        "anonymous": 401,
+        "user": 403,
+        "admin": 200,
+        "kv_changed": false,
+        "upstream_calls": 0
+      }
+    },
+    {
+      "route": "DELETE /server/{server_id}/user-env-vars",
+      "owner": "catalog:serveFamilyRoute:manage",
+      "group": "server",
+      "main_status": "needs_verification",
+      "evidence": [
+        "internal/gateway/family/catalog_persistence.go"
+      ],
+      "observation": {
+        "route": "DELETE /server/{server_id}/user-env-vars",
+        "anonymous": 401,
+        "user": 403,
+        "admin": 200,
+        "kv_changed": false,
+        "upstream_calls": 0
+      }
+    },
+    {
+      "route": "DELETE /v1/access_group/{access_group_id}",
+      "owner": "catalog:serveFamilyRoute:manage",
+      "group": "access-vector",
+      "main_status": "needs_verification",
+      "evidence": [
+        "internal/gateway/family/catalog_persistence.go"
+      ],
+      "observation": {
+        "route": "DELETE /v1/access_group/{access_group_id}",
+        "anonymous": 401,
+        "user": 403,
+        "admin": 200,
+        "kv_changed": false,
+        "upstream_calls": 0
+      }
+    },
+    {
+      "route": "DELETE /v1/skills/{skill_id}",
+      "owner": "catalog:serveFamilyRoute:manage",
+      "group": "skills",
+      "main_status": "needs_verification",
+      "evidence": [
+        "internal/gateway/family/handlers.go"
+      ],
+      "observation": {
+        "route": "DELETE /v1/skills/{skill_id}",
+        "anonymous": 401,
+        "user": 403,
+        "admin": 200,
+        "kv_changed": false,
+        "upstream_calls": 0
+      }
+    },
+    {
+      "route": "DELETE /vantage/delete",
+      "owner": "catalog:serveFamilyRoute:manage",
+      "group": "runtime-ops",
+      "main_status": "needs_fix",
+      "evidence": [
+        "internal/gateway/family/catalog_persistence.go"
+      ],
+      "observation": {
+        "route": "DELETE /vantage/delete",
+        "anonymous": 401,
+        "user": 403,
+        "admin": 200,
+        "kv_changed": false,
+        "upstream_calls": 0
+      }
+    },
+    {
+      "route": "DELETE /{provider}/v1/files/{file_id}",
+      "owner": "catalog:filesContract:manage",
+      "group": "protocol-alias",
+      "main_status": "needs_fix",
+      "evidence": [
+        "internal/gateway/ingress.go"
+      ],
+      "observation": {
+        "route": "DELETE /{provider}/v1/files/{file_id}",
+        "anonymous": 401,
+        "user": 403,
+        "admin": 200,
+        "kv_changed": false,
+        "upstream_calls": 0
+      }
+    },
+    {
+      "route": "GET /",
+      "owner": "catalog:serveFamilyRoute:manage",
+      "group": "discovery",
+      "main_status": "needs_verification",
+      "evidence": [
+        "internal/gateway/family/handlers.go"
+      ],
+      "observation": {
+        "route": "GET /",
+        "anonymous": 401,
+        "user": 403,
+        "admin": 200,
+        "kv_changed": false,
+        "upstream_calls": 0
+      }
+    },
+    {
+      "route": "GET /access_group/list",
+      "owner": "catalog:serveFamilyRoute:manage",
+      "group": "access-vector",
+      "main_status": "needs_verification",
+      "evidence": [
+        "internal/gateway/family/catalog_persistence.go"
+      ],
+      "observation": {
+        "route": "GET /access_group/list",
+        "anonymous": 401,
+        "user": 403,
+        "admin": 200,
+        "kv_changed": false,
+        "upstream_calls": 0
+      }
+    },
+    {
+      "route": "GET /access_group/{access_group}/info",
+      "owner": "catalog:serveFamilyRoute:manage",
+      "group": "access-vector",
+      "main_status": "needs_verification",
+      "evidence": [
+        "internal/gateway/family/catalog_persistence.go"
+      ],
+      "observation": {
+        "route": "GET /access_group/{access_group}/info",
+        "anonymous": 401,
+        "user": 403,
+        "admin": 404,
+        "kv_changed": false,
+        "upstream_calls": 0
+      }
+    },
+    {
+      "route": "GET /access_groups",
+      "owner": "catalog:serveFamilyRoute:manage",
+      "group": "access-vector",
+      "main_status": "needs_verification",
+      "evidence": [
+        "internal/gateway/family/catalog_persistence.go"
+      ],
+      "observation": {
+        "route": "GET /access_groups",
+        "anonymous": 401,
+        "user": 403,
+        "admin": 200,
+        "kv_changed": false,
+        "upstream_calls": 0
+      }
+    },
+    {
+      "route": "GET /api/plugins",
+      "owner": "catalog:serveFamilyRoute:manage",
+      "group": "plugin",
+      "main_status": "needs_verification",
+      "evidence": [
+        "internal/gateway/family/catalog_persistence.go"
+      ],
+      "observation": {
+        "route": "GET /api/plugins",
+        "anonymous": 401,
+        "user": 403,
+        "admin": 200,
+        "kv_changed": false,
+        "upstream_calls": 0
+      }
+    },
+    {
+      "route": "GET /api/plugins/auth-token",
+      "owner": "catalog:serveFamilyRoute:manage",
+      "group": "plugin",
+      "main_status": "needs_verification",
+      "evidence": [
+        "internal/gateway/family/catalog_persistence.go"
+      ],
+      "observation": {
+        "route": "GET /api/plugins/auth-token",
+        "anonymous": 401,
+        "user": 403,
+        "admin": 404,
+        "kv_changed": false,
+        "upstream_calls": 0
+      }
+    },
+    {
+      "route": "GET /authorize",
+      "owner": "catalog:serveFamilyRoute:manage",
+      "group": "auth-alias",
+      "main_status": "needs_fix",
+      "evidence": [
+        "internal/gateway/family/catalog_persistence.go"
+      ],
+      "observation": {
+        "route": "GET /authorize",
+        "anonymous": 401,
+        "user": 403,
+        "admin": 200,
+        "kv_changed": false,
+        "upstream_calls": 0
+      }
+    },
+    {
+      "route": "GET /budget/list",
+      "owner": "catalog:serveFamilyRoute:manage",
+      "group": "budget-iam",
+      "main_status": "needs_verification",
+      "evidence": [
+        "internal/gateway/family/catalog_persistence.go"
+      ],
+      "observation": {
+        "route": "GET /budget/list",
+        "anonymous": 401,
+        "user": 403,
+        "admin": 200,
+        "kv_changed": false,
+        "upstream_calls": 0
+      }
+    },
+    {
+      "route": "GET /budget/settings",
+      "owner": "catalog:serveFamilyRoute:manage",
+      "group": "budget-iam",
+      "main_status": "needs_verification",
+      "evidence": [
+        "internal/gateway/family/catalog_persistence.go"
+      ],
+      "observation": {
+        "route": "GET /budget/settings",
+        "anonymous": 401,
+        "user": 403,
+        "admin": 200,
+        "kv_changed": false,
+        "upstream_calls": 0
+      }
+    },
+    {
+      "route": "GET /budgets",
+      "owner": "catalog:serveFamilyRoute:manage",
+      "group": "budget-iam",
+      "main_status": "needs_verification",
+      "evidence": [
+        "internal/gateway/family/catalog_persistence.go"
+      ],
+      "observation": {
+        "route": "GET /budgets",
+        "anonymous": 401,
+        "user": 403,
+        "admin": 200,
+        "kv_changed": false,
+        "upstream_calls": 0
+      }
+    },
+    {
+      "route": "GET /claude-code/marketplace.json",
+      "owner": "catalog:serveFamilyRoute:manage",
+      "group": "plugin",
+      "main_status": "needs_verification",
+      "evidence": [
+        "internal/gateway/family/catalog_persistence.go"
+      ],
+      "observation": {
+        "route": "GET /claude-code/marketplace.json",
+        "anonymous": 401,
+        "user": 403,
+        "admin": 404,
+        "kv_changed": false,
+        "upstream_calls": 0
+      }
+    },
+    {
+      "route": "GET /claude-code/plugins",
+      "owner": "catalog:serveFamilyRoute:manage",
+      "group": "plugin",
+      "main_status": "needs_verification",
+      "evidence": [
+        "internal/gateway/family/catalog_persistence.go"
+      ],
+      "observation": {
+        "route": "GET /claude-code/plugins",
+        "anonymous": 401,
+        "user": 403,
+        "admin": 200,
+        "kv_changed": false,
+        "upstream_calls": 0
+      }
+    },
+    {
+      "route": "GET /claude-code/plugins/{plugin_name}",
+      "owner": "catalog:serveFamilyRoute:manage",
+      "group": "plugin",
+      "main_status": "needs_verification",
+      "evidence": [
+        "internal/gateway/family/catalog_persistence.go"
+      ],
+      "observation": {
+        "route": "GET /claude-code/plugins/{plugin_name}",
+        "anonymous": 401,
+        "user": 403,
+        "admin": 404,
+        "kv_changed": false,
+        "upstream_calls": 0
+      }
+    },
+    {
+      "route": "GET /config/field/info",
+      "owner": "catalog:serveFamilyRoute:manage",
+      "group": "settings",
+      "main_status": "needs_verification",
+      "evidence": [
+        "internal/gateway/family/handlers.go"
+      ],
+      "observation": {
+        "route": "GET /config/field/info",
+        "anonymous": 401,
+        "user": 403,
+        "admin": 404,
+        "kv_changed": false,
+        "upstream_calls": 0
+      }
+    },
+    {
+      "route": "GET /config/yaml",
+      "owner": "catalog:serveFamilyRoute:manage",
+      "group": "settings",
+      "main_status": "needs_verification",
+      "evidence": [
+        "internal/gateway/family/handlers.go"
+      ],
+      "observation": {
+        "route": "GET /config/yaml",
+        "anonymous": 401,
+        "user": 403,
+        "admin": 404,
+        "kv_changed": false,
+        "upstream_calls": 0
+      }
+    },
+    {
+      "route": "GET /coordination_redis/settings",
+      "owner": "catalog:serveFamilyRoute:manage",
+      "group": "operations",
+      "main_status": "needs_fix",
+      "evidence": [
+        "internal/gateway/family/catalog_persistence.go"
+      ],
+      "observation": {
+        "route": "GET /coordination_redis/settings",
+        "anonymous": 401,
+        "user": 403,
+        "admin": 200,
+        "kv_changed": false,
+        "upstream_calls": 0
+      }
+    },
+    {
+      "route": "GET /credentials",
+      "owner": "catalog:serveFamilyRoute:manage",
+      "group": "resource-config",
+      "main_status": "verified",
+      "evidence": [
+        "cmd/regression/catalog_integrity_test.go"
+      ],
+      "observation": {
+        "route": "GET /credentials",
+        "anonymous": 401,
+        "user": 403,
+        "admin": 200,
+        "kv_changed": false,
+        "upstream_calls": 0
+      }
+    },
+    {
+      "route": "GET /credentials/by_model/{model_id}",
+      "owner": "catalog:serveFamilyRoute:manage",
+      "group": "service-aux",
+      "main_status": "needs_fix",
+      "evidence": [
+        "internal/gateway/family/handlers.go"
+      ],
+      "observation": {
+        "route": "GET /credentials/by_model/{model_id}",
+        "anonymous": 401,
+        "user": 403,
+        "admin": 404,
+        "kv_changed": false,
+        "upstream_calls": 0
+      }
+    },
+    {
+      "route": "GET /credentials/by_name/{credential_name}",
+      "owner": "catalog:serveFamilyRoute:manage",
+      "group": "resource-config",
+      "main_status": "verified",
+      "evidence": [
+        "cmd/regression/catalog_integrity_test.go"
+      ],
+      "observation": {
+        "route": "GET /credentials/by_name/{credential_name}",
+        "anonymous": 401,
+        "user": 403,
+        "admin": 404,
+        "kv_changed": false,
+        "upstream_calls": 0
+      }
+    },
+    {
+      "route": "GET /credentials/migrate-encryption/check",
+      "owner": "catalog:serveFamilyRoute:manage",
+      "group": "service-aux",
+      "main_status": "needs_fix",
+      "evidence": [
+        "internal/gateway/family/handlers.go"
+      ],
+      "observation": {
+        "route": "GET /credentials/migrate-encryption/check",
+        "anonymous": 401,
+        "user": 403,
+        "admin": 404,
+        "kv_changed": false,
+        "upstream_calls": 0
+      }
+    },
+    {
+      "route": "GET /customer/info",
+      "owner": "catalog:serveFamilyRoute:manage",
+      "group": "metadata",
+      "main_status": "needs_verification",
+      "evidence": [
+        "internal/gateway/family/catalog_persistence.go"
+      ],
+      "observation": {
+        "route": "GET /customer/info",
+        "anonymous": 401,
+        "user": 403,
+        "admin": 404,
+        "kv_changed": false,
+        "upstream_calls": 0
+      }
+    },
+    {
+      "route": "GET /debug/asyncio-tasks",
+      "owner": "catalog:serveFamilyRoute:manage",
+      "group": "operations",
+      "main_status": "needs_fix",
+      "evidence": [
+        "internal/gateway/family/catalog_persistence.go"
+      ],
+      "observation": {
+        "route": "GET /debug/asyncio-tasks",
+        "anonymous": 401,
+        "user": 403,
+        "admin": 404,
+        "kv_changed": false,
+        "upstream_calls": 0
+      }
+    },
+    {
+      "route": "GET /debug/memory/details",
+      "owner": "catalog:serveFamilyRoute:manage",
+      "group": "operations",
+      "main_status": "needs_fix",
+      "evidence": [
+        "internal/gateway/family/catalog_persistence.go"
+      ],
+      "observation": {
+        "route": "GET /debug/memory/details",
+        "anonymous": 401,
+        "user": 403,
+        "admin": 404,
+        "kv_changed": false,
+        "upstream_calls": 0
+      }
+    },
+    {
+      "route": "GET /debug/memory/summary",
+      "owner": "catalog:serveFamilyRoute:manage",
+      "group": "operations",
+      "main_status": "needs_fix",
+      "evidence": [
+        "internal/gateway/family/catalog_persistence.go"
+      ],
+      "observation": {
+        "route": "GET /debug/memory/summary",
+        "anonymous": 401,
+        "user": 403,
+        "admin": 404,
+        "kv_changed": false,
+        "upstream_calls": 0
+      }
+    },
+    {
+      "route": "GET /discover",
+      "owner": "catalog:serveFamilyRoute:manage",
+      "group": "auth-alias",
+      "main_status": "needs_fix",
+      "evidence": [
+        "internal/gateway/family/catalog_persistence.go"
+      ],
+      "observation": {
+        "route": "GET /discover",
+        "anonymous": 401,
+        "user": 403,
+        "admin": 200,
+        "kv_changed": false,
+        "upstream_calls": 0
+      }
+    },
+    {
+      "route": "GET /enabled",
+      "owner": "catalog:serveFamilyRoute:manage",
+      "group": "auth-alias",
+      "main_status": "needs_fix",
+      "evidence": [
+        "internal/gateway/family/catalog_persistence.go"
+      ],
+      "observation": {
+        "route": "GET /enabled",
+        "anonymous": 401,
+        "user": 403,
+        "admin": 200,
+        "kv_changed": false,
+        "upstream_calls": 0
+      }
+    },
+    {
+      "route": "GET /end_user/daily/activity",
+      "owner": "catalog:serveFamilyRoute:manage",
+      "group": "discovery",
+      "main_status": "needs_verification",
+      "evidence": [
+        "internal/gateway/family/handlers.go"
+      ],
+      "observation": {
+        "route": "GET /end_user/daily/activity",
+        "anonymous": 401,
+        "user": 403,
+        "admin": 200,
+        "kv_changed": false,
+        "upstream_calls": 0
+      }
+    },
+    {
+      "route": "GET /end_user/info",
+      "owner": "catalog:serveFamilyRoute:manage",
+      "group": "metadata",
+      "main_status": "needs_verification",
+      "evidence": [
+        "internal/gateway/family/catalog_persistence.go"
+      ],
+      "observation": {
+        "route": "GET /end_user/info",
+        "anonymous": 401,
+        "user": 403,
+        "admin": 404,
+        "kv_changed": false,
+        "upstream_calls": 0
+      }
+    },
+    {
+      "route": "GET /fallback/login",
+      "owner": "catalog:serveFamilyRoute:manage",
+      "group": "model-alias",
+      "main_status": "needs_verification",
+      "evidence": [
+        "internal/gateway/family/catalog_persistence.go"
+      ],
+      "observation": {
+        "route": "GET /fallback/login",
+        "anonymous": 401,
+        "user": 403,
+        "admin": 404,
+        "kv_changed": false,
+        "upstream_calls": 0
+      }
+    },
+    {
+      "route": "GET /fallback/{model}",
+      "owner": "catalog:serveFamilyRoute:manage",
+      "group": "model-alias",
+      "main_status": "needs_verification",
+      "evidence": [
+        "internal/gateway/family/catalog_persistence.go"
+      ],
+      "observation": {
+        "route": "GET /fallback/{model}",
+        "anonymous": 401,
+        "user": 403,
+        "admin": 404,
+        "kv_changed": false,
+        "upstream_calls": 0
+      }
+    },
+    {
+      "route": "GET /get/default_team_settings",
+      "owner": "catalog:serveFamilyRoute:manage",
+      "group": "settings",
+      "main_status": "needs_verification",
+      "evidence": [
+        "internal/gateway/family/handlers.go"
+      ],
+      "observation": {
+        "route": "GET /get/default_team_settings",
+        "anonymous": 401,
+        "user": 403,
+        "admin": 200,
+        "kv_changed": false,
+        "upstream_calls": 0
+      }
+    },
+    {
+      "route": "GET /get/internal_user_settings",
+      "owner": "catalog:serveFamilyRoute:manage",
+      "group": "settings",
+      "main_status": "needs_verification",
+      "evidence": [
+        "internal/gateway/family/handlers.go"
+      ],
+      "observation": {
+        "route": "GET /get/internal_user_settings",
+        "anonymous": 401,
+        "user": 403,
+        "admin": 200,
+        "kv_changed": false,
+        "upstream_calls": 0
+      }
+    },
+    {
+      "route": "GET /get/ui_settings",
+      "owner": "catalog:serveFamilyRoute:manage",
+      "group": "settings",
+      "main_status": "needs_verification",
+      "evidence": [
+        "internal/gateway/family/handlers.go"
+      ],
+      "observation": {
+        "route": "GET /get/ui_settings",
+        "anonymous": 401,
+        "user": 403,
+        "admin": 200,
+        "kv_changed": false,
+        "upstream_calls": 0
+      }
+    },
+    {
+      "route": "GET /get/user_banner",
+      "owner": "catalog:serveFamilyRoute:manage",
+      "group": "settings",
+      "main_status": "needs_verification",
+      "evidence": [
+        "internal/gateway/family/handlers.go"
+      ],
+      "observation": {
+        "route": "GET /get/user_banner",
+        "anonymous": 401,
+        "user": 403,
+        "admin": 404,
+        "kv_changed": false,
+        "upstream_calls": 0
+      }
+    },
+    {
+      "route": "GET /get_favicon",
+      "owner": "catalog:serveFamilyRoute:manage",
+      "group": "settings",
+      "main_status": "needs_verification",
+      "evidence": [
+        "internal/gateway/family/handlers.go"
+      ],
+      "observation": {
+        "route": "GET /get_favicon",
+        "anonymous": 401,
+        "user": 403,
+        "admin": 200,
+        "kv_changed": false,
+        "upstream_calls": 0
+      }
+    },
+    {
+      "route": "GET /get_image",
+      "owner": "catalog:serveFamilyRoute:manage",
+      "group": "settings",
+      "main_status": "needs_verification",
+      "evidence": [
+        "internal/gateway/family/handlers.go"
+      ],
+      "observation": {
+        "route": "GET /get_image",
+        "anonymous": 401,
+        "user": 403,
+        "admin": 200,
+        "kv_changed": false,
+        "upstream_calls": 0
+      }
+    },
+    {
+      "route": "GET /get_logo_url",
+      "owner": "catalog:serveFamilyRoute:manage",
+      "group": "settings",
+      "main_status": "needs_verification",
+      "evidence": [
+        "internal/gateway/family/handlers.go"
+      ],
+      "observation": {
+        "route": "GET /get_logo_url",
+        "anonymous": 401,
+        "user": 403,
+        "admin": 200,
+        "kv_changed": false,
+        "upstream_calls": 0
+      }
+    },
+    {
+      "route": "GET /global/activity/exceptions",
+      "owner": "catalog:serveFamilyRoute:manage",
+      "group": "analytics",
+      "main_status": "needs_verification",
+      "evidence": [
+        "internal/gateway/family/handlers.go"
+      ],
+      "observation": {
+        "route": "GET /global/activity/exceptions",
+        "anonymous": 401,
+        "user": 403,
+        "admin": 404,
+        "kv_changed": false,
+        "upstream_calls": 0
+      }
+    },
+    {
+      "route": "GET /global/activity/exceptions/deployment",
+      "owner": "catalog:serveFamilyRoute:manage",
+      "group": "analytics",
+      "main_status": "needs_verification",
+      "evidence": [
+        "internal/gateway/family/handlers.go"
+      ],
+      "observation": {
+        "route": "GET /global/activity/exceptions/deployment",
+        "anonymous": 401,
+        "user": 403,
+        "admin": 404,
+        "kv_changed": false,
+        "upstream_calls": 0
+      }
+    },
+    {
+      "route": "GET /global/all_end_users",
+      "owner": "catalog:serveFamilyRoute:manage",
+      "group": "analytics",
+      "main_status": "needs_verification",
+      "evidence": [
+        "internal/gateway/family/handlers.go"
+      ],
+      "observation": {
+        "route": "GET /global/all_end_users",
+        "anonymous": 401,
+        "user": 403,
+        "admin": 404,
+        "kv_changed": false,
+        "upstream_calls": 0
+      }
+    },
+    {
+      "route": "GET /global/spend",
+      "owner": "catalog:serveFamilyRoute:manage",
+      "group": "analytics",
+      "main_status": "needs_verification",
+      "evidence": [
+        "internal/gateway/family/handlers.go"
+      ],
+      "observation": {
+        "route": "GET /global/spend",
+        "anonymous": 401,
+        "user": 403,
+        "admin": 404,
+        "kv_changed": false,
+        "upstream_calls": 0
+      }
+    },
+    {
+      "route": "GET /global/spend/report",
+      "owner": "catalog:serveFamilyRoute:manage",
+      "group": "analytics",
+      "main_status": "needs_verification",
+      "evidence": [
+        "internal/gateway/family/handlers.go"
+      ],
+      "observation": {
+        "route": "GET /global/spend/report",
+        "anonymous": 401,
+        "user": 403,
+        "admin": 404,
+        "kv_changed": false,
+        "upstream_calls": 0
+      }
+    },
+    {
+      "route": "GET /guardrails/list",
+      "owner": "catalog:serveFamilyRoute:manage",
+      "group": "guard",
+      "main_status": "needs_verification",
+      "evidence": [
+        "internal/gateway/guard/manage.go"
+      ],
+      "observation": {
+        "route": "GET /guardrails/list",
+        "anonymous": 401,
+        "user": 403,
+        "admin": 200,
+        "kv_changed": false,
+        "upstream_calls": 0
+      }
+    },
+    {
+      "route": "GET /guardrails/submissions",
+      "owner": "catalog:serveFamilyRoute:manage",
+      "group": "guard",
+      "main_status": "unsupported",
+      "evidence": [
+        "internal/gateway/guard/manage.go"
+      ],
+      "observation": {
+        "route": "GET /guardrails/submissions",
+        "anonymous": 401,
+        "user": 403,
+        "admin": 200,
+        "kv_changed": false,
+        "upstream_calls": 0
+      }
+    },
+    {
+      "route": "GET /guardrails/submissions/{guardrail_id}",
+      "owner": "catalog:serveFamilyRoute:manage",
+      "group": "guard",
+      "main_status": "unsupported",
+      "evidence": [
+        "internal/gateway/guard/manage.go"
+      ],
+      "observation": {
+        "route": "GET /guardrails/submissions/{guardrail_id}",
+        "anonymous": 401,
+        "user": 403,
+        "admin": 501,
+        "kv_changed": false,
+        "upstream_calls": 0
+      }
+    },
+    {
+      "route": "GET /guardrails/ui/add_guardrail_settings",
+      "owner": "catalog:serveFamilyRoute:manage",
+      "group": "guard",
+      "main_status": "needs_verification",
+      "evidence": [
+        "internal/gateway/guard/manage.go"
+      ],
+      "observation": {
+        "route": "GET /guardrails/ui/add_guardrail_settings",
+        "anonymous": 401,
+        "user": 403,
+        "admin": 200,
+        "kv_changed": false,
+        "upstream_calls": 0
+      }
+    },
+    {
+      "route": "GET /guardrails/ui/category_yaml/{category_name}",
+      "owner": "catalog:serveFamilyRoute:manage",
+      "group": "guard",
+      "main_status": "unsupported",
+      "evidence": [
+        "internal/gateway/guard/manage.go"
+      ],
+      "observation": {
+        "route": "GET /guardrails/ui/category_yaml/{category_name}",
+        "anonymous": 401,
+        "user": 403,
+        "admin": 501,
+        "kv_changed": false,
+        "upstream_calls": 0
+      }
+    },
+    {
+      "route": "GET /guardrails/ui/major_airlines",
+      "owner": "catalog:serveFamilyRoute:manage",
+      "group": "guard",
+      "main_status": "unsupported",
+      "evidence": [
+        "internal/gateway/guard/manage.go"
+      ],
+      "observation": {
+        "route": "GET /guardrails/ui/major_airlines",
+        "anonymous": 401,
+        "user": 403,
+        "admin": 501,
+        "kv_changed": false,
+        "upstream_calls": 0
+      }
+    },
+    {
+      "route": "GET /guardrails/ui/provider_specific_params",
+      "owner": "catalog:serveFamilyRoute:manage",
+      "group": "guard",
+      "main_status": "needs_verification",
+      "evidence": [
+        "internal/gateway/guard/manage.go"
+      ],
+      "observation": {
+        "route": "GET /guardrails/ui/provider_specific_params",
+        "anonymous": 401,
+        "user": 403,
+        "admin": 200,
+        "kv_changed": false,
+        "upstream_calls": 0
+      }
+    },
+    {
+      "route": "GET /guardrails/{guardrail_id}",
+      "owner": "catalog:serveFamilyRoute:manage",
+      "group": "guard",
+      "main_status": "needs_verification",
+      "evidence": [
+        "internal/gateway/guard/manage.go"
+      ],
+      "observation": {
+        "route": "GET /guardrails/{guardrail_id}",
+        "anonymous": 401,
+        "user": 403,
+        "admin": 404,
+        "kv_changed": false,
+        "upstream_calls": 0
+      }
+    },
+    {
+      "route": "GET /guardrails/{guardrail_id}/info",
+      "owner": "catalog:serveFamilyRoute:manage",
+      "group": "guard",
+      "main_status": "needs_verification",
+      "evidence": [
+        "internal/gateway/guard/manage.go"
+      ],
+      "observation": {
+        "route": "GET /guardrails/{guardrail_id}/info",
+        "anonymous": 401,
+        "user": 403,
+        "admin": 404,
+        "kv_changed": false,
+        "upstream_calls": 0
+      }
+    },
+    {
+      "route": "GET /health/backlog",
+      "owner": "catalog:serveFamilyRoute:manage",
+      "group": "operations",
+      "main_status": "needs_fix",
+      "evidence": [
+        "internal/gateway/family/catalog_persistence.go"
+      ],
+      "observation": {
+        "route": "GET /health/backlog",
+        "anonymous": 401,
+        "user": 403,
+        "admin": 404,
+        "kv_changed": false,
+        "upstream_calls": 0
+      }
+    },
+    {
+      "route": "GET /health/drain",
+      "owner": "catalog:serveFamilyRoute:manage",
+      "group": "operations",
+      "main_status": "needs_fix",
+      "evidence": [
+        "internal/gateway/family/catalog_persistence.go"
+      ],
+      "observation": {
+        "route": "GET /health/drain",
+        "anonymous": 401,
+        "user": 403,
+        "admin": 404,
+        "kv_changed": false,
+        "upstream_calls": 0
+      }
+    },
+    {
+      "route": "GET /health/history",
+      "owner": "catalog:serveFamilyRoute:manage",
+      "group": "operations",
+      "main_status": "needs_fix",
+      "evidence": [
+        "internal/gateway/family/catalog_persistence.go"
+      ],
+      "observation": {
+        "route": "GET /health/history",
+        "anonymous": 401,
+        "user": 403,
+        "admin": 404,
+        "kv_changed": false,
+        "upstream_calls": 0
+      }
+    },
+    {
+      "route": "GET /health/license",
+      "owner": "catalog:serveFamilyRoute:manage",
+      "group": "operations",
+      "main_status": "needs_fix",
+      "evidence": [
+        "internal/gateway/family/catalog_persistence.go"
+      ],
+      "observation": {
+        "route": "GET /health/license",
+        "anonymous": 401,
+        "user": 403,
+        "admin": 404,
+        "kv_changed": false,
+        "upstream_calls": 0
+      }
+    },
+    {
+      "route": "GET /health/shared-status",
+      "owner": "catalog:serveFamilyRoute:manage",
+      "group": "operations",
+      "main_status": "needs_fix",
+      "evidence": [
+        "internal/gateway/family/catalog_persistence.go"
+      ],
+      "observation": {
+        "route": "GET /health/shared-status",
+        "anonymous": 401,
+        "user": 403,
+        "admin": 404,
+        "kv_changed": false,
+        "upstream_calls": 0
+      }
+    },
+    {
+      "route": "GET /invitation/info",
+      "owner": "catalog:serveFamilyRoute:manage",
+      "group": "auth-alias",
+      "main_status": "needs_fix",
+      "evidence": [
+        "internal/gateway/family/catalog_persistence.go"
+      ],
+      "observation": {
+        "route": "GET /invitation/info",
+        "anonymous": 401,
+        "user": 403,
+        "admin": 404,
+        "kv_changed": false,
+        "upstream_calls": 0
+      }
+    },
+    {
+      "route": "GET /jwt/key/mapping/info",
+      "owner": "catalog:serveFamilyRoute:manage",
+      "group": "auth-alias",
+      "main_status": "needs_fix",
+      "evidence": [
+        "internal/gateway/family/catalog_persistence.go"
+      ],
+      "observation": {
+        "route": "GET /jwt/key/mapping/info",
+        "anonymous": 401,
+        "user": 403,
+        "admin": 404,
+        "kv_changed": false,
+        "upstream_calls": 0
+      }
+    },
+    {
+      "route": "GET /jwt/key/mapping/list",
+      "owner": "catalog:serveFamilyRoute:manage",
+      "group": "auth-alias",
+      "main_status": "needs_fix",
+      "evidence": [
+        "internal/gateway/family/catalog_persistence.go"
+      ],
+      "observation": {
+        "route": "GET /jwt/key/mapping/list",
+        "anonymous": 401,
+        "user": 403,
+        "admin": 200,
+        "kv_changed": false,
+        "upstream_calls": 0
+      }
+    },
+    {
+      "route": "GET /key/spend/report",
+      "owner": "catalog:serveFamilyRoute:manage",
+      "group": "analytics",
+      "main_status": "needs_verification",
+      "evidence": [
+        "internal/gateway/family/handlers.go"
+      ],
+      "observation": {
+        "route": "GET /key/spend/report",
+        "anonymous": 401,
+        "user": 403,
+        "admin": 404,
+        "kv_changed": false,
+        "upstream_calls": 0
+      }
+    },
+    {
+      "route": "GET /memory-usage",
+      "owner": "catalog:serveFamilyRoute:manage",
+      "group": "operations",
+      "main_status": "needs_fix",
+      "evidence": [
+        "internal/gateway/family/catalog_persistence.go"
+      ],
+      "observation": {
+        "route": "GET /memory-usage",
+        "anonymous": 401,
+        "user": 403,
+        "admin": 200,
+        "kv_changed": false,
+        "upstream_calls": 0
+      }
+    },
+    {
+      "route": "GET /memory-usage-in-mem-cache",
+      "owner": "catalog:serveFamilyRoute:manage",
+      "group": "operations",
+      "main_status": "needs_fix",
+      "evidence": [
+        "internal/gateway/family/catalog_persistence.go"
+      ],
+      "observation": {
+        "route": "GET /memory-usage-in-mem-cache",
+        "anonymous": 401,
+        "user": 403,
+        "admin": 200,
+        "kv_changed": false,
+        "upstream_calls": 0
+      }
+    },
+    {
+      "route": "GET /memory-usage-in-mem-cache-items",
+      "owner": "catalog:serveFamilyRoute:manage",
+      "group": "operations",
+      "main_status": "needs_fix",
+      "evidence": [
+        "internal/gateway/family/catalog_persistence.go"
+      ],
+      "observation": {
+        "route": "GET /memory-usage-in-mem-cache-items",
+        "anonymous": 401,
+        "user": 403,
+        "admin": 200,
+        "kv_changed": false,
+        "upstream_calls": 0
+      }
+    },
+    {
+      "route": "GET /model/deprecations",
+      "owner": "catalog:serveFamilyRoute:manage",
+      "group": "model-alias",
+      "main_status": "needs_verification",
+      "evidence": [
+        "internal/gateway/family/catalog_persistence.go"
+      ],
+      "observation": {
+        "route": "GET /model/deprecations",
+        "anonymous": 401,
+        "user": 403,
+        "admin": 404,
+        "kv_changed": false,
+        "upstream_calls": 0
+      }
+    },
+    {
+      "route": "GET /model/info",
+      "owner": "catalog:serveFamilyRoute:manage",
+      "group": "model-alias",
+      "main_status": "needs_verification",
+      "evidence": [
+        "internal/gateway/family/catalog_persistence.go"
+      ],
+      "observation": {
+        "route": "GET /model/info",
+        "anonymous": 401,
+        "user": 403,
+        "admin": 404,
+        "kv_changed": false,
+        "upstream_calls": 0
+      }
+    },
+    {
+      "route": "GET /model/metrics",
+      "owner": "catalog:serveFamilyRoute:manage",
+      "group": "analytics",
+      "main_status": "needs_verification",
+      "evidence": [
+        "internal/gateway/family/handlers.go"
+      ],
+      "observation": {
+        "route": "GET /model/metrics",
+        "anonymous": 401,
+        "user": 403,
+        "admin": 404,
+        "kv_changed": false,
+        "upstream_calls": 0
+      }
+    },
+    {
+      "route": "GET /model/metrics/exceptions",
+      "owner": "catalog:serveFamilyRoute:manage",
+      "group": "analytics",
+      "main_status": "needs_verification",
+      "evidence": [
+        "internal/gateway/family/handlers.go"
+      ],
+      "observation": {
+        "route": "GET /model/metrics/exceptions",
+        "anonymous": 401,
+        "user": 403,
+        "admin": 404,
+        "kv_changed": false,
+        "upstream_calls": 0
+      }
+    },
+    {
+      "route": "GET /model/metrics/slow_responses",
+      "owner": "catalog:serveFamilyRoute:manage",
+      "group": "analytics",
+      "main_status": "needs_verification",
+      "evidence": [
+        "internal/gateway/family/handlers.go"
+      ],
+      "observation": {
+        "route": "GET /model/metrics/slow_responses",
+        "anonymous": 401,
+        "user": 403,
+        "admin": 404,
+        "kv_changed": false,
+        "upstream_calls": 0
+      }
+    },
+    {
+      "route": "GET /model/settings",
+      "owner": "catalog:serveFamilyRoute:manage",
+      "group": "model-alias",
+      "main_status": "needs_verification",
+      "evidence": [
+        "internal/gateway/family/catalog_persistence.go"
+      ],
+      "observation": {
+        "route": "GET /model/settings",
+        "anonymous": 401,
+        "user": 403,
+        "admin": 200,
+        "kv_changed": false,
+        "upstream_calls": 0
+      }
+    },
+    {
+      "route": "GET /model/streaming_metrics",
+      "owner": "catalog:serveFamilyRoute:manage",
+      "group": "analytics",
+      "main_status": "needs_verification",
+      "evidence": [
+        "internal/gateway/family/handlers.go"
+      ],
+      "observation": {
+        "route": "GET /model/streaming_metrics",
+        "anonymous": 401,
+        "user": 403,
+        "admin": 404,
+        "kv_changed": false,
+        "upstream_calls": 0
+      }
+    },
+    {
+      "route": "GET /models/{model_id}",
+      "owner": "catalog:serveFamilyRoute:manage",
+      "group": "model-alias",
+      "main_status": "needs_verification",
+      "evidence": [
+        "internal/gateway/family/catalog_persistence.go"
+      ],
+      "observation": {
+        "route": "GET /models/{model_id}",
+        "anonymous": 401,
+        "user": 403,
+        "admin": 404,
+        "kv_changed": false,
+        "upstream_calls": 0
+      }
+    },
+    {
+      "route": "GET /network/client-ip",
+      "owner": "catalog:serveFamilyRoute:manage",
+      "group": "discovery",
+      "main_status": "needs_verification",
+      "evidence": [
+        "internal/gateway/family/handlers.go"
+      ],
+      "observation": {
+        "route": "GET /network/client-ip",
+        "anonymous": 401,
+        "user": 403,
+        "admin": 404,
+        "kv_changed": false,
+        "upstream_calls": 0
+      }
+    },
+    {
+      "route": "GET /onboarding/get_token",
+      "owner": "catalog:serveFamilyRoute:manage",
+      "group": "auth-alias",
+      "main_status": "needs_fix",
+      "evidence": [
+        "internal/gateway/family/catalog_persistence.go"
+      ],
+      "observation": {
+        "route": "GET /onboarding/get_token",
+        "anonymous": 401,
+        "user": 403,
+        "admin": 404,
+        "kv_changed": false,
+        "upstream_calls": 0
+      }
+    },
+    {
+      "route": "GET /openapi-registry",
+      "owner": "catalog:serveFamilyRoute:manage",
+      "group": "discovery",
+      "main_status": "needs_verification",
+      "evidence": [
+        "internal/gateway/family/handlers.go"
+      ],
+      "observation": {
+        "route": "GET /openapi-registry",
+        "anonymous": 401,
+        "user": 403,
+        "admin": 200,
+        "kv_changed": false,
+        "upstream_calls": 0
+      }
+    },
+    {
+      "route": "GET /organization/spend/report",
+      "owner": "catalog:serveFamilyRoute:manage",
+      "group": "analytics",
+      "main_status": "needs_verification",
+      "evidence": [
+        "internal/gateway/family/handlers.go"
+      ],
+      "observation": {
+        "route": "GET /organization/spend/report",
+        "anonymous": 401,
+        "user": 403,
+        "admin": 404,
+        "kv_changed": false,
+        "upstream_calls": 0
+      }
+    },
+    {
+      "route": "GET /otel-spans",
+      "owner": "catalog:serveFamilyRoute:manage",
+      "group": "analytics",
+      "main_status": "needs_verification",
+      "evidence": [
+        "internal/gateway/family/handlers.go"
+      ],
+      "observation": {
+        "route": "GET /otel-spans",
+        "anonymous": 401,
+        "user": 403,
+        "admin": 200,
+        "kv_changed": false,
+        "upstream_calls": 0
+      }
+    },
+    {
+      "route": "GET /policies/attachments/list",
+      "owner": "catalog:serveFamilyRoute:manage",
+      "group": "service-aux",
+      "main_status": "needs_fix",
+      "evidence": [
+        "internal/gateway/family/handlers.go"
+      ],
+      "observation": {
+        "route": "GET /policies/attachments/list",
+        "anonymous": 401,
+        "user": 403,
+        "admin": 200,
+        "kv_changed": false,
+        "upstream_calls": 0
+      }
+    },
+    {
+      "route": "GET /policies/attachments/{attachment_id}",
+      "owner": "catalog:serveFamilyRoute:manage",
+      "group": "service-aux",
+      "main_status": "needs_fix",
+      "evidence": [
+        "internal/gateway/family/handlers.go"
+      ],
+      "observation": {
+        "route": "GET /policies/attachments/{attachment_id}",
+        "anonymous": 401,
+        "user": 403,
+        "admin": 404,
+        "kv_changed": false,
+        "upstream_calls": 0
+      }
+    },
+    {
+      "route": "GET /policies/compare",
+      "owner": "catalog:serveFamilyRoute:manage",
+      "group": "service-aux",
+      "main_status": "needs_fix",
+      "evidence": [
+        "internal/gateway/family/handlers.go"
+      ],
+      "observation": {
+        "route": "GET /policies/compare",
+        "anonymous": 401,
+        "user": 403,
+        "admin": 404,
+        "kv_changed": false,
+        "upstream_calls": 0
+      }
+    },
+    {
+      "route": "GET /policies/list",
+      "owner": "catalog:serveFamilyRoute:manage",
+      "group": "resource-config",
+      "main_status": "verified",
+      "evidence": [
+        "cmd/regression/policy_config_service_test.go"
+      ],
+      "observation": {
+        "route": "GET /policies/list",
+        "anonymous": 401,
+        "user": 403,
+        "admin": 200,
+        "kv_changed": false,
+        "upstream_calls": 0
+      }
+    },
+    {
+      "route": "GET /policies/name/{policy_name}/versions",
+      "owner": "catalog:serveFamilyRoute:manage",
+      "group": "service-aux",
+      "main_status": "needs_fix",
+      "evidence": [
+        "internal/gateway/family/handlers.go"
+      ],
+      "observation": {
+        "route": "GET /policies/name/{policy_name}/versions",
+        "anonymous": 401,
+        "user": 403,
+        "admin": 404,
+        "kv_changed": false,
+        "upstream_calls": 0
+      }
+    },
+    {
+      "route": "GET /policies/usage/overview",
+      "owner": "catalog:serveFamilyRoute:manage",
+      "group": "service-aux",
+      "main_status": "needs_fix",
+      "evidence": [
+        "internal/gateway/family/handlers.go"
+      ],
+      "observation": {
+        "route": "GET /policies/usage/overview",
+        "anonymous": 401,
+        "user": 403,
+        "admin": 200,
+        "kv_changed": false,
+        "upstream_calls": 0
+      }
+    },
+    {
+      "route": "GET /policies/{policy_id}",
+      "owner": "catalog:serveFamilyRoute:manage",
+      "group": "resource-config",
+      "main_status": "verified",
+      "evidence": [
+        "cmd/regression/policy_config_service_test.go"
+      ],
+      "observation": {
+        "route": "GET /policies/{policy_id}",
+        "anonymous": 401,
+        "user": 403,
+        "admin": 404,
+        "kv_changed": false,
+        "upstream_calls": 0
+      }
+    },
+    {
+      "route": "GET /policies/{policy_id}/resolved-guardrails",
+      "owner": "catalog:serveFamilyRoute:manage",
+      "group": "service-aux",
+      "main_status": "needs_fix",
+      "evidence": [
+        "internal/gateway/family/handlers.go"
+      ],
+      "observation": {
+        "route": "GET /policies/{policy_id}/resolved-guardrails",
+        "anonymous": 401,
+        "user": 403,
+        "admin": 404,
+        "kv_changed": false,
+        "upstream_calls": 0
+      }
+    },
+    {
+      "route": "GET /policy/info/{policy_name}",
+      "owner": "catalog:serveFamilyRoute:manage",
+      "group": "service-aux",
+      "main_status": "needs_verification",
+      "evidence": [
+        "internal/gateway/family/handlers.go"
+      ],
+      "observation": {
+        "route": "GET /policy/info/{policy_name}",
+        "anonymous": 401,
+        "user": 403,
+        "admin": 404,
+        "kv_changed": false,
+        "upstream_calls": 0
+      }
+    },
+    {
+      "route": "GET /policy/list",
+      "owner": "catalog:serveFamilyRoute:manage",
+      "group": "service-aux",
+      "main_status": "needs_verification",
+      "evidence": [
+        "internal/gateway/family/handlers.go"
+      ],
+      "observation": {
+        "route": "GET /policy/list",
+        "anonymous": 401,
+        "user": 403,
+        "admin": 200,
+        "kv_changed": false,
+        "upstream_calls": 0
+      }
+    },
+    {
+      "route": "GET /policy/templates",
+      "owner": "catalog:serveFamilyRoute:manage",
+      "group": "service-aux",
+      "main_status": "needs_fix",
+      "evidence": [
+        "internal/gateway/family/handlers.go"
+      ],
+      "observation": {
+        "route": "GET /policy/templates",
+        "anonymous": 401,
+        "user": 403,
+        "admin": 200,
+        "kv_changed": false,
+        "upstream_calls": 0
+      }
+    },
+    {
+      "route": "GET /prompts/list",
+      "owner": "catalog:serveFamilyRoute:manage",
+      "group": "resource-config",
+      "main_status": "verified",
+      "evidence": [
+        "cmd/regression/prompt_config_service_test.go"
+      ],
+      "observation": {
+        "route": "GET /prompts/list",
+        "anonymous": 401,
+        "user": 403,
+        "admin": 200,
+        "kv_changed": false,
+        "upstream_calls": 0
+      }
+    },
+    {
+      "route": "GET /prompts/{prompt_id}",
+      "owner": "catalog:serveFamilyRoute:manage",
+      "group": "resource-config",
+      "main_status": "verified",
+      "evidence": [
+        "cmd/regression/prompt_config_service_test.go"
+      ],
+      "observation": {
+        "route": "GET /prompts/{prompt_id}",
+        "anonymous": 401,
+        "user": 403,
+        "admin": 404,
+        "kv_changed": false,
+        "upstream_calls": 0
+      }
+    },
+    {
+      "route": "GET /prompts/{prompt_id}/info",
+      "owner": "catalog:serveFamilyRoute:manage",
+      "group": "resource-config",
+      "main_status": "verified",
+      "evidence": [
+        "cmd/regression/prompt_config_service_test.go"
+      ],
+      "observation": {
+        "route": "GET /prompts/{prompt_id}/info",
+        "anonymous": 401,
+        "user": 403,
+        "admin": 404,
+        "kv_changed": false,
+        "upstream_calls": 0
+      }
+    },
+    {
+      "route": "GET /prompts/{prompt_id}/versions",
+      "owner": "catalog:serveFamilyRoute:manage",
+      "group": "service-aux",
+      "main_status": "needs_fix",
+      "evidence": [
+        "internal/gateway/family/handlers.go"
+      ],
+      "observation": {
+        "route": "GET /prompts/{prompt_id}/versions",
+        "anonymous": 401,
+        "user": 403,
+        "admin": 404,
+        "kv_changed": false,
+        "upstream_calls": 0
+      }
+    },
+    {
+      "route": "GET /provider/budgets",
+      "owner": "catalog:serveFamilyRoute:manage",
+      "group": "budget-iam",
+      "main_status": "needs_verification",
+      "evidence": [
+        "internal/gateway/family/catalog_persistence.go"
+      ],
+      "observation": {
+        "route": "GET /provider/budgets",
+        "anonymous": 401,
+        "user": 403,
+        "admin": 200,
+        "kv_changed": false,
+        "upstream_calls": 0
+      }
+    },
+    {
+      "route": "GET /redis/info",
+      "owner": "catalog:serveFamilyRoute:manage",
+      "group": "cache",
+      "main_status": "needs_verification",
+      "evidence": [
+        "internal/gateway/access.go"
+      ],
+      "observation": {
+        "route": "GET /redis/info",
+        "anonymous": 401,
+        "user": 403,
+        "admin": 404,
+        "kv_changed": false,
+        "upstream_calls": 0
+      }
+    },
+    {
+      "route": "GET /registry.json",
+      "owner": "catalog:serveFamilyRoute:manage",
+      "group": "discovery",
+      "main_status": "needs_verification",
+      "evidence": [
+        "internal/gateway/family/handlers.go"
+      ],
+      "observation": {
+        "route": "GET /registry.json",
+        "anonymous": 401,
+        "user": 403,
+        "admin": 200,
+        "kv_changed": false,
+        "upstream_calls": 0
+      }
+    },
+    {
+      "route": "GET /routes",
+      "owner": "catalog:serveFamilyRoute:manage",
+      "group": "discovery",
+      "main_status": "needs_verification",
+      "evidence": [
+        "internal/gateway/family/handlers.go"
+      ],
+      "observation": {
+        "route": "GET /routes",
+        "anonymous": 401,
+        "user": 403,
+        "admin": 200,
+        "kv_changed": false,
+        "upstream_calls": 0
+      }
+    },
+    {
+      "route": "GET /schedule/anthropic_beta_headers_reload/status",
+      "owner": "catalog:serveFamilyRoute:manage",
+      "group": "runtime-ops",
+      "main_status": "needs_fix",
+      "evidence": [
+        "internal/gateway/family/catalog_persistence.go"
+      ],
+      "observation": {
+        "route": "GET /schedule/anthropic_beta_headers_reload/status",
+        "anonymous": 401,
+        "user": 403,
+        "admin": 404,
+        "kv_changed": false,
+        "upstream_calls": 0
+      }
+    },
+    {
+      "route": "GET /search_tools/list",
+      "owner": "catalog:serveFamilyRoute:manage",
+      "group": "resource-config",
+      "main_status": "verified",
+      "evidence": [
+        "cmd/regression/search_config_service_test.go"
+      ],
+      "observation": {
+        "route": "GET /search_tools/list",
+        "anonymous": 401,
+        "user": 403,
+        "admin": 200,
+        "kv_changed": false,
+        "upstream_calls": 0
+      }
+    },
+    {
+      "route": "GET /search_tools/ui/available_providers",
+      "owner": "catalog:serveFamilyRoute:manage",
+      "group": "discovery",
+      "main_status": "needs_verification",
+      "evidence": [
+        "internal/gateway/family/handlers.go"
+      ],
+      "observation": {
+        "route": "GET /search_tools/ui/available_providers",
+        "anonymous": 401,
+        "user": 403,
+        "admin": 200,
+        "kv_changed": false,
+        "upstream_calls": 0
+      }
+    },
+    {
+      "route": "GET /search_tools/{search_tool_id}",
+      "owner": "catalog:serveFamilyRoute:manage",
+      "group": "resource-config",
+      "main_status": "verified",
+      "evidence": [
+        "cmd/regression/search_config_service_test.go"
+      ],
+      "observation": {
+        "route": "GET /search_tools/{search_tool_id}",
+        "anonymous": 401,
+        "user": 403,
+        "admin": 404,
+        "kv_changed": false,
+        "upstream_calls": 0
+      }
+    },
+    {
+      "route": "GET /server",
+      "owner": "catalog:serveFamilyRoute:manage",
+      "group": "server",
+      "main_status": "needs_verification",
+      "evidence": [
+        "internal/gateway/family/catalog_persistence.go"
+      ],
+      "observation": {
+        "route": "GET /server",
+        "anonymous": 401,
+        "user": 403,
+        "admin": 200,
+        "kv_changed": false,
+        "upstream_calls": 0
+      }
+    },
+    {
+      "route": "GET /server/health",
+      "owner": "catalog:serveFamilyRoute:manage",
+      "group": "server",
+      "main_status": "needs_verification",
+      "evidence": [
+        "internal/gateway/family/catalog_persistence.go"
+      ],
+      "observation": {
+        "route": "GET /server/health",
+        "anonymous": 401,
+        "user": 403,
+        "admin": 200,
+        "kv_changed": false,
+        "upstream_calls": 0
+      }
+    },
+    {
+      "route": "GET /server/oauth/{server_id}/authorize",
+      "owner": "catalog:serveFamilyRoute:manage",
+      "group": "server",
+      "main_status": "needs_verification",
+      "evidence": [
+        "internal/gateway/family/catalog_persistence.go"
+      ],
+      "observation": {
+        "route": "GET /server/oauth/{server_id}/authorize",
+        "anonymous": 401,
+        "user": 403,
+        "admin": 404,
+        "kv_changed": false,
+        "upstream_calls": 0
+      }
+    },
+    {
+      "route": "GET /server/submissions",
+      "owner": "catalog:serveFamilyRoute:manage",
+      "group": "server",
+      "main_status": "needs_verification",
+      "evidence": [
+        "internal/gateway/family/catalog_persistence.go"
+      ],
+      "observation": {
+        "route": "GET /server/submissions",
+        "anonymous": 401,
+        "user": 403,
+        "admin": 200,
+        "kv_changed": false,
+        "upstream_calls": 0
+      }
+    },
+    {
+      "route": "GET /server/{server_id}",
+      "owner": "catalog:serveFamilyRoute:manage",
+      "group": "server",
+      "main_status": "needs_verification",
+      "evidence": [
+        "internal/gateway/family/catalog_persistence.go"
+      ],
+      "observation": {
+        "route": "GET /server/{server_id}",
+        "anonymous": 401,
+        "user": 403,
+        "admin": 404,
+        "kv_changed": false,
+        "upstream_calls": 0
+      }
+    },
+    {
+      "route": "GET /server/{server_id}/oauth-user-credential/status",
+      "owner": "catalog:serveFamilyRoute:manage",
+      "group": "server",
+      "main_status": "needs_verification",
+      "evidence": [
+        "internal/gateway/family/catalog_persistence.go"
+      ],
+      "observation": {
+        "route": "GET /server/{server_id}/oauth-user-credential/status",
+        "anonymous": 401,
+        "user": 403,
+        "admin": 404,
+        "kv_changed": false,
+        "upstream_calls": 0
+      }
+    },
+    {
+      "route": "GET /server/{server_id}/user-env-vars",
+      "owner": "catalog:serveFamilyRoute:manage",
+      "group": "server",
+      "main_status": "needs_verification",
+      "evidence": [
+        "internal/gateway/family/catalog_persistence.go"
+      ],
+      "observation": {
+        "route": "GET /server/{server_id}/user-env-vars",
+        "anonymous": 401,
+        "user": 403,
+        "admin": 404,
+        "kv_changed": false,
+        "upstream_calls": 0
+      }
+    },
+    {
+      "route": "GET /settings",
+      "owner": "catalog:serveFamilyRoute:manage",
+      "group": "settings",
+      "main_status": "needs_verification",
+      "evidence": [
+        "internal/gateway/family/handlers.go"
+      ],
+      "observation": {
+        "route": "GET /settings",
+        "anonymous": 401,
+        "user": 403,
+        "admin": 200,
+        "kv_changed": false,
+        "upstream_calls": 0
+      }
+    },
+    {
+      "route": "GET /spend/logs",
+      "owner": "catalog:serveFamilyRoute:manage",
+      "group": "analytics",
+      "main_status": "needs_verification",
+      "evidence": [
+        "internal/gateway/family/handlers.go"
+      ],
+      "observation": {
+        "route": "GET /spend/logs",
+        "anonymous": 401,
+        "user": 403,
+        "admin": 200,
+        "kv_changed": false,
+        "upstream_calls": 0
+      }
+    },
+    {
+      "route": "GET /spend_logs/end_users",
+      "owner": "catalog:serveFamilyRoute:manage",
+      "group": "analytics",
+      "main_status": "needs_verification",
+      "evidence": [
+        "internal/gateway/family/handlers.go"
+      ],
+      "observation": {
+        "route": "GET /spend_logs/end_users",
+        "anonymous": 401,
+        "user": 403,
+        "admin": 200,
+        "kv_changed": false,
+        "upstream_calls": 0
+      }
+    },
+    {
+      "route": "GET /spend_logs/users",
+      "owner": "catalog:serveFamilyRoute:manage",
+      "group": "analytics",
+      "main_status": "needs_verification",
+      "evidence": [
+        "internal/gateway/family/handlers.go"
+      ],
+      "observation": {
+        "route": "GET /spend_logs/users",
+        "anonymous": 401,
+        "user": 403,
+        "admin": 200,
+        "kv_changed": false,
+        "upstream_calls": 0
+      }
+    },
+    {
+      "route": "GET /sso/get/ui_settings",
+      "owner": "catalog:serveFamilyRoute:manage",
+      "group": "settings",
+      "main_status": "needs_verification",
+      "evidence": [
+        "internal/gateway/family/handlers.go"
+      ],
+      "observation": {
+        "route": "GET /sso/get/ui_settings",
+        "anonymous": 401,
+        "user": 403,
+        "admin": 200,
+        "kv_changed": false,
+        "upstream_calls": 0
+      }
+    },
+    {
+      "route": "GET /tag/dau",
+      "owner": "catalog:serveFamilyRoute:manage",
+      "group": "analytics",
+      "main_status": "needs_verification",
+      "evidence": [
+        "internal/gateway/family/handlers.go"
+      ],
+      "observation": {
+        "route": "GET /tag/dau",
+        "anonymous": 401,
+        "user": 403,
+        "admin": 404,
+        "kv_changed": false,
+        "upstream_calls": 0
+      }
+    },
+    {
+      "route": "GET /tag/distinct",
+      "owner": "catalog:serveFamilyRoute:manage",
+      "group": "analytics",
+      "main_status": "needs_verification",
+      "evidence": [
+        "internal/gateway/family/handlers.go"
+      ],
+      "observation": {
+        "route": "GET /tag/distinct",
+        "anonymous": 401,
+        "user": 403,
+        "admin": 404,
+        "kv_changed": false,
+        "upstream_calls": 0
+      }
+    },
+    {
+      "route": "GET /tag/mau",
+      "owner": "catalog:serveFamilyRoute:manage",
+      "group": "analytics",
+      "main_status": "needs_verification",
+      "evidence": [
+        "internal/gateway/family/handlers.go"
+      ],
+      "observation": {
+        "route": "GET /tag/mau",
+        "anonymous": 401,
+        "user": 403,
+        "admin": 404,
+        "kv_changed": false,
+        "upstream_calls": 0
+      }
+    },
+    {
+      "route": "GET /tag/summary",
+      "owner": "catalog:serveFamilyRoute:manage",
+      "group": "analytics",
+      "main_status": "needs_verification",
+      "evidence": [
+        "internal/gateway/family/handlers.go"
+      ],
+      "observation": {
+        "route": "GET /tag/summary",
+        "anonymous": 401,
+        "user": 403,
+        "admin": 404,
+        "kv_changed": false,
+        "upstream_calls": 0
+      }
+    },
+    {
+      "route": "GET /tag/user-agent/per-user-analytics",
+      "owner": "catalog:serveFamilyRoute:manage",
+      "group": "analytics",
+      "main_status": "needs_verification",
+      "evidence": [
+        "internal/gateway/family/handlers.go"
+      ],
+      "observation": {
+        "route": "GET /tag/user-agent/per-user-analytics",
+        "anonymous": 401,
+        "user": 403,
+        "admin": 404,
+        "kv_changed": false,
+        "upstream_calls": 0
+      }
+    },
+    {
+      "route": "GET /tag/wau",
+      "owner": "catalog:serveFamilyRoute:manage",
+      "group": "analytics",
+      "main_status": "needs_verification",
+      "evidence": [
+        "internal/gateway/family/handlers.go"
+      ],
+      "observation": {
+        "route": "GET /tag/wau",
+        "anonymous": 401,
+        "user": 403,
+        "admin": 404,
+        "kv_changed": false,
+        "upstream_calls": 0
+      }
+    },
+    {
+      "route": "GET /team/filter/ui",
+      "owner": "catalog:serveFamilyRoute:manage",
+      "group": "budget-iam",
+      "main_status": "needs_verification",
+      "evidence": [
+        "internal/gateway/family/catalog_persistence.go"
+      ],
+      "observation": {
+        "route": "GET /team/filter/ui",
+        "anonymous": 401,
+        "user": 403,
+        "admin": 200,
+        "kv_changed": false,
+        "upstream_calls": 0
+      }
+    },
+    {
+      "route": "GET /team/metadata_schema",
+      "owner": "catalog:serveFamilyRoute:manage",
+      "group": "budget-iam",
+      "main_status": "needs_verification",
+      "evidence": [
+        "internal/gateway/family/catalog_persistence.go"
+      ],
+      "observation": {
+        "route": "GET /team/metadata_schema",
+        "anonymous": 401,
+        "user": 403,
+        "admin": 404,
+        "kv_changed": false,
+        "upstream_calls": 0
+      }
+    },
+    {
+      "route": "GET /team/permissions_list",
+      "owner": "catalog:serveFamilyRoute:manage",
+      "group": "budget-iam",
+      "main_status": "needs_verification",
+      "evidence": [
+        "internal/gateway/family/catalog_persistence.go"
+      ],
+      "observation": {
+        "route": "GET /team/permissions_list",
+        "anonymous": 401,
+        "user": 403,
+        "admin": 404,
+        "kv_changed": false,
+        "upstream_calls": 0
+      }
+    },
+    {
+      "route": "GET /team/spend/report",
+      "owner": "catalog:serveFamilyRoute:manage",
+      "group": "analytics",
+      "main_status": "needs_verification",
+      "evidence": [
+        "internal/gateway/family/handlers.go"
+      ],
+      "observation": {
+        "route": "GET /team/spend/report",
+        "anonymous": 401,
+        "user": 403,
+        "admin": 404,
+        "kv_changed": false,
+        "upstream_calls": 0
+      }
+    },
+    {
+      "route": "GET /team/{team_id}/members/me",
+      "owner": "catalog:serveFamilyRoute:manage",
+      "group": "budget-iam",
+      "main_status": "needs_verification",
+      "evidence": [
+        "internal/gateway/family/catalog_persistence.go"
+      ],
+      "observation": {
+        "route": "GET /team/{team_id}/members/me",
+        "anonymous": 401,
+        "user": 403,
+        "admin": 404,
+        "kv_changed": false,
+        "upstream_calls": 0
+      }
+    },
+    {
+      "route": "GET /token/generate",
+      "owner": "catalog:serveFamilyRoute:manage",
+      "group": "auth-alias",
+      "main_status": "needs_fix",
+      "evidence": [
+        "internal/gateway/family/catalog_persistence.go"
+      ],
+      "observation": {
+        "route": "GET /token/generate",
+        "anonymous": 401,
+        "user": 403,
+        "admin": 404,
+        "kv_changed": false,
+        "upstream_calls": 0
+      }
+    },
+    {
+      "route": "GET /user-credentials",
+      "owner": "catalog:serveFamilyRoute:manage",
+      "group": "server",
+      "main_status": "needs_verification",
+      "evidence": [
+        "internal/gateway/family/catalog_persistence.go"
+      ],
+      "observation": {
+        "route": "GET /user-credentials",
+        "anonymous": 401,
+        "user": 403,
+        "admin": 200,
+        "kv_changed": false,
+        "upstream_calls": 0
+      }
+    },
+    {
+      "route": "GET /user-env-vars/status",
+      "owner": "catalog:serveFamilyRoute:manage",
+      "group": "server",
+      "main_status": "needs_verification",
+      "evidence": [
+        "internal/gateway/family/catalog_persistence.go"
+      ],
+      "observation": {
+        "route": "GET /user-env-vars/status",
+        "anonymous": 401,
+        "user": 403,
+        "admin": 404,
+        "kv_changed": false,
+        "upstream_calls": 0
+      }
+    },
+    {
+      "route": "GET /user/available_roles",
+      "owner": "catalog:serveFamilyRoute:manage",
+      "group": "discovery",
+      "main_status": "needs_verification",
+      "evidence": [
+        "internal/gateway/family/handlers.go"
+      ],
+      "observation": {
+        "route": "GET /user/available_roles",
+        "anonymous": 401,
+        "user": 403,
+        "admin": 404,
+        "kv_changed": false,
+        "upstream_calls": 0
+      }
+    },
+    {
+      "route": "GET /user/spend/report",
+      "owner": "catalog:serveFamilyRoute:manage",
+      "group": "analytics",
+      "main_status": "needs_verification",
+      "evidence": [
+        "internal/gateway/family/handlers.go"
+      ],
+      "observation": {
+        "route": "GET /user/spend/report",
+        "anonymous": 401,
+        "user": 403,
+        "admin": 404,
+        "kv_changed": false,
+        "upstream_calls": 0
+      }
+    },
+    {
+      "route": "GET /utils/available_routes",
+      "owner": "catalog:serveFamilyRoute:manage",
+      "group": "discovery",
+      "main_status": "needs_verification",
+      "evidence": [
+        "internal/gateway/family/handlers.go"
+      ],
+      "observation": {
+        "route": "GET /utils/available_routes",
+        "anonymous": 401,
+        "user": 403,
+        "admin": 404,
+        "kv_changed": false,
+        "upstream_calls": 0
+      }
+    },
+    {
+      "route": "GET /v1/access_group",
+      "owner": "catalog:serveFamilyRoute:manage",
+      "group": "access-vector",
+      "main_status": "needs_verification",
+      "evidence": [
+        "internal/gateway/family/catalog_persistence.go"
+      ],
+      "observation": {
+        "route": "GET /v1/access_group",
+        "anonymous": 401,
+        "user": 403,
+        "admin": 200,
+        "kv_changed": false,
+        "upstream_calls": 0
+      }
+    },
+    {
+      "route": "GET /v1/access_group/{access_group_id}",
+      "owner": "catalog:serveFamilyRoute:manage",
+      "group": "access-vector",
+      "main_status": "needs_verification",
+      "evidence": [
+        "internal/gateway/family/catalog_persistence.go"
+      ],
+      "observation": {
+        "route": "GET /v1/access_group/{access_group_id}",
+        "anonymous": 401,
+        "user": 403,
+        "admin": 404,
+        "kv_changed": false,
+        "upstream_calls": 0
+      }
+    },
+    {
+      "route": "GET /v1/model/deprecations",
+      "owner": "catalog:serveFamilyRoute:manage",
+      "group": "model-alias",
+      "main_status": "needs_verification",
+      "evidence": [
+        "internal/gateway/family/catalog_persistence.go"
+      ],
+      "observation": {
+        "route": "GET /v1/model/deprecations",
+        "anonymous": 401,
+        "user": 403,
+        "admin": 404,
+        "kv_changed": false,
+        "upstream_calls": 0
+      }
+    },
+    {
+      "route": "GET /v1/model/info",
+      "owner": "catalog:serveFamilyRoute:manage",
+      "group": "model-alias",
+      "main_status": "needs_verification",
+      "evidence": [
+        "internal/gateway/family/catalog_persistence.go"
+      ],
+      "observation": {
+        "route": "GET /v1/model/info",
+        "anonymous": 401,
+        "user": 403,
+        "admin": 404,
+        "kv_changed": false,
+        "upstream_calls": 0
+      }
+    },
+    {
+      "route": "GET /v1/skills",
+      "owner": "catalog:serveFamilyRoute:manage",
+      "group": "skills",
+      "main_status": "needs_verification",
+      "evidence": [
+        "internal/gateway/family/handlers.go"
+      ],
+      "observation": {
+        "route": "GET /v1/skills",
+        "anonymous": 401,
+        "user": 403,
+        "admin": 200,
+        "kv_changed": false,
+        "upstream_calls": 0
+      }
+    },
+    {
+      "route": "GET /v1/skills/{skill_id}",
+      "owner": "catalog:serveFamilyRoute:manage",
+      "group": "skills",
+      "main_status": "needs_verification",
+      "evidence": [
+        "internal/gateway/family/handlers.go"
+      ],
+      "observation": {
+        "route": "GET /v1/skills/{skill_id}",
+        "anonymous": 401,
+        "user": 403,
+        "admin": 404,
+        "kv_changed": false,
+        "upstream_calls": 0
+      }
+    },
+    {
+      "route": "GET /v1/skills/{skill_id}/archive",
+      "owner": "catalog:serveFamilyRoute:manage",
+      "group": "skills",
+      "main_status": "needs_verification",
+      "evidence": [
+        "internal/gateway/family/handlers.go"
+      ],
+      "observation": {
+        "route": "GET /v1/skills/{skill_id}/archive",
+        "anonymous": 401,
+        "user": 403,
+        "admin": 404,
+        "kv_changed": false,
+        "upstream_calls": 0
+      }
+    },
+    {
+      "route": "GET /v2/guardrails/list",
+      "owner": "catalog:serveFamilyRoute:manage",
+      "group": "guard",
+      "main_status": "needs_verification",
+      "evidence": [
+        "internal/gateway/guard/manage.go"
+      ],
+      "observation": {
+        "route": "GET /v2/guardrails/list",
+        "anonymous": 401,
+        "user": 403,
+        "admin": 200,
+        "kv_changed": false,
+        "upstream_calls": 0
+      }
+    },
+    {
+      "route": "GET /vantage/settings",
+      "owner": "catalog:serveFamilyRoute:manage",
+      "group": "runtime-ops",
+      "main_status": "needs_fix",
+      "evidence": [
+        "internal/gateway/family/catalog_persistence.go"
+      ],
+      "observation": {
+        "route": "GET /vantage/settings",
+        "anonymous": 401,
+        "user": 403,
+        "admin": 200,
+        "kv_changed": false,
+        "upstream_calls": 0
+      }
+    },
+    {
+      "route": "GET /vector_store/list",
+      "owner": "catalog:serveFamilyRoute:manage",
+      "group": "access-vector",
+      "main_status": "needs_verification",
+      "evidence": [
+        "internal/gateway/family/catalog_persistence.go"
+      ],
+      "observation": {
+        "route": "GET /vector_store/list",
+        "anonymous": 401,
+        "user": 403,
+        "admin": 200,
+        "kv_changed": false,
+        "upstream_calls": 0
+      }
+    },
+    {
+      "route": "GET /{provider}/v1/batches",
+      "owner": "catalog:serveFamilyRoute:manage",
+      "group": "provider-batch",
+      "main_status": "needs_fix",
+      "evidence": [
+        "internal/gateway/family/catalog_persistence.go"
+      ],
+      "observation": {
+        "route": "GET /{provider}/v1/batches",
+        "anonymous": 401,
+        "user": 403,
+        "admin": 404,
+        "kv_changed": false,
+        "upstream_calls": 0
+      }
+    },
+    {
+      "route": "GET /{provider}/v1/batches/{batch_id}",
+      "owner": "catalog:serveFamilyRoute:manage",
+      "group": "provider-batch",
+      "main_status": "needs_fix",
+      "evidence": [
+        "internal/gateway/family/catalog_persistence.go"
+      ],
+      "observation": {
+        "route": "GET /{provider}/v1/batches/{batch_id}",
+        "anonymous": 401,
+        "user": 403,
+        "admin": 200,
+        "kv_changed": false,
+        "upstream_calls": 0
+      }
+    },
+    {
+      "route": "GET /{provider}/v1/files",
+      "owner": "catalog:filesContract:manage",
+      "group": "protocol-alias",
+      "main_status": "needs_fix",
+      "evidence": [
+        "internal/gateway/ingress.go"
+      ],
+      "observation": {
+        "route": "GET /{provider}/v1/files",
+        "anonymous": 401,
+        "user": 403,
+        "admin": 404,
+        "kv_changed": false,
+        "upstream_calls": 0
+      }
+    },
+    {
+      "route": "GET /{provider}/v1/files/{file_id}",
+      "owner": "catalog:filesContract:manage",
+      "group": "protocol-alias",
+      "main_status": "needs_fix",
+      "evidence": [
+        "internal/gateway/ingress.go"
+      ],
+      "observation": {
+        "route": "GET /{provider}/v1/files/{file_id}",
+        "anonymous": 401,
+        "user": 403,
+        "admin": 200,
+        "kv_changed": false,
+        "upstream_calls": 0
+      }
+    },
+    {
+      "route": "GET /{provider}/v1/files/{file_id}/content",
+      "owner": "catalog:filesContract:manage",
+      "group": "protocol-alias",
+      "main_status": "needs_fix",
+      "evidence": [
+        "internal/gateway/ingress.go"
+      ],
+      "observation": {
+        "route": "GET /{provider}/v1/files/{file_id}/content",
+        "anonymous": 401,
+        "user": 403,
+        "admin": 404,
+        "kv_changed": false,
+        "upstream_calls": 0
+      }
+    },
+    {
+      "route": "OPTIONS /health/liveliness",
+      "owner": "catalog:serveFamilyRoute:manage",
+      "group": "preflight",
+      "main_status": "needs_verification",
+      "evidence": [
+        "internal/gateway/server.go"
+      ],
+      "observation": {
+        "route": "OPTIONS /health/liveliness",
+        "anonymous": 204,
+        "user": 204,
+        "admin": 204,
+        "kv_changed": false,
+        "upstream_calls": 0
+      }
+    },
+    {
+      "route": "OPTIONS /health/liveness",
+      "owner": "catalog:serveFamilyRoute:manage",
+      "group": "preflight",
+      "main_status": "needs_verification",
+      "evidence": [
+        "internal/gateway/server.go"
+      ],
+      "observation": {
+        "route": "OPTIONS /health/liveness",
+        "anonymous": 204,
+        "user": 204,
+        "admin": 204,
+        "kv_changed": false,
+        "upstream_calls": 0
+      }
+    },
+    {
+      "route": "OPTIONS /health/readiness",
+      "owner": "catalog:serveFamilyRoute:manage",
+      "group": "preflight",
+      "main_status": "needs_verification",
+      "evidence": [
+        "internal/gateway/server.go"
+      ],
+      "observation": {
+        "route": "OPTIONS /health/readiness",
+        "anonymous": 204,
+        "user": 204,
+        "admin": 204,
+        "kv_changed": false,
+        "upstream_calls": 0
+      }
+    },
+    {
+      "route": "PATCH /credentials/{credential_name}",
+      "owner": "catalog:serveFamilyRoute:manage",
+      "group": "resource-config",
+      "main_status": "verified",
+      "evidence": [
+        "cmd/regression/catalog_integrity_test.go"
+      ],
+      "observation": {
+        "route": "PATCH /credentials/{credential_name}",
+        "anonymous": 401,
+        "user": 403,
+        "admin": 200,
+        "kv_changed": true,
+        "upstream_calls": 0
+      }
+    },
+    {
+      "route": "PATCH /guardrails/{guardrail_id}",
+      "owner": "catalog:serveFamilyRoute:manage",
+      "group": "guard",
+      "main_status": "needs_verification",
+      "evidence": [
+        "internal/gateway/guard/manage.go"
+      ],
+      "observation": {
+        "route": "PATCH /guardrails/{guardrail_id}",
+        "anonymous": 401,
+        "user": 403,
+        "admin": 404,
+        "kv_changed": false,
+        "upstream_calls": 0
+      }
+    },
+    {
+      "route": "PATCH /organization/member_update",
+      "owner": "catalog:serveFamilyRoute:manage",
+      "group": "budget-iam",
+      "main_status": "needs_verification",
+      "evidence": [
+        "internal/gateway/family/catalog_persistence.go"
+      ],
+      "observation": {
+        "route": "PATCH /organization/member_update",
+        "anonymous": 401,
+        "user": 403,
+        "admin": 200,
+        "kv_changed": true,
+        "upstream_calls": 0
+      }
+    },
+    {
+      "route": "PATCH /prompts/{prompt_id}",
+      "owner": "catalog:serveFamilyRoute:manage",
+      "group": "resource-config",
+      "main_status": "verified",
+      "evidence": [
+        "cmd/regression/prompt_config_service_test.go"
+      ],
+      "observation": {
+        "route": "PATCH /prompts/{prompt_id}",
+        "anonymous": 401,
+        "user": 403,
+        "admin": 200,
+        "kv_changed": true,
+        "upstream_calls": 0
+      }
+    },
+    {
+      "route": "PATCH /team/{team_id}",
+      "owner": "catalog:serveFamilyRoute:manage",
+      "group": "budget-iam",
+      "main_status": "needs_verification",
+      "evidence": [
+        "internal/gateway/family/catalog_persistence.go"
+      ],
+      "observation": {
+        "route": "PATCH /team/{team_id}",
+        "anonymous": 401,
+        "user": 403,
+        "admin": 200,
+        "kv_changed": true,
+        "upstream_calls": 0
+      }
+    },
+    {
+      "route": "PATCH /update/default_team_settings",
+      "owner": "catalog:serveFamilyRoute:manage",
+      "group": "settings",
+      "main_status": "needs_verification",
+      "evidence": [
+        "internal/gateway/family/handlers.go"
+      ],
+      "observation": {
+        "route": "PATCH /update/default_team_settings",
+        "anonymous": 401,
+        "user": 403,
+        "admin": 200,
+        "kv_changed": true,
+        "upstream_calls": 0
+      }
+    },
+    {
+      "route": "PATCH /update/internal_user_settings",
+      "owner": "catalog:serveFamilyRoute:manage",
+      "group": "settings",
+      "main_status": "needs_verification",
+      "evidence": [
+        "internal/gateway/family/handlers.go"
+      ],
+      "observation": {
+        "route": "PATCH /update/internal_user_settings",
+        "anonymous": 401,
+        "user": 403,
+        "admin": 200,
+        "kv_changed": true,
+        "upstream_calls": 0
+      }
+    },
+    {
+      "route": "PATCH /update/ui_settings",
+      "owner": "catalog:serveFamilyRoute:manage",
+      "group": "settings",
+      "main_status": "needs_verification",
+      "evidence": [
+        "internal/gateway/family/handlers.go"
+      ],
+      "observation": {
+        "route": "PATCH /update/ui_settings",
+        "anonymous": 401,
+        "user": 403,
+        "admin": 200,
+        "kv_changed": true,
+        "upstream_calls": 0
+      }
+    },
+    {
+      "route": "PATCH /update/user_banner",
+      "owner": "catalog:serveFamilyRoute:manage",
+      "group": "settings",
+      "main_status": "needs_verification",
+      "evidence": [
+        "internal/gateway/family/handlers.go"
+      ],
+      "observation": {
+        "route": "PATCH /update/user_banner",
+        "anonymous": 401,
+        "user": 403,
+        "admin": 200,
+        "kv_changed": true,
+        "upstream_calls": 0
+      }
+    },
+    {
+      "route": "PATCH /v2/organization/{organization_id}",
+      "owner": "catalog:serveFamilyRoute:manage",
+      "group": "budget-iam",
+      "main_status": "needs_verification",
+      "evidence": [
+        "internal/gateway/family/catalog_persistence.go"
+      ],
+      "observation": {
+        "route": "PATCH /v2/organization/{organization_id}",
+        "anonymous": 401,
+        "user": 403,
+        "admin": 200,
+        "kv_changed": true,
+        "upstream_calls": 0
+      }
+    },
+    {
+      "route": "POST /access_group/new",
+      "owner": "catalog:serveFamilyRoute:manage",
+      "group": "access-vector",
+      "main_status": "needs_verification",
+      "evidence": [
+        "internal/gateway/family/catalog_persistence.go"
+      ],
+      "observation": {
+        "route": "POST /access_group/new",
+        "anonymous": 401,
+        "user": 403,
+        "admin": 200,
+        "kv_changed": true,
+        "upstream_calls": 0
+      }
+    },
+    {
+      "route": "POST /api/event_logging/batch",
+      "owner": "catalog:serveFamilyRoute:manage",
+      "group": "runtime-ops",
+      "main_status": "needs_fix",
+      "evidence": [
+        "internal/gateway/family/catalog_persistence.go"
+      ],
+      "observation": {
+        "route": "POST /api/event_logging/batch",
+        "anonymous": 401,
+        "user": 403,
+        "admin": 200,
+        "kv_changed": true,
+        "upstream_calls": 0
+      }
+    },
+    {
+      "route": "POST /budget/delete",
+      "owner": "catalog:serveFamilyRoute:manage",
+      "group": "budget-iam",
+      "main_status": "needs_verification",
+      "evidence": [
+        "internal/gateway/family/catalog_persistence.go"
+      ],
+      "observation": {
+        "route": "POST /budget/delete",
+        "anonymous": 401,
+        "user": 403,
+        "admin": 200,
+        "kv_changed": false,
+        "upstream_calls": 0
+      }
+    },
+    {
+      "route": "POST /budget/info",
+      "owner": "catalog:serveFamilyRoute:manage",
+      "group": "budget-iam",
+      "main_status": "needs_verification",
+      "evidence": [
+        "internal/gateway/family/catalog_persistence.go"
+      ],
+      "observation": {
+        "route": "POST /budget/info",
+        "anonymous": 401,
+        "user": 403,
+        "admin": 404,
+        "kv_changed": false,
+        "upstream_calls": 0
+      }
+    },
+    {
+      "route": "POST /budget/new",
+      "owner": "catalog:serveFamilyRoute:manage",
+      "group": "budget-iam",
+      "main_status": "needs_verification",
+      "evidence": [
+        "internal/gateway/family/catalog_persistence.go"
+      ],
+      "observation": {
+        "route": "POST /budget/new",
+        "anonymous": 401,
+        "user": 403,
+        "admin": 200,
+        "kv_changed": true,
+        "upstream_calls": 0
+      }
+    },
+    {
+      "route": "POST /budget/update",
+      "owner": "catalog:serveFamilyRoute:manage",
+      "group": "budget-iam",
+      "main_status": "needs_verification",
+      "evidence": [
+        "internal/gateway/family/catalog_persistence.go"
+      ],
+      "observation": {
+        "route": "POST /budget/update",
+        "anonymous": 401,
+        "user": 403,
+        "admin": 200,
+        "kv_changed": false,
+        "upstream_calls": 0
+      }
+    },
+    {
+      "route": "POST /claude-code/plugins",
+      "owner": "catalog:serveFamilyRoute:manage",
+      "group": "plugin",
+      "main_status": "needs_verification",
+      "evidence": [
+        "internal/gateway/family/catalog_persistence.go"
+      ],
+      "observation": {
+        "route": "POST /claude-code/plugins",
+        "anonymous": 401,
+        "user": 403,
+        "admin": 200,
+        "kv_changed": true,
+        "upstream_calls": 0
+      }
+    },
+    {
+      "route": "POST /claude-code/plugins/{plugin_name}/disable",
+      "owner": "catalog:serveFamilyRoute:manage",
+      "group": "plugin",
+      "main_status": "needs_verification",
+      "evidence": [
+        "internal/gateway/family/catalog_persistence.go"
+      ],
+      "observation": {
+        "route": "POST /claude-code/plugins/{plugin_name}/disable",
+        "anonymous": 401,
+        "user": 403,
+        "admin": 200,
+        "kv_changed": true,
+        "upstream_calls": 0
+      }
+    },
+    {
+      "route": "POST /claude-code/plugins/{plugin_name}/enable",
+      "owner": "catalog:serveFamilyRoute:manage",
+      "group": "plugin",
+      "main_status": "needs_verification",
+      "evidence": [
+        "internal/gateway/family/catalog_persistence.go"
+      ],
+      "observation": {
+        "route": "POST /claude-code/plugins/{plugin_name}/enable",
+        "anonymous": 401,
+        "user": 403,
+        "admin": 200,
+        "kv_changed": true,
+        "upstream_calls": 0
+      }
+    },
+    {
+      "route": "POST /comprehendmedical",
+      "owner": "catalog:serveFamilyRoute:manage",
+      "group": "medical",
+      "main_status": "needs_fix",
+      "evidence": [
+        "internal/gateway/family/catalog_persistence.go"
+      ],
+      "observation": {
+        "route": "POST /comprehendmedical",
+        "anonymous": 401,
+        "user": 403,
+        "admin": 200,
+        "kv_changed": true,
+        "upstream_calls": 0
+      }
+    },
+    {
+      "route": "POST /comprehendmedical/{operation}",
+      "owner": "catalog:serveFamilyRoute:manage",
+      "group": "medical",
+      "main_status": "needs_fix",
+      "evidence": [
+        "internal/gateway/family/catalog_persistence.go"
+      ],
+      "observation": {
+        "route": "POST /comprehendmedical/{operation}",
+        "anonymous": 401,
+        "user": 403,
+        "admin": 200,
+        "kv_changed": false,
+        "upstream_calls": 0
+      }
+    },
+    {
+      "route": "POST /coordination_redis/settings",
+      "owner": "catalog:serveFamilyRoute:manage",
+      "group": "operations",
+      "main_status": "needs_fix",
+      "evidence": [
+        "internal/gateway/family/catalog_persistence.go"
+      ],
+      "observation": {
+        "route": "POST /coordination_redis/settings",
+        "anonymous": 401,
+        "user": 403,
+        "admin": 200,
+        "kv_changed": true,
+        "upstream_calls": 0
+      }
+    },
+    {
+      "route": "POST /coordination_redis/settings/test",
+      "owner": "catalog:serveFamilyRoute:manage",
+      "group": "operations",
+      "main_status": "needs_fix",
+      "evidence": [
+        "internal/gateway/family/catalog_persistence.go"
+      ],
+      "observation": {
+        "route": "POST /coordination_redis/settings/test",
+        "anonymous": 401,
+        "user": 403,
+        "admin": 200,
+        "kv_changed": true,
+        "upstream_calls": 0
+      }
+    },
+    {
+      "route": "POST /credentials",
+      "owner": "catalog:serveFamilyRoute:manage",
+      "group": "resource-config",
+      "main_status": "verified",
+      "evidence": [
+        "cmd/regression/catalog_integrity_test.go"
+      ],
+      "observation": {
+        "route": "POST /credentials",
+        "anonymous": 401,
+        "user": 403,
+        "admin": 200,
+        "kv_changed": false,
+        "upstream_calls": 0
+      }
+    },
+    {
+      "route": "POST /credentials/migrate-encryption",
+      "owner": "catalog:serveFamilyRoute:manage",
+      "group": "service-aux",
+      "main_status": "needs_fix",
+      "evidence": [
+        "internal/gateway/family/handlers.go"
+      ],
+      "observation": {
+        "route": "POST /credentials/migrate-encryption",
+        "anonymous": 401,
+        "user": 403,
+        "admin": 200,
+        "kv_changed": true,
+        "upstream_calls": 0
+      }
+    },
+    {
+      "route": "POST /customer/block",
+      "owner": "catalog:serveFamilyRoute:manage",
+      "group": "metadata",
+      "main_status": "needs_verification",
+      "evidence": [
+        "internal/gateway/family/catalog_persistence.go"
+      ],
+      "observation": {
+        "route": "POST /customer/block",
+        "anonymous": 401,
+        "user": 403,
+        "admin": 200,
+        "kv_changed": true,
+        "upstream_calls": 0
+      }
+    },
+    {
+      "route": "POST /customer/delete",
+      "owner": "catalog:serveFamilyRoute:manage",
+      "group": "metadata",
+      "main_status": "needs_verification",
+      "evidence": [
+        "internal/gateway/family/catalog_persistence.go"
+      ],
+      "observation": {
+        "route": "POST /customer/delete",
+        "anonymous": 401,
+        "user": 403,
+        "admin": 200,
+        "kv_changed": false,
+        "upstream_calls": 0
+      }
+    },
+    {
+      "route": "POST /customer/new",
+      "owner": "catalog:serveFamilyRoute:manage",
+      "group": "metadata",
+      "main_status": "needs_verification",
+      "evidence": [
+        "internal/gateway/family/catalog_persistence.go"
+      ],
+      "observation": {
+        "route": "POST /customer/new",
+        "anonymous": 401,
+        "user": 403,
+        "admin": 200,
+        "kv_changed": true,
+        "upstream_calls": 0
+      }
+    },
+    {
+      "route": "POST /customer/unblock",
+      "owner": "catalog:serveFamilyRoute:manage",
+      "group": "metadata",
+      "main_status": "needs_verification",
+      "evidence": [
+        "internal/gateway/family/catalog_persistence.go"
+      ],
+      "observation": {
+        "route": "POST /customer/unblock",
+        "anonymous": 401,
+        "user": 403,
+        "admin": 200,
+        "kv_changed": true,
+        "upstream_calls": 0
+      }
+    },
+    {
+      "route": "POST /customer/update",
+      "owner": "catalog:serveFamilyRoute:manage",
+      "group": "metadata",
+      "main_status": "needs_verification",
+      "evidence": [
+        "internal/gateway/family/catalog_persistence.go"
+      ],
+      "observation": {
+        "route": "POST /customer/update",
+        "anonymous": 401,
+        "user": 403,
+        "admin": 200,
+        "kv_changed": false,
+        "upstream_calls": 0
+      }
+    },
+    {
+      "route": "POST /debug/memory/gc/configure",
+      "owner": "catalog:serveFamilyRoute:manage",
+      "group": "operations",
+      "main_status": "needs_fix",
+      "evidence": [
+        "internal/gateway/family/catalog_persistence.go"
+      ],
+      "observation": {
+        "route": "POST /debug/memory/gc/configure",
+        "anonymous": 401,
+        "user": 403,
+        "admin": 200,
+        "kv_changed": true,
+        "upstream_calls": 0
+      }
+    },
+    {
+      "route": "POST /end_user/block",
+      "owner": "catalog:serveFamilyRoute:manage",
+      "group": "metadata",
+      "main_status": "needs_verification",
+      "evidence": [
+        "internal/gateway/family/catalog_persistence.go"
+      ],
+      "observation": {
+        "route": "POST /end_user/block",
+        "anonymous": 401,
+        "user": 403,
+        "admin": 200,
+        "kv_changed": true,
+        "upstream_calls": 0
+      }
+    },
+    {
+      "route": "POST /end_user/delete",
+      "owner": "catalog:serveFamilyRoute:manage",
+      "group": "metadata",
+      "main_status": "needs_verification",
+      "evidence": [
+        "internal/gateway/family/catalog_persistence.go"
+      ],
+      "observation": {
+        "route": "POST /end_user/delete",
+        "anonymous": 401,
+        "user": 403,
+        "admin": 200,
+        "kv_changed": false,
+        "upstream_calls": 0
+      }
+    },
+    {
+      "route": "POST /end_user/new",
+      "owner": "catalog:serveFamilyRoute:manage",
+      "group": "metadata",
+      "main_status": "needs_verification",
+      "evidence": [
+        "internal/gateway/family/catalog_persistence.go"
+      ],
+      "observation": {
+        "route": "POST /end_user/new",
+        "anonymous": 401,
+        "user": 403,
+        "admin": 200,
+        "kv_changed": true,
+        "upstream_calls": 0
+      }
+    },
+    {
+      "route": "POST /end_user/unblock",
+      "owner": "catalog:serveFamilyRoute:manage",
+      "group": "metadata",
+      "main_status": "needs_verification",
+      "evidence": [
+        "internal/gateway/family/catalog_persistence.go"
+      ],
+      "observation": {
+        "route": "POST /end_user/unblock",
+        "anonymous": 401,
+        "user": 403,
+        "admin": 200,
+        "kv_changed": true,
+        "upstream_calls": 0
+      }
+    },
+    {
+      "route": "POST /end_user/update",
+      "owner": "catalog:serveFamilyRoute:manage",
+      "group": "metadata",
+      "main_status": "needs_verification",
+      "evidence": [
+        "internal/gateway/family/catalog_persistence.go"
+      ],
+      "observation": {
+        "route": "POST /end_user/update",
+        "anonymous": 401,
+        "user": 403,
+        "admin": 200,
+        "kv_changed": false,
+        "upstream_calls": 0
+      }
+    },
+    {
+      "route": "POST /fallback",
+      "owner": "catalog:serveFamilyRoute:manage",
+      "group": "model-alias",
+      "main_status": "needs_verification",
+      "evidence": [
+        "internal/gateway/family/catalog_persistence.go"
+      ],
+      "observation": {
+        "route": "POST /fallback",
+        "anonymous": 401,
+        "user": 403,
+        "admin": 200,
+        "kv_changed": true,
+        "upstream_calls": 0
+      }
+    },
+    {
+      "route": "POST /global/spend/refresh",
+      "owner": "catalog:serveFamilyRoute:manage",
+      "group": "analytics",
+      "main_status": "needs_verification",
+      "evidence": [
+        "internal/gateway/family/handlers.go"
+      ],
+      "observation": {
+        "route": "POST /global/spend/refresh",
+        "anonymous": 401,
+        "user": 403,
+        "admin": 200,
+        "kv_changed": true,
+        "upstream_calls": 0
+      }
+    },
+    {
+      "route": "POST /global/spend/reset",
+      "owner": "catalog:serveFamilyRoute:manage",
+      "group": "analytics",
+      "main_status": "needs_verification",
+      "evidence": [
+        "internal/gateway/family/handlers.go"
+      ],
+      "observation": {
+        "route": "POST /global/spend/reset",
+        "anonymous": 401,
+        "user": 403,
+        "admin": 200,
+        "kv_changed": true,
+        "upstream_calls": 0
+      }
+    },
+    {
+      "route": "POST /guardrails",
+      "owner": "catalog:serveFamilyRoute:manage",
+      "group": "guard",
+      "main_status": "needs_verification",
+      "evidence": [
+        "internal/gateway/guard/manage.go"
+      ],
+      "observation": {
+        "route": "POST /guardrails",
+        "anonymous": 401,
+        "user": 403,
+        "admin": 400,
+        "kv_changed": false,
+        "upstream_calls": 0
+      }
+    },
+    {
+      "route": "POST /guardrails/register",
+      "owner": "catalog:serveFamilyRoute:manage",
+      "group": "guard",
+      "main_status": "unsupported",
+      "evidence": [
+        "internal/gateway/guard/manage.go"
+      ],
+      "observation": {
+        "route": "POST /guardrails/register",
+        "anonymous": 401,
+        "user": 403,
+        "admin": 501,
+        "kv_changed": false,
+        "upstream_calls": 0
+      }
+    },
+    {
+      "route": "POST /guardrails/submissions/{guardrail_id}/approve",
+      "owner": "catalog:serveFamilyRoute:manage",
+      "group": "guard",
+      "main_status": "unsupported",
+      "evidence": [
+        "internal/gateway/guard/manage.go"
+      ],
+      "observation": {
+        "route": "POST /guardrails/submissions/{guardrail_id}/approve",
+        "anonymous": 401,
+        "user": 403,
+        "admin": 501,
+        "kv_changed": false,
+        "upstream_calls": 0
+      }
+    },
+    {
+      "route": "POST /guardrails/submissions/{guardrail_id}/reject",
+      "owner": "catalog:serveFamilyRoute:manage",
+      "group": "guard",
+      "main_status": "unsupported",
+      "evidence": [
+        "internal/gateway/guard/manage.go"
+      ],
+      "observation": {
+        "route": "POST /guardrails/submissions/{guardrail_id}/reject",
+        "anonymous": 401,
+        "user": 403,
+        "admin": 501,
+        "kv_changed": false,
+        "upstream_calls": 0
+      }
+    },
+    {
+      "route": "POST /guardrails/test_custom_code",
+      "owner": "catalog:serveFamilyRoute:manage",
+      "group": "guard",
+      "main_status": "needs_verification",
+      "evidence": [
+        "internal/gateway/guard/manage.go"
+      ],
+      "observation": {
+        "route": "POST /guardrails/test_custom_code",
+        "anonymous": 401,
+        "user": 403,
+        "admin": 200,
+        "kv_changed": false,
+        "upstream_calls": 0
+      }
+    },
+    {
+      "route": "POST /guardrails/validate_blocked_words_file",
+      "owner": "catalog:serveFamilyRoute:manage",
+      "group": "guard",
+      "main_status": "unsupported",
+      "evidence": [
+        "internal/gateway/guard/manage.go"
+      ],
+      "observation": {
+        "route": "POST /guardrails/validate_blocked_words_file",
+        "anonymous": 401,
+        "user": 403,
+        "admin": 501,
+        "kv_changed": false,
+        "upstream_calls": 0
+      }
+    },
+    {
+      "route": "POST /introspect",
+      "owner": "catalog:serveFamilyRoute:manage",
+      "group": "auth-alias",
+      "main_status": "needs_fix",
+      "evidence": [
+        "internal/gateway/family/catalog_persistence.go"
+      ],
+      "observation": {
+        "route": "POST /introspect",
+        "anonymous": 401,
+        "user": 403,
+        "admin": 200,
+        "kv_changed": true,
+        "upstream_calls": 0
+      }
+    },
+    {
+      "route": "POST /invitation/delete",
+      "owner": "catalog:serveFamilyRoute:manage",
+      "group": "auth-alias",
+      "main_status": "needs_fix",
+      "evidence": [
+        "internal/gateway/family/catalog_persistence.go"
+      ],
+      "observation": {
+        "route": "POST /invitation/delete",
+        "anonymous": 401,
+        "user": 403,
+        "admin": 200,
+        "kv_changed": false,
+        "upstream_calls": 0
+      }
+    },
+    {
+      "route": "POST /invitation/new",
+      "owner": "catalog:serveFamilyRoute:manage",
+      "group": "auth-alias",
+      "main_status": "needs_fix",
+      "evidence": [
+        "internal/gateway/family/catalog_persistence.go"
+      ],
+      "observation": {
+        "route": "POST /invitation/new",
+        "anonymous": 401,
+        "user": 403,
+        "admin": 200,
+        "kv_changed": true,
+        "upstream_calls": 0
+      }
+    },
+    {
+      "route": "POST /invitation/update",
+      "owner": "catalog:serveFamilyRoute:manage",
+      "group": "auth-alias",
+      "main_status": "needs_fix",
+      "evidence": [
+        "internal/gateway/family/catalog_persistence.go"
+      ],
+      "observation": {
+        "route": "POST /invitation/update",
+        "anonymous": 401,
+        "user": 403,
+        "admin": 200,
+        "kv_changed": false,
+        "upstream_calls": 0
+      }
+    },
+    {
+      "route": "POST /jwt/key/mapping/delete",
+      "owner": "catalog:serveFamilyRoute:manage",
+      "group": "auth-alias",
+      "main_status": "needs_fix",
+      "evidence": [
+        "internal/gateway/family/catalog_persistence.go"
+      ],
+      "observation": {
+        "route": "POST /jwt/key/mapping/delete",
+        "anonymous": 401,
+        "user": 403,
+        "admin": 200,
+        "kv_changed": false,
+        "upstream_calls": 0
+      }
+    },
+    {
+      "route": "POST /jwt/key/mapping/new",
+      "owner": "catalog:serveFamilyRoute:manage",
+      "group": "auth-alias",
+      "main_status": "needs_fix",
+      "evidence": [
+        "internal/gateway/family/catalog_persistence.go"
+      ],
+      "observation": {
+        "route": "POST /jwt/key/mapping/new",
+        "anonymous": 401,
+        "user": 403,
+        "admin": 200,
+        "kv_changed": true,
+        "upstream_calls": 0
+      }
+    },
+    {
+      "route": "POST /jwt/key/mapping/update",
+      "owner": "catalog:serveFamilyRoute:manage",
+      "group": "auth-alias",
+      "main_status": "needs_fix",
+      "evidence": [
+        "internal/gateway/family/catalog_persistence.go"
+      ],
+      "observation": {
+        "route": "POST /jwt/key/mapping/update",
+        "anonymous": 401,
+        "user": 403,
+        "admin": 200,
+        "kv_changed": false,
+        "upstream_calls": 0
+      }
+    },
+    {
+      "route": "POST /lazy/warm/{name}",
+      "owner": "catalog:serveFamilyRoute:manage",
+      "group": "runtime-ops",
+      "main_status": "needs_fix",
+      "evidence": [
+        "internal/gateway/family/catalog_persistence.go"
+      ],
+      "observation": {
+        "route": "POST /lazy/warm/{name}",
+        "anonymous": 401,
+        "user": 403,
+        "admin": 200,
+        "kv_changed": true,
+        "upstream_calls": 0
+      }
+    },
+    {
+      "route": "POST /make_public",
+      "owner": "catalog:serveFamilyRoute:manage",
+      "group": "model-alias",
+      "main_status": "needs_verification",
+      "evidence": [
+        "internal/gateway/family/catalog_persistence.go"
+      ],
+      "observation": {
+        "route": "POST /make_public",
+        "anonymous": 401,
+        "user": 403,
+        "admin": 200,
+        "kv_changed": true,
+        "upstream_calls": 0
+      }
+    },
+    {
+      "route": "POST /model/block",
+      "owner": "catalog:serveFamilyRoute:manage",
+      "group": "model-alias",
+      "main_status": "needs_verification",
+      "evidence": [
+        "internal/gateway/family/catalog_persistence.go"
+      ],
+      "observation": {
+        "route": "POST /model/block",
+        "anonymous": 401,
+        "user": 403,
+        "admin": 200,
+        "kv_changed": true,
+        "upstream_calls": 0
+      }
+    },
+    {
+      "route": "POST /model/unblock",
+      "owner": "catalog:serveFamilyRoute:manage",
+      "group": "model-alias",
+      "main_status": "needs_verification",
+      "evidence": [
+        "internal/gateway/family/catalog_persistence.go"
+      ],
+      "observation": {
+        "route": "POST /model/unblock",
+        "anonymous": 401,
+        "user": 403,
+        "admin": 200,
+        "kv_changed": true,
+        "upstream_calls": 0
+      }
+    },
+    {
+      "route": "POST /model_group/make_public",
+      "owner": "catalog:serveFamilyRoute:manage",
+      "group": "model-alias",
+      "main_status": "needs_verification",
+      "evidence": [
+        "internal/gateway/family/catalog_persistence.go"
+      ],
+      "observation": {
+        "route": "POST /model_group/make_public",
+        "anonymous": 401,
+        "user": 403,
+        "admin": 200,
+        "kv_changed": true,
+        "upstream_calls": 0
+      }
+    },
+    {
+      "route": "POST /models/{model_name}:countTokens",
+      "owner": "catalog:serveFamilyRoute:manage",
+      "group": "legacy-inference",
+      "main_status": "needs_fix",
+      "evidence": [
+        "internal/gateway/family/catalog_persistence.go"
+      ],
+      "observation": {
+        "route": "POST /models/{model_name}:countTokens",
+        "anonymous": 401,
+        "user": 403,
+        "admin": 200,
+        "kv_changed": true,
+        "upstream_calls": 0
+      }
+    },
+    {
+      "route": "POST /models/{model_name}:generateContent",
+      "owner": "catalog:serveFamilyRoute:manage",
+      "group": "legacy-inference",
+      "main_status": "needs_fix",
+      "evidence": [
+        "internal/gateway/family/catalog_persistence.go"
+      ],
+      "observation": {
+        "route": "POST /models/{model_name}:generateContent",
+        "anonymous": 401,
+        "user": 403,
+        "admin": 200,
+        "kv_changed": true,
+        "upstream_calls": 0
+      }
+    },
+    {
+      "route": "POST /models/{model_name}:streamGenerateContent",
+      "owner": "catalog:serveFamilyRoute:manage",
+      "group": "legacy-inference",
+      "main_status": "needs_fix",
+      "evidence": [
+        "internal/gateway/family/catalog_persistence.go"
+      ],
+      "observation": {
+        "route": "POST /models/{model_name}:streamGenerateContent",
+        "anonymous": 401,
+        "user": 403,
+        "admin": 200,
+        "kv_changed": true,
+        "upstream_calls": 0
+      }
+    },
+    {
+      "route": "POST /ocr",
+      "owner": "catalog:serveFamilyRoute:manage",
+      "group": "legacy-inference",
+      "main_status": "needs_fix",
+      "evidence": [
+        "internal/gateway/family/catalog_persistence.go"
+      ],
+      "observation": {
+        "route": "POST /ocr",
+        "anonymous": 401,
+        "user": 403,
+        "admin": 200,
+        "kv_changed": true,
+        "upstream_calls": 0
+      }
+    },
+    {
+      "route": "POST /onboarding/claim_token",
+      "owner": "catalog:serveFamilyRoute:manage",
+      "group": "auth-alias",
+      "main_status": "needs_fix",
+      "evidence": [
+        "internal/gateway/family/catalog_persistence.go"
+      ],
+      "observation": {
+        "route": "POST /onboarding/claim_token",
+        "anonymous": 401,
+        "user": 403,
+        "admin": 200,
+        "kv_changed": true,
+        "upstream_calls": 0
+      }
+    },
+    {
+      "route": "POST /organization/info",
+      "owner": "catalog:serveFamilyRoute:manage",
+      "group": "budget-iam",
+      "main_status": "needs_verification",
+      "evidence": [
+        "internal/gateway/family/catalog_persistence.go"
+      ],
+      "observation": {
+        "route": "POST /organization/info",
+        "anonymous": 401,
+        "user": 403,
+        "admin": 200,
+        "kv_changed": false,
+        "upstream_calls": 0
+      }
+    },
+    {
+      "route": "POST /policies",
+      "owner": "catalog:serveFamilyRoute:manage",
+      "group": "resource-config",
+      "main_status": "verified",
+      "evidence": [
+        "cmd/regression/policy_config_service_test.go"
+      ],
+      "observation": {
+        "route": "POST /policies",
+        "anonymous": 401,
+        "user": 403,
+        "admin": 200,
+        "kv_changed": true,
+        "upstream_calls": 0
+      }
+    },
+    {
+      "route": "POST /policies/attachments",
+      "owner": "catalog:serveFamilyRoute:manage",
+      "group": "service-aux",
+      "main_status": "needs_fix",
+      "evidence": [
+        "internal/gateway/family/handlers.go"
+      ],
+      "observation": {
+        "route": "POST /policies/attachments",
+        "anonymous": 401,
+        "user": 403,
+        "admin": 200,
+        "kv_changed": true,
+        "upstream_calls": 0
+      }
+    },
+    {
+      "route": "POST /policies/attachments/estimate-impact",
+      "owner": "catalog:serveFamilyRoute:manage",
+      "group": "service-aux",
+      "main_status": "needs_fix",
+      "evidence": [
+        "internal/gateway/family/handlers.go"
+      ],
+      "observation": {
+        "route": "POST /policies/attachments/estimate-impact",
+        "anonymous": 401,
+        "user": 403,
+        "admin": 200,
+        "kv_changed": true,
+        "upstream_calls": 0
+      }
+    },
+    {
+      "route": "POST /policies/name/{policy_name}/versions",
+      "owner": "catalog:serveFamilyRoute:manage",
+      "group": "service-aux",
+      "main_status": "needs_fix",
+      "evidence": [
+        "internal/gateway/family/handlers.go"
+      ],
+      "observation": {
+        "route": "POST /policies/name/{policy_name}/versions",
+        "anonymous": 401,
+        "user": 403,
+        "admin": 200,
+        "kv_changed": true,
+        "upstream_calls": 0
+      }
+    },
+    {
+      "route": "POST /policies/resolve",
+      "owner": "catalog:serveFamilyRoute:manage",
+      "group": "service-aux",
+      "main_status": "needs_fix",
+      "evidence": [
+        "internal/gateway/family/handlers.go"
+      ],
+      "observation": {
+        "route": "POST /policies/resolve",
+        "anonymous": 401,
+        "user": 403,
+        "admin": 200,
+        "kv_changed": true,
+        "upstream_calls": 0
+      }
+    },
+    {
+      "route": "POST /policies/test-pipeline",
+      "owner": "catalog:serveFamilyRoute:manage",
+      "group": "service-aux",
+      "main_status": "needs_fix",
+      "evidence": [
+        "internal/gateway/family/handlers.go"
+      ],
+      "observation": {
+        "route": "POST /policies/test-pipeline",
+        "anonymous": 401,
+        "user": 403,
+        "admin": 200,
+        "kv_changed": true,
+        "upstream_calls": 0
+      }
+    },
+    {
+      "route": "POST /policy/templates/enrich",
+      "owner": "catalog:serveFamilyRoute:manage",
+      "group": "service-aux",
+      "main_status": "needs_fix",
+      "evidence": [
+        "internal/gateway/family/handlers.go"
+      ],
+      "observation": {
+        "route": "POST /policy/templates/enrich",
+        "anonymous": 401,
+        "user": 403,
+        "admin": 200,
+        "kv_changed": true,
+        "upstream_calls": 0
+      }
+    },
+    {
+      "route": "POST /policy/templates/enrich/stream",
+      "owner": "catalog:serveFamilyRoute:manage",
+      "group": "service-aux",
+      "main_status": "needs_fix",
+      "evidence": [
+        "internal/gateway/family/handlers.go"
+      ],
+      "observation": {
+        "route": "POST /policy/templates/enrich/stream",
+        "anonymous": 401,
+        "user": 403,
+        "admin": 200,
+        "kv_changed": true,
+        "upstream_calls": 0
+      }
+    },
+    {
+      "route": "POST /policy/templates/suggest",
+      "owner": "catalog:serveFamilyRoute:manage",
+      "group": "service-aux",
+      "main_status": "needs_fix",
+      "evidence": [
+        "internal/gateway/family/handlers.go"
+      ],
+      "observation": {
+        "route": "POST /policy/templates/suggest",
+        "anonymous": 401,
+        "user": 403,
+        "admin": 200,
+        "kv_changed": true,
+        "upstream_calls": 0
+      }
+    },
+    {
+      "route": "POST /policy/templates/test",
+      "owner": "catalog:serveFamilyRoute:manage",
+      "group": "service-aux",
+      "main_status": "needs_fix",
+      "evidence": [
+        "internal/gateway/family/handlers.go"
+      ],
+      "observation": {
+        "route": "POST /policy/templates/test",
+        "anonymous": 401,
+        "user": 403,
+        "admin": 200,
+        "kv_changed": true,
+        "upstream_calls": 0
+      }
+    },
+    {
+      "route": "POST /policy/test",
+      "owner": "catalog:serveFamilyRoute:manage",
+      "group": "service-aux",
+      "main_status": "needs_fix",
+      "evidence": [
+        "internal/gateway/family/handlers.go"
+      ],
+      "observation": {
+        "route": "POST /policy/test",
+        "anonymous": 401,
+        "user": 403,
+        "admin": 200,
+        "kv_changed": false,
+        "upstream_calls": 0
+      }
+    },
+    {
+      "route": "POST /policy/validate",
+      "owner": "catalog:serveFamilyRoute:manage",
+      "group": "service-aux",
+      "main_status": "needs_fix",
+      "evidence": [
+        "internal/gateway/family/handlers.go"
+      ],
+      "observation": {
+        "route": "POST /policy/validate",
+        "anonymous": 401,
+        "user": 403,
+        "admin": 200,
+        "kv_changed": true,
+        "upstream_calls": 0
+      }
+    },
+    {
+      "route": "POST /prompts",
+      "owner": "catalog:serveFamilyRoute:manage",
+      "group": "resource-config",
+      "main_status": "verified",
+      "evidence": [
+        "cmd/regression/prompt_config_service_test.go"
+      ],
+      "observation": {
+        "route": "POST /prompts",
+        "anonymous": 401,
+        "user": 403,
+        "admin": 200,
+        "kv_changed": false,
+        "upstream_calls": 0
+      }
+    },
+    {
+      "route": "POST /rag/ingest",
+      "owner": "catalog:serveFamilyRoute:manage",
+      "group": "legacy-inference",
+      "main_status": "needs_fix",
+      "evidence": [
+        "internal/gateway/family/catalog_persistence.go"
+      ],
+      "observation": {
+        "route": "POST /rag/ingest",
+        "anonymous": 401,
+        "user": 403,
+        "admin": 200,
+        "kv_changed": true,
+        "upstream_calls": 0
+      }
+    },
+    {
+      "route": "POST /rag/query",
+      "owner": "catalog:serveFamilyRoute:manage",
+      "group": "legacy-inference",
+      "main_status": "needs_fix",
+      "evidence": [
+        "internal/gateway/family/catalog_persistence.go"
+      ],
+      "observation": {
+        "route": "POST /rag/query",
+        "anonymous": 401,
+        "user": 403,
+        "admin": 200,
+        "kv_changed": true,
+        "upstream_calls": 0
+      }
+    },
+    {
+      "route": "POST /register",
+      "owner": "catalog:serveFamilyRoute:manage",
+      "group": "auth-alias",
+      "main_status": "needs_fix",
+      "evidence": [
+        "internal/gateway/family/catalog_persistence.go"
+      ],
+      "observation": {
+        "route": "POST /register",
+        "anonymous": 401,
+        "user": 403,
+        "admin": 200,
+        "kv_changed": true,
+        "upstream_calls": 0
+      }
+    },
+    {
+      "route": "POST /reload/anthropic_beta_headers",
+      "owner": "catalog:serveFamilyRoute:manage",
+      "group": "runtime-ops",
+      "main_status": "needs_fix",
+      "evidence": [
+        "internal/gateway/family/catalog_persistence.go"
+      ],
+      "observation": {
+        "route": "POST /reload/anthropic_beta_headers",
+        "anonymous": 401,
+        "user": 403,
+        "admin": 200,
+        "kv_changed": true,
+        "upstream_calls": 0
+      }
+    },
+    {
+      "route": "POST /revoke",
+      "owner": "catalog:serveFamilyRoute:manage",
+      "group": "auth-alias",
+      "main_status": "needs_fix",
+      "evidence": [
+        "internal/gateway/family/catalog_persistence.go"
+      ],
+      "observation": {
+        "route": "POST /revoke",
+        "anonymous": 401,
+        "user": 403,
+        "admin": 200,
+        "kv_changed": true,
+        "upstream_calls": 0
+      }
+    },
+    {
+      "route": "POST /schedule/anthropic_beta_headers_reload",
+      "owner": "catalog:serveFamilyRoute:manage",
+      "group": "runtime-ops",
+      "main_status": "needs_fix",
+      "evidence": [
+        "internal/gateway/family/catalog_persistence.go"
+      ],
+      "observation": {
+        "route": "POST /schedule/anthropic_beta_headers_reload",
+        "anonymous": 401,
+        "user": 403,
+        "admin": 200,
+        "kv_changed": true,
+        "upstream_calls": 0
+      }
+    },
+    {
+      "route": "POST /search_tools",
+      "owner": "catalog:serveFamilyRoute:manage",
+      "group": "resource-config",
+      "main_status": "verified",
+      "evidence": [
+        "cmd/regression/search_config_service_test.go"
+      ],
+      "observation": {
+        "route": "POST /search_tools",
+        "anonymous": 401,
+        "user": 403,
+        "admin": 200,
+        "kv_changed": true,
+        "upstream_calls": 0
+      }
+    },
+    {
+      "route": "POST /server",
+      "owner": "catalog:serveFamilyRoute:manage",
+      "group": "server",
+      "main_status": "needs_verification",
+      "evidence": [
+        "internal/gateway/family/catalog_persistence.go"
+      ],
+      "observation": {
+        "route": "POST /server",
+        "anonymous": 401,
+        "user": 403,
+        "admin": 200,
+        "kv_changed": true,
+        "upstream_calls": 0
+      }
+    },
+    {
+      "route": "POST /server/import",
+      "owner": "catalog:serveFamilyRoute:manage",
+      "group": "server",
+      "main_status": "needs_verification",
+      "evidence": [
+        "internal/gateway/family/catalog_persistence.go"
+      ],
+      "observation": {
+        "route": "POST /server/import",
+        "anonymous": 401,
+        "user": 403,
+        "admin": 200,
+        "kv_changed": true,
+        "upstream_calls": 0
+      }
+    },
+    {
+      "route": "POST /server/oauth/session",
+      "owner": "catalog:serveFamilyRoute:manage",
+      "group": "server",
+      "main_status": "needs_verification",
+      "evidence": [
+        "internal/gateway/family/catalog_persistence.go"
+      ],
+      "observation": {
+        "route": "POST /server/oauth/session",
+        "anonymous": 401,
+        "user": 403,
+        "admin": 200,
+        "kv_changed": true,
+        "upstream_calls": 0
+      }
+    },
+    {
+      "route": "POST /server/oauth/{server_id}/register",
+      "owner": "catalog:serveFamilyRoute:manage",
+      "group": "server",
+      "main_status": "needs_verification",
+      "evidence": [
+        "internal/gateway/family/catalog_persistence.go"
+      ],
+      "observation": {
+        "route": "POST /server/oauth/{server_id}/register",
+        "anonymous": 401,
+        "user": 403,
+        "admin": 200,
+        "kv_changed": false,
+        "upstream_calls": 0
+      }
+    },
+    {
+      "route": "POST /server/oauth/{server_id}/token",
+      "owner": "catalog:serveFamilyRoute:manage",
+      "group": "server",
+      "main_status": "needs_verification",
+      "evidence": [
+        "internal/gateway/family/catalog_persistence.go"
+      ],
+      "observation": {
+        "route": "POST /server/oauth/{server_id}/token",
+        "anonymous": 401,
+        "user": 403,
+        "admin": 200,
+        "kv_changed": true,
+        "upstream_calls": 0
+      }
+    },
+    {
+      "route": "POST /server/register",
+      "owner": "catalog:serveFamilyRoute:manage",
+      "group": "server",
+      "main_status": "needs_verification",
+      "evidence": [
+        "internal/gateway/family/catalog_persistence.go"
+      ],
+      "observation": {
+        "route": "POST /server/register",
+        "anonymous": 401,
+        "user": 403,
+        "admin": 200,
+        "kv_changed": false,
+        "upstream_calls": 0
+      }
+    },
+    {
+      "route": "POST /server/{server_id}/oauth-user-credential",
+      "owner": "catalog:serveFamilyRoute:manage",
+      "group": "server",
+      "main_status": "needs_verification",
+      "evidence": [
+        "internal/gateway/family/catalog_persistence.go"
+      ],
+      "observation": {
+        "route": "POST /server/{server_id}/oauth-user-credential",
+        "anonymous": 401,
+        "user": 403,
+        "admin": 200,
+        "kv_changed": true,
+        "upstream_calls": 0
+      }
+    },
+    {
+      "route": "POST /server/{server_id}/user-credential",
+      "owner": "catalog:serveFamilyRoute:manage",
+      "group": "server",
+      "main_status": "needs_verification",
+      "evidence": [
+        "internal/gateway/family/catalog_persistence.go"
+      ],
+      "observation": {
+        "route": "POST /server/{server_id}/user-credential",
+        "anonymous": 401,
+        "user": 403,
+        "admin": 200,
+        "kv_changed": true,
+        "upstream_calls": 0
+      }
+    },
+    {
+      "route": "POST /server/{server_id}/user-env-vars",
+      "owner": "catalog:serveFamilyRoute:manage",
+      "group": "server",
+      "main_status": "needs_verification",
+      "evidence": [
+        "internal/gateway/family/catalog_persistence.go"
+      ],
+      "observation": {
+        "route": "POST /server/{server_id}/user-env-vars",
+        "anonymous": 401,
+        "user": 403,
+        "admin": 200,
+        "kv_changed": true,
+        "upstream_calls": 0
+      }
+    },
+    {
+      "route": "POST /tag/delete",
+      "owner": "catalog:serveFamilyRoute:manage",
+      "group": "metadata",
+      "main_status": "needs_verification",
+      "evidence": [
+        "internal/gateway/family/catalog_persistence.go"
+      ],
+      "observation": {
+        "route": "POST /tag/delete",
+        "anonymous": 401,
+        "user": 403,
+        "admin": 200,
+        "kv_changed": false,
+        "upstream_calls": 0
+      }
+    },
+    {
+      "route": "POST /tag/info",
+      "owner": "catalog:serveFamilyRoute:manage",
+      "group": "metadata",
+      "main_status": "needs_verification",
+      "evidence": [
+        "internal/gateway/family/catalog_persistence.go"
+      ],
+      "observation": {
+        "route": "POST /tag/info",
+        "anonymous": 401,
+        "user": 403,
+        "admin": 404,
+        "kv_changed": false,
+        "upstream_calls": 0
+      }
+    },
+    {
+      "route": "POST /tag/new",
+      "owner": "catalog:serveFamilyRoute:manage",
+      "group": "metadata",
+      "main_status": "needs_verification",
+      "evidence": [
+        "internal/gateway/family/catalog_persistence.go"
+      ],
+      "observation": {
+        "route": "POST /tag/new",
+        "anonymous": 401,
+        "user": 403,
+        "admin": 200,
+        "kv_changed": true,
+        "upstream_calls": 0
+      }
+    },
+    {
+      "route": "POST /tag/update",
+      "owner": "catalog:serveFamilyRoute:manage",
+      "group": "metadata",
+      "main_status": "needs_verification",
+      "evidence": [
+        "internal/gateway/family/catalog_persistence.go"
+      ],
+      "observation": {
+        "route": "POST /tag/update",
+        "anonymous": 401,
+        "user": 403,
+        "admin": 200,
+        "kv_changed": false,
+        "upstream_calls": 0
+      }
+    },
+    {
+      "route": "POST /team/block",
+      "owner": "catalog:serveFamilyRoute:manage",
+      "group": "budget-iam",
+      "main_status": "needs_verification",
+      "evidence": [
+        "internal/gateway/family/catalog_persistence.go"
+      ],
+      "observation": {
+        "route": "POST /team/block",
+        "anonymous": 401,
+        "user": 403,
+        "admin": 200,
+        "kv_changed": true,
+        "upstream_calls": 0
+      }
+    },
+    {
+      "route": "POST /team/bulk_member_add",
+      "owner": "catalog:serveFamilyRoute:manage",
+      "group": "budget-iam",
+      "main_status": "needs_verification",
+      "evidence": [
+        "internal/gateway/family/catalog_persistence.go"
+      ],
+      "observation": {
+        "route": "POST /team/bulk_member_add",
+        "anonymous": 401,
+        "user": 403,
+        "admin": 200,
+        "kv_changed": true,
+        "upstream_calls": 0
+      }
+    },
+    {
+      "route": "POST /team/key/bulk_update",
+      "owner": "catalog:serveFamilyRoute:manage",
+      "group": "budget-iam",
+      "main_status": "needs_verification",
+      "evidence": [
+        "internal/gateway/family/catalog_persistence.go"
+      ],
+      "observation": {
+        "route": "POST /team/key/bulk_update",
+        "anonymous": 401,
+        "user": 403,
+        "admin": 200,
+        "kv_changed": true,
+        "upstream_calls": 0
+      }
+    },
+    {
+      "route": "POST /team/model/add",
+      "owner": "catalog:serveFamilyRoute:manage",
+      "group": "budget-iam",
+      "main_status": "needs_verification",
+      "evidence": [
+        "internal/gateway/family/catalog_persistence.go"
+      ],
+      "observation": {
+        "route": "POST /team/model/add",
+        "anonymous": 401,
+        "user": 403,
+        "admin": 200,
+        "kv_changed": true,
+        "upstream_calls": 0
+      }
+    },
+    {
+      "route": "POST /team/model/delete",
+      "owner": "catalog:serveFamilyRoute:manage",
+      "group": "budget-iam",
+      "main_status": "needs_verification",
+      "evidence": [
+        "internal/gateway/family/catalog_persistence.go"
+      ],
+      "observation": {
+        "route": "POST /team/model/delete",
+        "anonymous": 401,
+        "user": 403,
+        "admin": 200,
+        "kv_changed": false,
+        "upstream_calls": 0
+      }
+    },
+    {
+      "route": "POST /team/permissions_bulk_update",
+      "owner": "catalog:serveFamilyRoute:manage",
+      "group": "budget-iam",
+      "main_status": "needs_verification",
+      "evidence": [
+        "internal/gateway/family/catalog_persistence.go"
+      ],
+      "observation": {
+        "route": "POST /team/permissions_bulk_update",
+        "anonymous": 401,
+        "user": 403,
+        "admin": 200,
+        "kv_changed": true,
+        "upstream_calls": 0
+      }
+    },
+    {
+      "route": "POST /team/permissions_update",
+      "owner": "catalog:serveFamilyRoute:manage",
+      "group": "budget-iam",
+      "main_status": "needs_verification",
+      "evidence": [
+        "internal/gateway/family/catalog_persistence.go"
+      ],
+      "observation": {
+        "route": "POST /team/permissions_update",
+        "anonymous": 401,
+        "user": 403,
+        "admin": 200,
+        "kv_changed": true,
+        "upstream_calls": 0
+      }
+    },
+    {
+      "route": "POST /team/unblock",
+      "owner": "catalog:serveFamilyRoute:manage",
+      "group": "budget-iam",
+      "main_status": "needs_verification",
+      "evidence": [
+        "internal/gateway/family/catalog_persistence.go"
+      ],
+      "observation": {
+        "route": "POST /team/unblock",
+        "anonymous": 401,
+        "user": 403,
+        "admin": 200,
+        "kv_changed": true,
+        "upstream_calls": 0
+      }
+    },
+    {
+      "route": "POST /team/{team_id}/disable_logging",
+      "owner": "catalog:serveFamilyRoute:manage",
+      "group": "budget-iam",
+      "main_status": "needs_verification",
+      "evidence": [
+        "internal/gateway/family/catalog_persistence.go"
+      ],
+      "observation": {
+        "route": "POST /team/{team_id}/disable_logging",
+        "anonymous": 401,
+        "user": 403,
+        "admin": 200,
+        "kv_changed": true,
+        "upstream_calls": 0
+      }
+    },
+    {
+      "route": "POST /team/{team_id}/member/{user_id}/reset_spend",
+      "owner": "catalog:serveFamilyRoute:manage",
+      "group": "analytics",
+      "main_status": "needs_verification",
+      "evidence": [
+        "internal/gateway/family/handlers.go"
+      ],
+      "observation": {
+        "route": "POST /team/{team_id}/member/{user_id}/reset_spend",
+        "anonymous": 401,
+        "user": 403,
+        "admin": 200,
+        "kv_changed": true,
+        "upstream_calls": 0
+      }
+    },
+    {
+      "route": "POST /test/connection",
+      "owner": "catalog:serveFamilyRoute:manage",
+      "group": "auth-alias",
+      "main_status": "needs_fix",
+      "evidence": [
+        "internal/gateway/family/catalog_persistence.go"
+      ],
+      "observation": {
+        "route": "POST /test/connection",
+        "anonymous": 401,
+        "user": 403,
+        "admin": 200,
+        "kv_changed": true,
+        "upstream_calls": 0
+      }
+    },
+    {
+      "route": "POST /token",
+      "owner": "catalog:serveFamilyRoute:manage",
+      "group": "auth-alias",
+      "main_status": "needs_fix",
+      "evidence": [
+        "internal/gateway/family/catalog_persistence.go"
+      ],
+      "observation": {
+        "route": "POST /token",
+        "anonymous": 401,
+        "user": 403,
+        "admin": 200,
+        "kv_changed": true,
+        "upstream_calls": 0
+      }
+    },
+    {
+      "route": "POST /utils/test_policies_and_guardrails",
+      "owner": "catalog:serveFamilyRoute:manage",
+      "group": "service-aux",
+      "main_status": "needs_fix",
+      "evidence": [
+        "internal/gateway/family/handlers.go"
+      ],
+      "observation": {
+        "route": "POST /utils/test_policies_and_guardrails",
+        "anonymous": 401,
+        "user": 403,
+        "admin": 200,
+        "kv_changed": true,
+        "upstream_calls": 0
+      }
+    },
+    {
+      "route": "POST /v1/access_group",
+      "owner": "catalog:serveFamilyRoute:manage",
+      "group": "access-vector",
+      "main_status": "needs_verification",
+      "evidence": [
+        "internal/gateway/family/catalog_persistence.go"
+      ],
+      "observation": {
+        "route": "POST /v1/access_group",
+        "anonymous": 401,
+        "user": 403,
+        "admin": 200,
+        "kv_changed": false,
+        "upstream_calls": 0
+      }
+    },
+    {
+      "route": "POST /v1/skills",
+      "owner": "catalog:serveFamilyRoute:manage",
+      "group": "skills",
+      "main_status": "needs_verification",
+      "evidence": [
+        "internal/gateway/family/handlers.go"
+      ],
+      "observation": {
+        "route": "POST /v1/skills",
+        "anonymous": 401,
+        "user": 403,
+        "admin": 200,
+        "kv_changed": true,
+        "upstream_calls": 0
+      }
+    },
+    {
+      "route": "POST /v3/login/exchange",
+      "owner": "catalog:serveFamilyRoute:manage",
+      "group": "auth-alias",
+      "main_status": "needs_fix",
+      "evidence": [
+        "internal/gateway/family/catalog_persistence.go"
+      ],
+      "observation": {
+        "route": "POST /v3/login/exchange",
+        "anonymous": 401,
+        "user": 403,
+        "admin": 200,
+        "kv_changed": true,
+        "upstream_calls": 0
+      }
+    },
+    {
+      "route": "POST /vantage/dry-run",
+      "owner": "catalog:serveFamilyRoute:manage",
+      "group": "runtime-ops",
+      "main_status": "needs_fix",
+      "evidence": [
+        "internal/gateway/family/catalog_persistence.go"
+      ],
+      "observation": {
+        "route": "POST /vantage/dry-run",
+        "anonymous": 401,
+        "user": 403,
+        "admin": 200,
+        "kv_changed": true,
+        "upstream_calls": 0
+      }
+    },
+    {
+      "route": "POST /vantage/export",
+      "owner": "catalog:serveFamilyRoute:manage",
+      "group": "runtime-ops",
+      "main_status": "needs_fix",
+      "evidence": [
+        "internal/gateway/family/catalog_persistence.go"
+      ],
+      "observation": {
+        "route": "POST /vantage/export",
+        "anonymous": 401,
+        "user": 403,
+        "admin": 200,
+        "kv_changed": true,
+        "upstream_calls": 0
+      }
+    },
+    {
+      "route": "POST /vantage/init",
+      "owner": "catalog:serveFamilyRoute:manage",
+      "group": "runtime-ops",
+      "main_status": "needs_fix",
+      "evidence": [
+        "internal/gateway/family/catalog_persistence.go"
+      ],
+      "observation": {
+        "route": "POST /vantage/init",
+        "anonymous": 401,
+        "user": 403,
+        "admin": 200,
+        "kv_changed": true,
+        "upstream_calls": 0
+      }
+    },
+    {
+      "route": "POST /vector_store/delete",
+      "owner": "catalog:serveFamilyRoute:manage",
+      "group": "access-vector",
+      "main_status": "needs_verification",
+      "evidence": [
+        "internal/gateway/family/catalog_persistence.go"
+      ],
+      "observation": {
+        "route": "POST /vector_store/delete",
+        "anonymous": 401,
+        "user": 403,
+        "admin": 200,
+        "kv_changed": false,
+        "upstream_calls": 0
+      }
+    },
+    {
+      "route": "POST /vector_store/info",
+      "owner": "catalog:serveFamilyRoute:manage",
+      "group": "access-vector",
+      "main_status": "needs_verification",
+      "evidence": [
+        "internal/gateway/family/catalog_persistence.go"
+      ],
+      "observation": {
+        "route": "POST /vector_store/info",
+        "anonymous": 401,
+        "user": 403,
+        "admin": 404,
+        "kv_changed": false,
+        "upstream_calls": 0
+      }
+    },
+    {
+      "route": "POST /vector_store/new",
+      "owner": "catalog:serveFamilyRoute:manage",
+      "group": "access-vector",
+      "main_status": "needs_verification",
+      "evidence": [
+        "internal/gateway/family/catalog_persistence.go"
+      ],
+      "observation": {
+        "route": "POST /vector_store/new",
+        "anonymous": 401,
+        "user": 403,
+        "admin": 200,
+        "kv_changed": true,
+        "upstream_calls": 0
+      }
+    },
+    {
+      "route": "POST /vector_store/update",
+      "owner": "catalog:serveFamilyRoute:manage",
+      "group": "access-vector",
+      "main_status": "needs_verification",
+      "evidence": [
+        "internal/gateway/family/catalog_persistence.go"
+      ],
+      "observation": {
+        "route": "POST /vector_store/update",
+        "anonymous": 401,
+        "user": 403,
+        "admin": 200,
+        "kv_changed": false,
+        "upstream_calls": 0
+      }
+    },
+    {
+      "route": "POST /{provider}/v1/batches",
+      "owner": "catalog:serveFamilyRoute:manage",
+      "group": "provider-batch",
+      "main_status": "needs_fix",
+      "evidence": [
+        "internal/gateway/family/catalog_persistence.go"
+      ],
+      "observation": {
+        "route": "POST /{provider}/v1/batches",
+        "anonymous": 401,
+        "user": 403,
+        "admin": 200,
+        "kv_changed": true,
+        "upstream_calls": 0
+      }
+    },
+    {
+      "route": "POST /{provider}/v1/batches/{batch_id}/cancel",
+      "owner": "catalog:serveFamilyRoute:manage",
+      "group": "provider-batch",
+      "main_status": "needs_fix",
+      "evidence": [
+        "internal/gateway/family/catalog_persistence.go"
+      ],
+      "observation": {
+        "route": "POST /{provider}/v1/batches/{batch_id}/cancel",
+        "anonymous": 401,
+        "user": 403,
+        "admin": 200,
+        "kv_changed": true,
+        "upstream_calls": 0
+      }
+    },
+    {
+      "route": "POST /{provider}/v1/files",
+      "owner": "catalog:filesContract:manage",
+      "group": "protocol-alias",
+      "main_status": "needs_fix",
+      "evidence": [
+        "internal/gateway/ingress.go"
+      ],
+      "observation": {
+        "route": "POST /{provider}/v1/files",
+        "anonymous": 401,
+        "user": 403,
+        "admin": 200,
+        "kv_changed": true,
+        "upstream_calls": 0
+      }
+    },
+    {
+      "route": "PUT /access_group/{access_group}/update",
+      "owner": "catalog:serveFamilyRoute:manage",
+      "group": "access-vector",
+      "main_status": "needs_verification",
+      "evidence": [
+        "internal/gateway/family/catalog_persistence.go"
+      ],
+      "observation": {
+        "route": "PUT /access_group/{access_group}/update",
+        "anonymous": 401,
+        "user": 403,
+        "admin": 200,
+        "kv_changed": false,
+        "upstream_calls": 0
+      }
+    },
+    {
+      "route": "PUT /claude-code/plugins/{plugin_name}",
+      "owner": "catalog:serveFamilyRoute:manage",
+      "group": "plugin",
+      "main_status": "needs_verification",
+      "evidence": [
+        "internal/gateway/family/catalog_persistence.go"
+      ],
+      "observation": {
+        "route": "PUT /claude-code/plugins/{plugin_name}",
+        "anonymous": 401,
+        "user": 403,
+        "admin": 200,
+        "kv_changed": false,
+        "upstream_calls": 0
+      }
+    },
+    {
+      "route": "PUT /guardrails/{guardrail_id}",
+      "owner": "catalog:serveFamilyRoute:manage",
+      "group": "guard",
+      "main_status": "needs_verification",
+      "evidence": [
+        "internal/gateway/guard/manage.go"
+      ],
+      "observation": {
+        "route": "PUT /guardrails/{guardrail_id}",
+        "anonymous": 401,
+        "user": 403,
+        "admin": 404,
+        "kv_changed": false,
+        "upstream_calls": 0
+      }
+    },
+    {
+      "route": "PUT /policies/{policy_id}",
+      "owner": "catalog:serveFamilyRoute:manage",
+      "group": "resource-config",
+      "main_status": "verified",
+      "evidence": [
+        "cmd/regression/policy_config_service_test.go"
+      ],
+      "observation": {
+        "route": "PUT /policies/{policy_id}",
+        "anonymous": 401,
+        "user": 403,
+        "admin": 200,
+        "kv_changed": false,
+        "upstream_calls": 0
+      }
+    },
+    {
+      "route": "PUT /policies/{policy_id}/status",
+      "owner": "catalog:serveFamilyRoute:manage",
+      "group": "service-aux",
+      "main_status": "needs_fix",
+      "evidence": [
+        "internal/gateway/family/handlers.go"
+      ],
+      "observation": {
+        "route": "PUT /policies/{policy_id}/status",
+        "anonymous": 401,
+        "user": 403,
+        "admin": 200,
+        "kv_changed": true,
+        "upstream_calls": 0
+      }
+    },
+    {
+      "route": "PUT /prompts/{prompt_id}",
+      "owner": "catalog:serveFamilyRoute:manage",
+      "group": "resource-config",
+      "main_status": "verified",
+      "evidence": [
+        "cmd/regression/prompt_config_service_test.go"
+      ],
+      "observation": {
+        "route": "PUT /prompts/{prompt_id}",
+        "anonymous": 401,
+        "user": 403,
+        "admin": 200,
+        "kv_changed": false,
+        "upstream_calls": 0
+      }
+    },
+    {
+      "route": "PUT /search_tools/{search_tool_id}",
+      "owner": "catalog:serveFamilyRoute:manage",
+      "group": "resource-config",
+      "main_status": "verified",
+      "evidence": [
+        "cmd/regression/search_config_service_test.go"
+      ],
+      "observation": {
+        "route": "PUT /search_tools/{search_tool_id}",
+        "anonymous": 401,
+        "user": 403,
+        "admin": 200,
+        "kv_changed": false,
+        "upstream_calls": 0
+      }
+    },
+    {
+      "route": "PUT /server",
+      "owner": "catalog:serveFamilyRoute:manage",
+      "group": "server",
+      "main_status": "needs_verification",
+      "evidence": [
+        "internal/gateway/family/catalog_persistence.go"
+      ],
+      "observation": {
+        "route": "PUT /server",
+        "anonymous": 401,
+        "user": 403,
+        "admin": 200,
+        "kv_changed": false,
+        "upstream_calls": 0
+      }
+    },
+    {
+      "route": "PUT /server/{server_id}/approve",
+      "owner": "catalog:serveFamilyRoute:manage",
+      "group": "server",
+      "main_status": "needs_verification",
+      "evidence": [
+        "internal/gateway/family/catalog_persistence.go"
+      ],
+      "observation": {
+        "route": "PUT /server/{server_id}/approve",
+        "anonymous": 401,
+        "user": 403,
+        "admin": 200,
+        "kv_changed": true,
+        "upstream_calls": 0
+      }
+    },
+    {
+      "route": "PUT /server/{server_id}/reject",
+      "owner": "catalog:serveFamilyRoute:manage",
+      "group": "server",
+      "main_status": "needs_verification",
+      "evidence": [
+        "internal/gateway/family/catalog_persistence.go"
+      ],
+      "observation": {
+        "route": "PUT /server/{server_id}/reject",
+        "anonymous": 401,
+        "user": 403,
+        "admin": 200,
+        "kv_changed": true,
+        "upstream_calls": 0
+      }
+    },
+    {
+      "route": "PUT /v1/access_group/{access_group_id}",
+      "owner": "catalog:serveFamilyRoute:manage",
+      "group": "access-vector",
+      "main_status": "needs_verification",
+      "evidence": [
+        "internal/gateway/family/catalog_persistence.go"
+      ],
+      "observation": {
+        "route": "PUT /v1/access_group/{access_group_id}",
+        "anonymous": 401,
+        "user": 403,
+        "admin": 200,
+        "kv_changed": false,
+        "upstream_calls": 0
+      }
+    },
+    {
+      "route": "PUT /vantage/settings",
+      "owner": "catalog:serveFamilyRoute:manage",
+      "group": "runtime-ops",
+      "main_status": "needs_fix",
+      "evidence": [
+        "internal/gateway/family/catalog_persistence.go"
+      ],
+      "observation": {
+        "route": "PUT /vantage/settings",
+        "anonymous": 401,
+        "user": 403,
+        "admin": 200,
+        "kv_changed": true,
+        "upstream_calls": 0
+      }
+    },
+    {
+      "route": "WEBSOCKET /openai_passthrough/{endpoint}",
+      "owner": "catalog:passthroughContract:manage",
+      "group": "protocol-alias",
+      "main_status": "needs_fix",
+      "evidence": [
+        "internal/gateway/ingress.go"
+      ],
+      "observation": {
+        "route": "WEBSOCKET /openai_passthrough/{endpoint}",
+        "anonymous": 401,
+        "user": 200,
+        "admin": 200,
+        "kv_changed": false,
+        "upstream_calls": 0
+      }
+    },
+    {
+      "route": "WEBSOCKET /vertex_ai/live",
+      "owner": "catalog:realtimeContract:manage",
+      "group": "protocol-alias",
+      "main_status": "needs_fix",
+      "evidence": [
+        "internal/gateway/ingress.go"
+      ],
+      "observation": {
+        "route": "WEBSOCKET /vertex_ai/live",
+        "anonymous": 401,
+        "user": 426,
+        "admin": 426,
+        "kv_changed": false,
+        "upstream_calls": 0
+      }
+    }
+  ],
+  "other_catalog_counts": {
+    "catalog:audioContract:data": 4,
+    "catalog:filesContract:data": 22,
+    "catalog:imagesContract:data": 6,
+    "catalog:moderationsContract:data": 2,
+    "catalog:passthroughContract:data": 1,
+    "catalog:realtimeContract:data": 12,
+    "catalog:rerankContract:data": 3,
+    "catalog:responsesContract:data": 21,
+    "catalog:serveFamilyRoute:data": 91,
+    "catalog:serveFamilyRoute:mixed": 34,
+    "catalog:serveFamilyRoute:public": 11,
+    "catalog:videosContract:data": 18,
+    "module:access": 13,
+    "module:compliance": 2,
+    "module:family": 2,
+    "module:guard": 2,
+    "module:health": 7,
+    "module:identity": 25,
+    "module:ingress": 7,
+    "module:keys": 14,
+    "module:models": 14,
+    "module:prefs": 5,
+    "module:publichub": 6,
+    "module:session": 5,
+    "module:tokens": 3,
+    "module:usage": 35,
+    "removed": 89
+  },
+  "module_only_counts": {
+    "access": 2,
+    "directory": 43,
+    "identity": 25,
+    "ingress": 2,
+    "models": 15,
+    "publichub": 2,
+    "session": 8,
+    "usage": 1
+  }
+}

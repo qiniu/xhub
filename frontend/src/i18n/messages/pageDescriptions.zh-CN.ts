@@ -28,7 +28,7 @@ export const pageDescriptionsZhCN = {
   api_ref: "浏览 API 文档与端点",
   "model-hub-table": "浏览可用的 AI 模型与供应商",
   "learning-resources": "查看教程与文档",
-  caching: "配置响应缓存与协调 Redis",
+  caching: "查看和清空当前进程的响应缓存",
   "transform-request": "配置请求转换规则",
   "cost-tracking": "跟踪并分析 API 成本",
   "ui-theme": "自定义控制台外观",
