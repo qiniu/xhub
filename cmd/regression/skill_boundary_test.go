@@ -50,8 +50,9 @@ func TestSkillBoundaryResources(t *testing.T) {
 	if out := h.do("POST", "/v1/chat/completions", blocked.key, chatRequest("skill-boundary", "Verify zero budget stays blocked.")); out.status != 403 || len(h.upstreamCalls()) != 1 {
 		t.Fatal("零预算规则改变", out.describe())
 	}
+	h.ok("POST", "/v1/skills", admin, map[string]any{"skill_id": "untouched", "name": "must-remain"})
 	for _, id := range []string{"ordinary", "new", "list", "delete", "register", "skills", "archive"} {
-		out := h.do("DELETE", "/v1/skills/"+id, admin, nil)
+		out := h.do("DELETE", "/v1/skills/"+id, admin, map[string]any{"skill_id": "untouched", "id": "untouched", "skillss": []any{"untouched", id, id}})
 		if out.status != 200 || out.json()["deleted"] != float64(1) {
 			t.Errorf("删除未定位真实Skill: id=%s %s", id, out.describe())
 		}
@@ -59,6 +60,11 @@ func TestSkillBoundaryResources(t *testing.T) {
 			t.Errorf("删除后仍返回成功: %s", out.describe())
 		}
 	}
+	kept := h.ok("GET", "/v1/skills/untouched", admin, nil)
+	if kept.json()["name"] != "must-remain" {
+		t.Fatal("正文指定的无关Skill被误改", kept.describe())
+	}
+	h.ok("DELETE", "/v1/skills/untouched", admin, nil)
 	rows, err := h.store.ListKV("skills")
 	if err != nil || len(rows) != 0 {
 		t.Error("Skill配置清理不完整", rows, err)

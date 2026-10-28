@@ -22,7 +22,8 @@ type catalogRecordStore interface {
 
 // writeCatalogStore 处理已鉴权、已解析的通用目录读写；st 为存储，w/r 为 HTTP 输出及路径，body 为请求对象。
 // 由 writeCatalogPersist 调用，结果直接写入 w；供应商、搜索、提示词及策略配置委派独立服务，其余目录保持旧 CRUD/upsert，仅真实持久化成功才能返回成功。
-// 顶层JSON-RPC信封明确拒绝，普通token资源名不得触发令牌签发；非事务批量删除失败时不回滚已删除项，但必须返回错误。
+// 顶层JSON-RPC信封明确拒绝，普通token资源名不得触发令牌签发；Skill详情只删除路径ID，不合并正文ID。
+// 其他非事务批量删除失败时不回滚已删除项，但必须返回错误。
 func writeCatalogStore(st catalogRecordStore, w http.ResponseWriter, r *http.Request, body map[string]any) {
 	path := r.URL.Path
 	// 此入口是已鉴权的REST资源接口，没有RPC执行器。拒绝信封，而非吞掉操作并伪造空工具列表。
@@ -32,11 +33,13 @@ func writeCatalogStore(st catalogRecordStore, w http.ResponseWriter, r *http.Req
 		return
 	}
 	kind, action, id := parseMgmt(r.Method, path, body)
+	// Skill详情路径已明确指定唯一资源；不能再被通用批量操作的正文ID覆盖或扩大删除范围。
+	_, _, skillResource := skillResourceAction(r.Method, path)
 	if st == nil {
 		util.WriteError(w, http.StatusServiceUnavailable, "unavailable", "catalog store unavailable")
 		return
 	}
-	if id == "" || ((action == "update" || action == "delete") && (id == kind || id == singular(kind))) {
+	if !skillResource && (id == "" || ((action == "update" || action == "delete") && (id == kind || id == singular(kind)))) {
 		if alt := str(body[idField(kind)]); alt != "" {
 			id = alt
 		} else if alt := str(body["id"]); alt != "" && id == "" {
@@ -90,9 +93,13 @@ func writeCatalogStore(st catalogRecordStore, w http.ResponseWriter, r *http.Req
 		Freeze(kind, m)
 		util.WriteJSON(w, 200, redactCatalogObject(kind, m, true))
 	case "delete":
-		ids := idsFrom(body, kind+"s", idField(kind))
-		if id != "" {
-			ids = append(ids, id)
+		ids := []string{id}
+		if !skillResource {
+			// 其他旧入口仍保留原有批量删除语义，收窄只针对Skill详情路由。
+			ids = idsFrom(body, kind+"s", idField(kind))
+			if id != "" {
+				ids = append(ids, id)
+			}
 		}
 		n := 0
 		for _, x := range ids {

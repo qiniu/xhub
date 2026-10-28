@@ -63,7 +63,7 @@ func TestSkillBoundaryStore(t *testing.T) {
 			st := &catalogMemoryStore{rows: rows, getErr: tc.getErr, deleteErr: map[string]error{"new": tc.deleteErr}}
 			before := cloneCatalogTestObject(map[string]any{"rows": rows})
 			w := httptest.NewRecorder()
-			writeCatalogStore(st, w, httptest.NewRequest(tc.method, "/v1/skills/new", nil), nil)
+			writeCatalogStore(st, w, httptest.NewRequest(tc.method, "/v1/skills/new", nil), map[string]any{"skill_id": "other"})
 			if w.Code != tc.status || strings.Contains(w.Body.String(), "private-sql") {
 				t.Fatal("状态或脱敏错误", w)
 			}
@@ -84,5 +84,19 @@ func TestSkillBoundaryStore(t *testing.T) {
 	writeCatalogPersist(catalogPersistenceHost{}, w, httptest.NewRequest("GET", "/v1/skills/x/archive", nil), nil)
 	if w.Code != 501 {
 		t.Fatal("缺存储时归档仍应明确未实现", w)
+	}
+}
+
+// TestSkillBoundaryDeleteBody 验证详情删除只能删除路径ID，正文单值/数组和重复ID不能扩张目标；内存故障注入仅测存储边界，逐例重新建夹具无需外部清理。
+func TestSkillBoundaryDeleteBody(t *testing.T) {
+	for _, id := range []string{"new", "skills", "skill", "ordinary"} {
+		for _, body := range []map[string]any{nil, {"skill_id": "other"}, {"id": "other"}, {"skillss": []any{"other", id, id}}, {"skill_id": id}} {
+			st := &catalogMemoryStore{rows: map[string]map[string]any{id: {"skill_id": id}, "other": {"skill_id": "other"}}}
+			w := httptest.NewRecorder()
+			writeCatalogStore(st, w, httptest.NewRequest("DELETE", "/v1/skills/"+id, nil), body)
+			if w.Code != 200 || !strings.Contains(w.Body.String(), `"deleted":1`) || st.rows[id] != nil || st.rows["other"] == nil {
+				t.Fatalf("路径删除误删或目标被正文覆盖: id=%s body=%v status=%d response=%s rows=%v", id, body, w.Code, w.Body.String(), st.rows)
+			}
+		}
 	}
 }
