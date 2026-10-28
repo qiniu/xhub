@@ -53,7 +53,7 @@ describe("simple key details", () => {
   /** 保存仅传允许字段并精确保留共享与零；伪造隐藏配置也不能覆盖，成功同步响应，清理 DOM。 */
   it("allowlists updates and normalizes numeric allocations", async () => {
     const { update } = setup();
-    await act(async () => editor.submit?.({ token: "evil", key_alias: "renamed", max_budget: "0.00001", rpm_limit: "", tpm_limit: "0", metadata: {}, object_permission: {} }));
+    await act(async () => editor.submit?.({ token: "evil", key_alias: "renamed", max_budget: "0.00001", rpm_limit: "", tpm_limit: "0", metadata: {}, object_permission: { skills: ["legacy-skill"] }, skills: [], allowed_skills: ["new-skill"] }));
     expect(keyUpdateCall).toHaveBeenCalledWith("session", { key: "stable-id", key_alias: "renamed", max_budget: 0.00001, rpm_limit: null, tpm_limit: 0 });
     expect(update).toHaveBeenCalledWith(expect.objectContaining({ key_alias: "renamed" }));
     expect(screen.getByRole("heading", { name: "renamed" })).toBeVisible();
