@@ -30,3 +30,8 @@ export function saveEnterprise(path: string, body: EnterpriseConfiguration): Pro
 export function archiveAction(action: "test" | "retry"): Promise<void> { return client.post("/admin/archive/kodo/" + action, { accessToken: getAuthToken(), body: {} }); }
 /** 读取公开登录入口；返回受控名称和跳转路径，无秘密和写副作用，登录页调用。 */
 export function enterpriseLoginOptions(): Promise<{ id: string; name: string; url: string }[]> { return client.get("/auth/enterprise/options"); }
+
+/** SAML 刷新接口的公开状态；时间为 Unix 秒，0 表示尚无记录，租约和密钥不返回浏览器。 */
+export interface SAMLRefreshStatus {connection_id:string;enabled:boolean;source_url:string;interval_hours:number;last_attempt:number;last_success:number;next_attempt:number;expires_at:number;error_code:string}
+/** 对已保存的 SAML 配置立即执行受信元数据刷新；失败抛错，不自动重试写请求。 */
+export function refreshSSOMetadata(id:string):Promise<SAMLRefreshStatus>{return client.post("/admin/enterprise/sso/"+encodeURIComponent(id)+"/refresh",{accessToken:getAuthToken(),body:{}});}

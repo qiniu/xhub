@@ -21,6 +21,9 @@ x-litellm-call-id 关联调用与日志，x-litellm-response-cost 表示这次�
 | `POST /admin/archive/kodo/test` | `archiveAdmin` | [directory.go](../../../internal/gateway/directory.go) |
 | `POST /admin/archive/kodo/retry` | `archiveAdmin` | [directory.go](../../../internal/gateway/directory.go) |
 | `GET /admin/enterprise/sso` | `enterpriseOIDCAdmin` | [directory.go](../../../internal/gateway/directory.go) |
+| `GET /admin/enterprise/sso/{connection_id}/refresh` | `enterpriseSAMLRefreshAdmin` | [directory.go](../../../internal/gateway/directory.go) |
+| `PUT /admin/enterprise/sso/{connection_id}/refresh` | `enterpriseSAMLRefreshAdmin` | [directory.go](../../../internal/gateway/directory.go) |
+| `POST /admin/enterprise/sso/{connection_id}/refresh` | `enterpriseSAMLRefreshAdmin` | [directory.go](../../../internal/gateway/directory.go) |
 | `POST /admin/enterprise/sso` | `enterpriseOIDCAdmin` | [directory.go](../../../internal/gateway/directory.go) |
 | `GET /admin/enterprise/sso/{connection_id}` | `enterpriseOIDCAdmin` | [directory.go](../../../internal/gateway/directory.go) |
 | `PUT /admin/enterprise/sso/{connection_id}` | `enterpriseOIDCAdmin` | [directory.go](../../../internal/gateway/directory.go) |

@@ -184,7 +184,7 @@ func (s *Server) Run(addr string) error {
 }
 
 // serveListener 在成功监听后启动维护任务并提供 HTTP 服务；ln 为 Run 或隔离测试创建的监听器。
-// 返回服务退出错误；退出取消预算/归档任务，IAM 存在时即启动维护，不以 Redis 可用性为条件。
+// 返回服务退出错误；退出取消预算/归档/SSO 刷新任务，IAM 存在时即启动维护，不以 Redis 可用性为条件。
 func (s *Server) serveListener(ln net.Listener) error {
 	ctx, cancel := context.WithCancel(context.Background())
 	var flush sync.WaitGroup
@@ -195,6 +195,8 @@ func (s *Server) serveListener(ln net.Listener) error {
 	if s.IAM != nil {
 		flush.Add(1)
 		go func() { defer flush.Done(); s.flushLoop(ctx) }()
+		flush.Add(1)
+		go func() { defer flush.Done(); s.samlRefreshLoop(ctx) }()
 	}
 	go s.archiveLoop(ctx)
 	return (&http.Server{Handler: s.Handler()}).Serve(ln)

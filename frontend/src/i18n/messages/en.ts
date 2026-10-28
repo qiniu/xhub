@@ -1,3 +1,4 @@
+import { samlRefresh } from "./samlRefresh.en";
 import { budgetReconciliationEn } from "./budgetReconciliation.en";
 import { probesEn } from "./probes.en";
 import { docsEn } from "./docs.en";
@@ -10,6 +11,7 @@ import { cacheAdminEn } from "./cacheAdmin.en";
 export const en = {
   tagSelector: { loadFailed: "Unable to load saved tags. Refresh the page to retry." },
   cacheAdmin: cacheAdminEn,
+  samlRefresh,
   probes: probesEn,
   mcpOAuthCallback: {
     title: "MCP authorization callback",

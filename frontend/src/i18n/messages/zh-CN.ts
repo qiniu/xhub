@@ -1,3 +1,4 @@
+import { samlRefresh } from "./samlRefresh.zh-CN";
 import { budgetReconciliationZhCN } from "./budgetReconciliation.zh-CN";
 import { probesZhCN } from "./probes.zh-CN";
 import { docsZhCN } from "./docs.zh-CN";
@@ -11,6 +12,7 @@ import { cacheAdminZhCN } from "./cacheAdmin.zh-CN";
 export const zhCN = {
   tagSelector: { loadFailed: "无法读取已保存的标签，请刷新页面重试。" },
   cacheAdmin: cacheAdminZhCN,
+  samlRefresh,
   probes: probesZhCN,
   mcpOAuthCallback: {
     title: "MCP 授权回调",

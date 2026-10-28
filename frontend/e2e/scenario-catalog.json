@@ -3175,5 +3175,19 @@
     "title": "legacy server runtime helpers preserve configuration and chat zh-CN",
     "kind": "implemented",
     "environment": "default offline"
+  },
+  {
+    "id": "SC-445",
+    "file": "e2e/scenarios/enterprise/saml-refresh-en.test.ts",
+    "title": "SAML refresh HTTP valid en",
+    "kind": "implemented",
+    "environment": "local TLS IdP and PostgreSQL"
+  },
+  {
+    "id": "SC-446",
+    "file": "e2e/scenarios/enterprise/saml-refresh-zh-CN.test.ts",
+    "title": "SAML refresh HTTP expired zh-CN",
+    "kind": "implemented",
+    "environment": "local TLS IdP and PostgreSQL"
   }
 ]

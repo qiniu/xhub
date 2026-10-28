@@ -89,7 +89,7 @@ jobs:
           npx vitest run --project unit src/lib/http/client.test.ts
           npx vitest run --project component src/components/common_components/BudgetReconciliation.test.tsx src/components/templates/key_info_view.test.tsx
           npx vitest run --project unit src/lib/enterpriseSSO.test.ts src/lib/http/enterprise.test.ts
-          npx vitest run --project component src/components/Settings/AdminSettings/EnterpriseConfiguration.test.tsx src/components/Settings/AdminSettings/EnterpriseConfiguration.saml.test.tsx src/components/Settings/AdminSettings/IntegrationOverview.test.tsx
+          npx vitest run --project component src/components/Settings/AdminSettings/EnterpriseConfiguration.test.tsx src/components/Settings/AdminSettings/EnterpriseConfiguration.saml.test.tsx src/components/Settings/AdminSettings/SAMLRefresh.test.tsx src/components/Settings/AdminSettings/IntegrationOverview.test.tsx
       - run: npx playwright install --with-deps chromium
         working-directory: frontend
       # 真实登录、密钥轮换、推理及旧库升级后的日志/用量/监控；使用专属 Redis 和本地上游，运行器清理资源。
