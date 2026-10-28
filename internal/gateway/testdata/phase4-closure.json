@@ -151,7 +151,9 @@
       "batch": "C3",
       "source": "internal/gateway/family/catalog_persistence.go",
       "conclusion": "注册存在但只做KV读写，未接相应调度、热加载、事件或外部导出执行器。",
-      "pending_prs": []
+      "pending_prs": [
+        228
+      ]
     },
     "server": {
       "title": "server资源、OAuth、个人配置及导入审批",

@@ -1,6 +1,6 @@
 # Stage 4 closure inventory
 
-> C1 is submitted as [#224](https://github.com/qiniu/xhub/pull/224): 26 auxiliary routes explicitly reject unsupported operations and two singular-policy reads gain acceptance evidence. It is unmerged; main status below remains unchanged. C2 is submitted in [#226](https://github.com/qiniu/xhub/pull/226): 22 legacy identity operations explicitly rejected; real password login, signed SAML, session and budget regressions passed. It is not merged; main classifications remain unchanged. C3–C7 and integration are still pending.
+> C1 is submitted as [#224](https://github.com/qiniu/xhub/pull/224): 26 auxiliary routes explicitly reject unsupported operations and two singular-policy reads gain acceptance evidence. It is unmerged; main status below remains unchanged. C2 is submitted in [#226](https://github.com/qiniu/xhub/pull/226): 22 legacy identity operations explicitly rejected; real password login, signed SAML, session and budget regressions passed. It is not merged; main classifications remain unchanged. C3/runtime-ops is submitted in [#228](https://github.com/qiniu/xhub/pull/228): 12 legacy operations explicitly reject unsupported execution, with real configuration, credential rotation, budget and bilingual chat tests. It remains unmerged. The 15 C3/settings entries, C4–C7 and integration are still pending.
 
 Baseline: `939e0d6c0ba174bd03d6dad4c1035da8bf0be8cd`, reviewed 2026-10-28. Stage 4 is **not complete**. No merge or production deployment.
 
