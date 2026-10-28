@@ -576,8 +576,11 @@ func ServeMgmt(s Host, w http.ResponseWriter, r *http.Request) {
 }
 
 // writeCatalogPersist 将通用目录请求交给窄存储接口；s 提供已授权上下文，w/r 为 HTTP 响应和请求，body 为已解析对象。
-// 由 ServeMgmt 调用，返回值写入 w；不更改 Host、鉴权或资源路径语义，无存储时由处理器返回 503。
+// 由 ServeMgmt 调用，返回值写入 w；未实现的插件启停先拒绝，其余目录保留原语义，无存储时返回503。
 func writeCatalogPersist(s Host, w http.ResponseWriter, r *http.Request, body map[string]any) {
+	if rejectPluginActivation(w, r) {
+		return
+	}
 	var st catalogRecordStore
 	if recordStore := s.RecordStore(); recordStore != nil {
 		st = recordStore
