@@ -196,6 +196,18 @@ func TestCatalogReads(t *testing.T) {
 				}
 				return
 			}
+			// 独立列举两条无执行器的运维GET，不能全局接受未知501。
+			if rt.Path == "/vantage/settings" || rt.Path == "/schedule/anthropic_beta_headers_reload/status" {
+				var probe struct {
+					Error struct {
+						Type string `json:"type"`
+					} `json:"error"`
+				}
+				if status != http.StatusNotImplemented || json.Unmarshal(body, &probe) != nil || probe.Error.Type != "unsupported_operation" {
+					t.Fatalf("运维入口没有执行器，必须明确失败: %d %s", status, trim(body))
+				}
+				return
+			}
 			switch status {
 			case http.StatusOK:
 				if !json.Valid(body) {

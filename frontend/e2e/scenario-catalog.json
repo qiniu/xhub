@@ -3357,5 +3357,19 @@
     "title": "identity aliases reject false success without breaking login and chat zh-CN",
     "kind": "implemented",
     "environment": "default offline"
+  },
+  {
+    "id": "REG-runtime-operation-en",
+    "file": "e2e/scenarios/regression/runtime-operation-en.test.ts",
+    "title": "runtime operations reject false success without changing configuration and chat en",
+    "kind": "implemented",
+    "environment": "default offline"
+  },
+  {
+    "id": "REG-runtime-operation-zh-CN",
+    "file": "e2e/scenarios/regression/runtime-operation-zh-CN.test.ts",
+    "title": "runtime operations reject false success without changing configuration and chat zh-CN",
+    "kind": "implemented",
+    "environment": "default offline"
   }
 ]

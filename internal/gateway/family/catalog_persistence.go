@@ -32,6 +32,10 @@ func writeCatalogStore(st catalogRecordStore, w http.ResponseWriter, r *http.Req
 		util.WriteError(w, http.StatusBadRequest, "unsupported_protocol", "JSON-RPC is not supported by this REST management endpoint")
 		return
 	}
+	// 未接执行器的运维操作不能被当成同名配置的CRUD，避免返回假执行成功。
+	if rejectRuntimeOperation(w, r) {
+		return
+	}
 	// 旧身份别名没有签发或邀请执行器，不能落入公共KV后伪装成业务成功。
 	if rejectIdentityAlias(w, r) {
 		return
