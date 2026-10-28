@@ -548,11 +548,9 @@ func singular(kind string) string {
 	}
 }
 
-// ServeMixed answers the catalog's "mixed" paths, such as /v1/agents, /v1/skills and /v1/workflows. These were removed from the product and only remain in the catalog. They are refused rather than served: the generic store behind them is one shared key-value namespace keyed by resource kind, with no owner and no team column, so serving them let any signed-in member — and any inference key — create records that every other principal could then list. Refusing is what the classification has always described; this makes the code match. The identity is still required before the refusal, so an anonymous caller learns nothing beyond the fact that the path exists.
-// 参数 s（Host）：处理混合使用的数据面宿主；w（http.ResponseWriter）：调用方的 HTTP 响应，状态和正文写在这里；r（*http.Request）：入站 HTTP 请求。
-// 返回：无。状态码和正文写进调用方的响应。
-// 调用：gateway/catalog.go
-// 测试：无直接单测
+// ServeMixed 拒绝仍列在兼容目录的退役混合身份接口，例如agents、memory和workflows。
+// s提供身份检查，w/r为入站HTTP；先验证身份再返回410，无存储副作用。目录KV没有资源归属隔离，不能恢复给普通成员共享读写。
+// 网关目录分派调用；/v1/skills不属于该分类，其管理配置CRUD与未实现的归档边界另行处理。
 func ServeMixed(s Host, w http.ResponseWriter, r *http.Request) {
 	if s.RequireMixed(w, r) == nil {
 		return
@@ -597,6 +595,7 @@ func ServeMgmt(s Host, w http.ResponseWriter, r *http.Request) {
 // 由 ServeMgmt 调用，返回值写入 w；旧server导入/审批先明确拒绝，其余路径保持原语义，无存储时返回503。
 // 由 ServeMgmt 调用，返回值写入 w；未实现的插件启停先拒绝，其余目录保留原语义，无存储时返回503。
 // 由 ServeMgmt 调用，结果写入w；marketplace未实现时明确拒绝，其余目录保留原权限和存储边界。
+// 由 ServeMgmt 调用，返回值写入 w；Skill归档未实现时明确拒绝，其余保留原权限和持久化语义。
 func writeCatalogPersist(s Host, w http.ResponseWriter, r *http.Request, body map[string]any) {
 	if rejectServerRuntime(w, r) {
 		return
@@ -608,6 +607,9 @@ func writeCatalogPersist(s Host, w http.ResponseWriter, r *http.Request, body ma
 		return
 	}
 	if rejectPluginMarketplace(w, r) {
+		return
+	}
+	if rejectSkillArchive(w, r) {
 		return
 	}
 	var st catalogRecordStore
@@ -837,6 +839,8 @@ func setDefault(obj map[string]any, key string, val any) {
 
 // parseMgmt 根据已注册路径、HTTP方法及JSON正文解析目录种类、动作与资源ID，供通用存储适配器调用。
 // 插件详情按路径名称寻址，避免保留词被当作动作；其他资源沿用旧解析与正文ID回退，无存储或授权副作用。
+// parseMgmt 按已注册路径、HTTP方法及正文解析目录种类、动作、ID，供目录读写调用；无存储副作用。
+// Skill详情优先按资源ID寻址，避免GET误执行保留词动作；其余路径和正文ID回退保持原行为。
 func parseMgmt(method, path string, body map[string]any) (kind, action, id string) {
 	// 注册的插件详情路径以名称为资源身份，list/new/register等名字也不能被通用动作词吞掉。
 	pluginParts := strings.Split(strings.TrimSuffix(path, "/"), "/")
@@ -849,6 +853,9 @@ func parseMgmt(method, path string, body map[string]any) (kind, action, id strin
 		case http.MethodDelete:
 			return "claude-code", "delete", pluginParts[3]
 		}
+	}
+	if action, id, matched := skillResourceAction(method, path); matched {
+		return "skills", action, id
 	}
 	parts := catalog.Split(strings.TrimSuffix(path, "/"))
 	filtered := []string{}

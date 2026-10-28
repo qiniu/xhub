@@ -3245,5 +3245,19 @@
     "title": "plugin registration preserves identities and chat zh-CN",
     "kind": "implemented",
     "environment": "default offline"
+  },
+  {
+    "id": "REG-skill-resource-en",
+    "file": "e2e/scenarios/regression/skill-resource-en.test.ts",
+    "title": "skill resource boundaries preserve configuration and chat en",
+    "kind": "implemented",
+    "environment": "default offline"
+  },
+  {
+    "id": "REG-skill-resource-zh-CN",
+    "file": "e2e/scenarios/regression/skill-resource-zh-CN.test.ts",
+    "title": "skill resource boundaries preserve configuration and chat zh-CN",
+    "kind": "implemented",
+    "environment": "default offline"
   }
 ]

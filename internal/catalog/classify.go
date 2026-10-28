@@ -58,11 +58,8 @@ func AuthOf(path string) AuthClass {
 	return AuthManagement
 }
 
-// IsMixedPath reports the catalog paths that were removed from the product and are refused rather than served. /v1/skills is deliberately absent: it is a real route again, serving the organization's skills. A path leaves this list when a dedicated handler takes it over, or the refusal would answer before the handler ever ran.
-// 参数 path（string）：URL 路径，用来匹配路由或选择错误包络。
-// 返回 bool（bool）：这条路径属于已从产品移除、应当拒绝而不是继续服务的目录路径时返回真。/v1/skills 已恢复为真实路由，不在此列。
-// 调用：gateway/catalog.go、gateway/removed.go
-// 测试：无直接单测
+// IsMixedPath 判断路径是否属于仍保留在目录但已退役的混合身份接口；path为URL路径，返回是否应进入拒绝处理器。
+// AuthOf和网关退役检查调用，无副作用。/v1/skills不在此列，当前仅是管理权限下的通用配置CRUD，并非组织级执行或安装服务。
 func IsMixedPath(path string) bool {
 	for _, p := range []string{
 		"/v1/agents", "/v1beta/agents", "/v1/memory",
