@@ -421,3 +421,12 @@ test('guard management release gate includes bilingual execution flows', () => {
     assert.ok(existsSync(join(__dirname, '../frontend/e2e', file)));
   }
 });
+
+/** 发布验证需执行中英文旧批处理拒绝后正常对话的真实流程；只读登记和命令，无外部清理。 */
+test('provider batch release gate includes bilingual execution flows', () => {
+  const command = workflow.jobs.verify.steps.find(item => item.run?.startsWith('bash scripts/e2e.sh '))?.run;
+  for (const file of ['scenarios/regression/provider-batch-zh-CN.test.ts', 'scenarios/regression/provider-batch-en.test.ts']) {
+    assert.ok(command?.split(' ').includes(file), '旧批处理真实流程缺失：' + file);
+    assert.ok(existsSync(join(__dirname, '../frontend/e2e', file)));
+  }
+});
