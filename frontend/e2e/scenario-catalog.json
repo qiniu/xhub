@@ -3371,5 +3371,19 @@
     "title": "runtime operations reject false success without changing configuration and chat zh-CN",
     "kind": "implemented",
     "environment": "default offline"
+  },
+  {
+    "id": "REG-settings-operation-en",
+    "file": "e2e/scenarios/regression/settings-operation-en.test.ts",
+    "title": "unsupported settings preserve configuration and chat en",
+    "kind": "implemented",
+    "environment": "default offline"
+  },
+  {
+    "id": "REG-settings-operation-zh-CN",
+    "file": "e2e/scenarios/regression/settings-operation-zh-CN.test.ts",
+    "title": "unsupported settings preserve configuration and chat zh-CN",
+    "kind": "implemented",
+    "environment": "default offline"
   }
 ]

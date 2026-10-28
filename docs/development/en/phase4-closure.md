@@ -1,5 +1,16 @@
 # Stage 4 closure inventory
 
+## Current closure progress (2026-10-29)
+
+- Main `e8a29c4f972e8832e1c6e02a8226d0befcc65584` includes the accumulated phase-four PRs (#182–#228, including #202). C1, C2 and C3/runtime-ops are merged.
+- This candidate addresses **15 C3/settings routes** with no actual consumer: explicit `501 unsupported_settings_operation`, no activation of legacy KV defaults, unchanged anonymous401/member403 and JSON error precedence. The independent theme read/write/logo service remains available.
+- Real coverage: every route and role, invalid bodies and unchanged KV; theme write/read, model inference and zero-budget403; bilingual browser navigation after unavailable sidebar settings, configuration create/reload and chat. The typed HTTP middleware already throws errors; tests verify it without duplicate handling. The unmounted default-user form is not claimed as a browser-verified flow.
+- This batch is not merged or deployed. After it, **56 routes remain: C4 model aliases14, C5 analytics26, C6 protocols7, C7 discovery9**, plus final integration acceptance. Main still needs these15 as well (71 total).
+- The current inventory has301 entries; two of the historical303 moved to dedicated modules. The historical snapshot below, and JSON `main_status`/`observation`, are not current execution results. Candidate evidence is recorded separately without claiming main already contains this fix.
+
+<details><summary>Original audit snapshot (2026-10-28; historical status)</summary>
+
+
 > C1 is submitted as [#224](https://github.com/qiniu/xhub/pull/224): 26 auxiliary routes explicitly reject unsupported operations and two singular-policy reads gain acceptance evidence. It is unmerged; main status below remains unchanged. C2 is submitted in [#226](https://github.com/qiniu/xhub/pull/226): 22 legacy identity operations explicitly rejected; real password login, signed SAML, session and budget regressions passed. It is not merged; main classifications remain unchanged. C3/runtime-ops is submitted in [#228](https://github.com/qiniu/xhub/pull/228): 12 legacy operations explicitly reject unsupported execution, with real configuration, credential rotation, budget and bilingual chat tests. It remains unmerged. The 15 C3/settings entries, C4–C7 and integration are still pending.
 
 Baseline: `939e0d6c0ba174bd03d6dad4c1035da8bf0be8cd`, reviewed 2026-10-28. Stage 4 is **not complete**. No merge or production deployment.
@@ -43,3 +54,5 @@ go test -race ./internal/gateway -run '^Test(Phase4Closure|RouteOwnershipAudit|R
 ```
 
 Current execution evidence is recorded in the PR. Earlier 37 backend and 8 browser results in `compatibility-layer-audit.md` remain historical unless rerun. No production, real SSO or paid-model tests; isolated schema cleanup failure must fail the run.
+
+</details>

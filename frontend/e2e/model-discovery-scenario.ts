@@ -84,7 +84,7 @@ test("model discovery unregistered-relay saves and invokes a deployment", async 
     await page.getByRole("dialog").getByPlaceholder(name).fill(name);
     await page.getByRole("dialog").getByRole("button", { name: "删除", exact: true }).click();
     await expect(page.getByRole("region", { name: "公开模型 " + name, exact: true })).toHaveCount(0);
-    guard.assertOk();
+    await guard.assertOk();
   });
 }
 /** 用途：注册独立场景「model discovery registered-full-list saves and invokes a deployment」；无参数、无返回值。前置真实浏览器、私有数据库和本地上游；验证页面及原始契约，保留原套件前后置清理，运行器最终回收专属 schema。异常由 Playwright 单独记录。 */
@@ -157,7 +157,7 @@ test("model discovery registered-full-list saves and invokes a deployment", asyn
     await page.getByRole("dialog").getByPlaceholder(name).fill(name);
     await page.getByRole("dialog").getByRole("button", { name: "删除", exact: true }).click();
     await expect(page.getByRole("region", { name: "公开模型 " + name, exact: true })).toHaveCount(0);
-    guard.assertOk();
+    await guard.assertOk();
   });
 }
 /** 用途：注册独立场景「model discovery registered-failure saves and invokes a deployment」；无参数、无返回值。前置真实浏览器、私有数据库和本地上游；验证页面及原始契约，保留原套件前后置清理，运行器最终回收专属 schema。异常由 Playwright 单独记录。 */
@@ -230,7 +230,7 @@ test("model discovery registered-failure saves and invokes a deployment", async 
     await page.getByRole("dialog").getByPlaceholder(name).fill(name);
     await page.getByRole("dialog").getByRole("button", { name: "删除", exact: true }).click();
     await expect(page.getByRole("region", { name: "公开模型 " + name, exact: true })).toHaveCount(0);
-    guard.assertOk();
+    await guard.assertOk();
   });
 }
 /** 用途：注册独立场景「model discovery root-to-v1 saves and invokes a deployment」；无参数、无返回值。前置真实浏览器、私有数据库和本地上游；验证页面及原始契约，保留原套件前后置清理，运行器最终回收专属 schema。异常由 Playwright 单独记录。 */
@@ -303,7 +303,7 @@ test("model discovery root-to-v1 saves and invokes a deployment", async ({ page 
     await page.getByRole("dialog").getByPlaceholder(name).fill(name);
     await page.getByRole("dialog").getByRole("button", { name: "删除", exact: true }).click();
     await expect(page.getByRole("region", { name: "公开模型 " + name, exact: true })).toHaveCount(0);
-    guard.assertOk();
+    await guard.assertOk();
   });
 }
 /** 用途：注册独立场景「model discovery v1-to-root saves and invokes a deployment」；无参数、无返回值。前置真实浏览器、私有数据库和本地上游；验证页面及原始契约，保留原套件前后置清理，运行器最终回收专属 schema。异常由 Playwright 单独记录。 */
@@ -376,7 +376,7 @@ test("model discovery v1-to-root saves and invokes a deployment", async ({ page 
     await page.getByRole("dialog").getByPlaceholder(name).fill(name);
     await page.getByRole("dialog").getByRole("button", { name: "删除", exact: true }).click();
     await expect(page.getByRole("region", { name: "公开模型 " + name, exact: true })).toHaveCount(0);
-    guard.assertOk();
+    await guard.assertOk();
   });
 }
 /** 用途：注册独立场景「model discovery both-missing saves and invokes a deployment」；无参数、无返回值。前置真实浏览器、私有数据库和本地上游；验证页面及原始契约，保留原套件前后置清理，运行器最终回收专属 schema。异常由 Playwright 单独记录。 */
@@ -449,7 +449,7 @@ test("model discovery both-missing saves and invokes a deployment", async ({ pag
     await page.getByRole("dialog").getByPlaceholder(name).fill(name);
     await page.getByRole("dialog").getByRole("button", { name: "删除", exact: true }).click();
     await expect(page.getByRole("region", { name: "公开模型 " + name, exact: true })).toHaveCount(0);
-    guard.assertOk();
+    await guard.assertOk();
   });
 }
 /** 用途：注册独立场景「model discovery website-to-v1 saves and invokes a deployment」；无参数、无返回值。前置真实浏览器、私有数据库和本地上游；验证页面及原始契约，保留原套件前后置清理，运行器最终回收专属 schema。异常由 Playwright 单独记录。 */
@@ -522,7 +522,7 @@ test("model discovery website-to-v1 saves and invokes a deployment", async ({ pa
     await page.getByRole("dialog").getByPlaceholder(name).fill(name);
     await page.getByRole("dialog").getByRole("button", { name: "删除", exact: true }).click();
     await expect(page.getByRole("region", { name: "公开模型 " + name, exact: true })).toHaveCount(0);
-    guard.assertOk();
+    await guard.assertOk();
   });
 }
 /** 用途：注册独立场景「model discovery both-invalid saves and invokes a deployment」；无参数、无返回值。前置真实浏览器、私有数据库和本地上游；验证页面及原始契约，保留原套件前后置清理，运行器最终回收专属 schema。异常由 Playwright 单独记录。 */
@@ -595,6 +595,6 @@ test("model discovery both-invalid saves and invokes a deployment", async ({ pag
     await page.getByRole("dialog").getByPlaceholder(name).fill(name);
     await page.getByRole("dialog").getByRole("button", { name: "删除", exact: true }).click();
     await expect(page.getByRole("region", { name: "公开模型 " + name, exact: true })).toHaveCount(0);
-    guard.assertOk();
+    await guard.assertOk();
   });
 }

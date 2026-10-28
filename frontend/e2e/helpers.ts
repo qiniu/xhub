@@ -1,5 +1,6 @@
 import { expect, type Page } from "@playwright/test";
 import { translate, type Locale } from "../src/i18n/translate";
+import { isExpectedOptionalSettingsFailure, isOptionalSettingsRead } from "./optional-settings-response.cjs";
 import { requirePageSuccess } from "./assertions";
 
 export const t = (key: string) => translate("zh-CN", key);
@@ -9,21 +10,40 @@ export const UPSTREAM = process.env.E2E_UPSTREAM || "http://127.0.0.1:4110";
 
 export const MASTER = process.env.E2E_MASTER_KEY || "sk-e2e-master";
 
+/** 观察真实页面响应与异常；可选设置必须满足明确不支持契约，其余5xx均失败。
+ * page为浏览器页面；返回异步assertOk，调用方必须等待全部响应校验，不跳过错误或放宽超时。 */
 export function watchGateway(page: Page) {
   const bad: string[] = [];
+  const checks: Promise<void>[] = [];
   page.on("response", (res) => {
     const u = res.url();
     if (u.includes("/_next/")) return;
     if (!u.startsWith(GATEWAY) && !u.startsWith((page.url().startsWith("http") ? new URL(page.url()).origin : "about:blank"))) return;
     if (res.status() >= 500) {
-      bad.push(`${res.status()} ${res.request().method()} ${u}`);
+      if (!isOptionalSettingsRead({ url: u, method: res.request().method(), status: res.status() })) {
+        bad.push(`${res.status()} ${res.request().method()} ${u}`);
+        return;
+      }
+      checks.push((async () => {
+        const body = await res.json().catch(() => null);
+        if (!isExpectedOptionalSettingsFailure({ url: u, method: res.request().method(), status: res.status(), cacheControl: res.headers()["cache-control"], body })) {
+          bad.push(`${res.status()} ${res.request().method()} ${u}`);
+        }
+      })());
     }
   });
   page.on("pageerror", (err) => {
     bad.push(`pageerror ${err.message}`);
   });
   return {
-    assertOk() {
+    async assertOk() {
+      // 等待期间可能收到新响应，循环到已登记的检查全部完成再断言。
+      let checked = 0;
+      while (checked < checks.length) {
+        const batch = checks.slice(checked);
+        checked += batch.length;
+        await Promise.all(batch);
+      }
       expect(bad, bad.join("\n")).toEqual([]);
     },
   };
@@ -119,7 +139,7 @@ export async function loginAdmin(page: Page) {
   await expect(page.getByText(t("nav.apiKeys")).first()).toBeVisible({ timeout: 20_000 });
   await expect(page.locator('a[href="/ui/admin-panel"]')).toBeVisible({ timeout: 20_000 });
   await ensureFixtureTeam(page);
-  guard.assertOk();
+  await guard.assertOk();
 }
 
 /** Hierarchy prerequisite; UI scenarios still perform their own writes. */

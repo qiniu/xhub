@@ -238,7 +238,7 @@ test("single workspace has no comparison controls and preserves bilingual chat",
     expect(nextResponse.status()).toBe(200);
     expect(nextResponse.request().headers()["x-session-id"]).toBe(nextSessionId);
     expect(nextResponse.headers()["x-session-id"]).toBe(nextSessionId);
-    guard.assertOk();
+    await guard.assertOk();
     expect(localFailures, "发布镜像不能请求访问者自己的 localhost 网关").toEqual([]);
     await expect.poll(async () => {
       const log = await page.request.get(GATEWAY + "/spend/logs/ui/" + nextResponse.headers()["x-litellm-call-id"], { headers });

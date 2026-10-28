@@ -179,7 +179,7 @@
       "title": "旧设置、品牌、配置导出",
       "batch": "C3",
       "source": "internal/gateway/family/handlers.go",
-      "conclusion": "get/update使用不同命名空间，设置列表还会返回硬编码空值；需核对消费者及读写一致性。",
+      "conclusion": "C3/settings候选修复：15条无消费者设置精确拒绝；真实主题服务、鉴权与预算保留。main_status及observation仍为原审计历史，不表示本分支已合入。",
       "pending_prs": []
     },
     "skills": {
@@ -744,7 +744,10 @@
       "group": "settings",
       "main_status": "needs_verification",
       "evidence": [
-        "internal/gateway/family/handlers.go"
+        "internal/gateway/family/handlers.go",
+        "internal/gateway/family/settings_operation.go",
+        "cmd/regression/settings_operation_boundary_test.go",
+        "frontend/e2e/settings-operation-scenario.ts"
       ],
       "observation": {
         "route": "GET /config/field/info",
@@ -761,7 +764,10 @@
       "group": "settings",
       "main_status": "needs_verification",
       "evidence": [
-        "internal/gateway/family/handlers.go"
+        "internal/gateway/family/handlers.go",
+        "internal/gateway/family/settings_operation.go",
+        "cmd/regression/settings_operation_boundary_test.go",
+        "frontend/e2e/settings-operation-scenario.ts"
       ],
       "observation": {
         "route": "GET /config/yaml",
@@ -1033,7 +1039,10 @@
       "group": "settings",
       "main_status": "needs_verification",
       "evidence": [
-        "internal/gateway/family/handlers.go"
+        "internal/gateway/family/handlers.go",
+        "internal/gateway/family/settings_operation.go",
+        "cmd/regression/settings_operation_boundary_test.go",
+        "frontend/e2e/settings-operation-scenario.ts"
       ],
       "observation": {
         "route": "GET /get/default_team_settings",
@@ -1050,7 +1059,10 @@
       "group": "settings",
       "main_status": "needs_verification",
       "evidence": [
-        "internal/gateway/family/handlers.go"
+        "internal/gateway/family/handlers.go",
+        "internal/gateway/family/settings_operation.go",
+        "cmd/regression/settings_operation_boundary_test.go",
+        "frontend/e2e/settings-operation-scenario.ts"
       ],
       "observation": {
         "route": "GET /get/internal_user_settings",
@@ -1067,7 +1079,10 @@
       "group": "settings",
       "main_status": "needs_verification",
       "evidence": [
-        "internal/gateway/family/handlers.go"
+        "internal/gateway/family/handlers.go",
+        "internal/gateway/family/settings_operation.go",
+        "cmd/regression/settings_operation_boundary_test.go",
+        "frontend/e2e/settings-operation-scenario.ts"
       ],
       "observation": {
         "route": "GET /get/ui_settings",
@@ -1084,7 +1099,10 @@
       "group": "settings",
       "main_status": "needs_verification",
       "evidence": [
-        "internal/gateway/family/handlers.go"
+        "internal/gateway/family/handlers.go",
+        "internal/gateway/family/settings_operation.go",
+        "cmd/regression/settings_operation_boundary_test.go",
+        "frontend/e2e/settings-operation-scenario.ts"
       ],
       "observation": {
         "route": "GET /get/user_banner",
@@ -1101,7 +1119,10 @@
       "group": "settings",
       "main_status": "needs_verification",
       "evidence": [
-        "internal/gateway/family/handlers.go"
+        "internal/gateway/family/handlers.go",
+        "internal/gateway/family/settings_operation.go",
+        "cmd/regression/settings_operation_boundary_test.go",
+        "frontend/e2e/settings-operation-scenario.ts"
       ],
       "observation": {
         "route": "GET /get_favicon",
@@ -1118,7 +1139,10 @@
       "group": "settings",
       "main_status": "needs_verification",
       "evidence": [
-        "internal/gateway/family/handlers.go"
+        "internal/gateway/family/handlers.go",
+        "internal/gateway/family/settings_operation.go",
+        "cmd/regression/settings_operation_boundary_test.go",
+        "frontend/e2e/settings-operation-scenario.ts"
       ],
       "observation": {
         "route": "GET /get_image",
@@ -1135,7 +1159,10 @@
       "group": "settings",
       "main_status": "needs_verification",
       "evidence": [
-        "internal/gateway/family/handlers.go"
+        "internal/gateway/family/handlers.go",
+        "internal/gateway/family/settings_operation.go",
+        "cmd/regression/settings_operation_boundary_test.go",
+        "frontend/e2e/settings-operation-scenario.ts"
       ],
       "observation": {
         "route": "GET /get_logo_url",
@@ -2325,7 +2352,10 @@
       "group": "settings",
       "main_status": "needs_verification",
       "evidence": [
-        "internal/gateway/family/handlers.go"
+        "internal/gateway/family/handlers.go",
+        "internal/gateway/family/settings_operation.go",
+        "cmd/regression/settings_operation_boundary_test.go",
+        "frontend/e2e/settings-operation-scenario.ts"
       ],
       "observation": {
         "route": "GET /settings",
@@ -2393,7 +2423,10 @@
       "group": "settings",
       "main_status": "needs_verification",
       "evidence": [
-        "internal/gateway/family/handlers.go"
+        "internal/gateway/family/handlers.go",
+        "internal/gateway/family/settings_operation.go",
+        "cmd/regression/settings_operation_boundary_test.go",
+        "frontend/e2e/settings-operation-scenario.ts"
       ],
       "observation": {
         "route": "GET /sso/get/ui_settings",
@@ -3090,7 +3123,10 @@
       "group": "settings",
       "main_status": "needs_verification",
       "evidence": [
-        "internal/gateway/family/handlers.go"
+        "internal/gateway/family/handlers.go",
+        "internal/gateway/family/settings_operation.go",
+        "cmd/regression/settings_operation_boundary_test.go",
+        "frontend/e2e/settings-operation-scenario.ts"
       ],
       "observation": {
         "route": "PATCH /update/default_team_settings",
@@ -3107,7 +3143,10 @@
       "group": "settings",
       "main_status": "needs_verification",
       "evidence": [
-        "internal/gateway/family/handlers.go"
+        "internal/gateway/family/handlers.go",
+        "internal/gateway/family/settings_operation.go",
+        "cmd/regression/settings_operation_boundary_test.go",
+        "frontend/e2e/settings-operation-scenario.ts"
       ],
       "observation": {
         "route": "PATCH /update/internal_user_settings",
@@ -3124,7 +3163,10 @@
       "group": "settings",
       "main_status": "needs_verification",
       "evidence": [
-        "internal/gateway/family/handlers.go"
+        "internal/gateway/family/handlers.go",
+        "internal/gateway/family/settings_operation.go",
+        "cmd/regression/settings_operation_boundary_test.go",
+        "frontend/e2e/settings-operation-scenario.ts"
       ],
       "observation": {
         "route": "PATCH /update/ui_settings",
@@ -3141,7 +3183,10 @@
       "group": "settings",
       "main_status": "needs_verification",
       "evidence": [
-        "internal/gateway/family/handlers.go"
+        "internal/gateway/family/handlers.go",
+        "internal/gateway/family/settings_operation.go",
+        "cmd/regression/settings_operation_boundary_test.go",
+        "frontend/e2e/settings-operation-scenario.ts"
       ],
       "observation": {
         "route": "PATCH /update/user_banner",

@@ -38,7 +38,7 @@ test("all dashboard pages stay in the shell", async ({ page }) => {
       await expect(page.getByText(t("nav.groups.mine")).first()).toBeVisible();
     }
     expect(errors, errors.join("\n")).toEqual([]);
-    guard.assertOk();
+    await guard.assertOk();
   });
 }
 /** 用途：注册独立场景「chat shell is not admin sidebar」；无参数、无返回值。前置真实浏览器、私有数据库和本地上游；验证页面及原始契约，保留原套件前后置清理，运行器最终回收专属 schema。异常由 Playwright 单独记录。 */

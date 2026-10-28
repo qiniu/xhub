@@ -167,6 +167,15 @@ describe("typed api client middleware", () => {
     });
   });
 
+  /** 使用真实typed客户端中间件验证设置失败会抛错而非返回成功；仅模拟HTTP响应，无持久化数据。 */
+  it("rejects unsupported settings reads and writes", async () => {
+    const body = { error: { type: "unsupported_settings_operation", message: "Legacy settings unavailable" } };
+    const { fetch } = capturingFetch(jsonResponse(501, body));
+    await expect(fetchClient.GET("/get/internal_user_settings", { fetch })).rejects.toMatchObject({ status: 501 });
+    const write = capturingFetch(jsonResponse(501, body));
+    await expect(fetchClient.PATCH("/update/internal_user_settings", { body: { max_budget: 500 }, fetch: write.fetch })).rejects.toMatchObject({ status: 501 });
+  });
+
   it("returns the parsed body on a successful response", async () => {
     const body = { data: [{ model_group: "gpt-4o" }] };
     const { fetch } = capturingFetch(jsonResponse(200, body));

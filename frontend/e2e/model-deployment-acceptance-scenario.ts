@@ -64,7 +64,7 @@ test("真实验收按部署行核对单入口和 chat · responses 并完成浏�
         return { model: body.model, prompt_tokens: body.prompt_tokens, completion_tokens: body.completion_tokens, spend: Number(body.spend) };
       }).toEqual({ model: name, prompt_tokens: 8, completion_tokens: 2, spend: 0.000012 });
     }
-    guard.assertOk();
+    await guard.assertOk();
   } finally {
     for (const deployment of deployments) {
       expect((await page.request.post(GATEWAY + "/model/delete", { headers, data: { id: deployment.id } })).status(), "清理测试部署").toBe(200);

@@ -106,7 +106,7 @@ func TestUnusedAdminSurfacesStayGone(t *testing.T) {
 	}
 
 	status, body := authed(t, base, key, http.MethodGet, "/sso/get/ui_settings", nil)
-	if status != http.StatusOK {
+	if status != http.StatusNotImplemented {
 		t.Fatalf("ui settings alias status %d %s", status, trim(body))
 	}
 	status, body = authed(t, base, key, http.MethodPost, "/config/update", []byte(`{"general_settings":{"store_prompts_in_spend_logs":true}}`))

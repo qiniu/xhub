@@ -130,7 +130,7 @@ export function registerPageScenario(item: ReturnType<typeof discoverPages>[numb
     requirePageSuccess(response?.status(), businessPath, page.url());
   expect(errors, errors.join("\n")).toEqual([]);
   expect(failedReads, failedReads.join("\n")).toEqual([]);
-  guard.assertOk();
+  await guard.assertOk();
   recordPage(item.route, "pass", businessPath);
  });
 }
