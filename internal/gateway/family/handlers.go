@@ -591,11 +591,8 @@ func ServeMgmt(s Host, w http.ResponseWriter, r *http.Request) {
 }
 
 // writeCatalogPersist 将通用目录请求交给窄存储接口；s 提供已授权上下文，w/r 为 HTTP 响应和请求，body 为已解析对象。
-// 由ServeMgmt调用，返回值写入w；未实现的server运行时操作在取存储前拒绝，其余无存储时返回503，不改鉴权。
-// 由 ServeMgmt 调用，返回值写入 w；旧server导入/审批先明确拒绝，其余路径保持原语义，无存储时返回503。
-// 由 ServeMgmt 调用，返回值写入 w；未实现的插件启停先拒绝，其余目录保留原语义，无存储时返回503。
-// 由 ServeMgmt 调用，结果写入w；marketplace未实现时明确拒绝，其余目录保留原权限和存储边界。
-// 由 ServeMgmt 调用，返回值写入 w；Skill归档未实现时明确拒绝，其余保留原权限和持久化语义。
+// 由 ServeMgmt 在原鉴权之后调用；server执行、插件启停/市场及Skill归档先明确拒绝。
+// 其他资源委派配置服务或旧目录存储；缺失存储返回503，不改变权限和预算规则。
 func writeCatalogPersist(s Host, w http.ResponseWriter, r *http.Request, body map[string]any) {
 	if rejectServerRuntime(w, r) {
 		return
