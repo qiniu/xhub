@@ -73,6 +73,21 @@ func TestCatalogReads(t *testing.T) {
 				}
 				return
 			}
+			// 这些旧运维接口没有执行器，不接受空目录或固定healthy作为成功；真实存活/就绪继续走原模块。
+			switch rt.Path {
+			case "/coordination_redis/settings", "/debug/asyncio-tasks", "/debug/memory/details", "/debug/memory/summary",
+				"/memory-usage", "/memory-usage-in-mem-cache", "/memory-usage-in-mem-cache-items",
+				"/health/backlog", "/health/drain", "/health/history", "/health/license", "/health/shared-status", "/health/services":
+				var probe map[string]any
+				if status != http.StatusNotImplemented || json.Unmarshal(body, &probe) != nil {
+					t.Fatalf("unsupported operation status %d %s", status, trim(body))
+				}
+				errObj, _ := probe["error"].(map[string]any)
+				if errObj["type"] != "unsupported_operation" {
+					t.Fatalf("unsupported operation contract %s", trim(body))
+				}
+				return
+			}
 			if (strings.Contains(path, "/threads/") && strings.HasSuffix(path, "/messages")) ||
 				strings.HasPrefix(path, "/guardrails/submissions/") ||
 				path == "/authorize/flow" || path == "/guardrails/ui/major_airlines" || strings.HasPrefix(path, "/guardrails/ui/category_yaml/") {

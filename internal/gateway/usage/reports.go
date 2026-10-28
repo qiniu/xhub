@@ -1138,11 +1138,9 @@ func writeConnectionFailure(w http.ResponseWriter, model, mode, code, message st
 	})
 }
 
-// HealthServices returns the health list for dependent services.
-// 参数 s（Host）：HealthServices使用的数据面宿主；w（http.ResponseWriter）：调用方的 HTTP 响应，状态和正文写在这里；r（*http.Request）：入站 HTTP 请求。
-// 返回：无。状态码和正文写进调用方的响应。
-// 调用：gateway/usage/mount.go
-// 测试：gateway/dropped_alerts_test.go
+// HealthServices 保留旧管理员鉴权及退役告警服务的400；w/r为HTTP请求响应，s提供管理身份。
+// 此入口没有依赖健康探测器，必须返回明确501，不能用空列表声称所有服务健康；不访问或修改配置。
+// 模型连接测试由HealthTestConnection处理，公开数据库就绪检查由health模块处理。
 func HealthServices(s Host, w http.ResponseWriter, r *http.Request) {
 	if s.RequireManage(w, r) == nil {
 		return
@@ -1152,11 +1150,7 @@ func HealthServices(s Host, w http.ResponseWriter, r *http.Request) {
 		util.WriteError(w, 400, "invalid_request", "alerts are not supported")
 		return
 	}
-	util.WriteJSON(w, 200, map[string]any{
-		"healthy_services":   []any{},
-		"unhealthy_services": []any{},
-		"status":             "healthy",
-	})
+	util.WriteError(w, http.StatusNotImplemented, "unsupported_operation", "dependency service health probing is not implemented")
 }
 
 // HealthTest runs one health test against the named target. It is public: it proves the process is serving and says nothing about any tenant.

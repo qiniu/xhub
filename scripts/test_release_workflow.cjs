@@ -441,3 +441,9 @@ test('budget IAM boundary browser regressions remain in release gate', () => {
   const text = require('node:fs').readFileSync(require('node:path').join(__dirname, '../.github/workflows/release.yml'), 'utf8');
   for (const locale of ['en', 'zh-CN']) assert.ok(text.includes('scenarios/regression/budget-iam-' + locale + '.test.ts'));
 });
+
+/** 运维错误语义必须在两个语言环境走真实浏览器/网关/模型流程；读取配置不产生外部数据。 */
+test('operations boundary browser regressions remain in release gate', () => {
+  const text = require('node:fs').readFileSync(require('node:path').join(__dirname, '../.github/workflows/release.yml'), 'utf8');
+  for (const locale of ['en', 'zh-CN']) assert.ok(text.includes('scenarios/regression/operations-boundary-' + locale + '.test.ts'));
+});
