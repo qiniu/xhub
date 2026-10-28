@@ -3371,5 +3371,19 @@
     "title": "runtime operations reject false success without changing configuration and chat zh-CN",
     "kind": "implemented",
     "environment": "default offline"
+  },
+  {
+    "id": "REG-model-alias-en",
+    "file": "e2e/scenarios/regression/model-alias-en.test.ts",
+    "title": "legacy model aliases preserve real deployment and chat en",
+    "kind": "implemented",
+    "environment": "default offline"
+  },
+  {
+    "id": "REG-model-alias-zh-CN",
+    "file": "e2e/scenarios/regression/model-alias-zh-CN.test.ts",
+    "title": "legacy model aliases preserve real deployment and chat zh-CN",
+    "kind": "implemented",
+    "environment": "default offline"
   }
 ]

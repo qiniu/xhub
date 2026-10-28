@@ -93,7 +93,7 @@
       "title": "模型信息、fallback、封禁和公开旧别名",
       "batch": "C4",
       "source": "internal/gateway/family/catalog_persistence.go",
-      "conclusion": "与专用模型模块不同；不应由同名前缀推断真实路由/公开权限已修改。",
+      "conclusion": "C4候选修复：14条无实现契约的模型旧别名明确拒绝，真实模型专用服务、权限与预算保留。main_status及observation仍是历史审计，不能将候选当作已合入。",
       "pending_prs": []
     },
     "operations": {
@@ -251,7 +251,10 @@
       "group": "model-alias",
       "main_status": "needs_verification",
       "evidence": [
-        "internal/gateway/family/catalog_persistence.go"
+        "internal/gateway/family/catalog_persistence.go",
+        "internal/gateway/family/model_alias.go",
+        "cmd/regression/model_alias_boundary_test.go",
+        "frontend/e2e/model-alias-scenario.ts"
       ],
       "observation": {
         "route": "DELETE /fallback/{model}",
@@ -999,7 +1002,10 @@
       "group": "model-alias",
       "main_status": "needs_verification",
       "evidence": [
-        "internal/gateway/family/catalog_persistence.go"
+        "internal/gateway/family/catalog_persistence.go",
+        "internal/gateway/family/model_alias.go",
+        "cmd/regression/model_alias_boundary_test.go",
+        "frontend/e2e/model-alias-scenario.ts"
       ],
       "observation": {
         "route": "GET /fallback/login",
@@ -1016,7 +1022,10 @@
       "group": "model-alias",
       "main_status": "needs_verification",
       "evidence": [
-        "internal/gateway/family/catalog_persistence.go"
+        "internal/gateway/family/catalog_persistence.go",
+        "internal/gateway/family/model_alias.go",
+        "cmd/regression/model_alias_boundary_test.go",
+        "frontend/e2e/model-alias-scenario.ts"
       ],
       "observation": {
         "route": "GET /fallback/{model}",
@@ -1594,7 +1603,10 @@
       "group": "model-alias",
       "main_status": "needs_verification",
       "evidence": [
-        "internal/gateway/family/catalog_persistence.go"
+        "internal/gateway/family/catalog_persistence.go",
+        "internal/gateway/family/model_alias.go",
+        "cmd/regression/model_alias_boundary_test.go",
+        "frontend/e2e/model-alias-scenario.ts"
       ],
       "observation": {
         "route": "GET /model/deprecations",
@@ -1611,7 +1623,10 @@
       "group": "model-alias",
       "main_status": "needs_verification",
       "evidence": [
-        "internal/gateway/family/catalog_persistence.go"
+        "internal/gateway/family/catalog_persistence.go",
+        "internal/gateway/family/model_alias.go",
+        "cmd/regression/model_alias_boundary_test.go",
+        "frontend/e2e/model-alias-scenario.ts"
       ],
       "observation": {
         "route": "GET /model/info",
@@ -1679,7 +1694,10 @@
       "group": "model-alias",
       "main_status": "needs_verification",
       "evidence": [
-        "internal/gateway/family/catalog_persistence.go"
+        "internal/gateway/family/catalog_persistence.go",
+        "internal/gateway/family/model_alias.go",
+        "cmd/regression/model_alias_boundary_test.go",
+        "frontend/e2e/model-alias-scenario.ts"
       ],
       "observation": {
         "route": "GET /model/settings",
@@ -1713,7 +1731,10 @@
       "group": "model-alias",
       "main_status": "needs_verification",
       "evidence": [
-        "internal/gateway/family/catalog_persistence.go"
+        "internal/gateway/family/catalog_persistence.go",
+        "internal/gateway/family/model_alias.go",
+        "cmd/regression/model_alias_boundary_test.go",
+        "frontend/e2e/model-alias-scenario.ts"
       ],
       "observation": {
         "route": "GET /models/{model_id}",
@@ -2733,7 +2754,10 @@
       "group": "model-alias",
       "main_status": "needs_verification",
       "evidence": [
-        "internal/gateway/family/catalog_persistence.go"
+        "internal/gateway/family/catalog_persistence.go",
+        "internal/gateway/family/model_alias.go",
+        "cmd/regression/model_alias_boundary_test.go",
+        "frontend/e2e/model-alias-scenario.ts"
       ],
       "observation": {
         "route": "GET /v1/model/deprecations",
@@ -2750,7 +2774,10 @@
       "group": "model-alias",
       "main_status": "needs_verification",
       "evidence": [
-        "internal/gateway/family/catalog_persistence.go"
+        "internal/gateway/family/catalog_persistence.go",
+        "internal/gateway/family/model_alias.go",
+        "cmd/regression/model_alias_boundary_test.go",
+        "frontend/e2e/model-alias-scenario.ts"
       ],
       "observation": {
         "route": "GET /v1/model/info",
@@ -3617,7 +3644,10 @@
       "group": "model-alias",
       "main_status": "needs_verification",
       "evidence": [
-        "internal/gateway/family/catalog_persistence.go"
+        "internal/gateway/family/catalog_persistence.go",
+        "internal/gateway/family/model_alias.go",
+        "cmd/regression/model_alias_boundary_test.go",
+        "frontend/e2e/model-alias-scenario.ts"
       ],
       "observation": {
         "route": "POST /fallback",
@@ -3906,7 +3936,10 @@
       "group": "model-alias",
       "main_status": "needs_verification",
       "evidence": [
-        "internal/gateway/family/catalog_persistence.go"
+        "internal/gateway/family/catalog_persistence.go",
+        "internal/gateway/family/model_alias.go",
+        "cmd/regression/model_alias_boundary_test.go",
+        "frontend/e2e/model-alias-scenario.ts"
       ],
       "observation": {
         "route": "POST /make_public",
@@ -3923,7 +3956,10 @@
       "group": "model-alias",
       "main_status": "needs_verification",
       "evidence": [
-        "internal/gateway/family/catalog_persistence.go"
+        "internal/gateway/family/catalog_persistence.go",
+        "internal/gateway/family/model_alias.go",
+        "cmd/regression/model_alias_boundary_test.go",
+        "frontend/e2e/model-alias-scenario.ts"
       ],
       "observation": {
         "route": "POST /model/block",
@@ -3940,7 +3976,10 @@
       "group": "model-alias",
       "main_status": "needs_verification",
       "evidence": [
-        "internal/gateway/family/catalog_persistence.go"
+        "internal/gateway/family/catalog_persistence.go",
+        "internal/gateway/family/model_alias.go",
+        "cmd/regression/model_alias_boundary_test.go",
+        "frontend/e2e/model-alias-scenario.ts"
       ],
       "observation": {
         "route": "POST /model/unblock",
@@ -3957,7 +3996,10 @@
       "group": "model-alias",
       "main_status": "needs_verification",
       "evidence": [
-        "internal/gateway/family/catalog_persistence.go"
+        "internal/gateway/family/catalog_persistence.go",
+        "internal/gateway/family/model_alias.go",
+        "cmd/regression/model_alias_boundary_test.go",
+        "frontend/e2e/model-alias-scenario.ts"
       ],
       "observation": {
         "route": "POST /model_group/make_public",

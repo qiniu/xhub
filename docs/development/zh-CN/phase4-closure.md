@@ -1,5 +1,17 @@
 # 第四阶段固定收尾清单
 
+## 当前收尾进展（2026-10-29）
+
+- main `e8a29c4f972e8832e1c6e02a8226d0befcc65584` 已集成累计第四阶段 PR（#182–#228，含 #202），C1、C2、C3/runtime-ops 已合入。
+- **C3/settings 15条已提交 #231，未合并**：无消费者的旧设置明确拒绝，保留真实主题、权限与预算。详见该PR独立测试证据。
+- **本批C4/model-alias 14条**：旧模型列表、fallback、公开/封禁入口没有实现契约，明确返回 `501 unsupported_model_operation`，不再读写KV冒充真实模型操作。名称相似不等于可无损映射，不悄悄改变旧参数或权限。
+- 保留且真实验证：`/v2/model/info`部署列表，`/v1/models`及详情，`/model/disable`和`/model/enable`的实际推理结果、正常对话及零预算403；已有模型契约和fallback真实回归一并执行。没有改变模型授权、预算或路由策略。
+- 本批及#231均未合并/部署。两批验收后，剩余 **C5统计26、C6协议7、C7发现9，共42条**，以及最终组合验收；当前main仍有这29条候选修复，合计71条。不能将单PR通过当成集成通过。
+- 当前注册清单301条，历史303条有2条已交给专用模块。下面保留原审计快照，JSON `main_status`和`observation`仍为历史基线；新增的是候选证据，不冒充最新main观察。
+
+<details><summary>原始审计快照（2026-10-28，历史状态）</summary>
+
+
 > C1 已提交 [#224](https://github.com/qiniu/xhub/pull/224)：26条辅助接口明确拒绝，另外2条单数策略查询补充验收。该PR未合入，下面的main基线状态保持不变。C2 已提交 [#226](https://github.com/qiniu/xhub/pull/226)：22条旧身份操作明确拒绝，真实密码登录、SAML、会话和预算已回归；同样尚未合入。C3/runtime-ops 已提交 [#228](https://github.com/qiniu/xhub/pull/228)：12条无执行器的旧运维入口明确拒绝，配置、凭据轮换、预算及双语对话均有真实测试；尚未合入。剩余C3设置组15条、C4–C7及最终组合验收。
 
 评审基线：`939e0d6c0ba174bd03d6dad4c1035da8bf0be8cd`，2026-10-28。**第四阶段未完成；未合并、未部署。**
@@ -536,3 +548,5 @@ go test -race ./internal/gateway -run '^Test(Phase4Closure|RouteOwnershipAudit|R
 ```
 
 本次报告及实际执行结果见PR验证记录。原审计37项真实后台回归和8项浏览器流程的历史结果见 `compatibility-layer-audit.md`；未重新运行的历史结果不计入本轮。无线上、真实SSO或付费模型调用，隔离数据库清理失败不能通过。
+
+</details>
