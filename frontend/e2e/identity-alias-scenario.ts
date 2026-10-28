@@ -13,7 +13,6 @@ const routes = [
   "GET /jwt/key/mapping/list",
   "GET /onboarding/get_token",
   "GET /token/generate",
-  "POST /delete",
   "POST /introspect",
   "POST /invitation/delete",
   "POST /invitation/new",
@@ -30,7 +29,7 @@ const routes = [
 ];
 
 /** 注册双语真实浏览器流程；locale控制登录及调试台语言，无线上账户或外部服务凭据。
- * 管理员调用22条旧接口验证明确拒绝、零上游调用；随后普通用户页面登录、保留500预算并完成真实对话。
+ * 管理员调用21条旧接口验证明确拒绝、零上游调用；随后普通用户页面登录、保留500预算并完成真实对话。
  * 页面请求不mock；独立API上下文在页面关闭后仍删除临时用户及Key，运行器最终回收隔离schema。
  */
 export function registerIdentityAliasBoundary(locale: Locale) {

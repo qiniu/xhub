@@ -7,7 +7,7 @@ import (
 	"testing"
 )
 
-// identityAliasCases 独立登记C2的22条精确旧身份入口，不读取生产拒绝表，避免实现漏项时测试同步漏测。
+// identityAliasCases 独立登记C2的21条精确旧身份入口，不读取生产拒绝表，避免实现漏项时测试同步漏测。
 var identityAliasCases = []string{
 	"GET /authorize",
 	"GET /discover",
@@ -17,7 +17,6 @@ var identityAliasCases = []string{
 	"GET /jwt/key/mapping/list",
 	"GET /onboarding/get_token",
 	"GET /token/generate",
-	"POST /delete",
 	"POST /introspect",
 	"POST /invitation/delete",
 	"POST /invitation/new",

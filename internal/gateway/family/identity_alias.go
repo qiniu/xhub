@@ -7,6 +7,7 @@ import (
 	"github.com/sunqirui1987/xhub/internal/util"
 )
 
+// POST /delete 已由缓存模块接管，不属于身份别名；其真实拒绝契约由缓存回归覆盖。
 // identityAliases 只登记未接入身份执行器的旧目录操作；不能按路径前缀拒绝，否则会误伤真实登录和企业SSO。
 var identityAliases = map[string]struct{}{
 	"GET /authorize":               {},
@@ -17,7 +18,6 @@ var identityAliases = map[string]struct{}{
 	"GET /jwt/key/mapping/list":    {},
 	"GET /onboarding/get_token":    {},
 	"GET /token/generate":          {},
-	"POST /delete":                 {},
 	"POST /introspect":             {},
 	"POST /invitation/delete":      {},
 	"POST /invitation/new":         {},

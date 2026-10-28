@@ -1,7 +1,7 @@
 {
   "baseline": "939e0d6c0ba174bd03d6dad4c1035da8bf0be8cd",
   "reviewed_at": "2026-10-28",
-  "scope": "All catalog-owned management declarations; provider parameters require branch-specific follow-up.",
+  "scope": "Catalog-owned management declarations after stage-4 integration; observations retain the historical baseline. POST /delete and POST /cache/settings/test moved to cache administration with real regression coverage; three SAML refresh routes belong to the identity module. This inventory is not a completion claim.",
   "groups": {
     "access-vector": {
       "title": "访问组与向量库配置",
@@ -3272,23 +3272,6 @@
       }
     },
     {
-      "route": "POST /cache/settings/test",
-      "owner": "catalog:serveFamilyRoute:manage",
-      "group": "cache",
-      "main_status": "needs_verification",
-      "evidence": [
-        "internal/gateway/access.go"
-      ],
-      "observation": {
-        "route": "POST /cache/settings/test",
-        "anonymous": 401,
-        "user": 403,
-        "admin": 200,
-        "kv_changed": true,
-        "upstream_calls": 0
-      }
-    },
-    {
       "route": "POST /claude-code/plugins",
       "owner": "catalog:serveFamilyRoute:manage",
       "group": "plugin",
@@ -3540,23 +3523,6 @@
         "user": 403,
         "admin": 200,
         "kv_changed": true,
-        "upstream_calls": 0
-      }
-    },
-    {
-      "route": "POST /delete",
-      "owner": "catalog:serveFamilyRoute:manage",
-      "group": "auth-alias",
-      "main_status": "needs_fix",
-      "evidence": [
-        "internal/gateway/family/catalog_persistence.go"
-      ],
-      "observation": {
-        "route": "POST /delete",
-        "anonymous": 401,
-        "user": 403,
-        "admin": 200,
-        "kv_changed": false,
         "upstream_calls": 0
       }
     },
@@ -5359,7 +5325,7 @@
     "catalog:serveFamilyRoute:mixed": 34,
     "catalog:serveFamilyRoute:public": 11,
     "catalog:videosContract:data": 18,
-    "module:access": 11,
+    "module:access": 13,
     "module:compliance": 2,
     "module:family": 2,
     "module:guard": 2,
@@ -5377,7 +5343,7 @@
   },
   "module_only_counts": {
     "access": 2,
-    "directory": 40,
+    "directory": 43,
     "identity": 25,
     "ingress": 2,
     "models": 15,

@@ -6,7 +6,7 @@ import (
 	"testing"
 )
 
-// TestIdentityAliasRejects 验证22条操作、尾斜杠和无存储环境下的失败契约；仅内存HTTP，无需清理外部数据。
+// TestIdentityAliasRejects 验证21条操作、尾斜杠和无存储环境下的失败契约；仅内存HTTP，无需清理外部数据。
 func TestIdentityAliasRejects(t *testing.T) {
 	for _, route := range []string{
 		"GET /authorize",
@@ -17,7 +17,6 @@ func TestIdentityAliasRejects(t *testing.T) {
 		"GET /jwt/key/mapping/list",
 		"GET /onboarding/get_token",
 		"GET /token/generate",
-		"POST /delete",
 		"POST /introspect",
 		"POST /invitation/delete",
 		"POST /invitation/new",
@@ -47,7 +46,7 @@ func TestIdentityAliasRejects(t *testing.T) {
 
 // TestIdentityAliasBoundaries 验证真实身份路径、错误方法、相似名称不被扩大拒绝；JSON-RPC仍先返回400，测试不访问数据库。
 func TestIdentityAliasBoundaries(t *testing.T) {
-	for _, route := range []string{"POST /v2/login", "POST /v3/login", "GET /auth/me", "POST /auth/enterprise/saml/acs", "GET /authorize/flow", "POST /authorize/complete", "POST /v1/mcp/server/oauth/id/token", "POST /user/set_password", "GET /token", "POST /token/extra", "GET /jwt/key/mapping/list/extra", "POST /invitation/newer", "POST /register//"} {
+	for _, route := range []string{"POST /delete", "POST /v2/login", "POST /v3/login", "GET /auth/me", "POST /auth/enterprise/saml/acs", "GET /authorize/flow", "POST /authorize/complete", "POST /v1/mcp/server/oauth/id/token", "POST /user/set_password", "GET /token", "POST /token/extra", "GET /jwt/key/mapping/list/extra", "POST /invitation/newer", "POST /register//"} {
 		t.Run(route, func(t *testing.T) {
 			method, path, _ := strings.Cut(route, " ")
 			w := httptest.NewRecorder()
