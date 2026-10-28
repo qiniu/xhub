@@ -544,11 +544,9 @@ func singular(kind string) string {
 	}
 }
 
-// ServeMixed answers the catalog's "mixed" paths, such as /v1/agents, /v1/skills and /v1/workflows. These were removed from the product and only remain in the catalog. They are refused rather than served: the generic store behind them is one shared key-value namespace keyed by resource kind, with no owner and no team column, so serving them let any signed-in member — and any inference key — create records that every other principal could then list. Refusing is what the classification has always described; this makes the code match. The identity is still required before the refusal, so an anonymous caller learns nothing beyond the fact that the path exists.
-// 参数 s（Host）：处理混合使用的数据面宿主；w（http.ResponseWriter）：调用方的 HTTP 响应，状态和正文写在这里；r（*http.Request）：入站 HTTP 请求。
-// 返回：无。状态码和正文写进调用方的响应。
-// 调用：gateway/catalog.go
-// 测试：无直接单测
+// ServeMixed 拒绝仍列在兼容目录的退役混合身份接口，例如agents、memory和workflows。
+// s提供身份检查，w/r为入站HTTP；先验证身份再返回410，无存储副作用。目录KV没有资源归属隔离，不能恢复给普通成员共享读写。
+// 网关目录分派调用；/v1/skills不属于该分类，其管理配置CRUD与未实现的归档边界另行处理。
 func ServeMixed(s Host, w http.ResponseWriter, r *http.Request) {
 	if s.RequireMixed(w, r) == nil {
 		return
@@ -576,8 +574,11 @@ func ServeMgmt(s Host, w http.ResponseWriter, r *http.Request) {
 }
 
 // writeCatalogPersist 将通用目录请求交给窄存储接口；s 提供已授权上下文，w/r 为 HTTP 响应和请求，body 为已解析对象。
-// 由 ServeMgmt 调用，返回值写入 w；不更改 Host、鉴权或资源路径语义，无存储时由处理器返回 503。
+// 由 ServeMgmt 调用，返回值写入 w；Skill归档未实现时明确拒绝，其余保留原权限和持久化语义。
 func writeCatalogPersist(s Host, w http.ResponseWriter, r *http.Request, body map[string]any) {
+	if rejectSkillArchive(w, r) {
+		return
+	}
 	var st catalogRecordStore
 	if recordStore := s.RecordStore(); recordStore != nil {
 		st = recordStore
@@ -850,12 +851,12 @@ func setDefault(obj map[string]any, key string, val any) {
 	}
 }
 
-// parseMgmt reads the resource kind, action, and id from the method and path.
-// 参数 method（string）：HTTP 方法，例如 GET 或 POST；path（string）：解析Mgmt要定位的路径。可能是 URL，也可能是字段路径；body（map[string]any）：已解析或原始的 JSON。
-// 返回 kind（string）：固定文本 "misc"；action（string）：固定文本 "misc"；id（string）：固定文本 "misc"。
-// 调用：仅在 handlers.go 内使用
-// 测试：无直接单测
+// parseMgmt 按已注册路径、HTTP方法及正文解析目录种类、动作、ID，供目录读写调用；无存储副作用。
+// Skill详情优先按资源ID寻址，避免GET误执行保留词动作；其余路径和正文ID回退保持原行为。
 func parseMgmt(method, path string, body map[string]any) (kind, action, id string) {
+	if action, id, matched := skillResourceAction(method, path); matched {
+		return "skills", action, id
+	}
 	parts := catalog.Split(strings.TrimSuffix(path, "/"))
 	filtered := []string{}
 	for _, p := range parts {

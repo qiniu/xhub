@@ -73,6 +73,17 @@ func TestCatalogReads(t *testing.T) {
 				}
 				return
 			}
+			if rt.Path == "/v1/skills/{skill_id}/archive" {
+				var probe map[string]any
+				if status != http.StatusNotImplemented || json.Unmarshal(body, &probe) != nil {
+					t.Fatalf("Skill归档应明确未实现: %d %s", status, trim(body))
+				}
+				errObj, _ := probe["error"].(map[string]any)
+				if errObj["type"] != "unsupported_operation" {
+					t.Fatalf("Skill归档错误类型不正确: %s", trim(body))
+				}
+				return
+			}
 			switch status {
 			case http.StatusOK:
 				if !json.Valid(body) {
