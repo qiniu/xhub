@@ -232,6 +232,35 @@ jobs:
             coverage/supplier-contract.out
             coverage/search-config.out
           if-no-files-found: error
+      # 与供应商契约共用隔离数据库基础设施，旧server审批报告独立采集，不扩大契约覆盖声明。
+      - name: Run real server submission boundary regression
+        env:
+          XHUB_REGRESSION_COVERPROFILE: coverage/server-submission.out
+        run: bash scripts/regression.sh '^TestServerSubmissionBoundary$'
+      - name: Validate server submission regression coverage
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -s coverage/server-submission.out
+          go tool cover -func=coverage/server-submission.out | tail -1
+      - name: Upload server submission regression coverage
+        uses: codecov/codecov-action@v5
+        with:
+          files: coverage/server-submission.out
+          flags: backend
+          name: server-submission
+          disable_search: true
+          fail_ci_if_error: true
+          use_oidc: true
+      - name: Archive server submission regression evidence
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: server-submission-regression
+          path: |
+            .e2e/runs/
+            coverage/server-submission.out
+          if-no-files-found: error
       # 与供应商契约共用隔离数据库基础设施，旧server运行时报告独立采集，不扩大契约覆盖声明。
       - name: Run real server runtime boundary regression
         env:

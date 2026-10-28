@@ -3189,5 +3189,19 @@
     "title": "SAML refresh HTTP expired zh-CN",
     "kind": "implemented",
     "environment": "local TLS IdP and PostgreSQL"
+  },
+  {
+    "id": "REG-server-submission-en",
+    "file": "e2e/scenarios/regression/server-submission-en.test.ts",
+    "title": "legacy server submission helpers preserve configuration and chat en",
+    "kind": "implemented",
+    "environment": "default offline"
+  },
+  {
+    "id": "REG-server-submission-zh-CN",
+    "file": "e2e/scenarios/regression/server-submission-zh-CN.test.ts",
+    "title": "legacy server submission helpers preserve configuration and chat zh-CN",
+    "kind": "implemented",
+    "environment": "default offline"
   }
 ]

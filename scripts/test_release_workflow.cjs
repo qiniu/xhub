@@ -482,3 +482,15 @@ test('server runtime release gate includes bilingual real flows', () => {
     assert.equal(catalog.find(item => item.file === 'e2e/' + file)?.kind, 'implemented');
   }
 });
+
+/** 旧server审批边界必须进入真实发布浏览器门禁；验证双语场景都注册且没有跳过，配置只读无需清理。 */
+test('server submission release gate includes bilingual real flows', () => {
+  const browser = workflow.jobs.verify.steps.find(item => (item.run || '').startsWith('bash scripts/e2e.sh '));
+  assert.ok(browser, '发布缺少真实浏览器门禁');
+  const catalog = JSON.parse(readFileSync(join(__dirname, '../frontend/e2e/scenario-catalog.json'), 'utf8'));
+  for (const locale of ['en', 'zh-CN']) {
+    const file = `scenarios/regression/server-submission-${locale}.test.ts`;
+    assert.ok(browser.run.split(/\s+/).includes(file), '发布遗漏 ' + file);
+    assert.equal(catalog.find(item => item.file === 'e2e/' + file)?.kind, 'implemented');
+  }
+});
