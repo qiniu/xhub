@@ -38,6 +38,9 @@ func writeCatalogStore(st catalogRecordStore, w http.ResponseWriter, r *http.Req
 	if rejectProviderBatch(w, r) {
 		return
 	}
+	if rejectMedicalAlias(w, r) {
+		return
+	}
 	kind, action, id := parseMgmt(r.Method, path, body)
 	// Skill详情路径已明确指定唯一资源；不能再被通用批量操作的正文ID覆盖或扩大删除范围。
 	_, _, skillResource := skillResourceAction(r.Method, path)

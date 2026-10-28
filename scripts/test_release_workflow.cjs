@@ -579,3 +579,12 @@ test('provider batch release gate includes bilingual execution flows', () => {
     assert.ok(existsSync(join(__dirname, '../frontend/e2e', file)));
   }
 });
+
+/** 发布验证需执行中英文旧分析入口拒绝后正常对话的真实流程；只读登记和命令，无外部清理。 */
+test('medical alias release gate includes bilingual execution flows', () => {
+  const command = workflow.jobs.verify.steps.find(item => item.run?.startsWith('bash scripts/e2e.sh '))?.run;
+  for (const file of ['scenarios/regression/medical-alias-zh-CN.test.ts', 'scenarios/regression/medical-alias-en.test.ts']) {
+    assert.ok(command?.split(' ').includes(file), '旧分析入口真实流程缺失：' + file);
+    assert.ok(existsSync(join(__dirname, '../frontend/e2e', file)));
+  }
+});

@@ -428,3 +428,11 @@ npm run test:types
 修复在既有管理鉴权与 JSON 验证后明确返回 `501 unsupported_operation` 和 `Cache-Control: no-store`，不读取或写入公共配置、不调用上游。匿名 401、普通会话/Key 403、非法 JSON/JSON-RPC 400 保持；标准 `/v1/batches`、`/batches` 和 `/openai/v1/batches` 继续使用原数据面鉴权及拒绝逻辑。没有增加批处理能力或扩大 Swagger 支持清单。
 
 真实回归验证四种操作、配置快照、标准入口、正常推理计费、零预算拦截与清理。双语浏览器验证登录后旧接口明确拒绝，随后调试台选择模型和 Chat 端点完成真实本地对话。测试使用隔离数据库和本地 HTTP 上游，不代表外部供应商验收；CI 上传真实回归覆盖率，70% 门禁不变。无数据库迁移、不删除既有配置；提交不等于合并或部署。
+
+## 第四阶段旧 Comprehend Medical 入口边界
+
+[Bug #221](https://github.com/qiniu/xhub/issues/221) 的真实 HTTP/PostgreSQL 复现表明：`POST /comprehendmedical` 和 `POST /comprehendmedical/{operation}` 没有分析执行器，却落入公共配置处理。请求正文可能被保存并回显，`info` 会读取同名配置，`delete` 会删除记录；返回 200 不代表完成上游分析。
+
+修复在原管理鉴权和对象 JSON 校验后返回 `501 unsupported_operation`、`Cache-Control: no-store`，不访问存储、不回显请求、不调用上游。匿名 401、普通会话/Key 403、非法 JSON/JSON-RPC 400，以及未登记方法和多层路径的 404 保持；不新增供应商分析能力，不扩大 Swagger 支持清单。
+
+单元测试验证精确路径、保留操作名、存储故障和正文校验；真实回归验证四种操作不改配置、正常对话计费、零预算拒绝和清理；中英文浏览器验证真实登录、明确拒绝后调试台仍能选择模型和 Chat 端点完成对话。仅使用合成文本、隔离数据库和本地 HTTP 上游，不访问实际业务正文或第三方分析服务。CI 采集上传真实覆盖率，70% 门禁不变；无数据迁移或历史配置删除，提交不等于合并或部署。

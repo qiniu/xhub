@@ -811,6 +811,35 @@ jobs:
             .e2e/runs/
             coverage/provider-batch.out
           if-no-files-found: error
+      # 旧分析入口真实回归独立采集覆盖率，保留权限与预算规则。
+      - name: Run real medical alias regression
+        env:
+          XHUB_REGRESSION_COVERPROFILE: coverage/medical-alias.out
+        run: bash scripts/regression.sh '^TestMedicalAliasBoundary$'
+      - name: Validate medical alias regression coverage
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -s coverage/medical-alias.out
+          go tool cover -func=coverage/medical-alias.out | tail -1
+      - name: Upload medical alias regression coverage
+        uses: codecov/codecov-action@v5
+        with:
+          files: coverage/medical-alias.out
+          flags: backend
+          name: medical-alias
+          disable_search: true
+          fail_ci_if_error: true
+          use_oidc: true
+      - name: Archive medical alias regression evidence
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: medical-alias-regression
+          path: |
+            .e2e/runs/
+            coverage/medical-alias.out
+          if-no-files-found: error
       - run: docker compose down -v
         if: always()
 
