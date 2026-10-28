@@ -1,8 +1,8 @@
 import React, { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Plugin } from "./types";
-import { useT } from "@/i18n";
-import { getSourceLink } from "./helpers";
+import { useI18n } from "@/i18n";
+import { skillDetailDate, skillDetailSourceLink } from "./skill_detail_metadata";
 import SkillSupportNotice from "./SkillSupportNotice";
 
 /** 兼容旧详情调用方；skill为配置元数据，onBack回到目录，其他属性不授予安装或发布能力。 */
@@ -18,9 +18,9 @@ interface SkillDetailProps {
  * enabled只显示配置值，不代表发布状态；使用页不生成未实现marketplace的安装指令或发送外部请求。
  */
 const SkillDetail: React.FC<SkillDetailProps> = ({ skill, onBack }) => {
-  const t = useT();
+  const { t, locale } = useI18n();
   const [usage, setUsage] = useState(false);
-  const sourceUrl = skill.source ? getSourceLink(skill.source) : null;
+  const sourceUrl = skillDetailSourceLink(skill.source);
   const rows = [
     { label: t("Skill ID"), value: skill.id },
     { label: t("Category"), value: skill.category },
@@ -28,7 +28,7 @@ const SkillDetail: React.FC<SkillDetailProps> = ({ skill, onBack }) => {
     { label: t("Namespace"), value: skill.namespace },
     { label: t("Version"), value: skill.version },
     { label: t("Author"), value: skill.author?.name },
-    { label: t("Added"), value: skill.created_at },
+    { label: t("Added"), value: skillDetailDate(skill.created_at, locale) },
   ];
   return (
     <div className="space-y-5 py-6">
