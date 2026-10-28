@@ -166,8 +166,10 @@
       "title": "已拆分服务下的辅助操作",
       "batch": "C1",
       "source": "internal/gateway/family/handlers.go",
-      "conclusion": "策略执行/解析/附件/版本/状态、凭据迁移/按模型查询、提示词版本仍经parseMgmt映射CRUD；需语义级修复，不能沿用配置已验证结论。",
-      "pending_prs": []
+      "conclusion": "策略执行/解析/附件/版本/状态、凭据迁移/按模型查询、提示词版本仍经parseMgmt映射CRUD；需语义级修复，不能沿用配置已验证结论。 C1修复与补充验收见#224，仍待合入；main状态不提前更改。",
+      "pending_prs": [
+        224
+      ]
     },
     "settings": {
       "title": "旧设置、品牌、配置导出",

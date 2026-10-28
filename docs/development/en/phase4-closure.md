@@ -1,5 +1,7 @@
 # Stage 4 closure inventory
 
+> C1 is submitted as [#224](https://github.com/qiniu/xhub/pull/224): 26 auxiliary routes explicitly reject unsupported operations and two singular-policy reads gain acceptance evidence. It is unmerged; main status below remains unchanged. C2–C7 and integration acceptance remain.
+
 Baseline: `939e0d6c0ba174bd03d6dad4c1035da8bf0be8cd`, reviewed 2026-10-28. Stage 4 is **not complete**. No merge or production deployment.
 
 The finite inventory is `internal/gateway/testdata/phase4-closure.json`: all 303 catalog-owned management declarations (296 family, 5 provider files, 2 WebSocket wrappers). The broader ownership snapshot retains 755 catalog declarations and 95 module-only registrations. These are declarations, not counts of supported unique APIs.
