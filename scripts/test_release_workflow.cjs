@@ -428,3 +428,10 @@ test('release verifies tag catalog browser flows', () => {
  assert.ok(browser);
  for(const locale of ['en','zh-CN']) assert.ok(browser.run.includes(`scenarios/regression/tag-catalog-${locale}.test.ts`));
 });
+
+/** 发布校验必须运行双语元数据读写与真实聊天流程；只检查工作流声明，不代替浏览器结果，无外部副作用。 */
+test('release verifies metadata configuration browser flows', () => {
+ const browser=workflow.jobs.verify.steps.find(s=>s.run?.startsWith('bash scripts/e2e.sh scenarios/legacy/login/sc-056.test.ts'));
+ assert.ok(browser);
+ for(const locale of ['en','zh-CN']) assert.ok(browser.run.includes(`scenarios/regression/metadata-config-service-${locale}.test.ts`));
+});

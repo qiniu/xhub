@@ -424,3 +424,29 @@ test('tag configuration has real regression coverage and cleanup', () => {
   assert.ok(job.steps.every(item => !item['continue-on-error']));
   assert.equal(job.steps.find(item => item.run === 'docker compose down -v').if, 'always()');
 });
+
+/** 元数据配置真实HTTP/数据库回归必须独立采集并上传backend覆盖率，缺失报告或清理失败不得通过；纯工作流结构验证，无外部副作用。 */
+test('metadata configuration has real regression coverage and cleanup', () => {
+  const job = workflow.jobs['supplier-contract'];
+  const run = step('supplier-contract', 'Run real metadata configuration regression');
+  assert.equal(run.run, "bash scripts/regression.sh '^Test(MetadataConfig|CustomerListReadFailure)'");
+  assert.equal(run.env.XHUB_REGRESSION_COVERPROFILE, 'coverage/metadata-config.out');
+  const check = step('supplier-contract', 'Validate metadata regression coverage');
+  assert.match(check.run, /set -euo pipefail/);
+  assert.match(check.run, /test -s coverage\/metadata-config.out/);
+  assert.match(check.run, /go tool cover -func=coverage\/metadata-config.out/);
+  const upload = step('supplier-contract', 'Upload metadata regression coverage');
+  assert.equal(upload.with.files, 'coverage/metadata-config.out');
+  assert.equal(upload.with.fail_ci_if_error, true);
+  assert.equal(upload.with.disable_search, true);
+  assert.equal(upload.with.flags, 'backend');
+  assert.ok(job.steps.indexOf(run) < job.steps.indexOf(check));
+  assert.ok(job.steps.indexOf(check) < job.steps.indexOf(upload));
+  assert.ok(!upload.if || upload.if === 'success()');
+  const artifact = step('supplier-contract', 'Archive metadata regression evidence');
+  assert.equal(artifact.if, 'always()');
+  assert.match(artifact.with.path, /coverage\/metadata-config.out/);
+  assert.equal(artifact.with['if-no-files-found'], 'error');
+  assert.ok(job.steps.every(item => !item['continue-on-error']));
+  assert.equal(job.steps.find(item => item.run === 'docker compose down -v').if, 'always()');
+});

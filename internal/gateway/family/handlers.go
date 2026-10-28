@@ -19,6 +19,7 @@ import (
 	dpusage "github.com/sunqirui1987/xhub/internal/dataplane/usage"
 	"github.com/sunqirui1987/xhub/internal/gateway/accessgroupconfig"
 	"github.com/sunqirui1987/xhub/internal/gateway/guard"
+	"github.com/sunqirui1987/xhub/internal/gateway/metadataconfig"
 	"github.com/sunqirui1987/xhub/internal/gateway/policyconfig"
 	"github.com/sunqirui1987/xhub/internal/gateway/promptconfig"
 	"github.com/sunqirui1987/xhub/internal/gateway/searchconfig"
@@ -588,9 +589,8 @@ func writeCatalogPersist(s Host, w http.ResponseWriter, r *http.Request, body ma
 }
 
 // Freeze 为旧兼容响应补齐资源必需字段；kind 为资源族，obj 为可修改的 JSON 对象。
-// 无返回值；保留已有非 nil 字段并删除 password，不写数据库。供应商、搜索、提示词、策略及访问组字段交给各自独立服务规范化。
-// 无返回值；保留已有非 nil 字段并删除 password，不写数据库。供应商、搜索、提示词、策略及向量库管理字段交给各自独立服务规范化。
-// gateway/access.go 及旧目录适配器调用；新资源业务逻辑不应继续加入此通用分支。
+// 无返回值；保留已有非 nil 字段并删除 password，不写数据库；已迁移资源由各自服务规范化。
+// 旧目录适配器调用；新资源业务逻辑不应继续加入此通用分支。
 func Freeze(kind string, obj map[string]any) {
 	if kind == "access_group" || kind == "access_groups" {
 		accessgroupconfig.Normalize(kind, obj)
@@ -598,6 +598,10 @@ func Freeze(kind string, obj map[string]any) {
 	}
 	if kind == "vector_store" {
 		vectorconfig.Normalize(obj)
+		return
+	}
+	if metadataconfig.Supports(kind) {
+		metadataconfig.Normalize(kind, obj)
 		return
 	}
 	if kind == "policies" || kind == "policy" {
@@ -708,24 +712,10 @@ func Freeze(kind string, obj map[string]any) {
 	case "memory":
 		setDefault(obj, "key", id)
 		setDefault(obj, "value", "")
-	case "tags", "tag":
-		if n := str(obj["tag_name"]); n != "" {
-			obj["name"] = n
-		}
-		setDefault(obj, "name", id)
-		setDefault(obj, "tag_name", obj["name"])
-		setDefault(obj, "spend", 0)
 	case "guardrails", "apply_guardrail":
 		setDefault(obj, "guardrail_id", id)
 		setDefault(obj, "guardrail_name", "")
 		setDefault(obj, "litellm_params", map[string]any{})
-	case "customer", "end_user":
-		setDefault(obj, "user_id", id)
-		setDefault(obj, "spend", 0)
-		setDefault(obj, "blocked", false)
-		if _, ok := obj["max_budget"]; !ok {
-			obj["max_budget"] = nil
-		}
 	case "invitation":
 		setDefault(obj, "user_id", "")
 		setDefault(obj, "is_accepted", false)

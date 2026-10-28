@@ -270,3 +270,15 @@ See [core contract completion](core-contract-completion.md) for stage3 scope, ev
 ## Phase 4 remaining-scope review
 
 The [compatibility-layer ownership audit](compatibility-layer-audit.md) supplements the static contract inventory with actual module registration, distinguishing main, pending PRs and generic catalog entries. Extracted configuration services do not complete Phase 4: remaining management semantics require individual verification, while data-plane lifecycle work remains Phase 5.
+
+## Stage 4: tag and end-customer configuration
+
+[Proposal #189](https://github.com/qiniu/xhub/issues/189) builds on the tag read/write fix in #188. The narrow KV service `metadataconfig` owns CRUD, legacy defaults and list projections for `tag`, `tags`, `customer` and `end_user`. Existing adapters retain authentication, request parsing, envelopes and error mapping. Public scope is new/info/update/delete/list under `/tag`, `/customer` and `/end_user`; internal `tags` compatibility does not add public endpoints.
+
+Customer lists still combine two independent namespaces and expose only user_id/spend/blocked/max_budget. Identical IDs remain two rows rather than one identity. A failure reading either namespace now returns a sanitized 500 instead of a misleading empty or partial 200; an empty database still returns an empty list. Tags retain their name dictionary. Customer GET detail currently reads user_id from a JSON body; query-only behavior is unchanged.
+
+blocked/max_budget remain configuration metadata. This batch adds no authorization, blocking or budget enforcement. block/unblock, statistics and other execution-shaped legacy endpoints are excluded and require a separate semantic audit. Registration or successful storage does not prove their operation. Swagger support claims are unchanged.
+
+Real HTTP/PostgreSQL tests run before and after extraction. Customer read faults fail before the fix and pass after it; CRUD, namespace isolation, permissions, model calls and billing remain covered. English/Chinese browser tests exercise customer persistence and tag refresh/error recovery/chat/deletion. Real Playwright subprocesses verify cleanup after failures and timeouts. CI separately collects regression coverage without lowering the 70% gate.
+
+No database migration is needed; reverting the service and adapters preserves existing data. This batch depends on #188 and is not a claim of merge, deployment or completion of stage 4. Live providers, production SSO and reverse proxies are outside the offline boundary.
