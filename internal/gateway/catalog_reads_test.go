@@ -37,6 +37,17 @@ func TestCatalogReads(t *testing.T) {
 				}
 				return
 			}
+			if path == "/claude-code/marketplace.json" {
+				var probe map[string]any
+				if status != 501 || json.Unmarshal(body, &probe) != nil {
+					t.Fatalf("marketplace boundary: %d %s", status, trim(body))
+				}
+				e, _ := probe["error"].(map[string]any)
+				if e["type"] != "unsupported_operation" {
+					t.Fatalf("marketplace error: %s", trim(body))
+				}
+				return
+			}
 			// 旧审批列表没有执行器，不能把公共配置列表冒充审批结果。
 			if path == "/server/submissions" {
 				var probe map[string]any

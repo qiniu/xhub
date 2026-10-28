@@ -43,6 +43,9 @@ func writeCatalogStore(st catalogRecordStore, w http.ResponseWriter, r *http.Req
 	if writePluginList(st, w, r) {
 		return
 	}
+	if writePluginRegistration(st, w, r, body) {
+		return
+	}
 	if id == "" || ((action == "update" || action == "delete") && (id == kind || id == singular(kind))) {
 		if alt := str(body[idField(kind)]); alt != "" {
 			id = alt

@@ -596,6 +596,7 @@ func ServeMgmt(s Host, w http.ResponseWriter, r *http.Request) {
 // 由ServeMgmt调用，返回值写入w；未实现的server运行时操作在取存储前拒绝，其余无存储时返回503，不改鉴权。
 // 由 ServeMgmt 调用，返回值写入 w；旧server导入/审批先明确拒绝，其余路径保持原语义，无存储时返回503。
 // 由 ServeMgmt 调用，返回值写入 w；未实现的插件启停先拒绝，其余目录保留原语义，无存储时返回503。
+// 由 ServeMgmt 调用，结果写入w；marketplace未实现时明确拒绝，其余目录保留原权限和存储边界。
 func writeCatalogPersist(s Host, w http.ResponseWriter, r *http.Request, body map[string]any) {
 	if rejectServerRuntime(w, r) {
 		return
@@ -604,6 +605,9 @@ func writeCatalogPersist(s Host, w http.ResponseWriter, r *http.Request, body ma
 		return
 	}
 	if rejectPluginActivation(w, r) {
+		return
+	}
+	if rejectPluginMarketplace(w, r) {
 		return
 	}
 	var st catalogRecordStore
@@ -831,12 +835,21 @@ func setDefault(obj map[string]any, key string, val any) {
 	}
 }
 
-// parseMgmt reads the resource kind, action, and id from the method and path.
-// 参数 method（string）：HTTP 方法，例如 GET 或 POST；path（string）：解析Mgmt要定位的路径。可能是 URL，也可能是字段路径；body（map[string]any）：已解析或原始的 JSON。
-// 返回 kind（string）：固定文本 "misc"；action（string）：固定文本 "misc"；id（string）：固定文本 "misc"。
-// 调用：仅在 handlers.go 内使用
-// 测试：无直接单测
+// parseMgmt 根据已注册路径、HTTP方法及JSON正文解析目录种类、动作与资源ID，供通用存储适配器调用。
+// 插件详情按路径名称寻址，避免保留词被当作动作；其他资源沿用旧解析与正文ID回退，无存储或授权副作用。
 func parseMgmt(method, path string, body map[string]any) (kind, action, id string) {
+	// 注册的插件详情路径以名称为资源身份，list/new/register等名字也不能被通用动作词吞掉。
+	pluginParts := strings.Split(strings.TrimSuffix(path, "/"), "/")
+	if len(pluginParts) == 4 && pluginParts[0] == "" && pluginParts[1] == "claude-code" && pluginParts[2] == "plugins" && pluginParts[3] != "" {
+		switch method {
+		case http.MethodGet:
+			return "claude-code", "info", pluginParts[3]
+		case http.MethodPut:
+			return "claude-code", "update", pluginParts[3]
+		case http.MethodDelete:
+			return "claude-code", "delete", pluginParts[3]
+		}
+	}
 	parts := catalog.Split(strings.TrimSuffix(path, "/"))
 	filtered := []string{}
 	for _, p := range parts {

@@ -232,6 +232,35 @@ jobs:
             coverage/supplier-contract.out
             coverage/search-config.out
           if-no-files-found: error
+      # 与供应商契约共用隔离数据库基础设施，插件注册报告独立采集，不扩大契约覆盖声明。
+      - name: Run real plugin registration boundary regression
+        env:
+          XHUB_REGRESSION_COVERPROFILE: coverage/plugin-registration.out
+        run: bash scripts/regression.sh '^TestPluginRegistration'
+      - name: Validate plugin registration regression coverage
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -s coverage/plugin-registration.out
+          go tool cover -func=coverage/plugin-registration.out | tail -1
+      - name: Upload plugin registration regression coverage
+        uses: codecov/codecov-action@v5
+        with:
+          files: coverage/plugin-registration.out
+          flags: backend
+          name: plugin-registration
+          disable_search: true
+          fail_ci_if_error: true
+          use_oidc: true
+      - name: Archive plugin registration regression evidence
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: plugin-registration-regression
+          path: |
+            .e2e/runs/
+            coverage/plugin-registration.out
+          if-no-files-found: error
       # 与供应商契约共用隔离数据库基础设施，插件筛选报告独立采集，不扩大契约覆盖声明。
       - name: Run real plugin filter boundary regression
         env:
