@@ -256,3 +256,13 @@ See [core contract completion](core-contract-completion.md) for stage3 scope, ev
 - Run the same real HTTP/PostgreSQL regressions before and after extraction, covering all 11 operations, real SQL read/write/delete faults, recovery and cleanup. Real local-provider requests verify billing, unchanged Key model restrictions and zero-budget denial.
 - Both console locale E2Es edit configuration through management APIs, then log in as a real ordinary user and verify the model page, 500 budget, playground conversation and model availability after deletion. Independent cleanup runs after success, failure and timeout; cleanup errors fail tests. CI uploads actual regression coverage with the 70% gate unchanged.
 - No database migration, permission or budget-rule change. Revert the service and adapter to use the same stored records; merging and deployment remain separate decisions.
+
+## Phase 4: vector-store configuration management service
+
+[Proposal #183](https://github.com/qiniu/xhub/issues/183) delegates the five singular /vector_store management operations (list/new/info/update/delete) to vectorconfig.Service. HTTP adapters retain authentication, path parsing, strict JSON, response envelopes and error mapping. Storage remains in the vector_store KV namespace, with no migration.
+
+- Preserve replacement creates, missing-record upserts, shallow patches, nested expansion, non-transactional deletion, extension fields and null/zero values. Name, alias, status and file_counts defaults follow the old behavior.
+- status=completed and file_counts are legacy configuration metadata, not proof of indexing or retrieval. The plural /vector_stores and /v1/vector_stores data-plane paths are not migrated. File writes and search still return 501; management configuration does not appear in caller-owned data-plane resource lists.
+- Run the same real HTTP/PostgreSQL regressions before and after extraction: all five operations, permissions, SQL read/write/delete faults, recovery and cleanup. Real local-provider calls verify unchanged costs and zero-budget rejection.
+- Both console locale environments cover page creation/reload, API update/invalid-input/recovery, unsupported-operation rejection, model calls and deletion. Existing Chinese controls remain unchanged; this backend extraction does not claim to fix legacy localization debt. Independent cleanup tests cover business failures, timeout, cleanup errors and zero deletions.
+- CI collects and uploads real regression coverage without lowering the 70% gate. No expansion of phase-3 OpenAPI coverage or change to authorization/budgets. Revert the service and adapter to reuse the same records; merging and deployment remain separate decisions.
