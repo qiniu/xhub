@@ -297,3 +297,19 @@ test('service auxiliary scenarios are registered and failures stay failures', ()
   results[0].status = 'failed';
   assert.equal(evaluateScenarios(catalog, results).passed, 1);
 });
+
+/** 双语身份场景须登记精确标题，防止局部运行通过却漏出全量门禁；无外部数据。 */
+test('identity alias scenarios are registered', () => {
+  const fs = require('node:fs');
+  const path = require('node:path');
+  const {evaluateScenarios} = require('./scenario-coverage.cjs');
+  const catalog = require('./scenario-catalog.json');
+  const results = ['en','zh-CN'].map(locale => {
+    const file = `e2e/scenarios/regression/identity-alias-${locale}.test.ts`;
+    assert.ok(fs.existsSync(path.join(__dirname, '..', file)));
+    return {file, title: 'identity aliases reject false success without breaking login and chat ' + locale, status: 'passed'};
+  });
+  const report = evaluateScenarios(catalog, results);
+  assert.deepEqual(report.unregistered, []);
+  assert.equal(report.passed, 2);
+});

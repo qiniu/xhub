@@ -141,7 +141,7 @@ test('user contract requires generation, permissions and real budget regression'
   assert.equal(step('user-contract', 'Validate OpenAPI and Go types').run, 'go test -race ./contracts/users');
   assert.match(step('user-contract', 'Prepare contract database').run, /docker compose up -d --wait postgres redis/);
   assert.equal(step('user-contract', 'Run real user contract regression').run,
-    "bash scripts/regression.sh '^Test(UserContract|UserBulkBudget|UserMonthlyBudget|UserEnterpriseIdentity|SoftBudgetAllocationHTTP)'");
+    "bash scripts/regression.sh '^Test(IdentityAliasBoundary|UserContract|UserBulkBudget|UserMonthlyBudget|UserEnterpriseIdentity|SoftBudgetAllocationHTTP)'");
   assert.ok(job.steps.every(item => !item['continue-on-error']), '门禁不得忽略失败');
   const cleanup = job.steps.find(item => item.run === 'docker compose down -v');
   assert.equal(cleanup.if, 'always()');

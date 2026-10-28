@@ -183,6 +183,19 @@ func TestCatalogReads(t *testing.T) {
 				}
 				return
 			}
+			// 独立列出本批八条读取别名；不把其他接口的意外501当成通过。
+			switch rt.Path {
+			case "/authorize", "/discover", "/enabled", "/invitation/info", "/jwt/key/mapping/info", "/jwt/key/mapping/list", "/onboarding/get_token", "/token/generate":
+				var probe struct {
+					Error struct {
+						Type string `json:"type"`
+					} `json:"error"`
+				}
+				if status != http.StatusNotImplemented || json.Unmarshal(body, &probe) != nil || probe.Error.Type != "unsupported_operation" {
+					t.Fatalf("旧身份别名必须明确拒绝: status=%d body=%s", status, trim(body))
+				}
+				return
+			}
 			switch status {
 			case http.StatusOK:
 				if !json.Valid(body) {
