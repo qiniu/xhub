@@ -245,3 +245,18 @@ See [core contract completion](core-contract-completion.md) for stage3 scope, ev
 - Unit tests cover normal, boundary, failure and namespace behavior. Real HTTP/PostgreSQL regressions cover permissions, SQL read/write faults, recovery and cleanup; real local-provider calls verify unchanged billing and zero-budget denial. The same regressions also run against the pre-refactor management implementation as a compatibility baseline.
 - Browser tests in both console locale environments cover page creation, reload, HTTP updates, rejection/recovery, model calls and deletion. The legacy policy page still uses its existing Chinese controls; this backend extraction does not claim to fix that localization debt. Independent request contexts clean up after success, failure and timeout; cleanup errors fail tests. CI uploads real regression coverage without lowering the 70% gate.
 - No data migration or production deployment. Reverting the service and adapter restores the old implementation over the same stored records.
+
+## Phase 4: real cache-management effects
+
+[Bug #195](https://github.com/qiniu/xhub/issues/195) separates cache management from the generic catalog and customer-list file into `cacheadmin`. The HTTP adapter retains administrator authorization; the module receives the actual process cache without configuration KV or Redis dependencies.
+
+| Endpoint | Behavior in this batch |
+| --- | --- |
+| GET `/cache/settings` | Reports actual runtime state: `enabled: true`, `cache_type: memory`, `scope: process`, `configurable: false`; no ineffective saved configuration or credentials are echoed |
+| GET `/cache/ping`, `/ping` | Retains the process-memory readiness response; an uninitialized cache returns 503, without claiming a Redis probe |
+| POST `/flushall` | Retains the success envelope and really clears the current process response cache; other instances, sessions, usage and Redis are unaffected |
+| POST `/cache/settings`, `/cache/settings/test`, `/delete` | No runtime executor exists for these operations; return `501 unsupported_operation` without writing catalog records or echoing credentials |
+
+Compatibility changes are intentional: settings GET no longer returns arbitrary persisted JSON, and ineffective writes/deletes change from 200 to 501. Historical KV records remain stored but unused. `/cache/delete` and `/cache/flushall` remain unregistered (404). No phase-3 OpenAPI coverage is added. The bilingual console shows runtime state, scope and real clearing, with no ineffective save action.
+
+Real HTTP/PostgreSQL tests first reproduce configuration echo, false connection tests and false deletion, then verify explicit rejection without writes. Unit tests exercise actual memory readiness/clearing. Browser flows cover both languages, free hits, billed local-upstream calls after clearing, and real authorization failure/recovery. Permissions, budgets and the 70% gate stay unchanged; regression coverage is uploaded separately. No migration is needed. Reverting restores the old behavior, including false success; that is not a recommendation to revert. Paid providers and production are outside this validation; other legacy operations remain tracked separately.

@@ -346,3 +346,29 @@ test('policy configuration has real regression coverage and cleanup', () => {
   assert.ok(job.steps.every(item => !item['continue-on-error']));
   assert.equal(job.steps.find(item => item.run === 'docker compose down -v').if, 'always()');
 });
+
+/** 缓存真实回归必须独立采集上传覆盖率，失败不得忽略；只读配置，无清理。 */
+test('cache management has real regression coverage and cleanup', () => {
+  const job = workflow.jobs['supplier-contract'];
+  const run = step('supplier-contract', 'Run real cache management regression');
+  assert.equal(run.run, "bash scripts/regression.sh '^Test(CacheManagementTruth|CacheUnavailableManagement|CacheHitIsFreeAndLoggedAsOne)$'");
+  assert.equal(run.env.XHUB_REGRESSION_COVERPROFILE, 'coverage/cache-config.out');
+  const check = step('supplier-contract', 'Validate cache regression coverage');
+  assert.match(check.run, /set -euo pipefail/);
+  assert.match(check.run, /test -s coverage\/cache-config.out/);
+  assert.match(check.run, /go tool cover -func=coverage\/cache-config.out/);
+  const upload = step('supplier-contract', 'Upload cache regression coverage');
+  assert.equal(upload.with.files, 'coverage/cache-config.out');
+  assert.equal(upload.with.fail_ci_if_error, true);
+  assert.equal(upload.with.disable_search, true);
+  assert.equal(upload.with.flags, 'backend');
+  assert.ok(job.steps.indexOf(run) < job.steps.indexOf(check));
+  assert.ok(job.steps.indexOf(check) < job.steps.indexOf(upload));
+  assert.ok(!upload.if || upload.if === 'success()');
+  const artifact = step('supplier-contract', 'Archive cache regression evidence');
+  assert.equal(artifact.if, 'always()');
+  assert.match(artifact.with.path, /coverage\/cache-config.out/);
+  assert.equal(artifact.with['if-no-files-found'], 'error');
+  assert.ok(job.steps.every(item => !item['continue-on-error']));
+  assert.equal(job.steps.find(item => item.run === 'docker compose down -v').if, 'always()');
+});

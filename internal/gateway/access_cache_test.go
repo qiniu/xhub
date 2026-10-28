@@ -17,7 +17,7 @@ func TestFlushCacheHandler(t *testing.T) {
 	admin := loginAdmin(t, server.URL, db)
 	s.Cache.Set("test-entry", []byte("cached"))
 	anonymous := httptest.NewRecorder()
-	s.flushCache(anonymous, httptest.NewRequest(http.MethodPost, "/flushall", nil))
+	s.cacheManagement(anonymous, httptest.NewRequest(http.MethodPost, "/flushall", nil))
 	if _, exists := s.Cache.Get("test-entry"); anonymous.Code != http.StatusUnauthorized || !exists {
 		t.Fatalf("匿名清空缓存未拒绝或修改数据: status=%d exists=%v", anonymous.Code, exists)
 	}
@@ -25,7 +25,7 @@ func TestFlushCacheHandler(t *testing.T) {
 		r := httptest.NewRequest(http.MethodPost, "/flushall", nil)
 		r.Header.Set("Authorization", "Bearer "+admin)
 		w := httptest.NewRecorder()
-		s.flushCache(w, r)
+		s.cacheManagement(w, r)
 		if _, exists := s.Cache.Get("test-entry"); w.Code != http.StatusOK || exists {
 			t.Fatalf("管理清空缓存第%d次未生效: status=%d exists=%v body=%s", i+1, w.Code, exists, w.Body.String())
 		}

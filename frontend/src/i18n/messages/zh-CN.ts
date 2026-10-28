@@ -6,7 +6,10 @@ import { zhPhrases } from "./phrases.zh-CN";
 import { pageDescriptionsZhCN } from "./pageDescriptions.zh-CN";
 import { routeTemplatesZhCN } from "./routeTemplates.zh-CN";
 
+import { cacheAdminZhCN } from "./cacheAdmin.zh-CN";
+
 export const zhCN = {
+  cacheAdmin: cacheAdminZhCN,
   probes: probesZhCN,
   mcpOAuthCallback: {
     title: "MCP 授权回调",

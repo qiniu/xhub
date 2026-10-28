@@ -5,7 +5,10 @@ import { enPhrases } from "./phrases.en";
 import { pageDescriptionsEn } from "./pageDescriptions.en";
 import { routeTemplatesEn } from "./routeTemplates.en";
 
+import { cacheAdminEn } from "./cacheAdmin.en";
+
 export const en = {
+  cacheAdmin: cacheAdminEn,
   probes: probesEn,
   mcpOAuthCallback: {
     title: "MCP authorization callback",

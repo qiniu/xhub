@@ -919,14 +919,14 @@
   {
     "id": "SC-132",
     "file": "e2e/scenarios/columns/caching-flush.test.ts",
-    "title": "通用页面 /caching 清空",
+    "title": "cache management reflects runtime en",
     "kind": "implemented",
     "environment": "default offline"
   },
   {
     "id": "SC-133",
     "file": "e2e/scenarios/columns/caching-save.test.ts",
-    "title": "通用页面 /caching 保存",
+    "title": "cache management reflects runtime zh-CN",
     "kind": "implemented",
     "environment": "default offline"
   },

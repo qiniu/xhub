@@ -421,3 +421,12 @@ test('guard management release gate includes bilingual execution flows', () => {
     assert.ok(existsSync(join(__dirname, '../frontend/e2e', file)));
   }
 });
+
+/** 缓存双语清理与真实数据面必须进入发布门禁；只读无清理。 */
+test('cache management release gate includes bilingual execution flows', () => {
+  const command = workflow.jobs.verify.steps.find(item => item.run?.startsWith('bash scripts/e2e.sh '))?.run;
+  for (const file of ['scenarios/columns/caching-save.test.ts', 'scenarios/columns/caching-flush.test.ts']) {
+    assert.ok(command?.split(' ').includes(file), '缓存真实流程缺失：' + file);
+    assert.ok(existsSync(join(__dirname, '../frontend/e2e', file)));
+  }
+});
