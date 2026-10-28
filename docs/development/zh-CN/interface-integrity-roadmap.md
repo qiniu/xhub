@@ -411,3 +411,12 @@ npm run test:types
 [提案 #215](https://github.com/qiniu/xhub/issues/215) 移除没有产品引用的 `KeyEditViewControls` 和仅被它引用的 `SkillSelector`。当前 Key 编辑器已使用基础表单；此项不隐藏已有可用页面，不新增 Skill 授权或执行逻辑，也不删除存储字段。旧测试中“独立权限流程保存 Skill”的说明不能作为支持证据，已纠正。
 
 先在清理前运行现有实现的基线，再删除死代码重跑：组件验证原始名称与隐藏字段省略、没有插件列表请求；真实 HTTP/PostgreSQL 和中英文浏览器验证修改名称、读回模型/路由范围/限额/期限、真实允许调用以及模型/管理越权拒绝。新后台用例纳入既有 Key 契约覆盖率采集，发布工作流登记双语 E2E，70% 门禁不变。已存在的历史测试隔离清单保持原样，不将其中用例声明为本批通过。
+
+## 第四阶段旧推理别名边界
+
+[Bug #217](https://github.com/qiniu/xhub/issues/217) 核实无版本号的 `POST /rag/ingest`、`/rag/query`、`/ocr` 以及 `/models/{model_name}:generateContent`、`:streamGenerateContent`、`:countTokens` 落入通用配置写入，未调用上游却返回 200。修复在原管理鉴权和对象 JSON 校验后明确返回 `501 unsupported_operation`、`Cache-Control: no-store`，不保存或回显请求正文。
+
+- 保留匿名 401、普通会话和推理 Key 403，以及非法 JSON/JSON-RPC 400；不将这些旧入口升级为推理权限。
+- `/v1/rag/*`、`/v1/ocr` 保留既有数据面拒绝；Gemini `/v1beta/models/*`、Vertex `/vertex/v1/models/*` 和 Bypass 继续由原协议模块执行。普通模型读取与配置 CRUD 不迁移。
+- 真实 HTTP/PostgreSQL 回归验证配置快照不变、零上游副作用、原生协议调用、护栏、正常对话计费、零预算拦截和清理；双语浏览器验证登录、旧请求拒绝后调试台仍能真实对话。使用本地可计数协议上游，不代表外部供应商验收。
+- 不增加 RAG/OCR 执行器，不扩张 Swagger 支持清单，不做数据迁移或删除既有误写记录；CI 收集真实回归覆盖率并维持 70% 门禁。回退代码可恢复旧行为，但会恢复假成功，不作为默认故障处理。提交不代表合并或部署。
