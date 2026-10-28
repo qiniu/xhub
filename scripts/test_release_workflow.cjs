@@ -347,7 +347,7 @@ test('hard budget tier scenarios are registered and selected by the release gate
   }
 });
 
-/** 前置发布 YAML 与 SAML 场景登记；确认双语 HTTP/HTTPS、拒绝和证书边界进入实际 CI，不把跳过当通过；只读无需清理。 */
+/** 前置发布 YAML 与 SAML 场景登记；确认双语 HTTP/HTTPS、拒绝、证书及刷新边界进入实际 CI，不把跳过当通过；只读无需清理。 */
 test('SAML release gate includes protocol components and every registered browser flow', () => {
   assert.ok(workflow.jobs.verify.steps.some(item => item.run === 'go test ./internal/... ./cmd/regression/testsupport/...'), 'SAML 夹具移出生产目录后仍必须运行真实签名与加密单元测试');
   const steps = workflow.jobs.verify.steps;
@@ -359,7 +359,9 @@ test('SAML release gate includes protocol components and every registered browse
   const scenarios = JSON.parse(readFileSync(join(__dirname, '../frontend/e2e/scenario-catalog.json'), 'utf8'));
   const rows = Array.isArray(scenarios) ? scenarios : scenarios.scenarios;
   const saml = rows.filter(item => item.file.includes('/saml-'));
-  assert.equal(saml.length, 9, 'SAML HTTP/HTTPS、未知用户、篡改、重放和过期证书场景必须完整登记');
+  assert.equal(saml.length, 11, 'SAML 原有九条及新增双语元数据刷新必须完整登记');
+  assert.ok(unit.run.includes('SAMLRefresh.test.tsx'), '刷新组件必须进入发布门禁');
+  for (const locale of ['en', 'zh-CN']) assert.ok(saml.some(item => item.file === `e2e/scenarios/enterprise/saml-refresh-${locale}.test.ts`), '缺少刷新场景：' + locale);
 });
 
 /** 前置真实发布配置及完整场景目录；验证人工对账组件、动态错误与双语真实浏览器闭环都进入CI，避免只跑静态mock；只读无需清理。 */
