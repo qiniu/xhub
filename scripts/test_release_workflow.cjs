@@ -421,3 +421,9 @@ test('guard management release gate includes bilingual execution flows', () => {
     assert.ok(existsSync(join(__dirname, '../frontend/e2e', file)));
   }
 });
+
+/** 发布门禁包含运维边界双语真实流程；只读工作流，禁止只在本地验证后遗漏CI。 */
+test('release includes runtime operation browser regressions', () => {
+  const source = require('node:fs').readFileSync(require('node:path').join(__dirname, '../.github/workflows/release.yml'), 'utf8');
+  for (const locale of ['en','zh-CN']) assert.ok(source.includes(`scenarios/regression/runtime-operation-${locale}.test.ts`));
+});
