@@ -359,3 +359,13 @@ The exact five operations now return `501/unsupported_operation` with `Cache-Con
 Tests first reproduce all five failures, then verify no writes, error envelopes, ordinary CRUD, real local inference billing and zero-budget rejection. English and Chinese browser flows exercise the actual gateway and verify successful playground inference by upstream request count after the rejected operations. CI uploads dedicated regression coverage and selects both release flows without lowering the 70% gate. External MCP services are not exercised.
 
 Remaining work includes plugin management, skill consumers, residual management entries (including execution-looking RAG/OCR routes), obsolete branches, and a combined regression of all pending PRs on a temporary integration branch. Individual green PRs do not prove combined compatibility. SSO metadata refresh remains a separate feature for the user-selected merge batch; nothing is merged or deployed here.
+
+## Phase 4: plugin activation false-success boundary
+
+[Bug #205](https://github.com/qiniu/xhub/issues/205) reproduces both activation operations over real HTTP/PostgreSQL. POST `/claude-code/plugins/{name}/enable` and `/disable` create records keyed by the action name, default enabled to true and can overwrite ordinary records. No executor consumes this KV namespace to install, publish or load Claude Code plugins; persisting an enabled field is not proof of activation.
+
+The exact two operations now return `501/unsupported_operation` and `Cache-Control: no-store`, after existing authentication and JSON validation and before storage. Ordinary configuration CRUD, colliding names, permissions and budget rules are preserved. No plugin publisher or retired public skill endpoint is introduced; no migration or historical record deletion occurs. The core contract inventory is not expanded.
+
+Tests reproduce both false successes before the fix, then verify unchanged storage, invalid JSON, all identity classes, ordinary CRUD, real local inference billing and zero-budget rejection. English and Chinese browser flows log in, call the real rejected operations, verify unchanged configuration/list, complete playground inference with an upstream call-count assertion and clean up their records. CI independently uploads real regression coverage and selects both E2E flows without lowering the 70% gate.
+
+This completes activation false-success handling only. Registration name addressing, enabled_only filtering, marketplace output and skill consumers still need auditing; UI metadata is not client execution evidence. External Claude Code installation/loading is not tested. Pending PRs still require combined regression; nothing is merged or deployed.

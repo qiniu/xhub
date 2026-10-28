@@ -3203,5 +3203,19 @@
     "title": "legacy server submission helpers preserve configuration and chat zh-CN",
     "kind": "implemented",
     "environment": "default offline"
+  },
+  {
+    "id": "REG-plugin-activation-en",
+    "file": "e2e/scenarios/regression/plugin-activation-en.test.ts",
+    "title": "legacy plugin activation helpers preserve configuration and chat en",
+    "kind": "implemented",
+    "environment": "default offline"
+  },
+  {
+    "id": "REG-plugin-activation-zh-CN",
+    "file": "e2e/scenarios/regression/plugin-activation-zh-CN.test.ts",
+    "title": "legacy plugin activation helpers preserve configuration and chat zh-CN",
+    "kind": "implemented",
+    "environment": "default offline"
   }
 ]
