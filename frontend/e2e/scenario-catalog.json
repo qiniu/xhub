@@ -3063,5 +3063,19 @@
     "title": "policy configuration persistence and isolation zh-CN",
     "kind": "implemented",
     "environment": "default offline"
+  },
+  {
+    "id": "REG-operations-boundary-en",
+    "file": "e2e/scenarios/regression/operations-boundary-en.test.ts",
+    "title": "unsupported operations preserve real health and chat en",
+    "kind": "implemented",
+    "environment": "default offline"
+  },
+  {
+    "id": "REG-operations-boundary-zh-CN",
+    "file": "e2e/scenarios/regression/operations-boundary-zh-CN.test.ts",
+    "title": "unsupported operations preserve real health and chat zh-CN",
+    "kind": "implemented",
+    "environment": "default offline"
   }
 ]

@@ -290,6 +290,35 @@ jobs:
             .e2e/runs/
             coverage/policy-config.out
           if-no-files-found: error
+      # 运维假成功修复使用真实HTTP和数据库故障验证，覆盖率独立上传。
+      - name: Run real operations boundary regression
+        env:
+          XHUB_REGRESSION_COVERPROFILE: coverage/operations-config.out
+        run: bash scripts/regression.sh '^Test(OperationsNoFalseSuccess|ReadinessDetailsDatabaseFailure|HealthTestConnectionContract)$'
+      - name: Validate operations regression coverage
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -s coverage/operations-config.out
+          go tool cover -func=coverage/operations-config.out | tail -1
+      - name: Upload operations regression coverage
+        uses: codecov/codecov-action@v5
+        with:
+          files: coverage/operations-config.out
+          flags: backend
+          name: operations-config
+          disable_search: true
+          fail_ci_if_error: true
+          use_oidc: true
+      - name: Archive operations regression evidence
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: operations-config-regression
+          path: |
+            .e2e/runs/
+            coverage/operations-config.out
+          if-no-files-found: error
       # 护栏真实回归独立采集覆盖率，不扩大第三阶段契约范围。
       - name: Run real guard management regression
         env:
