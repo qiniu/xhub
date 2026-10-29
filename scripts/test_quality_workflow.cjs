@@ -325,7 +325,7 @@ test('guard management has real regression coverage and cleanup', () => {
 test('policy configuration has real regression coverage and cleanup', () => {
   const job = workflow.jobs['supplier-contract'];
   const run = step('supplier-contract', 'Run real policy configuration regression');
-  assert.equal(run.run, "bash scripts/regression.sh '^Test(PolicyConfigService|ServiceAuxBoundary|RuntimeOperationBoundary|SettingsOperationBoundary)'");
+  assert.equal(run.run, "bash scripts/regression.sh '^Test(PolicyConfigService|ServiceAuxBoundary|RuntimeOperationBoundary|SettingsOperationBoundary|ModelAliasBoundary)'");
   assert.equal(run.env.XHUB_REGRESSION_COVERPROFILE, 'coverage/policy-config.out');
   const check = step('supplier-contract', 'Validate policy regression coverage');
   assert.match(check.run, /set -euo pipefail/);

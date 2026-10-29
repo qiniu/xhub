@@ -615,3 +615,9 @@ test('release includes settings operation browser regressions', () => {
   const source = require('node:fs').readFileSync(require('node:path').join(__dirname, '../.github/workflows/release.yml'), 'utf8');
   for (const locale of ['en','zh-CN']) assert.ok(source.includes(`scenarios/regression/settings-operation-${locale}.test.ts`));
 });
+
+/** 发布门禁包含模型旧入口边界双语真实流程；只读工作流，禁止只在本地验证后遗漏CI。 */
+test('release includes model alias browser regressions', () => {
+  const source = require('node:fs').readFileSync(require('node:path').join(__dirname, '../.github/workflows/release.yml'), 'utf8');
+  for (const locale of ['en','zh-CN']) assert.ok(source.includes(`scenarios/regression/model-alias-${locale}.test.ts`));
+});

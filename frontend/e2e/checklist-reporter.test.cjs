@@ -345,3 +345,19 @@ test('settings operation scenarios are registered', () => {
   assert.deepEqual(report.unregistered, []);
   assert.equal(report.passed, 2);
 });
+
+/** 模型旧入口双语场景须登记精确标题，避免发布门禁漏测；仅检查注册信息，无外部数据。 */
+test('model alias scenarios are registered', () => {
+  const fs = require('node:fs');
+  const path = require('node:path');
+  const {evaluateScenarios} = require('./scenario-coverage.cjs');
+  const catalog = require('./scenario-catalog.json');
+  const results = ['en','zh-CN'].map(locale => {
+    const file = `e2e/scenarios/regression/model-alias-${locale}.test.ts`;
+    assert.ok(fs.existsSync(path.join(__dirname, '..', file)));
+    return {file, title: 'legacy model aliases preserve real deployment and chat ' + locale, status: 'passed'};
+  });
+  const report = evaluateScenarios(catalog, results);
+  assert.deepEqual(report.unregistered, []);
+  assert.equal(report.passed, 2);
+});

@@ -36,6 +36,10 @@ func writeCatalogStore(st catalogRecordStore, w http.ResponseWriter, r *http.Req
 	if rejectSettingsOperation(w, r) {
 		return
 	}
+	// 旧模型别名不能读写公共KV并冒充真实模型操作。
+	if rejectModelAlias(w, r) {
+		return
+	}
 	// 未接执行器的运维操作不能被当成同名配置的CRUD，避免返回假执行成功。
 	if rejectRuntimeOperation(w, r) {
 		return

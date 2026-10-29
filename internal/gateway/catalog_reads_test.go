@@ -221,6 +221,19 @@ func TestCatalogReads(t *testing.T) {
 				}
 				return
 			}
+			// C4旧读取只接受明确不支持；独立清单不放宽其他模型接口。
+			switch rt.Path {
+			case "/fallback/login", "/fallback/{model}", "/model/deprecations", "/model/info", "/model/settings", "/models/{model_id}", "/v1/model/deprecations", "/v1/model/info":
+				var probe struct {
+					Error struct {
+						Type string `json:"type"`
+					} `json:"error"`
+				}
+				if status != http.StatusNotImplemented || json.Unmarshal(body, &probe) != nil || probe.Error.Type != "unsupported_model_operation" {
+					t.Fatalf("模型旧别名拒绝契约错误: %d %s", status, trim(body))
+				}
+				return
+			}
 			switch status {
 			case http.StatusOK:
 				if !json.Valid(body) {

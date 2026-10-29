@@ -2,11 +2,12 @@
 
 ## Current closure progress (2026-10-29)
 
-- Main `e8a29c4f972e8832e1c6e02a8226d0befcc65584` includes the accumulated phase-four PRs (#182–#228, including #202). C1, C2 and C3/runtime-ops are merged.
-- This candidate addresses **15 C3/settings routes** with no actual consumer: explicit `501 unsupported_settings_operation`, no activation of legacy KV defaults, unchanged anonymous401/member403 and JSON error precedence. The independent theme read/write/logo service remains available.
-- Real coverage: every route and role, invalid bodies and unchanged KV; theme write/read, model inference and zero-budget403; bilingual browser navigation after unavailable sidebar settings, configuration create/reload and chat. The typed HTTP middleware already throws errors; tests verify it without duplicate handling. The unmounted default-user form is not claimed as a browser-verified flow.
-- This batch is not merged or deployed. Model aliases14 are also submitted in #233:29 candidate fixes across both PRs. After them, **42 routes remain: C5 analytics26, C6 protocols7, C7 discovery9**, plus final integration acceptance. Main still needs both candidates (71 total).
-- The current inventory has301 entries; two of the historical303 moved to dedicated modules. The historical snapshot below, and JSON `main_status`/`observation`, are not current execution results. Candidate evidence is recorded separately without claiming main already contains this fix.
+- Main `e8a29c4f972e8832e1c6e02a8226d0befcc65584` includes the accumulated phase-four PRs (#182–#228, including #202); C1, C2 and C3/runtime-ops are merged.
+- **C3/settings:15 routes submitted in #231, not merged.** Unsupported legacy settings fail explicitly; real theme functionality, permissions and budgets remain unchanged.
+- **This C4/model-alias candidate:14 routes.** Legacy model info, fallback, publication and block aliases have no implemented contract. They return `501 unsupported_model_operation` instead of reading/writing generic KV as if a real model operation occurred. Similar names do not establish compatible input/output semantics.
+- Real verification preserves deployment listing `/v2/model/info`, SDK model listing/detail, enable/disable effects on inference, normal chat and zero-budget403. Existing model-contract and fallback regressions also run. Authorization, budgets and routing policy are unchanged.
+- Neither this batch nor #231 is merged or deployed. After both, **42 routes remain: C5 analytics26, C6 protocols7, C7 discovery9**, plus final integrated acceptance. Main still needs these29 candidate fixes (71 total).
+- Current inventory:301 routes; two of the historical303 moved to dedicated modules. The snapshot below and JSON `main_status`/`observation` remain historical evidence, not current execution results. Candidate references do not claim main is fixed.
 
 <details><summary>Original audit snapshot (2026-10-28; historical status)</summary>
 
