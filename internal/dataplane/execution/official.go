@@ -53,10 +53,9 @@ func ServeBypass(h dpcontract.Bypass, w http.ResponseWriter, r *http.Request, hi
 		util.WriteTypedError(w, r.URL.Path, 400, "invalid_request", err.Error())
 		return
 	}
-	body := requestBody.Fields
 	// 某些同步协议没有动作名，以登记的 ModelField 判定创建；任务 ID 则按路径/查询登记读取。
 	if hit.Action.Name == "count_tokens" || hit.Action.Name == "create" || hit.Transport.ModelField != "" && hit.Action.Name == "" {
-		serveBypassCreate(h, w, r, hit, p, body, raw, callID, start)
+		serveBypassCreate(h, w, r, hit, p, requestBody, callID, start)
 		return
 	}
 	id := hit.Names["id"]
@@ -73,7 +72,7 @@ func ServeBypass(h dpcontract.Bypass, w http.ResponseWriter, r *http.Request, hi
 }
 
 // serveBypassCreate 为原生创建或只读计数请求选择合法部署，转发原始协议并按动作记录用量。
-// 参数 h、w、r、hit 为原生入口环境；principal 为已鉴权身份；body 是路由/计价字段投影，raw 是完整载荷；callID、start 标识本次调用与开始时间。
+// 参数 h、w、r、hit 为原生入口环境；principal 为已鉴权身份；requestBody 是入口验证后的只读载体，保存字段投影、完整载荷与文件分段；callID、start 标识本次调用与开始时间。
 // 返回值：无，写入原生响应或网关错误；由 ServeBypass 的创建/计数分支调用，计数不预留或结算生成费用。
 // 公开模型可来自正文或登记路径；路径固定模型必须唯一映射公开别名，歧义时要求显式选择。
 // 每个候选都复核实际模型/组权限，附加服务端凭据，用登记传输替换模型并移除网关字段。
@@ -81,10 +80,11 @@ func ServeBypass(h dpcontract.Bypass, w http.ResponseWriter, r *http.Request, hi
 // disable_fallbacks 只禁止跨目标回退；Required 父响应归属同时禁止普通重放。流写出后发生错误也立即终止。
 // 成功时按调用方与传输隔离任务 ID，保存部署和创建时计费事实，改写队列查询 URL，并提交成功会话目标。
 // 每次执行记录协议实测用量与出站诊断；资源清理由尝试上下文和响应正文关闭完成，远程任务生命周期由调用方管理。
-func serveBypassCreate(h dpcontract.Bypass, w http.ResponseWriter, r *http.Request, hit providercontract.Hit, principal *auth.Principal, body map[string]any, raw []byte, callID string, start time.Time) {
+func serveBypassCreate(h dpcontract.Bypass, w http.ResponseWriter, r *http.Request, hit providercontract.Hit, principal *auth.Principal, requestBody dptransport.BypassBody, callID string, start time.Time) {
 	// 计数是原厂只读辅助操作，不预留生成预算、不提交响应归属、不提取计费用量。
 	countOnly := hit.Action.Name == "count_tokens"
-	requestBody, _ := dptransport.ParseBypassBody(raw, r.Header.Get("Content-Type"))
+	// 复用入口已验证的载体，避免再次解码 JSON 或复制 multipart 文件；候选改写不修改原载体。
+	body, raw := requestBody.Fields, requestBody.Raw
 	field := hit.Transport.ModelField
 	if field == "" {
 		field = "model"
