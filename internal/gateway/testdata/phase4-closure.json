@@ -128,7 +128,9 @@
       "batch": "C6",
       "source": "internal/gateway/ingress.go",
       "conclusion": "C6 candidate (#236): five non-OpenAI file aliases reject public KV access after existing management auth/JSON validation. Two legacy WebSocket aliases reject actual GET and historical WEBSOCKET requests after existing LLM auth. No upstream connection; standard/OpenAI files and native data plane unchanged. Main status and historical observations remain baseline evidence until merge/integration.",
-      "pending_prs": []
+      "pending_prs": [
+        237
+      ]
     },
     "provider-batch": {
       "title": "供应商批处理别名",

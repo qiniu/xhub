@@ -4,7 +4,7 @@
 
 Main `e8a29c4f` includes the earlier batches via #229. The sections below retain historical evidence, not the current merge status of every PR. #231 (15 settings), #233 (14 model aliases), and #235 (26 analytics aliases) remain unmerged; the latest #231/#235 CI checks have passed.
 
-C6 addresses seven declarations under [#236](https://github.com/qiniu/xhub/issues/236): five non-OpenAI file aliases reject public configuration access; two legacy WebSocket aliases reject both actual GET handshakes and the historical pseudo method, without fake 200/101 responses. Two added GET registrations are rejection paths, not supported WebSocket sessions. Authenticated RFC6455 clients, HTTP/PostgreSQL and bilingual browser flows verify the boundary; standard/OpenAI files, chat and budget controls remain separate checks.
+C6 addresses seven declarations under [#236](https://github.com/qiniu/xhub/issues/236) / [PR #237](https://github.com/qiniu/xhub/pull/237): five non-OpenAI file aliases reject public configuration access; two legacy WebSocket aliases reject both actual GET handshakes and the historical pseudo method, without fake 200/101 responses. Two added GET registrations are rejection paths, not supported WebSocket sessions. Authenticated RFC6455 clients, HTTP/PostgreSQL and bilingual browser flows verify the boundary; standard/OpenAI files, chat and budget controls remain separate checks.
 
 No file/realtime executor is added. Permissions, budget rules and the 70% gate remain unchanged; no merge or deployment. After these candidates, **nine C7 discovery/helper declarations and final integration acceptance remain**. Historical main statuses and 909 observations are not relabelled as candidate successes.
 
