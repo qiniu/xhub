@@ -609,3 +609,9 @@ test('release includes runtime operation browser regressions', () => {
   const source = require('node:fs').readFileSync(require('node:path').join(__dirname, '../.github/workflows/release.yml'), 'utf8');
   for (const locale of ['en','zh-CN']) assert.ok(source.includes(`scenarios/regression/runtime-operation-${locale}.test.ts`));
 });
+
+/** 统计边界必须纳入发布浏览器验收，防止有测试文件但发布不执行；只读工作流无需清理。 */
+test('release includes analytics boundary browser scenarios', () => {
+ const source = require('node:fs').readFileSync('.github/workflows/release.yml','utf8');
+ for(const locale of ['en','zh-CN']) assert.ok(source.includes(`scenarios/regression/analytics-boundary-${locale}.test.ts`));
+});

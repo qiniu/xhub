@@ -10,6 +10,7 @@ import { routeTemplatesZhCN } from "./routeTemplates.zh-CN";
 import { cacheAdminZhCN } from "./cacheAdmin.zh-CN";
 
 export const zhCN = {
+  legacyUsage: { title: "旧版用量", unavailable: "此旧版报表尚未实现，未重置任何用量或消费。请打开用量页面查看真实账单。", openUsage: "打开用量页面" },
   tagSelector: { loadFailed: "无法读取已保存的标签，请刷新页面重试。" },
   cacheAdmin: cacheAdminZhCN,
   samlRefresh,
