@@ -117,11 +117,12 @@ CI 复用模型契约作业采集新 HTTP 回归覆盖率并上传 backend flag�
 | 真实 HTTP/PostgreSQL | 54 叶子通过，0 失败/跳过：热更新、凭据轮换、撤销/预算阻断重试、模板/回退/预览、协议及历史 |
 | 双语浏览器 | 2 通过，0 失败/跳过/重试；页面停用/启用、在途对话、后续拒绝、型号/凭据更新、日志和费用；清理退出 0 |
 | 工作流测试 | 83 通过，0 失败/跳过 |
-| Go vet、场景 ESLint | 通过 |
+| Go vet、场景 ESLint | 通过；清单测试文件另有 11 个既有未修改行警告，无错误 |
+| 网站单元与构建 | 52 项通过，0 失败/跳过；构建 443 文档页与 2 首页；网站浏览器检查通过 |
 
 四个跳过是 `TestQiniuSeedanceLive`、`TestQiniuFalLive`、`TestKodoLiveArchive`（未配置外部凭据）和 `TestBrowserEnterpriseFixture`（常规 Go 测试不启动浏览器专用导出夹具，E2E 运行器单独启动）。不计入通过，也不据本地夹具宣称真实 SSO、供应商或生产代理可用。
 
-首次失败记录：旧实现单元及旧 getter 的真实回归按预期失败；去掉预览重复读时曾遗漏一个未使用 import，出现一次编译失败，修复后重跑。未延长超时、跳过失败项或降低 70% 门禁。#242 的双语场景另发现缺少全量清单登记，拆为两个语言入口并补登记；本批同样独立登记，定向结果不能替代全量验收。
+首次失败记录：旧实现单元及旧 getter 的真实回归按预期失败；去掉预览重复读时曾遗漏一个未使用 import，出现一次编译失败，修复后重跑。首轮 PR 网站检查另有一条源码断言仍匹配旧 `cfg.ModelList` 表达式；更新为独立目录读取，保留入口、模型能力与账号三项条件，重新运行完整网站测试。未延长超时、跳过失败项或降低 70% 门禁。#242 的双语场景另发现缺少全量清单登记，拆为两个语言入口并补登记；本批同样独立登记，定向结果不能替代全量验收。
 
 实际命令：
 
@@ -132,6 +133,9 @@ XHUB_REGRESSION_COVERPROFILE="$PWD/.verification/phase5/P2/regression-accepted.o
 E2E_RUN_DIR="$PWD/.e2e/phase5-p2-registered" bash scripts/e2e.sh model-view-hot-update-
 node --test scripts/test_quality_workflow.cjs scripts/test_release_workflow.cjs
 node --test frontend/e2e/checklist-reporter.test.cjs
+npm test --prefix website
+npm run build --prefix website
+npm run test:e2e --prefix website
 go vet ./internal/config ./internal/dataplane/... ./internal/gateway/...
 go test ./internal/config -run '^$' -bench BenchmarkCloneModels -benchmem -count=3
 ```

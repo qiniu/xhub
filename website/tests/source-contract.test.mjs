@@ -75,11 +75,11 @@ test("双语项目入口反映企业身份与成员凭据当前边界", () => {
   }
 });
 
-/** 目的：统一续接与原厂透传文档区分实际执行链；前置执行器和会话源码，验证灰度参数接线、双语历史、护栏及协议字段边界，纯读取无需清理。 */
+/** 目的：统一续接与原厂透传文档区分实际执行链；前置执行器和会话源码，验证独立目录及灰度参数接线、双语历史、护栏及协议字段边界，纯读取无需清理。 */
 test("Responses 与 Bypass 说明匹配各自执行链", () => {
   const execution = source("internal/dataplane/execution/serve.go");
   assert.match(execution, /ResponsesRequestBody\(body,\s*plan\.History,\s*nativeEligible\)/, "标准 Responses 必须同时传递网关历史与原生灰度判定");
-  assert.ok(execution.includes('nativeEligible := op == "responses" && providerdeployment.NativeResponsesConfigured(cfg.ModelList) && h.NativeResponsesAllowed(p.UserID)'), "原生解析必须受入口、部署与可信用户灰度共同约束");
+  assert.ok(execution.includes('nativeEligible := op == "responses" && providerdeployment.NativeResponsesConfigured(h.Models()) && h.NativeResponsesAllowed(p.UserID)'), "原生解析必须受入口、部署与可信用户灰度共同约束");
   for (const locale of ["en", "zh-CN"]) {
     const responses = source("docs/api/" + locale + "/responses.md");
     assert.match(responses, locale === "en" ? /Uses gateway history/ : /使用网关历史/);
