@@ -1,15 +1,12 @@
 # Stage 4 closure inventory
 
-## Current progress (2026-10-29, candidate changes)
+## Current candidates (2026-10-29)
 
-- Main baseline is `e8a29c4f972e8832e1c6e02a8226d0befcc65584`. C1, C2, runtime operations and earlier stage-4 PRs are merged. The old baseline and census below remain historical evidence.
-- #231 covers 15 settings routes; #233 covers 14 model aliases. Both remain unmerged. PR [#235](https://github.com/qiniu/xhub/pull/235) tracks #234: C5 has 26 analytics routes, with 23 unimplemented aliases explicitly rejected and three existing IAM report/reset boundaries retaining `unsupported_iam_operation`.
-- Live log pages use `/spend/logs/ui`, facets use `/management/v1/spend_logs/*`, and usage uses `/user/daily/activity` and related modules. The old `/spend/logs` and `/spend_logs/users` KV responses are not compatible implementations. The unmounted tag-analytics component has no ledger attribution; zero statistics must not be fabricated.
-- Direct `/old-usage` visits show a bilingual unavailable notice and link to the live Usage page; no unsupported request or fabricated zero report.
-- Candidate acceptance uses successful, upstream-500 and billed requests, 26-route authorization checks, invalid JSON/RPC, unchanged KV/account budgets/logs/usage, existing scope/pagination contracts, and bilingual browser chat→billed log→legacy rejection→visible log after reload.
-- These three batches cover 55 candidate routes. After merge, **C6 protocols (7), C7 discovery (9), and integrated acceptance** remain. Main still has 71 pending routes. PR submission is not merge or deployment; neither is performed here.
+Main `e8a29c4f` includes the earlier batches via #229. The sections below retain historical evidence, not the current merge status of every PR. #231 (15 settings), #233 (14 model aliases), and #235 (26 analytics aliases) remain unmerged; the latest #231/#235 CI checks have passed.
 
-## Historical audit record
+C6 addresses seven declarations under [#236](https://github.com/qiniu/xhub/issues/236) / [PR #237](https://github.com/qiniu/xhub/pull/237): five non-OpenAI file aliases reject public configuration access; two legacy WebSocket aliases reject both actual GET handshakes and the historical pseudo method, without fake 200/101 responses. Two added GET registrations are rejection paths, not supported WebSocket sessions. Authenticated RFC6455 clients, HTTP/PostgreSQL and bilingual browser flows verify the boundary; standard/OpenAI files, chat and budget controls remain separate checks.
+
+No file/realtime executor is added. Permissions, budget rules and the 70% gate remain unchanged; no merge or deployment. After these candidates, **nine C7 discovery/helper declarations and final integration acceptance remain**. Historical main statuses and 909 observations are not relabelled as candidate successes.
 
 > C1 is submitted as [#224](https://github.com/qiniu/xhub/pull/224): 26 auxiliary routes explicitly reject unsupported operations and two singular-policy reads gain acceptance evidence. It is unmerged; main status below remains unchanged. C2 is submitted in [#226](https://github.com/qiniu/xhub/pull/226): 22 legacy identity operations explicitly rejected; real password login, signed SAML, session and budget regressions passed. It is not merged; main classifications remain unchanged. C3/runtime-ops is submitted in [#228](https://github.com/qiniu/xhub/pull/228): 12 legacy operations explicitly reject unsupported execution, with real configuration, credential rotation, budget and bilingual chat tests. It remains unmerged. The 15 C3/settings entries, C4–C7 and integration are still pending.
 

@@ -763,11 +763,11 @@ test('legacy inference has real regression coverage and cleanup', () => {
   assert.equal(job.steps.find(item => item.run === 'docker compose down -v').if, 'always()');
 });
 
-/** 旧供应商批处理真实数据库回归必须产出并上传有效覆盖率，失败不得忽略；配置只读，无清理。 */
-test('provider batch has real regression coverage and cleanup', () => {
+/** 旧供应商批处理、文件和WebSocket边界的真实回归必须产出并上传有效覆盖率，失败不得忽略；配置只读，无清理。 */
+test('provider batch, file and websocket boundaries have real regression coverage and cleanup', () => {
   const job = workflow.jobs['supplier-contract'];
   const run = step('supplier-contract', 'Run real provider batch regression');
-  assert.equal(run.run, "bash scripts/regression.sh '^TestProviderBatchBoundary$'");
+  assert.equal(run.run, "bash scripts/regression.sh '^Test(ProviderBatchBoundary|ProviderFileBoundary|LegacyWebsocketBoundary)$'");
   assert.equal(run.env.XHUB_REGRESSION_COVERPROFILE, 'coverage/provider-batch.out');
   const check = step('supplier-contract', 'Validate provider batch regression coverage');
   assert.match(check.run, /set -euo pipefail/);

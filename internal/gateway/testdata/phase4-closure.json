@@ -129,8 +129,10 @@
       "title": "文件及WebSocket兼容入口",
       "batch": "C6",
       "source": "internal/gateway/ingress.go",
-      "conclusion": "非openai文件入口落到管理KV；passthrough只计算URL，realtime只写握手。协议执行不得伪报成功；不能改现有原生数据面。",
-      "pending_prs": []
+      "conclusion": "C6 candidate (#236): five non-OpenAI file aliases reject public KV access after existing management auth/JSON validation. Two legacy WebSocket aliases reject actual GET and historical WEBSOCKET requests after existing LLM auth. No upstream connection; standard/OpenAI files and native data plane unchanged. Main status and historical observations remain baseline evidence until merge/integration.",
+      "pending_prs": [
+        237
+      ]
     },
     "provider-batch": {
       "title": "供应商批处理别名",
@@ -511,7 +513,10 @@
       "group": "protocol-alias",
       "main_status": "needs_fix",
       "evidence": [
-        "internal/gateway/ingress.go"
+        "internal/gateway/ingress.go",
+        "cmd/regression/provider_file_boundary_test.go",
+        "cmd/regression/legacy_websocket_boundary_test.go",
+        "frontend/e2e/protocol-boundary-scenario.ts"
       ],
       "observation": {
         "route": "DELETE /{provider}/v1/files/{file_id}",
@@ -3011,7 +3016,10 @@
       "group": "protocol-alias",
       "main_status": "needs_fix",
       "evidence": [
-        "internal/gateway/ingress.go"
+        "internal/gateway/ingress.go",
+        "cmd/regression/provider_file_boundary_test.go",
+        "cmd/regression/legacy_websocket_boundary_test.go",
+        "frontend/e2e/protocol-boundary-scenario.ts"
       ],
       "observation": {
         "route": "GET /{provider}/v1/files",
@@ -3028,7 +3036,10 @@
       "group": "protocol-alias",
       "main_status": "needs_fix",
       "evidence": [
-        "internal/gateway/ingress.go"
+        "internal/gateway/ingress.go",
+        "cmd/regression/provider_file_boundary_test.go",
+        "cmd/regression/legacy_websocket_boundary_test.go",
+        "frontend/e2e/protocol-boundary-scenario.ts"
       ],
       "observation": {
         "route": "GET /{provider}/v1/files/{file_id}",
@@ -3045,7 +3056,10 @@
       "group": "protocol-alias",
       "main_status": "needs_fix",
       "evidence": [
-        "internal/gateway/ingress.go"
+        "internal/gateway/ingress.go",
+        "cmd/regression/provider_file_boundary_test.go",
+        "cmd/regression/legacy_websocket_boundary_test.go",
+        "frontend/e2e/protocol-boundary-scenario.ts"
       ],
       "observation": {
         "route": "GET /{provider}/v1/files/{file_id}/content",
@@ -5203,7 +5217,10 @@
       "group": "protocol-alias",
       "main_status": "needs_fix",
       "evidence": [
-        "internal/gateway/ingress.go"
+        "internal/gateway/ingress.go",
+        "cmd/regression/provider_file_boundary_test.go",
+        "cmd/regression/legacy_websocket_boundary_test.go",
+        "frontend/e2e/protocol-boundary-scenario.ts"
       ],
       "observation": {
         "route": "POST /{provider}/v1/files",
@@ -5424,7 +5441,10 @@
       "group": "protocol-alias",
       "main_status": "needs_fix",
       "evidence": [
-        "internal/gateway/ingress.go"
+        "internal/gateway/ingress.go",
+        "cmd/regression/provider_file_boundary_test.go",
+        "cmd/regression/legacy_websocket_boundary_test.go",
+        "frontend/e2e/protocol-boundary-scenario.ts"
       ],
       "observation": {
         "route": "WEBSOCKET /openai_passthrough/{endpoint}",
@@ -5441,7 +5461,10 @@
       "group": "protocol-alias",
       "main_status": "needs_fix",
       "evidence": [
-        "internal/gateway/ingress.go"
+        "internal/gateway/ingress.go",
+        "cmd/regression/provider_file_boundary_test.go",
+        "cmd/regression/legacy_websocket_boundary_test.go",
+        "frontend/e2e/protocol-boundary-scenario.ts"
       ],
       "observation": {
         "route": "WEBSOCKET /vertex_ai/live",

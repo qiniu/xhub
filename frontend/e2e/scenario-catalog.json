@@ -3413,5 +3413,19 @@
     "title": "analytics aliases preserve billed chat and logs zh-CN",
     "kind": "implemented",
     "environment": "default offline"
+  },
+  {
+    "id": "REG-protocol-boundary-en",
+    "file": "e2e/scenarios/regression/protocol-boundary-en.test.ts",
+    "title": "legacy protocol aliases reject false success en",
+    "kind": "implemented",
+    "environment": "default offline"
+  },
+  {
+    "id": "REG-protocol-boundary-zh-CN",
+    "file": "e2e/scenarios/regression/protocol-boundary-zh-CN.test.ts",
+    "title": "legacy protocol aliases reject false success zh-CN",
+    "kind": "implemented",
+    "environment": "default offline"
   }
 ]
