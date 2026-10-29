@@ -15,7 +15,7 @@ type catalogRoute struct {
 }
 
 // TestCatalogReads 通过真实网关处理器调用目录中的全部 GET 路由。
-// 前置条件是隔离数据库和管理员会话；验证已删除、已退役、未实现维度、占位授权及普通读取的精确 JSON 契约。
+// 前置条件是隔离数据库和管理员会话；验证已删除、已退役、C7未实现发现目录、占位授权及普通读取的精确 JSON 契约。
 // 参数 t 为测试上下文，返回无；网关与数据库由 bootGateway 和测试清理函数回收。
 func TestCatalogReads(t *testing.T) {
 	srv, base, db := bootGateway(t)
@@ -205,6 +205,19 @@ func TestCatalogReads(t *testing.T) {
 				}
 				if status != http.StatusNotImplemented || json.Unmarshal(body, &probe) != nil || probe.Error.Type != "unsupported_operation" {
 					t.Fatalf("运维入口没有执行器，必须明确失败: %d %s", status, trim(body))
+				}
+				return
+			}
+			// C7仅这八个GET已确认无实现；独立枚举并检查错误类型，不放宽其他目录的意外501。
+			switch rt.Path {
+			case "/", "/end_user/daily/activity", "/network/client-ip", "/openapi-registry", "/registry.json", "/routes", "/user/available_roles", "/utils/available_routes":
+				var probe struct {
+					Error struct {
+						Type string `json:"type"`
+					} `json:"error"`
+				}
+				if status != http.StatusNotImplemented || json.Unmarshal(body, &probe) != nil || probe.Error.Type != "unsupported_discovery_operation" {
+					t.Fatalf("旧发现目录必须明确拒绝: %d %s", status, trim(body))
 				}
 				return
 			}

@@ -205,7 +205,7 @@ jobs:
       - name: Run real search configuration regression
         env:
           XHUB_REGRESSION_COVERPROFILE: coverage/search-config.out
-        run: bash scripts/regression.sh '^Test(SearchConfigService|SearchProbe|CatalogIntegrity)'
+        run: bash scripts/regression.sh '^Test(SearchConfigService|SearchProbe|SearchProviderDiscovery|DiscoveryBoundary|CatalogIntegrity)'
       - name: Validate regression coverage
         shell: bash
         run: |

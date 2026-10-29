@@ -50,8 +50,8 @@
     "discovery": {
       "title": "根页、路由/注册表及辅助目录",
       "batch": "C7",
-      "source": "internal/gateway/family/handlers.go",
-      "conclusion": "返回通用KV不证明目录与已注册路由一致；现有前端/SDK调用方需核对。",
+      "source": "internal/gateway/family/discovery.go",
+      "conclusion": "C7 candidate (#238): eight legacy discovery/activity GET aliases explicitly reject after existing management auth and JSON validation; available search providers use the same adapter definitions as real probes without reading KV. Historical main observations remain unchanged. HTTP/PG, real SQL faults, all three provider protocols and bilingual browser acceptance are linked below; combined integration remains pending.",
       "pending_prs": []
     },
     "guard": {
@@ -523,7 +523,10 @@
       "group": "discovery",
       "main_status": "needs_verification",
       "evidence": [
-        "internal/gateway/family/handlers.go"
+        "internal/gateway/family/handlers.go",
+        "cmd/regression/discovery_boundary_test.go",
+        "cmd/regression/search_probe_test.go",
+        "frontend/e2e/discovery-boundary-scenario.ts"
       ],
       "observation": {
         "route": "GET /",
@@ -965,7 +968,10 @@
       "group": "discovery",
       "main_status": "needs_verification",
       "evidence": [
-        "internal/gateway/family/handlers.go"
+        "internal/gateway/family/handlers.go",
+        "cmd/regression/discovery_boundary_test.go",
+        "cmd/regression/search_probe_test.go",
+        "frontend/e2e/discovery-boundary-scenario.ts"
       ],
       "observation": {
         "route": "GET /end_user/daily/activity",
@@ -1730,7 +1736,10 @@
       "group": "discovery",
       "main_status": "needs_verification",
       "evidence": [
-        "internal/gateway/family/handlers.go"
+        "internal/gateway/family/handlers.go",
+        "cmd/regression/discovery_boundary_test.go",
+        "cmd/regression/search_probe_test.go",
+        "frontend/e2e/discovery-boundary-scenario.ts"
       ],
       "observation": {
         "route": "GET /network/client-ip",
@@ -1764,7 +1773,10 @@
       "group": "discovery",
       "main_status": "needs_verification",
       "evidence": [
-        "internal/gateway/family/handlers.go"
+        "internal/gateway/family/handlers.go",
+        "cmd/regression/discovery_boundary_test.go",
+        "cmd/regression/search_probe_test.go",
+        "frontend/e2e/discovery-boundary-scenario.ts"
       ],
       "observation": {
         "route": "GET /openapi-registry",
@@ -2104,7 +2116,10 @@
       "group": "discovery",
       "main_status": "needs_verification",
       "evidence": [
-        "internal/gateway/family/handlers.go"
+        "internal/gateway/family/handlers.go",
+        "cmd/regression/discovery_boundary_test.go",
+        "cmd/regression/search_probe_test.go",
+        "frontend/e2e/discovery-boundary-scenario.ts"
       ],
       "observation": {
         "route": "GET /registry.json",
@@ -2121,7 +2136,10 @@
       "group": "discovery",
       "main_status": "needs_verification",
       "evidence": [
-        "internal/gateway/family/handlers.go"
+        "internal/gateway/family/handlers.go",
+        "cmd/regression/discovery_boundary_test.go",
+        "cmd/regression/search_probe_test.go",
+        "frontend/e2e/discovery-boundary-scenario.ts"
       ],
       "observation": {
         "route": "GET /routes",
@@ -2172,7 +2190,10 @@
       "group": "discovery",
       "main_status": "needs_verification",
       "evidence": [
-        "internal/gateway/family/handlers.go"
+        "internal/gateway/family/handlers.go",
+        "cmd/regression/discovery_boundary_test.go",
+        "cmd/regression/search_probe_test.go",
+        "frontend/e2e/discovery-boundary-scenario.ts"
       ],
       "observation": {
         "route": "GET /search_tools/ui/available_providers",
@@ -2648,7 +2669,10 @@
       "group": "discovery",
       "main_status": "needs_verification",
       "evidence": [
-        "internal/gateway/family/handlers.go"
+        "internal/gateway/family/handlers.go",
+        "cmd/regression/discovery_boundary_test.go",
+        "cmd/regression/search_probe_test.go",
+        "frontend/e2e/discovery-boundary-scenario.ts"
       ],
       "observation": {
         "route": "GET /user/available_roles",
@@ -2682,7 +2706,10 @@
       "group": "discovery",
       "main_status": "needs_verification",
       "evidence": [
-        "internal/gateway/family/handlers.go"
+        "internal/gateway/family/handlers.go",
+        "cmd/regression/discovery_boundary_test.go",
+        "cmd/regression/search_probe_test.go",
+        "frontend/e2e/discovery-boundary-scenario.ts"
       ],
       "observation": {
         "route": "GET /utils/available_routes",

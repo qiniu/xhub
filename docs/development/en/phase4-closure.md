@@ -1,5 +1,15 @@
 # Stage 4 closure inventory
 
+## Current candidates (2026-10-29)
+
+Main `e8a29c4f` includes the earlier batches via #229; the older sections below retain historical evidence, not current merge status. Unmerged candidates are #231 (15 settings), #233 (14 model aliases), #235 (26 analytics aliases), #237 (7 protocol declarations), and this C7 batch (9), totaling 71 declarations. Separate batch passes do not prove combined compatibility.
+
+C7 tracks [#238](https://github.com/qiniu/xhub/issues/238): GET `/`, `/end_user/daily/activity`, `/network/client-ip`, `/openapi-registry`, `/registry.json`, `/routes`, `/user/available_roles`, and `/utils/available_routes` have no corresponding discovery/activity implementation. They return 501/no-store after existing management authentication and JSON validation, never public configuration, fabricated roles/routes or fixed-zero activity. No new registry/IP capability is added.
+
+The ninth route, `/search_tools/ui/available_providers`, retains Tavily, Perplexity, Serper and existing response fields. Discovery and real probes share adapter definitions; discovery no longer reads search configuration. Real HTTP/PostgreSQL checks cover existing paid activity, permissions, zero budget and independence from SQL read failures. Every discovered provider is exercised against a local HTTP protocol server. Bilingual browser flows cover rejections, provider selection, probe success/failure/recovery and ordinary chat.
+
+No fixed batch remains unaddressed after this candidate, but **merging candidates and final combined acceptance remain; stage 4 is not complete**. No merge/deployment; permissions, budgets and the 70% gate are unchanged. Historical main classifications and 909 observations remain intact. New evidence describes candidate behavior, not production. Other module/public/data-plane/retired-route exclusions remain as documented below.
+
 > C1 is submitted as [#224](https://github.com/qiniu/xhub/pull/224): 26 auxiliary routes explicitly reject unsupported operations and two singular-policy reads gain acceptance evidence. It is unmerged; main status below remains unchanged. C2 is submitted in [#226](https://github.com/qiniu/xhub/pull/226): 22 legacy identity operations explicitly rejected; real password login, signed SAML, session and budget regressions passed. It is not merged; main classifications remain unchanged. C3/runtime-ops is submitted in [#228](https://github.com/qiniu/xhub/pull/228): 12 legacy operations explicitly reject unsupported execution, with real configuration, credential rotation, budget and bilingual chat tests. It remains unmerged. The 15 C3/settings entries, C4–C7 and integration are still pending.
 
 Baseline: `939e0d6c0ba174bd03d6dad4c1035da8bf0be8cd`, reviewed 2026-10-28. Stage 4 is **not complete**. No merge or production deployment.

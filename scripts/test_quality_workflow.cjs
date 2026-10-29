@@ -259,7 +259,7 @@ test('compatibility gate compares historical contracts with real pinned checker'
 /** 搜索配置服务复用真实数据库作业；验证回归与覆盖率上传不可遗漏，不降低门禁，只读无需清理。 */
 test('search configuration service requires real regression coverage', () => {
   const run = step('supplier-contract', 'Run real search configuration regression');
-  assert.equal(run.run, "bash scripts/regression.sh '^Test(SearchConfigService|SearchProbe|CatalogIntegrity)'");
+  assert.equal(run.run, "bash scripts/regression.sh '^Test(SearchConfigService|SearchProbe|SearchProviderDiscovery|DiscoveryBoundary|CatalogIntegrity)'");
   assert.equal(run.env.XHUB_REGRESSION_COVERPROFILE, 'coverage/search-config.out');
   assert.match(step('supplier-contract', 'Validate regression coverage').run, /test -s coverage\/search-config.out/);
   const upload = step('supplier-contract', 'Upload regression coverage');
