@@ -16,7 +16,7 @@ Local integration branch `codex/stage4-final-integration` combines five candidat
 
 Total:71 declarations. Actual GET handshakes are also covered for both WebSocket declarations; declarations are not unique URLs or test counts. Per-batch complete matrices and shared-service integration tests serve different purposes.
 
-Combined acceptance verifies unchanged configuration, deployments, sessions and billed logs after interleaved rejections; real model disable/enable, zero-budget403, upstream failure logs, search probes, key rotation and bilingual browser flows. See the [combined acceptance report](../zh-CN/phase4-final-integration.md) for commands and results. Permissions, budget rules and the70% gate are unchanged.
+Combined acceptance verifies unchanged configuration, deployments, sessions and billed logs after interleaved rejections; real model disable/enable, zero-budget403, upstream failure logs, search probes, key rotation and bilingual browser flows. See the [combined acceptance report](phase4-final-integration.md) for commands and results. Permissions, budget rules and the70% gate are unchanged.
 
 No new unhandled batch remains in this fixed scope. Delivery still requires integration CI/review, a separate merge decision and later deployment/real-provider acceptance. Local fixtures do not prove external search services, enterpriseSSO network/certificates or live suppliers.
 

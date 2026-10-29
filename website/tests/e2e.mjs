@@ -60,6 +60,25 @@ try {
       assert.equal(await article.locator('a[href*="benchmarks/reports/"]').count(), 0, `${locale} 不能提供无效报告链接`);
     }
   });
+  // 目的：组合验收报告必须有双语同主题页面；前置真实构建和HTTP服务器，从清单点击报告并切换语言/刷新，保留验证边界；只读，主流程清理浏览器。
+  await scenario("第四阶段清单 → 双语验收报告 → 同主题切换与刷新", async () => {
+    for (const [locale, label, title] of [["en", "combined acceptance report", "Phase-four combined acceptance report"], ["zh-CN", "组合验收报告", "第四阶段候选组合验收"]]) {
+      await page.goto(base + `docs/development/${locale}/phase4-closure.html`);
+      await page.getByRole("article").getByRole("link", { name: label, exact: true }).click();
+      await page.waitForURL(`**/development/${locale}/phase4-final-integration.html`);
+      await page.reload();
+      await expect(page.getByRole("heading", { name: title, exact: true })).toBeVisible();
+      assert.equal((await page.request.get(page.url())).status(), 200, "报告必须由真实HTTP服务返回");
+      for (const value of ["4244", "1254", "112", "23", "70%", "cleanup_exit=0"]) {
+        assert.ok((await page.getByRole("article").innerText()).includes(value), `${locale} 报告缺少验证结果或边界: ${value}`);
+      }
+    }
+    await page.getByRole("link", { name: "Switch to English", exact: true }).click();
+    await page.waitForURL("**/development/en/phase4-final-integration.html");
+    await page.reload();
+    await expect(page.getByRole("heading", { name: "Phase-four combined acceptance report", exact: true })).toBeVisible();
+    assert.equal(await page.locator("html").getAttribute("lang"), "en");
+  });
   // 目的：双语入口可实际导航且共享翻译源不造成重复目录；前置真实构建服务器，只读页面，最终关闭上下文。
   await scenario("整体文档入口 → 开发指南 → 双语目录无重复", async () => {
     for (const [lang, home, label, locale] of [["zh", "", "开发指南", "zh-CN"], ["en", "en/", "Developer guide", "en"]]) {
