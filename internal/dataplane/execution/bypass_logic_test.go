@@ -274,7 +274,7 @@ func (h *logicHost) ResolveRequest(*http.Request) (*auth.Principal, error) {
 // RouteSettingsFor 是 logicHost 的测试接口实现。
 // 优先返回 h.settings 与 h.modelDefaults，未指定设置时使用 BuiltinSettings 并补入模型默认；身份参数不参与解析，不访问数据库。
 // 调用方为本文件或同包的执行测试；仅模拟所述边界，不能据此推断生产宿主的行为。
-func (h *logicHost) RouteSettingsFor(*auth.Principal) router.RouteSettings {
+func (h *logicHost) RouteSettingsFor(*auth.Principal, []config.ModelEntry) router.RouteSettings {
 	if h.settings != nil {
 		return router.RouteSettings{Settings: h.settings, ModelDefaults: h.modelDefaults}
 	}
@@ -282,11 +282,6 @@ func (h *logicHost) RouteSettingsFor(*auth.Principal) router.RouteSettings {
 	settings.ModelDefaults = h.modelDefaults
 	return settings
 }
-
-// GatewayConfig 是 logicHost 的测试接口实现。
-// 返回本夹具的 cfg 指针；无参数，供执行入口读取目录，不复制配置，不产生外部副作用。
-// 调用方为本文件或同包的执行测试；仅模拟所述边界，不能据此推断生产宿主的行为。
-func (h *logicHost) GatewayConfig() *config.Config { return h.cfg }
 
 // HTTPClient 是 logicHost 的测试接口实现。
 // 返回本夹具指定的 client 指针；无参数，由执行器调用测试上游，方法本身不拨号。
@@ -425,9 +420,9 @@ func (h *logicHost) EnforceIdentityLimits(http.ResponseWriter, string, *auth.Pri
 func (h *logicHost) Redis() *live.Client { return nil }
 
 // Models 是 logicHost 的测试接口实现。
-// 返回本夹具的部署切片；无参数，不复制嵌套映射，执行器只能只读使用。
+// 无参数，返回本夹具部署目录及嵌套配置的独立副本；不连接真实存储。
 // 调用方为本文件或同包的执行测试；仅模拟所述边界，不能据此推断生产宿主的行为。
-func (h *logicHost) Models() []config.ModelEntry { return h.models }
+func (h *logicHost) Models() []config.ModelEntry { return config.CloneModels(h.models) }
 
 // BusyMap 是 logicHost 的测试接口实现。
 // 返回新建的空并发映射；无参数，表示测试没有正在占用的部署，不读取生产计数。

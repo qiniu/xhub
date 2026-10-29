@@ -100,7 +100,7 @@ jobs:
           E2E_REDIS: '1'
       # 独立无 Redis 链验证 PostgreSQL 待结算恢复，并覆盖 Agent 历史、流终态、取消、文档和 Key 生命周期。
       - name: API client reliability browser regression
-        run: bash scripts/e2e.sh client-docs-url- client-cancellation- stream-terminal-sc- billing-pending-recovery usage-spool- key-lifecycle- agent-history- hard-budget- budget-reconciliation- messages-signed-history- claude-client-compat- user-bulk-budget- scenarios/enterprise/saml- scenarios/enterprise/sso-valid.test.ts scenarios/directory/sso-config.test.ts
+        run: bash scripts/e2e.sh client-docs-url- client-cancellation- stream-terminal-sc- billing-pending-recovery usage-spool- key-lifecycle- agent-history- model-view- hard-budget- budget-reconciliation- messages-signed-history- claude-client-compat- user-bulk-budget- scenarios/enterprise/saml- scenarios/enterprise/sso-valid.test.ts scenarios/directory/sso-config.test.ts
         env:
           E2E_RUN_DIR: ${{ github.workspace }}/.e2e/release-agent-reliability
           E2E_BUILD_DIR: .next-agent-reliability

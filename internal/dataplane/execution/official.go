@@ -85,6 +85,8 @@ func serveBypassCreate(h dpcontract.Bypass, w http.ResponseWriter, r *http.Reque
 	countOnly := hit.Action.Name == "count_tokens"
 	// 复用入口已验证的载体，避免再次解码 JSON 或复制 multipart 文件；候选改写不修改原载体。
 	body, raw := requestBody.Fields, requestBody.Raw
+	// 固定路径别名解析和候选过滤共用目录；凭据仍在候选尝试时读取。
+	directory := h.Models()
 	field := hit.Transport.ModelField
 	if field == "" {
 		field = "model"
@@ -99,7 +101,7 @@ func serveBypassCreate(h dpcontract.Bypass, w http.ResponseWriter, r *http.Reque
 		// Fal 原厂正文通常没有 model，必须把固定路径型号映射回当前目录的公开别名。
 		// 多个别名对应同一端点时不猜测调用方权限范围，要求显式指定 model。
 		names := map[string]bool{}
-		list, _ := dprouting.DropDisabled(eligible(h, hit))
+		list, _ := dprouting.DropDisabled(eligible(directory, hit))
 		for _, dep := range list {
 			names[dep.ModelName] = true
 		}
@@ -128,7 +130,7 @@ func serveBypassCreate(h dpcontract.Bypass, w http.ResponseWriter, r *http.Reque
 	if !h.AdmitRequest(w, r.URL.Path, principal, alias, dpusage.EstimateTokens(body)) {
 		return
 	}
-	settings := h.RouteSettingsFor(principal)
+	settings := h.RouteSettingsFor(principal, directory)
 	if settings.Err != nil {
 		util.WriteTypedError(w, r.URL.Path, 503, "unavailable", "route template unavailable")
 		return
@@ -143,7 +145,7 @@ func serveBypassCreate(h dpcontract.Bypass, w http.ResponseWriter, r *http.Reque
 		util.WriteTypedError(w, r.URL.Path, 400, "invalid_request", err.Error())
 		return
 	}
-	list := eligible(h, hit)
+	list := eligible(directory, hit)
 	list, _ = dprouting.DropDisabled(list)
 	state := h.RouteState()
 	state.Allocations = settings.Policy.Shares()
@@ -424,7 +426,7 @@ func serveBypassFollow(h dpcontract.Bypass, w http.ResponseWriter, r *http.Reque
 	if !h.AdmitRequest(w, r.URL.Path, principal, dep.ModelName, 0) {
 		return
 	}
-	settings := h.RouteSettingsFor(principal)
+	settings := h.RouteSettingsFor(principal, h.Models())
 	if settings.Err != nil {
 		util.WriteTypedError(w, r.URL.Path, 503, "unavailable", "route template unavailable")
 		return
@@ -570,13 +572,13 @@ func sameEndpoint(dep config.ModelEntry, hit providercontract.Hit) bool {
 	return providerdeployment.Includes(dep, hit.Transport.ID)
 }
 
-// eligible 从主机模型目录筛出支持本次原生端点的部署。
-// 参数 h 提供当前模型表，hit 指定能力端点；返回能力兼容的候选切片。
+// eligible 从本轮独立目录筛出支持本次原生端点的部署。
+// 参数 models 为策略编译共用的目录，hit 指定能力端点；返回能力兼容的候选切片。
 // 原生创建与唯一上游查找调用；之后仍需过滤停用、授权、冷却和凭据，能力兼容本身不是执行许可。
 // 只读目录，不发请求、不提交会话归属；空切片表示没有兼容部署。
-func eligible(h dpcontract.Bypass, hit providercontract.Hit) []config.ModelEntry {
+func eligible(models []config.ModelEntry, hit providercontract.Hit) []config.ModelEntry {
 	var out []config.ModelEntry
-	for _, m := range h.Models() {
+	for _, m := range models {
 		// 使用本次入口权限与动作校验；标准计数不隐式打开 Bypass，跨协议计数不入池。
 		allowed := providerdeployment.Includes(m, hit.Transport.ID)
 		if hit.Action.Name == "count_tokens" {
@@ -597,7 +599,7 @@ func eligible(h dpcontract.Bypass, hit providercontract.Hit) []config.ModelEntry
 // 凭据失败的候选跳过；没有或多个账户时 ok 为 false，由调用方返回明确错误。
 // 仅查询服务端配置/凭据，不访问上游；不得把返回模型名列表当作供应商密钥或地址输出。
 func oneUpstream(h dpcontract.Bypass, hit providercontract.Hit) (config.ModelEntry, []string, bool) {
-	list, _ := dprouting.DropDisabled(eligible(h, hit))
+	list, _ := dprouting.DropDisabled(eligible(h.Models(), hit))
 	seen := map[string]config.ModelEntry{}
 	var names []string
 	for _, m := range list {

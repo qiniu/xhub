@@ -4,7 +4,7 @@ Date: 2026-10-29. Proposal #241. Baseline main `09273d4d`. See the [fixed execut
 
 ## Status
 
-P0 has an initial ownership/test inventory with explicit gaps. P1 has local implementation and verification; CI, merge and deployment remain separate. P2 configuration views, P3 attempt results, P4 retries/resources, P5 history/logging/settlement and P6 combined acceptance remain pending. This is not phase-wide completion.
+P0 has an initial ownership/test inventory with explicit gaps. P1 has local implementation and verification; CI, merge and deployment remain separate. P2 model-directory isolation has local evidence but pricing/connection update combinations and multi-store reads still need audit. P3 attempt results, P4 retries/resources, P5 history/logging/settlement and P6 combined acceptance remain pending. This is not phase-wide completion.
 
 ## Ownership audit
 
@@ -13,7 +13,7 @@ P0 has an initial ownership/test inventory with explicit gaps. P1 has local impl
 - ParseBypassBody keeps raw bytes, a field projection and multipart parts. The projection still has existing float64 JSON numbers; RawMessage rewriting preserves outbound precision.
 - Payload changes the candidate model and removes gateway controls without mutating original bytes or file parts.
 - PlanRoute owns request-local history/affinity planning. The Bypass projection consumers inspected here do not mutate the input fields.
-- RouteSettingsFor copies the model slice under lock before compilation, while GatewayConfig/Models expose other configuration views. This is not proof of a fully immutable configuration snapshot; nested maps and concurrent hot updates remain P2 work, not a reproduced race claim.
+- Models now copies the directory and nested containers under the model lock. Execution passes the same directory to RouteSettingsFor and candidate selection. Template/default/fallback reads remain separate storage operations, not a multi-store transaction.
 - Credential attachment and per-attempt authentication/limits remain in their existing positions. Budget preparation can rewrite outbound payloads.
 - ForwardOfficial measures the actual outbound body. Its stream-measurement parse remains intentionally separate from inbound parsing.
 - Retry and cancellation policies stay entry-specific. Required parent responses and ambiguous asynchronous creation cannot be replayed like ordinary synchronous requests.
@@ -76,3 +76,19 @@ New HTTP regressions reuse the model-contract coverage upload with the backend f
 ## Rollback
 
 Revert the two production files to restore the original parsing call. Keep configurations, bills, tasks and history. There is no migration or rollout switch, and no production access, merge or deployment occurred. P1 acceptance does not replace later combined or external acceptance.
+
+## Model-directory isolation and hot updates
+
+The old getter exposed shared slices/maps. A unit reproduction altered process configuration through a returned view; restoring the old getter made both real HTTP paths fail the disable/isolation assertion. Models now copies configuration containers without JSON round-tripping, preserving numeric types, nil and invalid values for existing validators. Preview compilation and candidate diagnostics share one directory; lookup by runtime ID copies only the matching entry.
+
+Native Responses parsing eligibility is still observed before history restoration. Standard routing captures its directory after admission/guardrails; Bypass create captures before public-alias resolution. In-flight upstream calls finish, subsequent calls observe disable/update. Named credentials, retry authentication and budgets retain their existing boundaries. Pricing plans and settlement fallback reads are unchanged. Cross-update pricing/connection combinations and multi-store consistency remain open; this is not completion of all P2 work.
+
+Verification: 2,622 related Go/race leaves passed, zero failed, four existing skips; final focused checks passed eight leaves. CloneModels, its recursive helper, Models and FindDeployment have 100% focused coverage. Real HTTP/PostgreSQL regression passed 54 leaves with no skips: hot updates, credential rotation, key revocation/budget exhaustion before retries, routing/preview and protocol/history cases. Two bilingual browser flows passed with zero failures/skips/retries and cleanup exit zero. Workflow tests passed 83 cases; vet and scenario ESLint passed.
+
+Existing skips: TestQiniuSeedanceLive, TestQiniuFalLive and TestKodoLiveArchive require external credentials; TestBrowserEnterpriseFixture is a helper started separately by the browser runner. They are not counted as passes; local fixtures do not prove real SSO/vendor/production proxy availability.
+
+Failure evidence is retained: expected old-getter failures and one unused-import build failure after preview cleanup, fixed before rerunning. Review also identified missing catalog registration for the preceding Bypass browser flows; locales now have separate entry files with exact catalog titles. This batch follows the same rule. Filtered browser success never substitutes for full catalog acceptance.
+
+Commands and evidence locations are listed in the [Chinese report](../zh-CN/phase5-execution-baseline.md). Local evidence: `.verification/phase5/P2/`, `.e2e/runs/regression-xHgU1Dlp/`, and `.e2e/phase5-p2-registered/`. Three 100-model nested-directory benchmarks measured 119570–139957 ns/op, approximately 142656 B/op and 2701 allocations/op; this measures isolation cost, not end-to-end latency improvement.
+
+No schema migration, merge or deployment. Reverting code does not revert configuration, spend or history. Permissions, budgets and the 70% patch gate are unchanged.

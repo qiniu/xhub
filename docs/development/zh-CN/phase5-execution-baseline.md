@@ -7,8 +7,8 @@
 | 工作包 | 本批状态 | 仍需完成 |
 | --- | --- | --- |
 | P0 行为与测试基线 | 完成首轮代码归属、测试映射与首批验证，缺口如下 | 后续每批实施前补对应动态场景和性能测量，不把测试文件存在当作已验收 |
-| P1 Bypass 解析去重 | 已实现并本地验收，待 PR/CI、合入与发布 | CI 和外部发布验收分别记录 |
-| P2 请求配置视图 | 待实现 | 热更新时点、共享 map/slice、凭据轮换及请求内一致性 |
+| P1 Bypass 解析去重 | #242 已提交；初版 CI 通过，补齐双语场景登记后重跑 | 未合入、未部署；外部验收另列 |
+| P2 请求配置视图 | 模型目录隔离、共用选路目录及热更新/安全重查已本地验证 | 价格与连接跨更新组合、多存储读取边界仍需审计，不宣称整个工作包完成 |
 | P3 单次尝试结果 | 待实现 | HTTP/客户端提交/协议终态、取消和失败的共同事实 |
 | P4 超时重试与资源释放 | 待实现 | 保留各入口差异，抽取安全公共部分 |
 | P5 历史日志与结算编排 | 待实现 | 保留持久化顺序、所有权与结算幂等性 |
@@ -23,7 +23,7 @@
 | 入站解析 | `ParseBypassBody` 保存原文、字段投影、multipart 分段；本批直接传入 `serveBypassCreate` | 原始数字依靠 RawMessage 出站保留；Fields 中的 JSON number 仍是既有 float64 投影，不能当无损正文 |
 | 候选载荷 | `BypassBody.Payload` 根据每个候选改写模型、去除 session_id/disable_fallbacks | 不污染原文和下个候选；普通重复表单字段、文件头/顺序保留 |
 | 路由计划 | `affinity.State.PlanRoute` 读取会话信号和授权历史，返回 request-local `RoutePlan` 与回调 | 本次核查 Bypass 读投影路径没有原地改写字段；不能把调用方输入作为历史授权 |
-| 路由配置 | `RouteSettingsFor` 读取模板，在锁内浅复制模型切片后编译；标准入口还读取 `GatewayConfig`，Bypass 通过 `Models` 枚举 | 不能宣称整个配置已经是不可变快照；P2 核对嵌套 map、读取时点和热更新并发 |
+| 路由配置 | `Models` 在锁内复制目录和嵌套容器，执行器将同一目录传给 `RouteSettingsFor` 与候选选择 | 不宣称跨存储事务一致；权限、预算、凭据按原时点重查 |
 | 凭据/预算 | `AttachCredential` 在候选层补连接；尝试层重新鉴权/限额；`PrepareBudgetAttempt` 可能再次改写实际出站正文 | 不删除每次尝试的安全检查，不提前缓存凭据或冻结撤销状态 |
 | 转发/流测量 | `ForwardOfficial` 单次发送，SSE 保留原行，独立观察终态/用量 | 测量解析的是经过模型及预算处理的出站正文，P1 保留这次解析，不能复用入站投影假装等价 |
 | 重试/取消 | 两类执行器分别管理超时、候选队列、提交状态和取消路径 | 同步、异步创建、固定历史不能共用无差别重试；P4 保留真实上游调用次数断言 |
@@ -101,3 +101,41 @@ CI 复用模型契约作业采集新 HTTP 回归覆盖率并上传 backend flag�
 本批无数据迁移、配置/权限/预算调整。回退这两个生产文件即可恢复旧解析调用，账单、历史、任务和配置保留；测试和文档可继续保留。未连接生产、未合并或部署，未新增灰度开关，因为本批没有新旧业务语义切换。
 
 第五阶段剩余 P2–P6 仍按[总计划](phase5-execution-plan.md)推进。P1 本地通过不代表第五阶段全部完成，也不替代后续组合或生产验收。
+
+## 模型目录隔离与热更新验收
+
+旧 `Models` 暴露共享切片和嵌套 map。新增单元修改返回值后发现进程配置被污染；恢复旧 getter 运行真实 HTTP 回归，两个入口均在停用后检测到旧目录被改写。修正采用锁内复制配置容器，保留数字类型、nil 和无效配置，不用 JSON 往返隐式改值。
+
+标准入口的原生解析资格仍在历史恢复前读取，路由目录在准入/护栏后捕获；Bypass 创建在公开别名解析前捕获。候选过滤、策略目录校验和标准入口缓存范围使用这份目录。预览也复用一次目录；按 ID 查询仅复制命中模型。命名凭据仍按候选读取，身份/预算仍按重试与回退边界重查。已经开始的请求正常完成，下一请求看到停用或更新；不把目录快照当作授权快照。
+
+边界：模板、模型默认项、全局回退和模型目录不构成数据库与内存间的单一事务。价格计划仍由既有预算准备建立，普通结算回退仍可按当前目录读取；任务轮询保留当前查找规则。此处没有修改这些业务语义。跨更新价格、连接与多存储组合仍待补验收，不宣称整个配置视图工作包已完成。
+
+| 实际运行 | 结果与范围 |
+| --- | --- |
+| 相关 Go 单元与 race | 2622 叶子通过，0 失败；4 个既有跳过如下 |
+| 最终目录/查找/执行/预览定向单元 | 8 叶子通过，0 失败/跳过；复制函数和 Models/FindDeployment 定向覆盖 100% |
+| 真实 HTTP/PostgreSQL | 54 叶子通过，0 失败/跳过：热更新、凭据轮换、撤销/预算阻断重试、模板/回退/预览、协议及历史 |
+| 双语浏览器 | 2 通过，0 失败/跳过/重试；页面停用/启用、在途对话、后续拒绝、型号/凭据更新、日志和费用；清理退出 0 |
+| 工作流测试 | 83 通过，0 失败/跳过 |
+| Go vet、场景 ESLint | 通过 |
+
+四个跳过是 `TestQiniuSeedanceLive`、`TestQiniuFalLive`、`TestKodoLiveArchive`（未配置外部凭据）和 `TestBrowserEnterpriseFixture`（常规 Go 测试不启动浏览器专用导出夹具，E2E 运行器单独启动）。不计入通过，也不据本地夹具宣称真实 SSO、供应商或生产代理可用。
+
+首次失败记录：旧实现单元及旧 getter 的真实回归按预期失败；去掉预览重复读时曾遗漏一个未使用 import，出现一次编译失败，修复后重跑。未延长超时、跳过失败项或降低 70% 门禁。#242 的双语场景另发现缺少全量清单登记，拆为两个语言入口并补登记；本批同样独立登记，定向结果不能替代全量验收。
+
+实际命令：
+
+```bash
+XHUB_REGRESSION_STRICT=1 go test -race ./internal/config ./internal/dataplane/... ./internal/gateway/... ./internal/router/... -count=1 -json
+go test -race ./internal/config ./internal/dataplane/execution ./internal/gateway -run 'Test(CloneModels|ModelsSnapshot.*|FindDeploymentSnapshot|ExecutionUsesValidatedModelView|Preview.*)' -count=1 -coverprofile=.verification/phase5/P2/focused-coverage.out -json
+XHUB_REGRESSION_COVERPROFILE="$PWD/.verification/phase5/P2/regression-accepted.out" bash scripts/regression.sh '^Test(ModelView.*|ModelContract.*|ModelFallback.*|RouteTemplate.*|RoutePreviewMatchesInference|NativeResponses.*|NativeMessagesAgentHistory|ChatAgentToolHistory|ChangingABudgetTakesEffectImmediately)$'
+E2E_RUN_DIR="$PWD/.e2e/phase5-p2-registered" bash scripts/e2e.sh model-view-hot-update-
+node --test scripts/test_quality_workflow.cjs scripts/test_release_workflow.cjs
+node --test frontend/e2e/checklist-reporter.test.cjs
+go vet ./internal/config ./internal/dataplane/... ./internal/gateway/...
+go test ./internal/config -run '^$' -bench BenchmarkCloneModels -benchmem -count=3
+```
+
+报告：`.verification/phase5/P2/` 保存初次失败、最终单元事件、回归覆盖率、工作流和微基准；`.e2e/runs/regression-xHgU1Dlp/` 保存 54 项回归及清理校验；`.e2e/phase5-p2-registered/` 保存最终双语报告和清理状态。100 条嵌套模型复制的三次微基准为 119570–139957 ns/op、约 142656 B/op、2701 allocs/op，仅描述复制开销，不代表完整请求性能提升。
+
+无 schema 迁移。回退代码可恢复原目录读取方式，不回滚配置、账单或历史；未合入、未部署。

@@ -232,7 +232,7 @@ test('model contract requires generated types and real deployment regression', (
   assert.equal(step('model-contract', 'Test generator drift rejection').run, 'node --test frontend/scripts/gen-model-contract.test.mjs');
   assert.equal(step('model-contract', 'Validate OpenAPI and Go types').run, 'go test -race ./contracts/models');
   // 第五阶段的真实原生载荷回归复用模型作业的覆盖率采集与上传，不能只在本地运行。
-  assert.equal(step('model-contract', 'Run real model contract regression').run, "bash scripts/regression.sh '^Test(ModelContract|OfficialCredentialSupportsNativeModel|BypassBodyHTTPContract|BypassMultipartHTTPContract)'");
+  assert.equal(step('model-contract', 'Run real model contract regression').run, "bash scripts/regression.sh '^Test(ModelContract|OfficialCredentialSupportsNativeModel|BypassBodyHTTPContract|BypassMultipartHTTPContract|ModelViewHTTPContract|ModelViewRetryChecks)'");
   assert.ok(job.steps.every(item => !item['continue-on-error']));
   assert.equal(job.steps.find(item => item.run === 'docker compose down -v').if, 'always()');
 });

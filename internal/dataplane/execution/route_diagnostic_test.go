@@ -24,7 +24,9 @@ type diagnosticHost struct {
 }
 
 // RouteSettingsFor 返回测试的请求规则快照；参数身份由 Serve 提供，返回设置，不写数据。
-func (h *diagnosticHost) RouteSettingsFor(*auth.Principal) router.RouteSettings { return h.settings }
+func (h *diagnosticHost) RouteSettingsFor(*auth.Principal, []config.ModelEntry) router.RouteSettings {
+	return h.settings
+}
 
 // RouteState 返回测试冷却状态；Serve 调用，无参数，返回只读快照，无外部副作用。
 func (h *diagnosticHost) RouteState() router.State { return h.state }

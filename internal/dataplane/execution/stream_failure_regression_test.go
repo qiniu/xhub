@@ -39,7 +39,9 @@ type streamAuditHost struct {
 // RouteSettingsFor 是 streamAuditHost 的测试接口实现。
 // 忽略身份并返回 h.settings；供流失败回归指定重试策略或模板错误，不查询数据库。
 // 调用方为本文件或同包的执行测试；仅模拟所述边界，不能据此推断生产宿主的行为。
-func (h *streamAuditHost) RouteSettingsFor(*auth.Principal) router.RouteSettings { return h.settings }
+func (h *streamAuditHost) RouteSettingsFor(*auth.Principal, []config.ModelEntry) router.RouteSettings {
+	return h.settings
+}
 
 // RecordSpend 是 streamAuditHost 的测试接口实现。
 // 只保存参数 status，忽略其他记账值；无返回，供失败状态断言，不扣费。

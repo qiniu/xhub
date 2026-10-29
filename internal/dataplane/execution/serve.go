@@ -80,8 +80,8 @@ func Serve(h dpcontract.Adapted, w http.ResponseWriter, r *http.Request, op stri
 		util.WriteTypedError(w, r.URL.Path, 400, "invalid_request", "model required")
 		return
 	}
-	cfg := h.GatewayConfig()
-	nativeEligible := op == "responses" && providerdeployment.NativeResponsesConfigured(cfg.ModelList) && h.NativeResponsesAllowed(p.UserID)
+	// 原生解析资格仍在历史恢复前观察；选路目录在准入和护栏后另取，不能提前冻结安全检查。
+	nativeEligible := op == "responses" && providerdeployment.NativeResponsesConfigured(h.Models()) && h.NativeResponsesAllowed(p.UserID)
 	// 会话计划先于调度生成；这里只读偏好或父响应归属，最终候选仍要按当前配置重新验证。
 	if op == "responses" {
 		// 统一入口的完整客户端历史允许跨模型迁移；不把未知来源的账户密文当作访问旧会话的凭据。
@@ -129,9 +129,10 @@ func Serve(h dpcontract.Adapted, w http.ResponseWriter, r *http.Request, op stri
 	}
 
 	// 第二阶段：读取身份链选中的请求级路由模板，再应用模型默认设置。
-	// 策略、重试、超时与冷却都从这个快照读取，不能混入进程 cfg.RouterSettings。
+	// 策略、重试、超时与冷却都从这个快照读取，不能混入进程共享配置。
 	// 保留未套用模型的 baseRouteCfg，跨模型回退时重新解析目标的默认设置。
-	routeCfg := h.RouteSettingsFor(p)
+	directory := h.Models()
+	routeCfg := h.RouteSettingsFor(p, directory)
 	if routeCfg.Err != nil {
 		util.WriteTypedError(w, r.URL.Path, 503, "unavailable", "route template unavailable")
 		return
@@ -162,7 +163,7 @@ func Serve(h dpcontract.Adapted, w http.ResponseWriter, r *http.Request, op stri
 		}
 	}
 	scope := map[string]any{
-		"models": cfg.ModelList, "router": routeCfg.Settings,
+		"models": directory, "router": routeCfg.Settings,
 		"model_defaults": routeCfg.ModelDefaults,
 		"session":        plan.SessionID, "query": r.URL.RawQuery,
 	}
@@ -214,7 +215,7 @@ func Serve(h dpcontract.Adapted, w http.ResponseWriter, r *http.Request, op stri
 	}
 	// 第三阶段：先过滤停用和协议不兼容项，再调度；偏好不能把已剔除的部署塞回候选。
 	// 权重仅取自解析后的模板，旧部署权重不会参与任何策略。
-	models := cfg.ModelList
+	models := directory
 	models, _ = dprouting.DropDisabled(models)
 	// 实际请求与预览使用同一兼容性判断，策略只处理已经兼容的候选。
 	if dpdialogue.CallerProtocol(op) != "" {
@@ -225,7 +226,7 @@ func Serve(h dpcontract.Adapted, w http.ResponseWriter, r *http.Request, op stri
 	state := h.RouteState()
 	state.Allocations = routeCfg.Policy.Shares()
 	// 诊断保留匹配、兼容与可用三个阶段；只读计算不推进调度状态，不改变既有回退顺序。
-	diagnosis := dprouting.DiagnoseRoute(cfg.ModelList, models, alias, providercapability.EndpointForOp(op), routeCfg, state, &dialogue, dpdialogue.CallerProtocol(op) != "")
+	diagnosis := dprouting.DiagnoseRoute(directory, models, alias, providercapability.EndpointForOp(op), routeCfg, state, &dialogue, dpdialogue.CallerProtocol(op) != "")
 	diagnosis.Log(r.URL.Path, callID, alias, routeCfg)
 	runtimePin := dprouting.RuntimePin(models, plan.Pinned)
 	pool := routeCfg.Schedule(models, alias, state, runtimePin)
@@ -241,7 +242,7 @@ func Serve(h dpcontract.Adapted, w http.ResponseWriter, r *http.Request, op stri
 			if settings.Err == nil {
 				targetState := state
 				targetState.Allocations = settings.Policy.Shares()
-				dprouting.DiagnoseRoute(cfg.ModelList, models, target, providercapability.EndpointForOp(op), settings, targetState, &dialogue, dpdialogue.CallerProtocol(op) != "").Log(r.URL.Path, callID, target, settings)
+				dprouting.DiagnoseRoute(directory, models, target, providercapability.EndpointForOp(op), settings, targetState, &dialogue, dpdialogue.CallerProtocol(op) != "").Log(r.URL.Path, callID, target, settings)
 			}
 		}
 	}
