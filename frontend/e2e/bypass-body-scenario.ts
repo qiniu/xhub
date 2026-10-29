@@ -1,13 +1,13 @@
 import { test, expect } from "@playwright/test";
 import { createServer } from "node:http";
 import { once } from "node:events";
-import { GATEWAY, loginAdmin, sessionBearer, stableGoto } from "../../helpers";
-import { translate } from "../../../src/i18n/translate";
+import { GATEWAY, loginAdmin, sessionBearer, stableGoto } from "./helpers";
+import { translate } from "../src/i18n/translate";
 
 /** 验证双语控制台到 Bypass 的原文保留、完整流、上游失败和日志可见性。
  * 前置真实浏览器/网关/隔离数据库，本地 HTTP 供应商记录实际出站正文；finally 删除模型、关闭服务，运行器回收 schema 和账单。
  */
-for (const locale of ["en", "zh-CN"] as const) {
+export function registerBypassBody(locale: "en" | "zh-CN") {
   test(`bypass request body and log lifecycle ${locale}`, async ({ page }) => {
     const received: string[] = [];
     let reject = false;

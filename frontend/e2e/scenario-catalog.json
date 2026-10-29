@@ -3455,5 +3455,19 @@
     "title": "stage4 combined boundaries preserve chat and logs zh-CN",
     "kind": "implemented",
     "environment": "default offline"
+  },
+  {
+    "id": "REG-bypass-body-en",
+    "file": "e2e/scenarios/regression/agent-history-bypass-body-en.test.ts",
+    "title": "bypass request body and log lifecycle en",
+    "kind": "implemented",
+    "environment": "default offline"
+  },
+  {
+    "id": "REG-bypass-body-zh-CN",
+    "file": "e2e/scenarios/regression/agent-history-bypass-body-zh-CN.test.ts",
+    "title": "bypass request body and log lifecycle zh-CN",
+    "kind": "implemented",
+    "environment": "default offline"
   }
 ]
