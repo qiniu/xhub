@@ -207,6 +207,11 @@ export function registerSC254() {
 
 
 test("team member add is listed", async ({ page }) => {
+  // 记录真实浏览器请求，防止创建表单重新依赖已退役的默认配置；上下文由运行器回收。
+  const retiredDefaults: string[] = [];
+  page.on("request", request => {
+    if (["/get/default_team_settings", "/team/metadata_schema"].some(path => new URL(request.url()).pathname.endsWith(path))) retiredDefaults.push(request.url());
+  });
   const guard = watchGateway(page);
   await loginAdmin(page);
   await page.goto(uiPath("/teams"));
@@ -236,6 +241,7 @@ test("team member add is listed", async ({ page }) => {
   await page.getByRole("option", { name: "e2e-member@example.com" }).click();
   await memberDialog.getByRole("button", { name: t("Add Member") }).click();
   await expect(page.getByText("e2e-member@example.com").first()).toBeVisible({ timeout: 15_000 });
+  expect(retiredDefaults, "创建团队不应调用已退役的默认设置").toEqual([]);
   await guard.assertOk();
 });
 }

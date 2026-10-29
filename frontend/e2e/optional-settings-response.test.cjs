@@ -10,7 +10,7 @@ test('optional settings require an explicit unavailable contract', () => {
 /** 所有页面响应巡检必须被等待，不能让异步校验逃逸；只读本地源码，无环境副作用。 */
 test('every page guard assertion is awaited', () => {
  const fs=require('node:fs'), path=require('node:path');
- for(const file of fs.readdirSync(__dirname).filter(x=>x.endsWith('.ts'))) {
+ for(const file of fs.readdirSync(__dirname, {recursive:true}).filter(x=>x.endsWith('.ts'))) {
   const source=fs.readFileSync(path.join(__dirname,file),'utf8');
   for(const line of source.split('\n').filter(x=>x.includes('.assertOk('))) assert.match(line,/await \w+\.assertOk\(/,file+': '+line);
  }
