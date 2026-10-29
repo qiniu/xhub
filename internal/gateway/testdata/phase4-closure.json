@@ -1,23 +1,20 @@
 {
   "baseline": "939e0d6c0ba174bd03d6dad4c1035da8bf0be8cd",
   "reviewed_at": "2026-10-28",
-  "scope": "Catalog-owned management declarations after stage-4 integration; observations retain the historical baseline. POST /delete and POST /cache/settings/test moved to cache administration with real regression coverage; three SAML refresh routes belong to the identity module. This inventory is not a completion claim.",
+  "scope": "Catalog-owned management declarations (301) after integration of #229. Route main_status/observation retain the 939e0d6c historical audit; group conclusions and pending_prs track current integration separately. Candidate #231/#233/#235/#237/#239 cover the final 71 declarations. This inventory is not a production completion claim.",
   "groups": {
     "access-vector": {
       "title": "访问组与向量库配置",
       "batch": "integration",
       "source": "internal/gateway/family/catalog_persistence.go",
-      "conclusion": "现有通用配置存储；独立服务在待合入PR，配置保存不证明授权/索引生效。",
-      "pending_prs": [
-        182,
-        184
-      ]
+      "conclusion": "已随 #229 合入 main e8a29c4f（原候选 #182,#184）；本次组合运行保留既有真实回归，具体支持边界见对应实现与测试。旧route观察仍保留历史值，不能作为当前结果。",
+      "pending_prs": []
     },
     "analytics": {
       "title": "统计、支出与日志旧别名",
       "batch": "C5",
-      "source": "internal/gateway/family/handlers.go",
-      "conclusion": "候选修复 #234：23条旧统计明确unsupported_analytics_operation，3条已有IAM边界保持；真实成功/失败/费用、权限矩阵、KV/预算/日志一致和双语浏览器验收。尚未合入；main_status及observation保留历史基线，不作为新结果。",
+      "source": "internal/gateway/family/analytics_alias.go",
+      "conclusion": "候选PR #235 已纳入本地组合分支；完整单批语义证据与组合HTTP/PG、双语浏览器验收分别保留。main e8a29c4f 尚未包含本批，不表示已部署；routes中的main_status/observation仍是历史审计。",
       "pending_prs": [
         235
       ]
@@ -26,34 +23,28 @@
       "title": "OAuth、邀请、JWT映射、引导旧入口",
       "batch": "C2",
       "source": "internal/gateway/family/catalog_persistence.go",
-      "conclusion": "这些精确路径仍读写KV，不是已修复的/authorize/flow或MCP OAuth；须验证令牌/身份副作用并明确支持边界。",
-      "pending_prs": [
-        226
-      ]
+      "conclusion": "已随 #229 合入 main e8a29c4f（原候选 #226）；本次组合运行保留既有真实回归，具体支持边界见对应实现与测试。旧route观察仍保留历史值，不能作为当前结果。",
+      "pending_prs": []
     },
     "budget-iam": {
       "title": "预算配置与组织/团队旧入口",
       "batch": "integration",
       "source": "internal/gateway/family/catalog_persistence.go",
-      "conclusion": "预算配置独立服务及无执行器旧IAM入口拒绝待合入；不改变真实权限预算服务。",
-      "pending_prs": [
-        192
-      ]
+      "conclusion": "已随 #229 合入 main e8a29c4f（原候选 #192）；本次组合运行保留既有真实回归，具体支持边界见对应实现与测试。旧route观察仍保留历史值，不能作为当前结果。",
+      "pending_prs": []
     },
     "cache": {
       "title": "缓存管理",
       "batch": "integration",
       "source": "internal/gateway/access.go",
-      "conclusion": "缓存设置不生效的修复待合入；真实Flush仍保留。",
-      "pending_prs": [
-        196
-      ]
+      "conclusion": "已随 #229 合入 main e8a29c4f（原候选 #196）；本次组合运行保留既有真实回归，具体支持边界见对应实现与测试。旧route观察仍保留历史值，不能作为当前结果。",
+      "pending_prs": []
     },
     "discovery": {
       "title": "根页、路由/注册表及辅助目录",
       "batch": "C7",
       "source": "internal/gateway/family/discovery.go",
-      "conclusion": "C7 candidate (#238): eight legacy discovery/activity GET aliases explicitly reject after existing management auth and JSON validation; available search providers use the same adapter definitions as real probes without reading KV. Historical main observations remain unchanged. HTTP/PG, real SQL faults, all three provider protocols and bilingual browser acceptance are linked below; combined integration remains pending.",
+      "conclusion": "候选PR #239 已纳入本地组合分支；完整单批语义证据与组合HTTP/PG、双语浏览器验收分别保留。main e8a29c4f 尚未包含本批，不表示已部署；routes中的main_status/observation仍是历史审计。",
       "pending_prs": [
         239
       ]
@@ -69,56 +60,45 @@
       "title": "旧RAG/OCR/Google操作别名",
       "batch": "integration",
       "source": "internal/gateway/family/catalog_persistence.go",
-      "conclusion": "无推理执行器却写KV；拒绝修复待合入，原生推理不受影响。",
-      "pending_prs": [
-        218
-      ]
+      "conclusion": "已随 #229 合入 main e8a29c4f（原候选 #218）；本次组合运行保留既有真实回归，具体支持边界见对应实现与测试。旧route观察仍保留历史值，不能作为当前结果。",
+      "pending_prs": []
     },
     "medical": {
       "title": "旧医学文本操作",
       "batch": "integration",
       "source": "internal/gateway/family/catalog_persistence.go",
-      "conclusion": "操作名被当作公共配置ID，修复待合入。",
-      "pending_prs": [
-        222
-      ]
+      "conclusion": "已随 #229 合入 main e8a29c4f（原候选 #222）；本次组合运行保留既有真实回归，具体支持边界见对应实现与测试。旧route观察仍保留历史值，不能作为当前结果。",
+      "pending_prs": []
     },
     "metadata": {
       "title": "标签、客户和终端用户配置",
       "batch": "integration",
       "source": "internal/gateway/family/catalog_persistence.go",
-      "conclusion": "标签/客户配置修复待合入；终端用户封禁是否消费不能由KV记录证明。",
-      "pending_prs": [
-        188,
-        190
-      ]
+      "conclusion": "已随 #229 合入 main e8a29c4f（原候选 #188,#190）；本次组合运行保留既有真实回归，具体支持边界见对应实现与测试。旧route观察仍保留历史值，不能作为当前结果。",
+      "pending_prs": []
     },
     "model-alias": {
       "title": "模型信息、fallback、封禁和公开旧别名",
       "batch": "C4",
-      "source": "internal/gateway/family/catalog_persistence.go",
-      "conclusion": "C4候选修复：14条无实现契约的模型旧别名明确拒绝，真实模型专用服务、权限与预算保留。main_status及observation仍是历史审计，不能将候选当作已合入。",
-      "pending_prs": []
+      "source": "internal/gateway/family/model_alias.go",
+      "conclusion": "候选PR #233 已纳入本地组合分支；完整单批语义证据与组合HTTP/PG、双语浏览器验收分别保留。main e8a29c4f 尚未包含本批，不表示已部署；routes中的main_status/observation仍是历史审计。",
+      "pending_prs": [
+        233
+      ]
     },
     "operations": {
       "title": "运维旧操作",
       "batch": "integration",
       "source": "internal/gateway/family/catalog_persistence.go",
-      "conclusion": "占位运维接口的明确拒绝及readiness修复待合入。",
-      "pending_prs": [
-        194
-      ]
+      "conclusion": "已随 #229 合入 main e8a29c4f（原候选 #194）；本次组合运行保留既有真实回归，具体支持边界见对应实现与测试。旧route观察仍保留历史值，不能作为当前结果。",
+      "pending_prs": []
     },
     "plugin": {
       "title": "插件注册、启停、筛选、marketplace",
       "batch": "integration",
       "source": "internal/gateway/family/catalog_persistence.go",
-      "conclusion": "分别提交的注册、筛选、启停边界需组合回归，不能将启用标志视为执行器。",
-      "pending_prs": [
-        206,
-        208,
-        210
-      ]
+      "conclusion": "已随 #229 合入 main e8a29c4f（原候选 #206,#208,#210）；本次组合运行保留既有真实回归，具体支持边界见对应实现与测试。旧route观察仍保留历史值，不能作为当前结果。",
+      "pending_prs": []
     },
     "preflight": {
       "title": "健康路径OPTIONS",
@@ -131,7 +111,7 @@
       "title": "文件及WebSocket兼容入口",
       "batch": "C6",
       "source": "internal/gateway/ingress.go",
-      "conclusion": "C6 candidate (#236): five non-OpenAI file aliases reject public KV access after existing management auth/JSON validation. Two legacy WebSocket aliases reject actual GET and historical WEBSOCKET requests after existing LLM auth. No upstream connection; standard/OpenAI files and native data plane unchanged. Main status and historical observations remain baseline evidence until merge/integration.",
+      "conclusion": "候选PR #237 已纳入本地组合分支；完整单批语义证据与组合HTTP/PG、双语浏览器验收分别保留。main e8a29c4f 尚未包含本批，不表示已部署；routes中的main_status/observation仍是历史审计。",
       "pending_prs": [
         237
       ]
@@ -140,10 +120,8 @@
       "title": "供应商批处理别名",
       "batch": "integration",
       "source": "internal/gateway/family/catalog_persistence.go",
-      "conclusion": "非openai供应商落到管理KV；修复待合入，须保留openai数据面分支。",
-      "pending_prs": [
-        220
-      ]
+      "conclusion": "已随 #229 合入 main e8a29c4f（原候选 #220）；本次组合运行保留既有真实回归，具体支持边界见对应实现与测试。旧route观察仍保留历史值，不能作为当前结果。",
+      "pending_prs": []
     },
     "resource-config": {
       "title": "供应商、搜索、提示词和策略基本配置",
@@ -156,47 +134,38 @@
       "title": "调度、预热、事件、Vantage集成",
       "batch": "C3",
       "source": "internal/gateway/family/catalog_persistence.go",
-      "conclusion": "注册存在但只做KV读写，未接相应调度、热加载、事件或外部导出执行器。",
-      "pending_prs": [
-        228
-      ]
+      "conclusion": "已随 #229 合入 main e8a29c4f（原候选 #228）；本次组合运行保留既有真实回归，具体支持边界见对应实现与测试。旧route观察仍保留历史值，不能作为当前结果。",
+      "pending_prs": []
     },
     "server": {
       "title": "server资源、OAuth、个人配置及导入审批",
       "batch": "integration",
       "source": "internal/gateway/family/catalog_persistence.go",
-      "conclusion": "子操作拒绝边界待合入，基本server配置不等于MCP运行时。",
-      "pending_prs": [
-        198,
-        200,
-        204
-      ]
+      "conclusion": "已随 #229 合入 main e8a29c4f（原候选 #198,#200,#204）；本次组合运行保留既有真实回归，具体支持边界见对应实现与测试。旧route观察仍保留历史值，不能作为当前结果。",
+      "pending_prs": []
     },
     "service-aux": {
       "title": "已拆分服务下的辅助操作",
       "batch": "C1",
       "source": "internal/gateway/family/handlers.go",
-      "conclusion": "策略执行/解析/附件/版本/状态、凭据迁移/按模型查询、提示词版本仍经parseMgmt映射CRUD；需语义级修复，不能沿用配置已验证结论。 C1修复与补充验收见#224，仍待合入；main状态不提前更改。",
-      "pending_prs": [
-        224
-      ]
+      "conclusion": "已随 #229 合入 main e8a29c4f（原候选 #224）；本次组合运行保留既有真实回归，具体支持边界见对应实现与测试。旧route观察仍保留历史值，不能作为当前结果。",
+      "pending_prs": []
     },
     "settings": {
       "title": "旧设置、品牌、配置导出",
       "batch": "C3",
-      "source": "internal/gateway/family/handlers.go",
-      "conclusion": "C3/settings候选修复：15条无消费者设置精确拒绝；真实主题服务、鉴权与预算保留。main_status及observation仍为原审计历史，不表示本分支已合入。",
-      "pending_prs": []
+      "source": "internal/gateway/family/settings_operation.go",
+      "conclusion": "候选PR #231 已纳入本地组合分支；完整单批语义证据与组合HTTP/PG、双语浏览器验收分别保留。main e8a29c4f 尚未包含本批，不表示已部署；routes中的main_status/observation仍是历史审计。",
+      "pending_prs": [
+        231
+      ]
     },
     "skills": {
       "title": "Skill资源与归档",
       "batch": "integration",
       "source": "internal/gateway/family/handlers.go",
-      "conclusion": "资源CRUD及归档明确拒绝修复待合入；SkillHub另有模块补充项。",
-      "pending_prs": [
-        212,
-        214
-      ]
+      "conclusion": "已随 #229 合入 main e8a29c4f（原候选 #212,#214）；本次组合运行保留既有真实回归，具体支持边界见对应实现与测试。旧route观察仍保留历史值，不能作为当前结果。",
+      "pending_prs": []
     }
   },
   "routes": [

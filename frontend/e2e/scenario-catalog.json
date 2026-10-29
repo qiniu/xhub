@@ -3441,5 +3441,19 @@
     "title": "discovery aliases reject false success zh-CN",
     "kind": "implemented",
     "environment": "default offline"
+  },
+  {
+    "id": "REG-stage4-combined-en",
+    "file": "e2e/scenarios/regression/stage4-combined-en.test.ts",
+    "title": "stage4 combined boundaries preserve chat and logs en",
+    "kind": "implemented",
+    "environment": "default offline"
+  },
+  {
+    "id": "REG-stage4-combined-zh-CN",
+    "file": "e2e/scenarios/regression/stage4-combined-zh-CN.test.ts",
+    "title": "stage4 combined boundaries preserve chat and logs zh-CN",
+    "kind": "implemented",
+    "environment": "default offline"
   }
 ]

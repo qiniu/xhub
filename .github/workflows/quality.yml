@@ -439,7 +439,7 @@ jobs:
       - name: Run real policy configuration regression
         env:
           XHUB_REGRESSION_COVERPROFILE: coverage/policy-config.out
-        run: bash scripts/regression.sh '^Test(PolicyConfigService|ServiceAuxBoundary|RuntimeOperationBoundary|SettingsOperationBoundary|ModelAliasBoundary|AnalyticsAliasBoundary)'
+        run: bash scripts/regression.sh '^Test(PolicyConfigService|ServiceAuxBoundary|RuntimeOperationBoundary|SettingsOperationBoundary|ModelAliasBoundary|AnalyticsAliasBoundary|Stage4CombinedAcceptance)'
       - name: Validate policy regression coverage
         shell: bash
         run: |

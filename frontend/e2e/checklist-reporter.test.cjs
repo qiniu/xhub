@@ -369,3 +369,22 @@ test('analytics boundary scenarios are registered and failures stay failures', (
  const results=['en','zh-CN'].map(locale=>{const file=`e2e/scenarios/regression/analytics-boundary-${locale}.test.ts`;assert.ok(fs.existsSync(path.join(__dirname,'..',file)));return {file,title:'analytics aliases preserve billed chat and logs '+locale,status:'passed'};});
  assert.deepEqual(evaluateScenarios(catalog,results).unregistered,[]);assert.equal(evaluateScenarios(catalog,results).passed,2);results[0].status='failed';assert.equal(evaluateScenarios(catalog,results).passed,1);
 });
+
+/** 组合场景必须匹配真实标题并进入报告；静态夹具验证双语注册和不存在/错名会被报告，不创建业务数据。 */
+test('phase4 combined scenarios are registered with exact titles', () => {
+  const fs = require('node:fs');
+  const path = require('node:path');
+  const {evaluateScenarios} = require('./scenario-coverage.cjs');
+  const catalog = require('./scenario-catalog.json');
+  const results = ['en', 'zh-CN'].map(locale => {
+    const file = `e2e/scenarios/regression/stage4-combined-${locale}.test.ts`;
+    assert.ok(fs.existsSync(path.join(__dirname, '..', file)));
+    return {file, title: 'stage4 combined boundaries preserve chat and logs ' + locale, status: 'passed'};
+  });
+  const report = evaluateScenarios(catalog, results);
+  assert.deepEqual(report.unregistered, []);
+  assert.equal(report.passed, 2);
+  const wrong = evaluateScenarios(catalog, results.map(row => ({...row, title: row.title + '-wrong'})));
+  assert.equal(wrong.passed, 0);
+  assert.equal(wrong.unregistered.length, 2);
+});

@@ -627,3 +627,13 @@ test('release includes analytics boundary browser scenarios', () => {
  const source = require('node:fs').readFileSync('.github/workflows/release.yml','utf8');
  for(const locale of ['en','zh-CN']) assert.ok(source.includes(`scenarios/regression/analytics-boundary-${locale}.test.ts`));
 });
+
+/** 组合验收不能仅靠五个PR各自通过；发布流水线必须运行同一网关中的双语组合流程。
+ * 前置工作流静态文件，验证两种语言均登记且不重复；不连接GitHub或修改文件，无清理副作用。 */
+test('release includes combined phase4 browser acceptance once per locale', () => {
+  const source = require('node:fs').readFileSync(require('node:path').join(__dirname, '../.github/workflows/release.yml'), 'utf8');
+  for (const locale of ['en','zh-CN']) {
+    const scenario = `scenarios/regression/stage4-combined-${locale}.test.ts`;
+    assert.equal(source.split(scenario).length - 1, 1, `组合验收遗漏或重复: ${locale}`);
+  }
+});

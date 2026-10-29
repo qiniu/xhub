@@ -1,14 +1,28 @@
-# Stage 4 closure inventory
+# Phase-four fixed closure inventory
 
-## Current candidates (2026-10-29)
+## Combined acceptance (2026-10-29)
 
-Main `e8a29c4f` includes the earlier batches via #229; the older sections below retain historical evidence, not current merge status. Unmerged candidates are #231 (15 settings), #233 (14 model aliases), #235 (26 analytics aliases), #237 (7 protocol declarations), and this C7 batch (9), totaling 71 declarations. Separate batch passes do not prove combined compatibility.
+Main baseline: `e8a29c4f972e8832e1c6e02a8226d0befcc65584`. The earlier accumulated batches (#182–#228, including #202) entered main through #229 and are no longer pending.
 
-C7 tracks [#238](https://github.com/qiniu/xhub/issues/238) / [PR #239](https://github.com/qiniu/xhub/pull/239): GET `/`, `/end_user/daily/activity`, `/network/client-ip`, `/openapi-registry`, `/registry.json`, `/routes`, `/user/available_roles`, and `/utils/available_routes` have no corresponding discovery/activity implementation. They return 501/no-store after existing management authentication and JSON validation, never public configuration, fabricated roles/routes or fixed-zero activity. No new registry/IP capability is added.
+Local integration branch `codex/stage4-final-integration` combines five candidates. **No merge into main or production deployment has occurred.**
 
-The ninth route, `/search_tools/ui/available_providers`, retains Tavily, Perplexity, Serper and existing response fields. Discovery and real probes share adapter definitions; discovery no longer reads search configuration. Real HTTP/PostgreSQL checks cover existing paid activity, permissions, zero budget and independence from SQL read failures. Every discovered provider is exercised against a local HTTP protocol server. Bilingual browser flows cover rejections, provider selection, probe success/failure/recovery and ordinary chat.
+| Batch | Candidate | Declarations | Supported boundary |
+| --- | --- | ---: | --- |
+| C3 settings | #231 | 15 | Unsupported legacy settings reject; real theme services remain. |
+| C4 model aliases | #233 | 14 | Unsupported aliases reject; real models, enable/disable and inference remain. |
+| C5 analytics | #235 | 26 | 23 aliases plus 3 existing IAM boundaries reject; real logs, billing and usage remain. |
+| C6 protocols | #237 | 7 | 5 non-OpenAI file aliases and 2 old WebSocket declarations reject; native data plane remains. |
+| C7 discovery | #239 | 9 | 8 unsupported discovery aliases reject; real provider discovery returns the same adapters used by probes. |
 
-No fixed batch remains unaddressed after this candidate, but **merging candidates and final combined acceptance remain; stage 4 is not complete**. No merge/deployment; permissions, budgets and the 70% gate are unchanged. Historical main classifications and 909 observations remain intact. New evidence describes candidate behavior, not production. Other module/public/data-plane/retired-route exclusions remain as documented below.
+Total:71 declarations. Actual GET handshakes are also covered for both WebSocket declarations; declarations are not unique URLs or test counts. Per-batch complete matrices and shared-service integration tests serve different purposes.
+
+Combined acceptance verifies unchanged configuration, deployments, sessions and billed logs after interleaved rejections; real model disable/enable, zero-budget403, upstream failure logs, search probes, key rotation and bilingual browser flows. See the [combined acceptance report](../zh-CN/phase4-final-integration.md) for commands and results. Permissions, budget rules and the70% gate are unchanged.
+
+No new unhandled batch remains in this fixed scope. Delivery still requires integration CI/review, a separate merge decision and later deployment/real-provider acceptance. Local fixtures do not prove external search services, enterpriseSSO network/certificates or live suppliers.
+
+JSON `groups.pending_prs` now lists only these five candidates. Route `main_status`, `observation` and `baseline` preserve the2026-10-28 audit; they are not current execution or production claims. Everything below is historical.
+
+<details><summary>Historical audit snapshot (2026-10-28)</summary>
 
 > C1 is submitted as [#224](https://github.com/qiniu/xhub/pull/224): 26 auxiliary routes explicitly reject unsupported operations and two singular-policy reads gain acceptance evidence. It is unmerged; main status below remains unchanged. C2 is submitted in [#226](https://github.com/qiniu/xhub/pull/226): 22 legacy identity operations explicitly rejected; real password login, signed SAML, session and budget regressions passed. It is not merged; main classifications remain unchanged. C3/runtime-ops is submitted in [#228](https://github.com/qiniu/xhub/pull/228): 12 legacy operations explicitly reject unsupported execution, with real configuration, credential rotation, budget and bilingual chat tests. It remains unmerged. The 15 C3/settings entries, C4–C7 and integration are still pending.
 
@@ -53,3 +67,5 @@ go test -race ./internal/gateway -run '^Test(Phase4Closure|RouteOwnershipAudit|R
 ```
 
 Current execution evidence is recorded in the PR. Earlier 37 backend and 8 browser results in `compatibility-layer-audit.md` remain historical unless rerun. No production, real SSO or paid-model tests; isolated schema cleanup failure must fail the run.
+
+</details>
