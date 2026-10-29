@@ -32,6 +32,21 @@ func writeCatalogStore(st catalogRecordStore, w http.ResponseWriter, r *http.Req
 		util.WriteError(w, http.StatusBadRequest, "unsupported_protocol", "JSON-RPC is not supported by this REST management endpoint")
 		return
 	}
+	// 旧设置没有真实消费者，不能把无效配置写入KV并冒充已生效。
+	if rejectSettingsOperation(w, r) {
+		return
+	}
+	// 旧模型别名不能读写公共KV并冒充真实模型操作。
+	if rejectModelAlias(w, r) {
+		return
+	}
+	// 统计读取和支出重置不属于配置CRUD，未实现时必须先于目录存储明确拒绝。
+	if rejectAnalyticsAlias(w, r) {
+		return
+	}
+	if writeDiscovery(w, r) {
+		return
+	}
 	// 未接执行器的运维操作不能被当成同名配置的CRUD，避免返回假执行成功。
 	if rejectRuntimeOperation(w, r) {
 		return
@@ -41,6 +56,9 @@ func writeCatalogStore(st catalogRecordStore, w http.ResponseWriter, r *http.Req
 		return
 	}
 	if rejectLegacyInference(w, r) {
+		return
+	}
+	if rejectProviderFile(w, r) {
 		return
 	}
 	if rejectProviderBatch(w, r) {

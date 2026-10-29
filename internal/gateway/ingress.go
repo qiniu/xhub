@@ -25,17 +25,21 @@ import (
 
 var logTraceOnceIngress sync.Once
 
-// handle mounts one "METHOD /path" pattern on Gin. A {param} in the path becomes :pN per segment. The same position keeps the same parameter name so Gin wildcards do not conflict. A method and pattern that is already mounted is skipped, so a dedicated handler registered first is not overwritten by the catalog.
-// 参数 pattern（string）：要匹配的路径模板或正则；h（http.HandlerFunc）：要挂上的 HTTP 处理函数。
-// 返回：无。这条 METHOD /path 已挂到 Gin。路径里的 {param} 按段变成 :pN。模式无效或路由已删除时不挂。
-// 调用：gateway/routes.go
-// 测试：无直接单测
+// handle 将METHOD/path目录模板注册到Gin；pattern为声明，h为处理器，无返回值。
+// 调用方为模块与目录挂载；无效、退役或重复注册不覆盖既有处理器，路径参数按位置还原。
+// 两条已审计旧WebSocket别名另注册GET拒绝入口，保持真实握手和伪方法的一致鉴权。
+// 副作用仅为注册表和Gin路由；RouteOwnershipAudit与LegacyWebsocketBoundary验证注册及HTTP结果。
 func (s *Server) handle(pattern string, h http.HandlerFunc) {
 	logTraceOnceIngress.Do(func() { util.Trace("enter gateway.handle") })
 
 	method, path, ok := strings.Cut(pattern, " ")
 	if !ok || h == nil || removedColumnRoute(path) {
 		return
+	}
+	// 目录用WEBSOCKET描述协议，但真实RFC6455握手使用GET。只为两条已审计旧别名补齐拒绝入口，
+	// 保留伪方法用于旧客户端；其余协议入口由各自模块继续负责，先注册者仍优先。
+	if method == "WEBSOCKET" && legacyWebsocketAlias(path) {
+		s.handle(http.MethodGet+" "+path, h)
 	}
 	gp, names := ginPathNames(path)
 	key := method + " " + gp
@@ -246,21 +250,20 @@ func (s *Server) responsesContract(w http.ResponseWriter, r *http.Request) {
 	s.serveFamilyRoute(w, r)
 }
 
-// filesContract is the HTTP contract for the Files family. Create, read, and delete persist file rows. The response is a file object rather than an echo of the request body.
-// 参数 w（http.ResponseWriter）：调用方的 HTTP 响应，状态码和正文写在这里；r（*http.Request）：入站 HTTP 请求，用来读路径、头和正文。
-// 调用：仅在 ingress.go 内使用
-// 测试：无直接单测
-// 返回：无。状态码和正文写进调用方的响应。
+// filesContract 将文件目录请求交给现有权限分类；w/r为HTTP响应与请求，无直接返回值。
+// 标准/OpenAI文件入口保留数据面资源规则，其他供应商别名在管理鉴权和JSON解析后明确拒绝。
+// 由目录挂载调用；不代表文件上传或上游存储已实现，真实分流由ProviderFileBoundary回归验证。
 func (s *Server) filesContract(w http.ResponseWriter, r *http.Request) {
 	s.serveFamilyRoute(w, r)
 }
 
-// realtimeContract is the HTTP contract for the Realtime family. The client must start a WebSocket upgrade. An ordinary POST or GET gets 426 instead of a placeholder JSON body.
-// 参数 w（http.ResponseWriter）：调用方的 HTTP 响应，状态码和正文写在这里；r（*http.Request）：入站 HTTP 请求，用来读路径、头和正文。
-// 调用：仅在 ingress.go 内使用
-// 测试：无直接单测
-// 返回：无。状态码和正文写进调用方的响应。
+// realtimeContract 处理目录实时入口；w/r为HTTP响应与请求，由handlerFor挂载，无直接返回值。
+// C6旧Vertex Live别名先执行原LLM鉴权并明确501拒绝，不hijack或连接上游；标准实时入口仍走原流程。
+// LegacyWebsocketBoundary使用真实RFC6455客户端覆盖身份、错误和正常数据面对照。
 func (s *Server) realtimeContract(w http.ResponseWriter, r *http.Request) {
+	if s.rejectLegacyWebsocket(w, r) {
+		return
+	}
 	// client_secrets and calls are ordinary JSON. Only the channel itself requires an upgrade.
 	if strings.Contains(r.URL.Path, "/realtime/") || strings.Contains(r.URL.Path, "/live/") {
 		s.serveFamilyRoute(w, r)
@@ -290,12 +293,14 @@ func (s *Server) realtimeContract(w http.ResponseWriter, r *http.Request) {
 	_ = buf.Flush()
 }
 
-// passthroughContract is the HTTP contract for a provider prefix that is forwarded as-is. The prefix chooses the provider. The outbound URL uses LiteLLM _join_url_paths: the remaining path is joined, and OpenAI gains /v1/. This only computes the address that would be called. It does not dial the provider.
-// 参数 w（http.ResponseWriter）：调用方的 HTTP 响应，状态码和正文写在这里；r（*http.Request）：入站 HTTP 请求，用来读路径、头和正文。
-// 调用：仅在 ingress.go 内使用
-// 测试：无直接单测
-// 返回：无。状态码和正文写进调用方的响应。
+// passthroughContract 处理目录的供应商前缀；w/r为HTTP响应与请求，由handlerFor挂载，无直接返回值。
+// C6旧openai_passthrough别名先执行原LLM鉴权并501拒绝，不返回地址信息冒充转发。
+// 其余旧目录分支仍仅计算URL并返回元信息，本函数不是专用Bypass执行链；不应声称已转发上游。
+// LegacyWebsocketBoundary覆盖真实握手及旧伪方法；本次不扩大其他目录分支的支持范围。
 func (s *Server) passthroughContract(w http.ResponseWriter, r *http.Request) {
+	if s.rejectLegacyWebsocket(w, r) {
+		return
+	}
 	if s.requireLLMPrincipal(w, r) == nil {
 		return
 	}

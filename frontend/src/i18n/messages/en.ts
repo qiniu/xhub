@@ -9,6 +9,7 @@ import { routeTemplatesEn } from "./routeTemplates.en";
 import { cacheAdminEn } from "./cacheAdmin.en";
 
 export const en = {
+  legacyUsage: { title: "Legacy usage", unavailable: "This legacy report is unavailable. No usage or spend has been reset. Open Usage to view real billing records.", openUsage: "Open Usage" },
   tagSelector: { loadFailed: "Unable to load saved tags. Refresh the page to retry." },
   cacheAdmin: cacheAdminEn,
   samlRefresh,

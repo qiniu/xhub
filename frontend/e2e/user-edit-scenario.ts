@@ -83,7 +83,7 @@ test("users can be edited and their team access follows membership changes", asy
     const memberHeaders = { Authorization: "Bearer " + await sessionBearer(page) };
     const denied = await page.request.get(GATEWAY + "/team/info?team_id=" + team.team_id, { headers: memberHeaders });
     requireAuthorizationError(denied.status(), await denied.json(), 404);
-    guard.assertOk();
+    await guard.assertOk();
   } finally {
     const cleanup = await page.request.post(GATEWAY + "/user/delete", { headers, data: { user_id: account.user_id } });
     expect(cleanup.ok(), await cleanup.text()).toBeTruthy();

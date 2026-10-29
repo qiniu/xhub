@@ -3371,5 +3371,89 @@
     "title": "runtime operations reject false success without changing configuration and chat zh-CN",
     "kind": "implemented",
     "environment": "default offline"
+  },
+  {
+    "id": "REG-settings-operation-en",
+    "file": "e2e/scenarios/regression/settings-operation-en.test.ts",
+    "title": "unsupported settings preserve configuration and chat en",
+    "kind": "implemented",
+    "environment": "default offline"
+  },
+  {
+    "id": "REG-settings-operation-zh-CN",
+    "file": "e2e/scenarios/regression/settings-operation-zh-CN.test.ts",
+    "title": "unsupported settings preserve configuration and chat zh-CN",
+    "kind": "implemented",
+    "environment": "default offline"
+  },
+  {
+    "id": "REG-model-alias-en",
+    "file": "e2e/scenarios/regression/model-alias-en.test.ts",
+    "title": "legacy model aliases preserve real deployment and chat en",
+    "kind": "implemented",
+    "environment": "default offline"
+  },
+  {
+    "id": "REG-model-alias-zh-CN",
+    "file": "e2e/scenarios/regression/model-alias-zh-CN.test.ts",
+    "title": "legacy model aliases preserve real deployment and chat zh-CN",
+    "kind": "implemented",
+    "environment": "default offline"
+  },
+  {
+    "id": "REG-analytics-boundary-en",
+    "file": "e2e/scenarios/regression/analytics-boundary-en.test.ts",
+    "title": "analytics aliases preserve billed chat and logs en",
+    "kind": "implemented",
+    "environment": "default offline"
+  },
+  {
+    "id": "REG-analytics-boundary-zh-CN",
+    "file": "e2e/scenarios/regression/analytics-boundary-zh-CN.test.ts",
+    "title": "analytics aliases preserve billed chat and logs zh-CN",
+    "kind": "implemented",
+    "environment": "default offline"
+  },
+  {
+    "id": "REG-protocol-boundary-en",
+    "file": "e2e/scenarios/regression/protocol-boundary-en.test.ts",
+    "title": "legacy protocol aliases reject false success en",
+    "kind": "implemented",
+    "environment": "default offline"
+  },
+  {
+    "id": "REG-protocol-boundary-zh-CN",
+    "file": "e2e/scenarios/regression/protocol-boundary-zh-CN.test.ts",
+    "title": "legacy protocol aliases reject false success zh-CN",
+    "kind": "implemented",
+    "environment": "default offline"
+  },
+  {
+    "id": "REG-discovery-boundary-en",
+    "file": "e2e/scenarios/regression/discovery-boundary-en.test.ts",
+    "title": "discovery aliases reject false success en",
+    "kind": "implemented",
+    "environment": "default offline"
+  },
+  {
+    "id": "REG-discovery-boundary-zh-CN",
+    "file": "e2e/scenarios/regression/discovery-boundary-zh-CN.test.ts",
+    "title": "discovery aliases reject false success zh-CN",
+    "kind": "implemented",
+    "environment": "default offline"
+  },
+  {
+    "id": "REG-stage4-combined-en",
+    "file": "e2e/scenarios/regression/stage4-combined-en.test.ts",
+    "title": "stage4 combined boundaries preserve chat and logs en",
+    "kind": "implemented",
+    "environment": "default offline"
+  },
+  {
+    "id": "REG-stage4-combined-zh-CN",
+    "file": "e2e/scenarios/regression/stage4-combined-zh-CN.test.ts",
+    "title": "stage4 combined boundaries preserve chat and logs zh-CN",
+    "kind": "implemented",
+    "environment": "default offline"
   }
 ]

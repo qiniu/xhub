@@ -94,7 +94,7 @@ test("team usage displays recorded calls without requesting the removed Agent en
     }
     expect(agentRequests, "团队用量不得请求已移除的 Agent 接口").toEqual([]);
     expect(errors, "用量请求应成功且无控制台异常").toEqual([]);
-    guard.assertOk();
+    await guard.assertOk();
   } finally {
     if (key) expect((await page.request.post(GATEWAY + "/key/delete", { headers, data: { keys: [key] } })).status()).toBe(200);
     if (userID) expect((await page.request.post(GATEWAY + "/user/delete", { headers, data: { user_id: userID } })).status()).toBe(200);
@@ -240,7 +240,7 @@ test("usage views reconcile stored successes, failures, dimensions, filters and 
     await expect(page.getByRole("tab", { name: t("pages.usage.tag"), exact: true })).toHaveCount(0);
     expect(requests, "剩余视图不得请求移除维度").toEqual([]);
     await testInfo.attach("用量核对", { body: await page.screenshot({ fullPage: true }), contentType: "image/png" });
-    guard.assertOk();
+    await guard.assertOk();
   } finally {
     if (key) expect((await page.request.post(GATEWAY + "/key/delete", { headers, data: { keys: [key] } })).status()).toBe(200);
     if (userID) expect((await page.request.post(GATEWAY + "/user/delete", { headers, data: { user_id: userID } })).status()).toBe(200);

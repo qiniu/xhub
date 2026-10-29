@@ -966,3 +966,22 @@ describe("key contract adapters preserve wire behavior", () => {
     await expect(Networking.keyDeleteCall("session", "id")).rejects.toThrow("Key write rejected");
   });
 });
+
+/** 可选设置读取对失败保持null，但消费响应体；使用fetch替身覆盖成功/错误/损坏响应，恢复全局对象且无持久数据。 */
+describe("optional UI settings response lifecycle", () => {
+  afterEach(() => vi.unstubAllGlobals());
+  it("consumes unavailable settings without clearing the session", async () => {
+    const response = new Response(JSON.stringify({error:{type:"unsupported_settings_operation"}}), { status: 501 });
+    vi.stubGlobal("fetch",vi.fn().mockResolvedValue(response));
+    const cleared = vi.mocked(clearTokenCookies).mock.calls.length;
+    expect(await Networking.getUISettings("session")).toBeNull();
+    expect(response.bodyUsed).toBe(true);
+    expect(clearTokenCookies).toHaveBeenCalledTimes(cleared);
+  });
+  it("keeps successful values and rejects malformed bodies as unavailable", async () => {
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValueOnce(new Response('{"values":{"flag":true}}')).mockResolvedValueOnce(new Response('broken')).mockRejectedValueOnce(new Error("network unavailable")));
+    expect(await Networking.getUISettings("session")).toEqual({values:{flag:true}});
+    expect(await Networking.getUISettings("session")).toBeNull();
+    expect(await Networking.getUISettings("session")).toBeNull();
+  });
+});

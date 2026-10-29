@@ -15,7 +15,7 @@ type catalogRoute struct {
 }
 
 // TestCatalogReads 通过真实网关处理器调用目录中的全部 GET 路由。
-// 前置条件是隔离数据库和管理员会话；验证已删除、已退役、未实现维度、占位授权及普通读取的精确 JSON 契约。
+// 前置条件是隔离数据库和管理员会话；验证已删除、已退役、C7未实现发现目录、占位授权及普通读取的精确 JSON 契约。
 // 参数 t 为测试上下文，返回无；网关与数据库由 bootGateway 和测试清理函数回收。
 func TestCatalogReads(t *testing.T) {
 	srv, base, db := bootGateway(t)
@@ -119,6 +119,19 @@ func TestCatalogReads(t *testing.T) {
 				}
 				return
 			}
+			// C5旧统计没有查询实现；不能把目录空数组或同名配置当作账单。
+			switch rt.Path {
+			case "/global/activity/exceptions", "/global/activity/exceptions/deployment", "/global/all_end_users", "/global/spend", "/global/spend/report", "/key/spend/report", "/model/metrics", "/model/metrics/exceptions", "/model/metrics/slow_responses", "/model/streaming_metrics", "/otel-spans", "/spend/logs", "/spend_logs/end_users", "/spend_logs/users", "/tag/dau", "/tag/distinct", "/tag/mau", "/tag/summary", "/tag/user-agent/per-user-analytics", "/tag/wau", "/user/spend/report":
+				var probe map[string]any
+				if status != http.StatusNotImplemented || json.Unmarshal(body, &probe) != nil {
+					t.Fatalf("unsupported analytics status %d %s", status, trim(body))
+				}
+				errObj, _ := probe["error"].(map[string]any)
+				if errObj["type"] != "unsupported_analytics_operation" {
+					t.Fatalf("unsupported analytics contract %s", trim(body))
+				}
+				return
+			}
 			// 仅这些尚未接入IAM的旧读取入口拒绝；真实组织/团队查询仍必须遵守下方成功契约。
 			switch rt.Path {
 			case "/organization/spend/report", "/team/spend/report", "/team/permissions_list", "/team/filter/ui", "/team/metadata_schema", "/team/{team_id}/members/me":
@@ -205,6 +218,45 @@ func TestCatalogReads(t *testing.T) {
 				}
 				if status != http.StatusNotImplemented || json.Unmarshal(body, &probe) != nil || probe.Error.Type != "unsupported_operation" {
 					t.Fatalf("运维入口没有执行器，必须明确失败: %d %s", status, trim(body))
+				}
+				return
+			}
+			// C3旧设置读取只接受明确不支持；独立清单不放宽其他配置接口。
+			switch rt.Path {
+			case "/config/field/info", "/config/yaml", "/get/default_team_settings", "/get/internal_user_settings", "/get/ui_settings", "/get/user_banner", "/get_favicon", "/get_image", "/get_logo_url", "/settings", "/sso/get/ui_settings":
+				var probe struct {
+					Error struct {
+						Type string `json:"type"`
+					} `json:"error"`
+				}
+				if status != http.StatusNotImplemented || json.Unmarshal(body, &probe) != nil || probe.Error.Type != "unsupported_settings_operation" {
+					t.Fatalf("设置旧入口拒绝契约错误: %d %s", status, trim(body))
+				}
+				return
+			}
+			// C4旧读取只接受明确不支持；独立清单不放宽其他模型接口。
+			switch rt.Path {
+			case "/fallback/login", "/fallback/{model}", "/model/deprecations", "/model/info", "/model/settings", "/models/{model_id}", "/v1/model/deprecations", "/v1/model/info":
+				var probe struct {
+					Error struct {
+						Type string `json:"type"`
+					} `json:"error"`
+				}
+				if status != http.StatusNotImplemented || json.Unmarshal(body, &probe) != nil || probe.Error.Type != "unsupported_model_operation" {
+					t.Fatalf("模型旧别名拒绝契约错误: %d %s", status, trim(body))
+				}
+				return
+			}
+			// C7仅这八个GET已确认无实现；独立枚举并检查错误类型，不放宽其他目录的意外501。
+			switch rt.Path {
+			case "/", "/end_user/daily/activity", "/network/client-ip", "/openapi-registry", "/registry.json", "/routes", "/user/available_roles", "/utils/available_routes":
+				var probe struct {
+					Error struct {
+						Type string `json:"type"`
+					} `json:"error"`
+				}
+				if status != http.StatusNotImplemented || json.Unmarshal(body, &probe) != nil || probe.Error.Type != "unsupported_discovery_operation" {
+					t.Fatalf("旧发现目录必须明确拒绝: %d %s", status, trim(body))
 				}
 				return
 			}

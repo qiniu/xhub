@@ -89,7 +89,7 @@ test("花园展示创建入口、支持状态和提交护栏空态", async ({ pa
     await expect(page.getByRole("button", { name: /Aporia/ })).toContainText("尚未移植");
     await page.getByRole("tab", { name: t("pages.guardrails.submitted"), exact: true }).click();
     await expect(page.getByText("Cannot read properties of undefined", { exact: false })).toHaveCount(0);
-    guard.assertOk();
+    await guard.assertOk();
   });
 }
 /** 用途：注册独立场景「关键词正则完成草稿调试、保存、编辑、真实拦截与删除」；无参数、无返回值。前置真实浏览器、私有数据库和本地上游；验证页面及原始契约，保留原套件前后置清理，运行器最终回收专属 schema。异常由 Playwright 单独记录。 */
@@ -157,7 +157,7 @@ test("关键词正则完成草稿调试、保存、编辑、真实拦截与删�
       .getByRole("button", { name: t("common.delete"), exact: true })
       .click();
     await expect(page.getByRole("row").filter({ hasText: "e2e-guardrails-local" })).toHaveCount(0);
-    guard.assertOk();
+    await guard.assertOk();
   });
 }
 /** 用途：注册独立场景「默认启用规则拦截请求，并拒绝非法 RE2 保存」；无参数、无返回值。前置真实浏览器、私有数据库和本地上游；验证页面及原始契约，保留原套件前后置清理，运行器最终回收专属 schema。异常由 Playwright 单独记录。 */
@@ -202,7 +202,7 @@ test("默认启用规则拦截请求，并拒绝非法 RE2 保存", async ({ pag
     expect(
       (await chat(page, { model: "gpt-4o-mini", messages: [{ role: "user", content: "安全内容" }] })).response.status(),
     ).toBe(200);
-    guard.assertOk();
+    await guard.assertOk();
   });
 }
 /** 用途：注册独立场景「XGo 编辑器展示 primitives，并完成脚本调试、保存和真实转发」；无参数、无返回值。前置真实浏览器、私有数据库和本地上游；验证页面及原始契约，保留原套件前后置清理，运行器最终回收专属 schema。异常由 Playwright 单独记录。 */
@@ -259,6 +259,6 @@ test("XGo 编辑器展示 primitives，并完成脚本调试、保存和真实�
     });
     expect(redacted.response.status()).toBe(200);
     expect(redacted.json.choices[0].message.content).toBe("upstream-saw-redacted");
-    guard.assertOk();
+    await guard.assertOk();
   });
 }

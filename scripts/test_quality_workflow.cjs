@@ -259,7 +259,7 @@ test('compatibility gate compares historical contracts with real pinned checker'
 /** 搜索配置服务复用真实数据库作业；验证回归与覆盖率上传不可遗漏，不降低门禁，只读无需清理。 */
 test('search configuration service requires real regression coverage', () => {
   const run = step('supplier-contract', 'Run real search configuration regression');
-  assert.equal(run.run, "bash scripts/regression.sh '^Test(SearchConfigService|SearchProbe|CatalogIntegrity)'");
+  assert.equal(run.run, "bash scripts/regression.sh '^Test(SearchConfigService|SearchProbe|SearchProviderDiscovery|DiscoveryBoundary|CatalogIntegrity)'");
   assert.equal(run.env.XHUB_REGRESSION_COVERPROFILE, 'coverage/search-config.out');
   assert.match(step('supplier-contract', 'Validate regression coverage').run, /test -s coverage\/search-config.out/);
   const upload = step('supplier-contract', 'Upload regression coverage');
@@ -325,7 +325,7 @@ test('guard management has real regression coverage and cleanup', () => {
 test('policy configuration has real regression coverage and cleanup', () => {
   const job = workflow.jobs['supplier-contract'];
   const run = step('supplier-contract', 'Run real policy configuration regression');
-  assert.equal(run.run, "bash scripts/regression.sh '^Test(PolicyConfigService|ServiceAuxBoundary|RuntimeOperationBoundary)'");
+  assert.equal(run.run, "bash scripts/regression.sh '^Test(PolicyConfigService|ServiceAuxBoundary|RuntimeOperationBoundary|SettingsOperationBoundary|ModelAliasBoundary|AnalyticsAliasBoundary|Stage4CombinedAcceptance)'");
   assert.equal(run.env.XHUB_REGRESSION_COVERPROFILE, 'coverage/policy-config.out');
   const check = step('supplier-contract', 'Validate policy regression coverage');
   assert.match(check.run, /set -euo pipefail/);
@@ -763,11 +763,11 @@ test('legacy inference has real regression coverage and cleanup', () => {
   assert.equal(job.steps.find(item => item.run === 'docker compose down -v').if, 'always()');
 });
 
-/** 旧供应商批处理真实数据库回归必须产出并上传有效覆盖率，失败不得忽略；配置只读，无清理。 */
-test('provider batch has real regression coverage and cleanup', () => {
+/** 旧供应商批处理、文件和WebSocket边界的真实回归必须产出并上传有效覆盖率，失败不得忽略；配置只读，无清理。 */
+test('provider batch, file and websocket boundaries have real regression coverage and cleanup', () => {
   const job = workflow.jobs['supplier-contract'];
   const run = step('supplier-contract', 'Run real provider batch regression');
-  assert.equal(run.run, "bash scripts/regression.sh '^TestProviderBatchBoundary$'");
+  assert.equal(run.run, "bash scripts/regression.sh '^Test(ProviderBatchBoundary|ProviderFileBoundary|LegacyWebsocketBoundary)$'");
   assert.equal(run.env.XHUB_REGRESSION_COVERPROFILE, 'coverage/provider-batch.out');
   const check = step('supplier-contract', 'Validate provider batch regression coverage');
   assert.match(check.run, /set -euo pipefail/);

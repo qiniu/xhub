@@ -1,4 +1,28 @@
-# Stage 4 closure inventory
+# Phase-four fixed closure inventory
+
+## Combined acceptance (2026-10-29)
+
+Main baseline: `e8a29c4f972e8832e1c6e02a8226d0befcc65584`. The earlier accumulated batches (#182–#228, including #202) entered main through #229 and are no longer pending.
+
+Local integration branch `codex/stage4-final-integration` combines five candidates. **No merge into main or production deployment has occurred.**
+
+| Batch | Candidate | Declarations | Supported boundary |
+| --- | --- | ---: | --- |
+| C3 settings | #231 | 15 | Unsupported legacy settings reject; real theme services remain. |
+| C4 model aliases | #233 | 14 | Unsupported aliases reject; real models, enable/disable and inference remain. |
+| C5 analytics | #235 | 26 | 23 aliases plus 3 existing IAM boundaries reject; real logs, billing and usage remain. |
+| C6 protocols | #237 | 7 | 5 non-OpenAI file aliases and 2 old WebSocket declarations reject; native data plane remains. |
+| C7 discovery | #239 | 9 | 8 unsupported discovery aliases reject; real provider discovery returns the same adapters used by probes. |
+
+Total:71 declarations. Actual GET handshakes are also covered for both WebSocket declarations; declarations are not unique URLs or test counts. Per-batch complete matrices and shared-service integration tests serve different purposes.
+
+Combined acceptance verifies unchanged configuration, deployments, sessions and billed logs after interleaved rejections; real model disable/enable, zero-budget403, upstream failure logs, search probes, key rotation and bilingual browser flows. See the [combined acceptance report](phase4-final-integration.md) for commands and results. Permissions, budget rules and the70% gate are unchanged.
+
+No new unhandled batch remains in this fixed scope. Delivery still requires integration CI/review, a separate merge decision and later deployment/real-provider acceptance. Local fixtures do not prove external search services, enterpriseSSO network/certificates or live suppliers.
+
+JSON `groups.pending_prs` now lists only these five candidates. Route `main_status`, `observation` and `baseline` preserve the2026-10-28 audit; they are not current execution or production claims. Everything below is historical.
+
+<details><summary>Historical audit snapshot (2026-10-28)</summary>
 
 > C1 is submitted as [#224](https://github.com/qiniu/xhub/pull/224): 26 auxiliary routes explicitly reject unsupported operations and two singular-policy reads gain acceptance evidence. It is unmerged; main status below remains unchanged. C2 is submitted in [#226](https://github.com/qiniu/xhub/pull/226): 22 legacy identity operations explicitly rejected; real password login, signed SAML, session and budget regressions passed. It is not merged; main classifications remain unchanged. C3/runtime-ops is submitted in [#228](https://github.com/qiniu/xhub/pull/228): 12 legacy operations explicitly reject unsupported execution, with real configuration, credential rotation, budget and bilingual chat tests. It remains unmerged. The 15 C3/settings entries, C4–C7 and integration are still pending.
 
@@ -43,3 +67,5 @@ go test -race ./internal/gateway -run '^Test(Phase4Closure|RouteOwnershipAudit|R
 ```
 
 Current execution evidence is recorded in the PR. Earlier 37 backend and 8 browser results in `compatibility-layer-audit.md` remain historical unless rerun. No production, real SSO or paid-model tests; isolated schema cleanup failure must fail the run.
+
+</details>

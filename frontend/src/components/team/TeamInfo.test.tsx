@@ -336,7 +336,8 @@ describe("TeamInfoView", () => {
   });
 
   describe("display and rendering", () => {
-    it("should render", async () => {
+    /** 团队数据可渲染且不读取已退役的元数据 schema；模拟成功结果，框架清理组件。 */
+    it("should render without requesting retired metadata schema", async () => {
       vi.mocked(networking.teamInfoCall).mockResolvedValue(createMockTeamData());
 
       renderWithProviders(<TeamInfoView {...defaultProps} />);
@@ -344,6 +345,7 @@ describe("TeamInfoView", () => {
       await waitFor(() => {
         const teamNameElements = screen.queryAllByText("Test Team");
         expect(teamNameElements.length).toBeGreaterThan(0);
+        expect(useTeamMetadataSchema).not.toHaveBeenCalled();
       });
     });
 

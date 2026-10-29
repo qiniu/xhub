@@ -3282,10 +3282,9 @@ export const getProxyUISettings = async (accessToken: string) => {
   }
 };
 
+/** 读取可选侧栏设置；accessToken为当前会话凭据，返回设置或null。
+ * 失败时保持侧栏现有默认值，但必须消费响应体以结束请求，避免重载时悬挂；不清除会话、不改变权限。 */
 export const getUISettings = async (accessToken: string) => {
-  /**
-   * Get UI-specific configuration flags from the database
-   */
   try {
     const url = proxyBaseUrl ? `${proxyBaseUrl}/get/ui_settings` : `/get/ui_settings`;
     const response = await fetch(url, {
@@ -3297,6 +3296,7 @@ export const getUISettings = async (accessToken: string) => {
     });
 
     if (!response.ok) {
+      await response.text();
       return null;
     }
 

@@ -36,7 +36,12 @@ func TestRemovedSurfacesStayGone(t *testing.T) {
 		}
 	}
 
-	h.ok(http.MethodGet, "/sso/get/ui_settings", admin, nil)
+	// SSO 登录真实连接保持独立；已退役的 UI 设置读取必须明确失败，不能伪装成成功。
+	settings := h.do(http.MethodGet, "/sso/get/ui_settings", admin, nil)
+	errBody, _ := settings.json()["error"].(map[string]any)
+	if settings.status != http.StatusNotImplemented || errBody["type"] != "unsupported_settings_operation" || settings.header("Cache-Control") != "no-store" {
+		t.Fatalf("退役 SSO UI 设置契约错误: %s", settings.describe())
+	}
 
 	for _, dest := range []string{"slack", "email", "ms_teams"} {
 		got := h.do(http.MethodPost, "/config/update", admin, map[string]any{

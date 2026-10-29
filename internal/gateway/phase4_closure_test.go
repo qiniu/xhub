@@ -173,3 +173,33 @@ func TestPhase4ClosureRejectsDrift(t *testing.T) {
 		})
 	}
 }
+
+// TestPhase4ClosurePendingCandidates 固定本次组合验收的五个候选与71条声明，避免历史已合入PR继续占据待办。
+// 前置人工维护的收尾JSON；核对分组数量、精确PR映射及其他分组为空；只读文件，无数据清理副作用。
+func TestPhase4ClosurePendingCandidates(t *testing.T) {
+	plan := readPhase4Closure(t)
+	expected := map[string]struct{ pr, count int }{
+		"settings": {231, 15}, "model-alias": {233, 14}, "analytics": {235, 26}, "protocol-alias": {237, 7}, "discovery": {239, 9},
+	}
+	counts := map[string]int{}
+	for _, row := range plan.Routes {
+		counts[row.Group]++
+	}
+	total := 0
+	for name, group := range plan.Groups {
+		want, ok := expected[name]
+		if !ok {
+			if len(group.PendingPRs) != 0 {
+				t.Errorf("已合入或保留组仍列待合入PR: %s %v", name, group.PendingPRs)
+			}
+			continue
+		}
+		if !reflect.DeepEqual(group.PendingPRs, []int{want.pr}) || counts[name] != want.count {
+			t.Errorf("候选范围漂移: %s PR=%v count=%d", name, group.PendingPRs, counts[name])
+		}
+		total += counts[name]
+	}
+	if total != 71 {
+		t.Fatalf("组合验收范围缺项: %d/71", total)
+	}
+}

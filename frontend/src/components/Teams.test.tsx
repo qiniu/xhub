@@ -1,3 +1,4 @@
+import { useTeamMetadataSchema } from "@/app/(dashboard)/hooks/teams/useTeamMetadataSchema";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { act, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
@@ -707,6 +708,14 @@ describe("Teams - the create form keeps the organization and models picks while 
     vi.mocked(getGuardrailsList).mockResolvedValue({ guardrails: [] });
     vi.mocked(getDefaultTeamSettings).mockResolvedValue({ values: {} });
     mockUseOrganizations.mockReturnValue({ data: ORGS });
+  });
+
+  /** 创建团队仅使用真实表单，不请求已停用的默认设置；模拟列表正常返回，断言打开成功且无旧请求；测试框架清理组件。 */
+  it("opens create team without requesting retired defaults", async () => {
+    renderWithQueryClient(<Teams accessToken="test-token" userID="user-123" userRole="Admin" />);
+    await openCreateModal();
+    expect(getDefaultTeamSettings).not.toHaveBeenCalled();
+    expect(useTeamMetadataSchema).not.toHaveBeenCalled();
   });
 
   it("keeps both picks when the organizations list comes back changed from a refetch", async () => {

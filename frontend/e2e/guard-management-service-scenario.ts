@@ -83,6 +83,6 @@ export function registerGuardManagementService(locale: Locale) {
     expect(restored.status(), await restored.text()).toBe(200);
     expect((await restored.json()).choices[0].message.content).toBe("Rendered: " + input);
     expect(fixture.requests).toHaveLength(2);
-    watched.assertOk();
+    await watched.assertOk();
   });
 }

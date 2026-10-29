@@ -127,7 +127,7 @@ test("护栏真实拦截、脱敏和标记后在监控总览、详情与日志�
     const flagLogs = await page.request.get(GATEWAY + "/guardrails/usage/logs?guardrail_id=" + encodeURIComponent(flagId), { headers: await adminHeaders(page) });
     expect((await flagLogs.json()).logs[0].action).toBe("flagged");
     expect(blockId).toBeTruthy();
-    guard.assertOk();
+    await guard.assertOk();
   });
 }
 /** 用途：注册独立场景「大模型广场身份明确且部署添加、下架失败、恢复可用走真实数据面」；无参数、无返回值。前置真实浏览器、私有数据库和本地上游；验证页面及原始契约，保留原套件前后置清理，运行器最终回收专属 schema。异常由 Playwright 单独记录。 */
@@ -184,6 +184,6 @@ test("大模型广场身份明确且部署添加、下架失败、恢复可用�
     expect(enabled.status(), await enabled.text()).toBe(200);
     const restored = await chat(page, deploymentName, "browser lifecycle restored call");
     expect(restored.status(), await restored.text()).toBe(200);
-    guard.assertOk();
+    await guard.assertOk();
   });
 }

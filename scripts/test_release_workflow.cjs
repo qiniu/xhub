@@ -609,3 +609,31 @@ test('release includes runtime operation browser regressions', () => {
   const source = require('node:fs').readFileSync(require('node:path').join(__dirname, '../.github/workflows/release.yml'), 'utf8');
   for (const locale of ['en','zh-CN']) assert.ok(source.includes(`scenarios/regression/runtime-operation-${locale}.test.ts`));
 });
+
+/** 发布门禁包含设置边界双语真实流程；只读工作流，禁止只在本地验证后遗漏CI。 */
+test('release includes settings operation browser regressions', () => {
+  const source = require('node:fs').readFileSync(require('node:path').join(__dirname, '../.github/workflows/release.yml'), 'utf8');
+  for (const locale of ['en','zh-CN']) assert.ok(source.includes(`scenarios/regression/settings-operation-${locale}.test.ts`));
+});
+
+/** 发布门禁包含模型旧入口边界双语真实流程；只读工作流，禁止只在本地验证后遗漏CI。 */
+test('release includes model alias browser regressions', () => {
+  const source = require('node:fs').readFileSync(require('node:path').join(__dirname, '../.github/workflows/release.yml'), 'utf8');
+  for (const locale of ['en','zh-CN']) assert.ok(source.includes(`scenarios/regression/model-alias-${locale}.test.ts`));
+});
+
+/** 统计边界必须纳入发布浏览器验收，防止有测试文件但发布不执行；只读工作流无需清理。 */
+test('release includes analytics boundary browser scenarios', () => {
+ const source = require('node:fs').readFileSync('.github/workflows/release.yml','utf8');
+ for(const locale of ['en','zh-CN']) assert.ok(source.includes(`scenarios/regression/analytics-boundary-${locale}.test.ts`));
+});
+
+/** 组合验收不能仅靠五个PR各自通过；发布流水线必须运行同一网关中的双语组合流程。
+ * 前置工作流静态文件，验证两种语言均登记且不重复；不连接GitHub或修改文件，无清理副作用。 */
+test('release includes combined phase4 browser acceptance once per locale', () => {
+  const source = require('node:fs').readFileSync(require('node:path').join(__dirname, '../.github/workflows/release.yml'), 'utf8');
+  for (const locale of ['en','zh-CN']) {
+    const scenario = `scenarios/regression/stage4-combined-${locale}.test.ts`;
+    assert.equal(source.split(scenario).length - 1, 1, `组合验收遗漏或重复: ${locale}`);
+  }
+});

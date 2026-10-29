@@ -48,7 +48,6 @@ import {
 } from "./teamModelAccess";
 
 import { metadataObjectToPairs, metadataPairsSchema } from "../common_components/MetadataKeyValueFields";
-import { useTeamMetadataSchema } from "@/app/(dashboard)/hooks/teams/useTeamMetadataSchema";
 import DeleteResourceModal from "../common_components/DeleteResourceModal";
 import { unfurlWildcardModelsInList } from "../key_team_helpers/fetch_available_models_team_key";
 
@@ -550,7 +549,6 @@ const TeamInfoView: React.FC<TeamInfoProps> = ({
   const canEditTeamEstimates = isProxyAdminRole(userRole);
   const teamEstimateTooltip = estimateTooltips(canEditTeamEstimates, "team");
   const { data: userOrganizations = [] } = useOrganizations();
-  const { data: teamMetadataSchemaFields = [], isLoading: isTeamMetadataSchemaLoading } = useTeamMetadataSchema();
   const queryClient = useQueryClient();
 
   // Check if user is org admin for this team's organization

@@ -107,7 +107,7 @@ test("personal keys remain owned by the signed-in user through create, lookup, u
     });
     expect(revoked.status()).toBe(401);
     keys.splice(keys.indexOf(own.token_id), 1);
-    guard.assertOk();
+    await guard.assertOk();
   } finally {
     // 即使浏览器断言失败也主动撤销本测试密钥；隔离脚本退出时删除整个专属 schema，包含新用户及辅助团队。
     if (keys.length) {
@@ -185,7 +185,7 @@ test("ordinary user with a team creates and uses a personal key without choosing
       });
       expect(revoked.status()).toBe(401);
       id = "";
-      guard.assertOk();
+      await guard.assertOk();
     } finally {
       if (id) {
         const cleanup = await page.request.post(GATEWAY + "/key/delete", { headers: adminHeaders, data: { keys: [id] } });
@@ -264,7 +264,7 @@ test("ordinary user without a team creates and uses a personal key without choos
       });
       expect(revoked.status()).toBe(401);
       id = "";
-      guard.assertOk();
+      await guard.assertOk();
     } finally {
       if (id) {
         const cleanup = await page.request.post(GATEWAY + "/key/delete", { headers: adminHeaders, data: { keys: [id] } });
