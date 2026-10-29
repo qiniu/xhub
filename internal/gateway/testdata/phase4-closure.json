@@ -52,7 +52,9 @@
       "batch": "C7",
       "source": "internal/gateway/family/discovery.go",
       "conclusion": "C7 candidate (#238): eight legacy discovery/activity GET aliases explicitly reject after existing management auth and JSON validation; available search providers use the same adapter definitions as real probes without reading KV. Historical main observations remain unchanged. HTTP/PG, real SQL faults, all three provider protocols and bilingual browser acceptance are linked below; combined integration remains pending.",
-      "pending_prs": []
+      "pending_prs": [
+        239
+      ]
     },
     "guard": {
       "title": "护栏管理与明确不支持分支",

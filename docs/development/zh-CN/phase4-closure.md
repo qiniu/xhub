@@ -4,7 +4,7 @@
 
 main `e8a29c4f` 已通过 #229 合入先前累计批次；下面旧审计章节保留为历史证据，不表示所有旧 PR 仍待合入。当前待合入候选为 #231（设置15条）、#233（模型14条）、#235（统计26条）、#237（协议7条）及本批 C7（9条），共71条声明。各批通过不等于组合通过。
 
-C7 对应 [#238](https://github.com/qiniu/xhub/issues/238)：`GET /`、`/end_user/daily/activity`、`/network/client-ip`、`/openapi-registry`、`/registry.json`、`/routes`、`/user/available_roles`、`/utils/available_routes` 没有对应发现/统计实现，经原管理鉴权及JSON校验后明确501/no-store。不能返回公共配置、伪角色/路由或固定零活动，也不新增IP/注册表能力。
+C7 对应 [#238](https://github.com/qiniu/xhub/issues/238) / [PR #239](https://github.com/qiniu/xhub/pull/239)：`GET /`、`/end_user/daily/activity`、`/network/client-ip`、`/openapi-registry`、`/registry.json`、`/routes`、`/user/available_roles`、`/utils/available_routes` 没有对应发现/统计实现，经原管理鉴权及JSON校验后明确501/no-store。不能返回公共配置、伪角色/路由或固定零活动，也不新增IP/注册表能力。
 
 第九条 `/search_tools/ui/available_providers` 保留既有 Tavily、Perplexity、Serper 及响应字段；目录和真实探测共用适配器定义，目录不再读取搜索配置。真实HTTP/PG验证已有消费不被隐藏、权限及零预算不变、SQL读取故障不影响静态目录；三种供应商按实际发现结果逐个真实调用本地协议服务。双语浏览器覆盖目录拒绝、供应商选择、探测成功/失败/恢复和正常对话。
 
