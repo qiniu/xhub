@@ -119,6 +119,19 @@ func TestCatalogReads(t *testing.T) {
 				}
 				return
 			}
+			// C5旧统计没有查询实现；不能把目录空数组或同名配置当作账单。
+			switch rt.Path {
+			case "/global/activity/exceptions", "/global/activity/exceptions/deployment", "/global/all_end_users", "/global/spend", "/global/spend/report", "/key/spend/report", "/model/metrics", "/model/metrics/exceptions", "/model/metrics/slow_responses", "/model/streaming_metrics", "/otel-spans", "/spend/logs", "/spend_logs/end_users", "/spend_logs/users", "/tag/dau", "/tag/distinct", "/tag/mau", "/tag/summary", "/tag/user-agent/per-user-analytics", "/tag/wau", "/user/spend/report":
+				var probe map[string]any
+				if status != http.StatusNotImplemented || json.Unmarshal(body, &probe) != nil {
+					t.Fatalf("unsupported analytics status %d %s", status, trim(body))
+				}
+				errObj, _ := probe["error"].(map[string]any)
+				if errObj["type"] != "unsupported_analytics_operation" {
+					t.Fatalf("unsupported analytics contract %s", trim(body))
+				}
+				return
+			}
 			// 仅这些尚未接入IAM的旧读取入口拒绝；真实组织/团队查询仍必须遵守下方成功契约。
 			switch rt.Path {
 			case "/organization/spend/report", "/team/spend/report", "/team/permissions_list", "/team/filter/ui", "/team/metadata_schema", "/team/{team_id}/members/me":

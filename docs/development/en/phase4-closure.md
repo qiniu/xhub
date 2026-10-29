@@ -1,16 +1,15 @@
 # Stage 4 closure inventory
 
-## Current closure progress (2026-10-29)
+## Current progress (2026-10-29, candidate changes)
 
-- Main `e8a29c4f972e8832e1c6e02a8226d0befcc65584` includes the accumulated phase-four PRs (#182–#228, including #202); C1, C2 and C3/runtime-ops are merged.
-- **C3/settings:15 routes submitted in #231, not merged.** Unsupported legacy settings fail explicitly; real theme functionality, permissions and budgets remain unchanged.
-- **This C4/model-alias candidate:14 routes.** Legacy model info, fallback, publication and block aliases have no implemented contract. They return `501 unsupported_model_operation` instead of reading/writing generic KV as if a real model operation occurred. Similar names do not establish compatible input/output semantics.
-- Real verification preserves deployment listing `/v2/model/info`, SDK model listing/detail, enable/disable effects on inference, normal chat and zero-budget403. Existing model-contract and fallback regressions also run. Authorization, budgets and routing policy are unchanged.
-- Neither this batch nor #231 is merged or deployed. After both, **42 routes remain: C5 analytics26, C6 protocols7, C7 discovery9**, plus final integrated acceptance. Main still needs these29 candidate fixes (71 total).
-- Current inventory:301 routes; two of the historical303 moved to dedicated modules. The snapshot below and JSON `main_status`/`observation` remain historical evidence, not current execution results. Candidate references do not claim main is fixed.
+- Main baseline is `e8a29c4f972e8832e1c6e02a8226d0befcc65584`. C1, C2, runtime operations and earlier stage-4 PRs are merged. The old baseline and census below remain historical evidence.
+- #231 covers 15 settings routes; #233 covers 14 model aliases. Both remain unmerged. PR [#235](https://github.com/qiniu/xhub/pull/235) tracks #234: C5 has 26 analytics routes, with 23 unimplemented aliases explicitly rejected and three existing IAM report/reset boundaries retaining `unsupported_iam_operation`.
+- Live log pages use `/spend/logs/ui`, facets use `/management/v1/spend_logs/*`, and usage uses `/user/daily/activity` and related modules. The old `/spend/logs` and `/spend_logs/users` KV responses are not compatible implementations. The unmounted tag-analytics component has no ledger attribution; zero statistics must not be fabricated.
+- Direct `/old-usage` visits show a bilingual unavailable notice and link to the live Usage page; no unsupported request or fabricated zero report.
+- Candidate acceptance uses successful, upstream-500 and billed requests, 26-route authorization checks, invalid JSON/RPC, unchanged KV/account budgets/logs/usage, existing scope/pagination contracts, and bilingual browser chat→billed log→legacy rejection→visible log after reload.
+- These three batches cover 55 candidate routes. After merge, **C6 protocols (7), C7 discovery (9), and integrated acceptance** remain. Main still has 71 pending routes. PR submission is not merge or deployment; neither is performed here.
 
-<details><summary>Original audit snapshot (2026-10-28; historical status)</summary>
-
+## Historical audit record
 
 > C1 is submitted as [#224](https://github.com/qiniu/xhub/pull/224): 26 auxiliary routes explicitly reject unsupported operations and two singular-policy reads gain acceptance evidence. It is unmerged; main status below remains unchanged. C2 is submitted in [#226](https://github.com/qiniu/xhub/pull/226): 22 legacy identity operations explicitly rejected; real password login, signed SAML, session and budget regressions passed. It is not merged; main classifications remain unchanged. C3/runtime-ops is submitted in [#228](https://github.com/qiniu/xhub/pull/228): 12 legacy operations explicitly reject unsupported execution, with real configuration, credential rotation, budget and bilingual chat tests. It remains unmerged. The 15 C3/settings entries, C4–C7 and integration are still pending.
 
@@ -55,5 +54,3 @@ go test -race ./internal/gateway -run '^Test(Phase4Closure|RouteOwnershipAudit|R
 ```
 
 Current execution evidence is recorded in the PR. Earlier 37 backend and 8 browser results in `compatibility-layer-audit.md` remain historical unless rerun. No production, real SSO or paid-model tests; isolated schema cleanup failure must fail the run.
-
-</details>

@@ -361,3 +361,11 @@ test('model alias scenarios are registered', () => {
   assert.deepEqual(report.unregistered, []);
   assert.equal(report.passed, 2);
 });
+
+/** 双语统计边界必须进入场景清单；失败不可算通过，纯注册检查无外部数据。 */
+test('analytics boundary scenarios are registered and failures stay failures', () => {
+ const fs=require('node:fs'),path=require('node:path');
+ const {evaluateScenarios}=require('./scenario-coverage.cjs');const catalog=require('./scenario-catalog.json');
+ const results=['en','zh-CN'].map(locale=>{const file=`e2e/scenarios/regression/analytics-boundary-${locale}.test.ts`;assert.ok(fs.existsSync(path.join(__dirname,'..',file)));return {file,title:'analytics aliases preserve billed chat and logs '+locale,status:'passed'};});
+ assert.deepEqual(evaluateScenarios(catalog,results).unregistered,[]);assert.equal(evaluateScenarios(catalog,results).passed,2);results[0].status='failed';assert.equal(evaluateScenarios(catalog,results).passed,1);
+});

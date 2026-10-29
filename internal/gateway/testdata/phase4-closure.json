@@ -17,8 +17,10 @@
       "title": "统计、支出与日志旧别名",
       "batch": "C5",
       "source": "internal/gateway/family/handlers.go",
-      "conclusion": "通用KV读写/空统计不能证明真实账单查询或重置，须用有消费数据的夹具逐条验收。",
-      "pending_prs": []
+      "conclusion": "候选修复 #234：23条旧统计明确unsupported_analytics_operation，3条已有IAM边界保持；真实成功/失败/费用、权限矩阵、KV/预算/日志一致和双语浏览器验收。尚未合入；main_status及observation保留历史基线，不作为新结果。",
+      "pending_prs": [
+        235
+      ]
     },
     "auth-alias": {
       "title": "OAuth、邀请、JWT映射、引导旧入口",
@@ -1188,7 +1190,9 @@
       "group": "analytics",
       "main_status": "needs_verification",
       "evidence": [
-        "internal/gateway/family/handlers.go"
+        "internal/gateway/family/handlers.go",
+        "cmd/regression/analytics_alias_boundary_test.go",
+        "frontend/e2e/analytics-boundary-scenario.ts"
       ],
       "observation": {
         "route": "GET /global/activity/exceptions",
@@ -1205,7 +1209,9 @@
       "group": "analytics",
       "main_status": "needs_verification",
       "evidence": [
-        "internal/gateway/family/handlers.go"
+        "internal/gateway/family/handlers.go",
+        "cmd/regression/analytics_alias_boundary_test.go",
+        "frontend/e2e/analytics-boundary-scenario.ts"
       ],
       "observation": {
         "route": "GET /global/activity/exceptions/deployment",
@@ -1222,7 +1228,9 @@
       "group": "analytics",
       "main_status": "needs_verification",
       "evidence": [
-        "internal/gateway/family/handlers.go"
+        "internal/gateway/family/handlers.go",
+        "cmd/regression/analytics_alias_boundary_test.go",
+        "frontend/e2e/analytics-boundary-scenario.ts"
       ],
       "observation": {
         "route": "GET /global/all_end_users",
@@ -1239,7 +1247,9 @@
       "group": "analytics",
       "main_status": "needs_verification",
       "evidence": [
-        "internal/gateway/family/handlers.go"
+        "internal/gateway/family/handlers.go",
+        "cmd/regression/analytics_alias_boundary_test.go",
+        "frontend/e2e/analytics-boundary-scenario.ts"
       ],
       "observation": {
         "route": "GET /global/spend",
@@ -1256,7 +1266,9 @@
       "group": "analytics",
       "main_status": "needs_verification",
       "evidence": [
-        "internal/gateway/family/handlers.go"
+        "internal/gateway/family/handlers.go",
+        "cmd/regression/analytics_alias_boundary_test.go",
+        "frontend/e2e/analytics-boundary-scenario.ts"
       ],
       "observation": {
         "route": "GET /global/spend/report",
@@ -1562,7 +1574,9 @@
       "group": "analytics",
       "main_status": "needs_verification",
       "evidence": [
-        "internal/gateway/family/handlers.go"
+        "internal/gateway/family/handlers.go",
+        "cmd/regression/analytics_alias_boundary_test.go",
+        "frontend/e2e/analytics-boundary-scenario.ts"
       ],
       "observation": {
         "route": "GET /key/spend/report",
@@ -1670,7 +1684,9 @@
       "group": "analytics",
       "main_status": "needs_verification",
       "evidence": [
-        "internal/gateway/family/handlers.go"
+        "internal/gateway/family/handlers.go",
+        "cmd/regression/analytics_alias_boundary_test.go",
+        "frontend/e2e/analytics-boundary-scenario.ts"
       ],
       "observation": {
         "route": "GET /model/metrics",
@@ -1687,7 +1703,9 @@
       "group": "analytics",
       "main_status": "needs_verification",
       "evidence": [
-        "internal/gateway/family/handlers.go"
+        "internal/gateway/family/handlers.go",
+        "cmd/regression/analytics_alias_boundary_test.go",
+        "frontend/e2e/analytics-boundary-scenario.ts"
       ],
       "observation": {
         "route": "GET /model/metrics/exceptions",
@@ -1704,7 +1722,9 @@
       "group": "analytics",
       "main_status": "needs_verification",
       "evidence": [
-        "internal/gateway/family/handlers.go"
+        "internal/gateway/family/handlers.go",
+        "cmd/regression/analytics_alias_boundary_test.go",
+        "frontend/e2e/analytics-boundary-scenario.ts"
       ],
       "observation": {
         "route": "GET /model/metrics/slow_responses",
@@ -1741,7 +1761,9 @@
       "group": "analytics",
       "main_status": "needs_verification",
       "evidence": [
-        "internal/gateway/family/handlers.go"
+        "internal/gateway/family/handlers.go",
+        "cmd/regression/analytics_alias_boundary_test.go",
+        "frontend/e2e/analytics-boundary-scenario.ts"
       ],
       "observation": {
         "route": "GET /model/streaming_metrics",
@@ -1829,7 +1851,9 @@
       "group": "analytics",
       "main_status": "needs_verification",
       "evidence": [
-        "internal/gateway/family/handlers.go"
+        "internal/gateway/family/handlers.go",
+        "cmd/regression/analytics_alias_boundary_test.go",
+        "frontend/e2e/analytics-boundary-scenario.ts"
       ],
       "observation": {
         "route": "GET /organization/spend/report",
@@ -1846,7 +1870,9 @@
       "group": "analytics",
       "main_status": "needs_verification",
       "evidence": [
-        "internal/gateway/family/handlers.go"
+        "internal/gateway/family/handlers.go",
+        "cmd/regression/analytics_alias_boundary_test.go",
+        "frontend/e2e/analytics-boundary-scenario.ts"
       ],
       "observation": {
         "route": "GET /otel-spans",
@@ -2393,7 +2419,9 @@
       "group": "analytics",
       "main_status": "needs_verification",
       "evidence": [
-        "internal/gateway/family/handlers.go"
+        "internal/gateway/family/handlers.go",
+        "cmd/regression/analytics_alias_boundary_test.go",
+        "frontend/e2e/analytics-boundary-scenario.ts"
       ],
       "observation": {
         "route": "GET /spend/logs",
@@ -2410,7 +2438,9 @@
       "group": "analytics",
       "main_status": "needs_verification",
       "evidence": [
-        "internal/gateway/family/handlers.go"
+        "internal/gateway/family/handlers.go",
+        "cmd/regression/analytics_alias_boundary_test.go",
+        "frontend/e2e/analytics-boundary-scenario.ts"
       ],
       "observation": {
         "route": "GET /spend_logs/end_users",
@@ -2427,7 +2457,9 @@
       "group": "analytics",
       "main_status": "needs_verification",
       "evidence": [
-        "internal/gateway/family/handlers.go"
+        "internal/gateway/family/handlers.go",
+        "cmd/regression/analytics_alias_boundary_test.go",
+        "frontend/e2e/analytics-boundary-scenario.ts"
       ],
       "observation": {
         "route": "GET /spend_logs/users",
@@ -2464,7 +2496,9 @@
       "group": "analytics",
       "main_status": "needs_verification",
       "evidence": [
-        "internal/gateway/family/handlers.go"
+        "internal/gateway/family/handlers.go",
+        "cmd/regression/analytics_alias_boundary_test.go",
+        "frontend/e2e/analytics-boundary-scenario.ts"
       ],
       "observation": {
         "route": "GET /tag/dau",
@@ -2481,7 +2515,9 @@
       "group": "analytics",
       "main_status": "needs_verification",
       "evidence": [
-        "internal/gateway/family/handlers.go"
+        "internal/gateway/family/handlers.go",
+        "cmd/regression/analytics_alias_boundary_test.go",
+        "frontend/e2e/analytics-boundary-scenario.ts"
       ],
       "observation": {
         "route": "GET /tag/distinct",
@@ -2498,7 +2534,9 @@
       "group": "analytics",
       "main_status": "needs_verification",
       "evidence": [
-        "internal/gateway/family/handlers.go"
+        "internal/gateway/family/handlers.go",
+        "cmd/regression/analytics_alias_boundary_test.go",
+        "frontend/e2e/analytics-boundary-scenario.ts"
       ],
       "observation": {
         "route": "GET /tag/mau",
@@ -2515,7 +2553,9 @@
       "group": "analytics",
       "main_status": "needs_verification",
       "evidence": [
-        "internal/gateway/family/handlers.go"
+        "internal/gateway/family/handlers.go",
+        "cmd/regression/analytics_alias_boundary_test.go",
+        "frontend/e2e/analytics-boundary-scenario.ts"
       ],
       "observation": {
         "route": "GET /tag/summary",
@@ -2532,7 +2572,9 @@
       "group": "analytics",
       "main_status": "needs_verification",
       "evidence": [
-        "internal/gateway/family/handlers.go"
+        "internal/gateway/family/handlers.go",
+        "cmd/regression/analytics_alias_boundary_test.go",
+        "frontend/e2e/analytics-boundary-scenario.ts"
       ],
       "observation": {
         "route": "GET /tag/user-agent/per-user-analytics",
@@ -2549,7 +2591,9 @@
       "group": "analytics",
       "main_status": "needs_verification",
       "evidence": [
-        "internal/gateway/family/handlers.go"
+        "internal/gateway/family/handlers.go",
+        "cmd/regression/analytics_alias_boundary_test.go",
+        "frontend/e2e/analytics-boundary-scenario.ts"
       ],
       "observation": {
         "route": "GET /tag/wau",
@@ -2617,7 +2661,9 @@
       "group": "analytics",
       "main_status": "needs_verification",
       "evidence": [
-        "internal/gateway/family/handlers.go"
+        "internal/gateway/family/handlers.go",
+        "cmd/regression/analytics_alias_boundary_test.go",
+        "frontend/e2e/analytics-boundary-scenario.ts"
       ],
       "observation": {
         "route": "GET /team/spend/report",
@@ -2719,7 +2765,9 @@
       "group": "analytics",
       "main_status": "needs_verification",
       "evidence": [
-        "internal/gateway/family/handlers.go"
+        "internal/gateway/family/handlers.go",
+        "cmd/regression/analytics_alias_boundary_test.go",
+        "frontend/e2e/analytics-boundary-scenario.ts"
       ],
       "observation": {
         "route": "GET /user/spend/report",
@@ -3709,7 +3757,9 @@
       "group": "analytics",
       "main_status": "needs_verification",
       "evidence": [
-        "internal/gateway/family/handlers.go"
+        "internal/gateway/family/handlers.go",
+        "cmd/regression/analytics_alias_boundary_test.go",
+        "frontend/e2e/analytics-boundary-scenario.ts"
       ],
       "observation": {
         "route": "POST /global/spend/refresh",
@@ -3726,7 +3776,9 @@
       "group": "analytics",
       "main_status": "needs_verification",
       "evidence": [
-        "internal/gateway/family/handlers.go"
+        "internal/gateway/family/handlers.go",
+        "cmd/regression/analytics_alias_boundary_test.go",
+        "frontend/e2e/analytics-boundary-scenario.ts"
       ],
       "observation": {
         "route": "POST /global/spend/reset",
@@ -4877,7 +4929,9 @@
       "group": "analytics",
       "main_status": "needs_verification",
       "evidence": [
-        "internal/gateway/family/handlers.go"
+        "internal/gateway/family/handlers.go",
+        "cmd/regression/analytics_alias_boundary_test.go",
+        "frontend/e2e/analytics-boundary-scenario.ts"
       ],
       "observation": {
         "route": "POST /team/{team_id}/member/{user_id}/reset_spend",

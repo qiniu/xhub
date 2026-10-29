@@ -3399,5 +3399,19 @@
     "title": "legacy model aliases preserve real deployment and chat zh-CN",
     "kind": "implemented",
     "environment": "default offline"
+  },
+  {
+    "id": "REG-analytics-boundary-en",
+    "file": "e2e/scenarios/regression/analytics-boundary-en.test.ts",
+    "title": "analytics aliases preserve billed chat and logs en",
+    "kind": "implemented",
+    "environment": "default offline"
+  },
+  {
+    "id": "REG-analytics-boundary-zh-CN",
+    "file": "e2e/scenarios/regression/analytics-boundary-zh-CN.test.ts",
+    "title": "analytics aliases preserve billed chat and logs zh-CN",
+    "kind": "implemented",
+    "environment": "default offline"
   }
 ]

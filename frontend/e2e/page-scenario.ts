@@ -81,7 +81,7 @@ export function registerPageScenario(item: ReturnType<typeof discoverPages>[numb
       }
     }
     if (item.route === "/old-usage") {
-      await expect(page.getByTestId("old-usage-body")).toContainText(/"spend"|用量读取失败/, { timeout: 15_000 });
+      await expect(page.getByTestId("old-usage-body")).toContainText(t("legacyUsage.unavailable"), { timeout: 15_000 });
     }
     if (item.route === "/logs") {
       const logsResponse = await page.request.get(GATEWAY + "/spend/logs/ui?page=1&page_size=1", { headers: authHeaders });

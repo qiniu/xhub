@@ -1,14 +1,20 @@
 "use client";
-import { useEffect, useState } from "react";
+import Link from "next/link";
 import useAuthorized from "@/app/(dashboard)/hooks/useAuthorized";
-import { apiClient } from "@/components/networking";
+import { useT } from "@/i18n/I18nProvider";
+
+/** 保留旧用量URL作为明确能力说明；无参数，返回已鉴权的迁移入口。
+ * 旧/global/spend从未接真实账单，不能显示KV或假零值；不请求旧接口，不改变用户权限或消费。 */
 export default function OldUsagePage() {
-  const { accessToken } = useAuthorized();
-  const [text, setText] = useState("");
-  const [ready, setReady] = useState(false);
-  useEffect(() => {
-    if (!accessToken) return;
-    apiClient.get("/global/spend", { accessToken }).then((data) => setText(JSON.stringify(data))).catch((error: unknown) => setText(error instanceof Error ? error.message : "用量读取失败")).finally(() => setReady(true));
-  }, [accessToken]);
-  return (<div className="p-6"><h1 className="text-2xl font-semibold">历史用量</h1>{ready ? <p data-testid="old-usage-body">{text}</p> : <p>正在读取用量</p>}</div>);
+  useAuthorized();
+  const t = useT();
+  return (
+    <section className="p-6">
+      <h1 className="text-2xl font-semibold">{t("legacyUsage.title")}</h1>
+      <p role="status" data-testid="old-usage-body">
+        {t("legacyUsage.unavailable")}
+      </p>
+      <Link href="/ui/usage">{t("legacyUsage.openUsage")}</Link>
+    </section>
+  );
 }
