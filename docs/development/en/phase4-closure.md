@@ -1,5 +1,13 @@
 # Stage 4 closure inventory
 
+## Current candidates (2026-10-29)
+
+Main `e8a29c4f` includes the earlier batches via #229. The sections below retain historical evidence, not the current merge status of every PR. #231 (15 settings), #233 (14 model aliases), and #235 (26 analytics aliases) remain unmerged; the latest #231/#235 CI checks have passed.
+
+C6 addresses seven declarations under [#236](https://github.com/qiniu/xhub/issues/236): five non-OpenAI file aliases reject public configuration access; two legacy WebSocket aliases reject both actual GET handshakes and the historical pseudo method, without fake 200/101 responses. Two added GET registrations are rejection paths, not supported WebSocket sessions. Authenticated RFC6455 clients, HTTP/PostgreSQL and bilingual browser flows verify the boundary; standard/OpenAI files, chat and budget controls remain separate checks.
+
+No file/realtime executor is added. Permissions, budget rules and the 70% gate remain unchanged; no merge or deployment. After these candidates, **nine C7 discovery/helper declarations and final integration acceptance remain**. Historical main statuses and 909 observations are not relabelled as candidate successes.
+
 > C1 is submitted as [#224](https://github.com/qiniu/xhub/pull/224): 26 auxiliary routes explicitly reject unsupported operations and two singular-policy reads gain acceptance evidence. It is unmerged; main status below remains unchanged. C2 is submitted in [#226](https://github.com/qiniu/xhub/pull/226): 22 legacy identity operations explicitly rejected; real password login, signed SAML, session and budget regressions passed. It is not merged; main classifications remain unchanged. C3/runtime-ops is submitted in [#228](https://github.com/qiniu/xhub/pull/228): 12 legacy operations explicitly reject unsupported execution, with real configuration, credential rotation, budget and bilingual chat tests. It remains unmerged. The 15 C3/settings entries, C4–C7 and integration are still pending.
 
 Baseline: `939e0d6c0ba174bd03d6dad4c1035da8bf0be8cd`, reviewed 2026-10-28. Stage 4 is **not complete**. No merge or production deployment.

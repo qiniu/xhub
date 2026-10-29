@@ -43,6 +43,9 @@ func writeCatalogStore(st catalogRecordStore, w http.ResponseWriter, r *http.Req
 	if rejectLegacyInference(w, r) {
 		return
 	}
+	if rejectProviderFile(w, r) {
+		return
+	}
 	if rejectProviderBatch(w, r) {
 		return
 	}

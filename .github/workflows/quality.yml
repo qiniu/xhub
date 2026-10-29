@@ -786,7 +786,7 @@ jobs:
       - name: Run real provider batch regression
         env:
           XHUB_REGRESSION_COVERPROFILE: coverage/provider-batch.out
-        run: bash scripts/regression.sh '^TestProviderBatchBoundary$'
+        run: bash scripts/regression.sh '^Test(ProviderBatchBoundary|ProviderFileBoundary|LegacyWebsocketBoundary)$'
       - name: Validate provider batch regression coverage
         shell: bash
         run: |
