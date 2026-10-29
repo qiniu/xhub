@@ -18,7 +18,9 @@
       "batch": "C5",
       "source": "internal/gateway/family/handlers.go",
       "conclusion": "候选修复 #234：23条旧统计明确unsupported_analytics_operation，3条已有IAM边界保持；真实成功/失败/费用、权限矩阵、KV/预算/日志一致和双语浏览器验收。尚未合入；main_status及observation保留历史基线，不作为新结果。",
-      "pending_prs": []
+      "pending_prs": [
+        235
+      ]
     },
     "auth-alias": {
       "title": "OAuth、邀请、JWT映射、引导旧入口",

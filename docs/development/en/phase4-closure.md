@@ -3,7 +3,7 @@
 ## Current progress (2026-10-29, candidate changes)
 
 - Main baseline is `e8a29c4f972e8832e1c6e02a8226d0befcc65584`. C1, C2, runtime operations and earlier stage-4 PRs are merged. The old baseline and census below remain historical evidence.
-- #231 covers 15 settings routes; #233 covers 14 model aliases. Both remain unmerged. This batch tracks #234: C5 has 26 analytics routes, with 23 unimplemented aliases explicitly rejected and three existing IAM report/reset boundaries retaining `unsupported_iam_operation`.
+- #231 covers 15 settings routes; #233 covers 14 model aliases. Both remain unmerged. PR [#235](https://github.com/qiniu/xhub/pull/235) tracks #234: C5 has 26 analytics routes, with 23 unimplemented aliases explicitly rejected and three existing IAM report/reset boundaries retaining `unsupported_iam_operation`.
 - Live log pages use `/spend/logs/ui`, facets use `/management/v1/spend_logs/*`, and usage uses `/user/daily/activity` and related modules. The old `/spend/logs` and `/spend_logs/users` KV responses are not compatible implementations. The unmounted tag-analytics component has no ledger attribution; zero statistics must not be fabricated.
 - Direct `/old-usage` visits show a bilingual unavailable notice and link to the live Usage page; no unsupported request or fabricated zero report.
 - Candidate acceptance uses successful, upstream-500 and billed requests, 26-route authorization checks, invalid JSON/RPC, unchanged KV/account budgets/logs/usage, existing scope/pagination contracts, and bilingual browser chat→billed log→legacy rejection→visible log after reload.
