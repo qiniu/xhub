@@ -940,11 +940,9 @@ func catalogCollectionLast(last string) bool {
 	return false
 }
 
-// catalogListBody wraps a list as the JSON for this resource kind. Some kinds need paging fields and some are a plain array.
-// 参数 kind（string）：分类名，用来选择限额主体、日志类型或官方端点；path（string）：目录列表正文要定位的路径。可能是 URL，也可能是字段路径；list（[]map[string]any）：目录列表正文使用的map[string]any。
-// 返回 any（any）：目录列表正文的结果。具体类型由调用方断言。
-// 调用：仅在 handlers.go 内使用
-// 测试：无直接单测
+// catalogListBody 将已读取的配置列表封装成旧接口响应；kind为资源种类，path为已匹配路径，list为数据副本。
+// 返回对应对象或数组，供目录/专用配置适配器调用，不读写存储；nil列表转为空数组。
+// C7供应商发现由writeDiscovery独立处理，不再在配置列表中硬编码支持能力。
 func catalogListBody(kind, path string, list []map[string]any) any {
 	if list == nil {
 		list = []map[string]any{}
@@ -996,14 +994,6 @@ func catalogListBody(kind, path string, list []map[string]any) any {
 		return map[string]any{"object": "list", "data": list, "memories": list, "total": len(list)}
 	case kind == "workflows" || strings.Contains(p, "/workflows/runs"):
 		return map[string]any{"object": "list", "data": list, "runs": list, "events": []any{}, "messages": []any{}}
-	case strings.Contains(p, "available_providers"):
-		return map[string]any{
-			"providers": []any{
-				map[string]any{"provider_name": "tavily", "ui_friendly_name": "Tavily"},
-				map[string]any{"provider_name": "perplexity", "ui_friendly_name": "Perplexity"},
-				map[string]any{"provider_name": "serper", "ui_friendly_name": "Serper"},
-			},
-		}
 	case strings.Contains(p, "/guardrails/usage/overview"):
 		return map[string]any{
 			"chart": []any{}, "passRate": 100, "rows": []any{},

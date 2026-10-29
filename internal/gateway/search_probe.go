@@ -12,6 +12,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/sunqirui1987/xhub/internal/gateway/searchconfig"
 	"github.com/sunqirui1987/xhub/internal/util"
 )
 
@@ -113,14 +114,9 @@ func readSearchProbeInput(reader io.Reader) (searchProbeInput, error) {
 // 协议依据为Tavily/Perplexity官方/search参考和Serper官方playground，来源及核对日期记录在本PR验证文档。
 func makeSearchProbeConfig(params map[string]any, query *string) (searchProbeConfig, *searchProbeFailure) {
 	cfg := searchProbeConfig{Provider: strings.ToLower(strings.TrimSpace(str(params["search_provider"]))), Query: searchProbeQuery}
-	switch cfg.Provider {
-	case "tavily":
-		cfg.Endpoint = "https://api.tavily.com/search"
-	case "perplexity":
-		cfg.Endpoint = "https://api.perplexity.ai/search"
-	case "serper":
-		cfg.Endpoint = "https://google.serper.dev/search"
-	default:
+	// 与管理目录共用适配器定义，避免界面宣称支持而执行器不认识；规范化和覆盖URL规则保持原样。
+	cfg.Endpoint = searchconfig.ProviderEndpoint(cfg.Provider)
+	if cfg.Endpoint == "" {
 		return cfg, &searchProbeFailure{Status: 400, Code: "unsupported_provider"}
 	}
 	if query != nil {
