@@ -91,6 +91,7 @@ export const enPhrases: Record<string, string> = {
   "logDiagnostics.title": "Request diagnostics",
   "logDiagnostics.cancelUnknown": "The request connection was canceled. Who initiated it is unknown; this does not prove a user stopped generation.",
   "logDiagnostics.upstreamError": "Observed upstream error",
+  "logDiagnostics.bodyOmitted": "The request body was not fully read and was not saved. Bytes read, the size limit, and the error reason were retained.",
   "logDiagnostics.noUpstreamError": "No explicit upstream error was observed. This does not prove the upstream was healthy.",
   "logDiagnostics.noResponse": "No upstream HTTP response received",
   "Upstream Response": "Upstream Response",

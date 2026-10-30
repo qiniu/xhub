@@ -67,6 +67,7 @@ export interface LogDetailContentProps {
  * 上游响应默认折叠，用户通过标题按钮展开；切换请求时重置折叠状态，复制始终保留完整诊断。
  * 推理强度只展示明确快照，缺省为未知；金额格式化不修改计费或用户内容。
  */
+/** 日志抽屉正文：按 logEntry 展示原始协议证据与国际化诊断，读取失败时说明正文省略；返回详情组件，不修改请求或费用。 */
 export function LogDetailContent({ logEntry, isLoadingDetails = false, accessToken }: LogDetailContentProps) {
   const t = useT();
   const metadata = logEntry.metadata || {};
@@ -122,6 +123,7 @@ export function LogDetailContent({ logEntry, isLoadingDetails = false, accessTok
         <section aria-label={t("logDiagnostics.title")} className="mb-6 rounded-lg border p-4">
           <h3 className="font-semibold">{t("logDiagnostics.title")}</h3>
           {metadata.upstream_response.failure?.cancellation_source === "unknown" && <p>{t("logDiagnostics.cancelUnknown")}</p>}
+          {metadata.upstream_response.failure?.request_body_omitted && <p>{t("logDiagnostics.bodyOmitted")}</p>}
           <pre className="max-h-64 overflow-auto whitespace-pre-wrap break-all text-xs">{JSON.stringify(metadata.upstream_response.failure ?? metadata.upstream_response.routing ?? metadata.upstream_response.rate_limit, null, 2)}</pre>
           <h4>{t("logDiagnostics.upstreamError")}</h4>
           {metadata.upstream_response.error

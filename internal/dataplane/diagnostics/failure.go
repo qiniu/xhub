@@ -21,6 +21,8 @@ type Failure struct {
 	ElapsedMS           int64  `json:"elapsed_ms"`
 	BytesRead           *int64 `json:"bytes_read,omitempty"`
 	BodyLimit           int64  `json:"body_limit,omitempty"`
+	// RequestBodyOmitted 表示读取失败的入站正文未保存；BytesRead仍记录实际读取量，避免误解为空请求。
+	RequestBodyOmitted bool `json:"request_body_omitted,omitempty"`
 }
 
 // ObserveFailure 根据入站上下文和实际错误建立独立诊断；参数 elapsed 为请求已经历时间。

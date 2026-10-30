@@ -86,7 +86,8 @@ func setCORS(w http.ResponseWriter, r *http.Request) {
 // 测试：无直接单测
 func (s *Server) GinRoutes() gin.RoutesInfo { return s.engine.Routes() }
 
-// Handler is the process HTTP entry. Tests mount this, not the Gin engine. Bypass that returns true has already written the response. Gin then either streams straight through or buffers a non-stream response so the idempotency key can replay it.
+// Handler 返回统一 HTTP 入口，供服务器和测试挂载；读取失败仅保留有界诊断，不保存不完整正文。
+// Bypass 处理后直接返回，其余请求经 Gin 流式输出或缓冲供幂等重放；不改变鉴权、预算或正常请求正文保存规则。
 // 参数：无。
 // 调用：gateway/server.go
 // 测试：access_log_test.go、activity_http_test.go、builtin_providers_test.go
@@ -107,8 +108,6 @@ func (s *Server) Handler() http.Handler {
 					lw.ResponseWriter.WriteHeader(http.StatusInternalServerError)
 				}
 			}
-			// Method, path, status, and elapsed time only. Headers and bodies stay off this line.
-			util.Info("%s %s %d %s", r.Method, r.URL.Path, lw.code, time.Since(start))
 			if lw.code >= 400 {
 				s.recordEarlyError(lw, r, raw, body, start)
 				s.ReleaseCall(lw.Header().Get("x-litellm-call-id"))
@@ -118,6 +117,8 @@ func (s *Server) Handler() http.Handler {
 				}
 				util.Error("%s %s %d %s", r.Method, r.URL.Path, lw.code, note)
 			}
+			// 包含同步错误日志保存耗时，避免只报告读取结束时间，掩盖响应返回前的阻塞；不输出头或正文。
+			util.Info("%s %s %d %s", r.Method, r.URL.Path, lw.code, time.Since(start))
 		}()
 		w = lw
 		callID := util.CallID()
@@ -136,6 +137,10 @@ func (s *Server) Handler() http.Handler {
 			bytesRead := int64(len(raw))
 			failure.BytesRead = &bytesRead
 			failure.BodyLimit = 64 << 20
+			failure.RequestBodyOmitted = true
+			// 未读完的正文不是可信的请求快照。只保留字节数与错误事实，阻止最多64MiB的
+			// 残片进入日志JSON及持久化重放路径；正常请求及其上游失败仍沿用原正文保存规则。
+			raw = nil
 			status, kind, message := dpdiagnostics.BodyFailureStatus(failure)
 			dpdiagnostics.RecordEarlyFailure(w, &dpdiagnostics.UpstreamDiagnostics{Failure: failure})
 			util.Info("process step=request_body call_id=%q status=%d kind=%q bytes_read=%d limit=%d elapsed_ms=%d cause=%q context_error=%q", callID, status, failure.Kind, bytesRead, failure.BodyLimit, failure.ElapsedMS, failure.TransportError, failure.RequestContextError)

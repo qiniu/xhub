@@ -66,6 +66,7 @@ export const zhPhrases: Record<string, string> = {
   "logDiagnostics.title": "请求诊断",
   "logDiagnostics.cancelUnknown": "请求连接已取消，触发来源未知；这不能证明用户手动停止生成。",
   "logDiagnostics.upstreamError": "已观测到的上游错误",
+  "logDiagnostics.bodyOmitted": "请求正文未读取完整，未保存正文；已保留读取字节数、大小上限和错误原因。",
   "logDiagnostics.noUpstreamError": "未观测到上游明确错误，不能据此证明上游正常。",
   "logDiagnostics.noResponse": "尚未收到上游 HTTP 响应",
   "Upstream Response": "上游响应",
