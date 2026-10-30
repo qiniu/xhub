@@ -13,12 +13,15 @@ NODE = "node:24-bookworm"
 
 class NginxSlowClientTest(unittest.TestCase):
     def test_client_resumes_after_two_seconds(self):
-        """前置 Docker；真实TCP暂停3.5秒使写缓冲耗尽，旧配置失败、新片段保留连接；finally清除容器与临时文件。"""
+        """前置 Docker；验证非特权worker可读夹具及真实TCP暂停3.5秒的旧/新配置对照；finally清除容器与临时文件。"""
         name = "xhub-slow-client-" + uuid.uuid4().hex[:10]
         with tempfile.TemporaryDirectory(prefix="xhub-nginx-") as directory:
             root = pathlib.Path(directory)
+            # Linux 的临时目录默认为0700，容器worker无法穿越；目录只有公开测试正文，不含凭据。
+            root.chmod(0o755)
             body_size = 32 << 20
             (root / "body").write_bytes(b"x" * body_size)
+            (root / "body").chmod(0o644)
             (root / "nginx.conf").write_text("""
 events {}
 http {
@@ -74,6 +77,8 @@ function receive(path) {
                                 NGINX, "nginx", "-c", "/fixture/nginx.conf", "-g", "daemon off;"],
                                check=True, capture_output=True, text=True)
                 subprocess.run(["docker", "exec", name, "nginx", "-t", "-c", "/fixture/nginx.conf"], check=True)
+                subprocess.run(["docker", "exec", "--user", "nginx", name, "sh", "-c",
+                                "test -x /fixture && test -r /fixture/body"], check=True)
                 run = subprocess.run(["docker", "run", "--rm", "--network", f"container:{name}",
                                       "-v", f"{root}:/fixture:ro", NODE, "node", "/fixture/client.cjs"],
                                      capture_output=True, text=True, timeout=45)
