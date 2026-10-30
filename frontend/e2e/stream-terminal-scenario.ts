@@ -59,7 +59,7 @@ async function sendTerminalPrompt(page: Page, model: string, endpoint: string) {
   await page.getByPlaceholder(t("Select an endpoint"), { exact: true }).click();
   await page
     .getByRole("option")
-    .filter({ hasText: new RegExp("/v1/" + endpoint + "$") })
+    .filter({ hasText: new RegExp("(?:^|\\s)/v1/" + endpoint + "$") })
     .click();
   await page
     .getByPlaceholder(t("Type your message... (Shift+Enter for new line)"))

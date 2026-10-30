@@ -81,7 +81,7 @@ export function registerIdentityAliasBoundary(locale: Locale) {
       await page.getByPlaceholder(tr("Select a Model"), { exact: true }).click();
       await page.getByRole("option", { name: "gpt-4o-mini", exact: true }).click();
       await page.getByPlaceholder(tr("Select an endpoint"), { exact: true }).click();
-      await page.getByRole("option").filter({ hasText: /\/v1\/chat\/completions$/ }).click();
+      await page.getByRole("option").filter({ hasText: /(?:^|\s)\/v1\/chat\/completions$/ }).click();
       const prompt = "Verify ordinary chat after unavailable identity operations.";
       await page.getByTestId("chat-composer-input").fill(prompt);
       const chat = page.waitForResponse(r => ["/v1/chat/completions", "/chat/completions"].some(endpoint => matchesGatewayResponse(r.url(), r.request().method(), endpoint, "POST")));

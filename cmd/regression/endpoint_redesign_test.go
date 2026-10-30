@@ -35,7 +35,7 @@ func TestEndpointAvailableContract(t *testing.T) {
 			if len(endpoints) != 0 || !strings.Contains(stringField(row, "unavailable_reason"), "transport") {
 				t.Fatalf("无效配置未解释: %+v", row)
 			}
-		} else if len(endpoints) != 7 || row["unavailable_reason"] != nil {
+		} else if len(endpoints) != 8 || row["unavailable_reason"] != nil {
 			t.Fatalf("有效部署受无效部署影响: %+v", row)
 		}
 	}
@@ -218,7 +218,11 @@ func TestEndpointDialogueMatrix(t *testing.T) {
 			admin := h.adminSession()
 			owner := h.openScope(t, admin, "matrix")
 			rows := listField(h.ok("GET", "/model/available", admin, nil).json(), "data")
-			if len(rows) != 1 || len(rows[0]["endpoints"].([]any)) != 7 {
+			expectedEndpoints := 7
+			if i < 3 {
+				expectedEndpoints++
+			}
+			if len(rows) != 1 || len(rows[0]["endpoints"].([]any)) != expectedEndpoints {
 				t.Fatalf("自动公开接口不完整：%v", rows)
 			}
 			for _, target := range protocols {
@@ -267,12 +271,12 @@ func TestEndpointDialogueMatrix(t *testing.T) {
 			if source != "openai-chat" && (denied.status != 400 || calls.Load() != beforeCalls) {
 				t.Fatalf("未知能力必须调用上游前失败：%s calls=%d", denied.describe(), calls.Load())
 			}
-			if denied := h.do("POST", "/bypass/openai/v1/chat/completions", owner.key, map[string]any{"model": "matrix", "messages": []any{map[string]any{"role": "user", "content": "hello"}}}); denied.status == 200 {
-				t.Fatal("Bypass 未显式启用仍被调用")
+			if denied := h.do("POST", "/bypass/openai/v1/chat/completions", owner.key, map[string]any{"model": "matrix", "messages": []any{map[string]any{"role": "user", "content": "hello"}}}); (denied.status == 200) != (source == "openai-chat") {
+				t.Fatalf("Bypass 应仅默认开放匹配协议: %s", denied.describe())
 			}
 			wantCalls := int32(10)
 			if source == "openai-chat" {
-				wantCalls = 11
+				wantCalls = 12
 				if denied.status != 200 {
 					t.Fatal("同协议扩展字段应交由上游验证")
 				}

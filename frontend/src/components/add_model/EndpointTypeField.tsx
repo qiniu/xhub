@@ -21,7 +21,7 @@ import {
   protocolLabel,
   endpointLabel,
   upstreamProtocolGroup,
-  publicEndpointGroup,
+  automaticEndpoint,
   defaultEndpoints,
   type EndpointDescriptor,
   type EndpointTransport,
@@ -105,10 +105,10 @@ const EndpointTypeField: React.FC<{
         "The catalog does not provide an available upstream protocol, so this model cannot be saved. Check the upstream model ID and provider connection type.",
       );
   const available = (payload.endpoint_types ?? []).filter((entry) => compatibleEndpoint(entry, binding));
-  const standard = available.filter((entry) => publicEndpointGroup(entry) !== "bypass");
-  const bypass = available.filter((entry) => publicEndpointGroup(entry) === "bypass");
+  const automatic = available.filter(automaticEndpoint);
+  const bypass = available.filter((entry) => !automaticEndpoint(entry));
   /** 写入上游执行及可用公开接口；参数为注册执行 ID，返回无。
-   * 只开放后端已实现的标准接口，Bypass 须显式勾选；空值清空旧声明，供选择和模型切换调用。 */
+   * 自动开放标准及匹配的三种对话透传接口，其他 Bypass 保留显式勾选；空值清空旧声明，供选择和模型切换调用。 */
   const selectTransport = useCallback(
     (id: string, dirty = true) => {
       const execution = choices.find((item) => item.id === id);
@@ -238,14 +238,14 @@ const EndpointTypeField: React.FC<{
           {/* 保留已挂载的接口选项，折叠期间仍保存自动开放和用户勾选的声明；hidden 同时移出键盘和辅助技术导航。 */}
           <div id={endpointsPanelId} hidden={!endpointsExpanded} className="space-y-4 px-4 pb-4">
             <p className="text-xs leading-relaxed text-muted-foreground">
-              {standard.length
-                ? t("Standard endpoints are enabled automatically and use the same public model name.")
+              {automatic.length
+                ? t("modelEndpoints.automaticDescription")
                 : t(
                     "This model uses a provider-specific protocol. The passthrough endpoints below are enabled from registered capabilities.",
                   )}
             </p>
             <ul aria-label={t("Enabled endpoints")} className="space-y-3">
-              {standard.map((entry) => (
+              {automatic.map((entry) => (
                 <li key={entry.id} aria-label={endpointLabel(entry)} className="min-w-0 rounded-md border bg-background p-3">
                   <div className="flex flex-wrap items-center justify-between gap-2">
                     <span className="text-sm font-medium">{endpointLabel(entry)}</span>

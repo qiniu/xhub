@@ -184,7 +184,7 @@ export function registerCatalogPersistence(locale: Locale, shortKey = false) {
       await page.getByPlaceholder(tr("Select a Model"), { exact: true }).click();
       await page.getByRole("option", { name: modelName, exact: true }).click();
       await page.getByPlaceholder(tr("Select an endpoint"), { exact: true }).click();
-      await page.getByRole("option").filter({ hasText: /\/v1\/chat\/completions$/ }).click();
+      await page.getByRole("option").filter({ hasText: /(?:^|\s)\/v1\/chat\/completions$/ }).click();
       const before = await page.request.get(UPSTREAM + "/e2e/request-count");
       expect(before.status()).toBe(200);
       const count = (await before.json()).requests;

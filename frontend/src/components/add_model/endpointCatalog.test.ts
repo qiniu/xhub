@@ -36,7 +36,7 @@ describe("端点与执行目录", () => {
   });
 });
 
-/** 前置三协议转换目录；验证标准接口自动开放、原生 Bypass 需显式选择以及空配置无兜底，无数据清理。 */
+/** 前置三协议转换目录；验证标准接口自动开放、匹配的对话 Bypass 默认开放以及空配置无兜底，无数据清理。 */
 it("从上游能力生成固定接口并将 Fal 归入 Bypass", () => {
  const entries: EndpointDescriptor[] = [
   {id:"chat",label:"Chat",category:"openai",kind:"adapted",protocol:"openai-chat",family:"chat"},
@@ -44,7 +44,7 @@ it("从上游能力生成固定接口并将 Fal 归入 Bypass", () => {
   {id:"messages",label:"Messages",category:"claude",kind:"adapted",protocol:"anthropic-messages",family:"chat"},
   {id:"bypass:openai-chat",label:"Bypass",category:"bypass",kind:"bypass",protocol:"openai-chat",family:"chat"},
  ];
- expect(defaultEndpoints(entries,{...transport,endpoint_id:"bypass:openai-chat",protocol:"openai-chat"})).toEqual(["chat","responses","messages"]);
+ expect(defaultEndpoints(entries,{...transport,endpoint_id:"bypass:openai-chat",protocol:"openai-chat"})).toEqual(["chat","responses","messages","bypass:openai-chat"]);
  expect(defaultEndpoints(entries)).toEqual([]);
  expect(publicEndpointGroup({...generation,id:"fal:queue",protocol:"fal",category:"bypass"})).toBe("bypass");
  expect(defaultEndpoints([generation],transport)).toEqual(["image_generation"]);
@@ -93,4 +93,16 @@ it("defaults regular protocols from the connection without blocking manual choic
  expect(defaultTransport(all,"openai","fal")).toBe("fal");
  expect(defaultTransport(all,"unknown")).toBe("");
  expect(defaultTransport([],"openai")).toBe("");
+});
+
+/** 前置五种对话目录；验证三种匹配透传默认开放、错协议和未知配置不开放，Google 仍需显式选择；纯函数无清理。 */
+it("automatically exposes only matching dialogue bypass endpoints", () => {
+ const protocols = ["openai-chat", "openai-responses", "anthropic-messages", "gemini", "vertex"];
+ const entries: EndpointDescriptor[] = protocols.map(protocol => ({id: "bypass:"+protocol, label: protocol, category: "bypass",kind: "bypass",protocol,family:"chat"}));
+ const standard: EndpointDescriptor = {...generation, id:"chat", kind:"adapted",protocol:"openai-chat"};
+ for (const protocol of protocols) {
+  const result = defaultEndpoints([standard,...entries], {...transport, endpoint_id:"unused",protocol});
+  expect(result).toEqual(protocols.slice(0,3).includes(protocol) ? ["chat","bypass:"+protocol] : ["chat"]);
+ }
+ expect(defaultEndpoints(entries,{...transport,protocol:"unknown"})).toEqual([]);
 });

@@ -13,9 +13,11 @@
 | litellm_credential_name | 保存的供应商连接 |
 | deployment_id | 稳定部署标识，供权重引用、会话粘性与响应归属使用；地址或定价修改不改变它 |
 | model_info.transport | 必须已注册的执行器 |
-| endpoint_types | 标准入口按能力生成；Bypass/Fal 显式启用 |
+| endpoint_types | 标准入口及匹配的 Chat/Responses/Messages 透传按能力生成；其他 Bypass/Fal 显式启用 |
 
 价格不决定协议。未知或缺失 transport 拒绝保存。`/public/endpoints` 是注册目录；`/model/available` 是当前身份真正可调用的模型端点。端点是请求入口和执行能力标识，与供应商地址分别管理。
+
+有效部署配置上游协议后，与其匹配的 Chat Completions、Responses 或 Messages Bypass 入口自动开放，已有部署也生效，无需逐个勾选或重写 `endpoint_types`。客户端通过标准路径或 `/bypass/...` 路径选择处理方式；上游协议不匹配时不会进行透传转换。其他 Bypass 仍需显式声明。模型权限、预算及停用规则继续执行；透传沿用现有原生处理行为，不保证具备标准接口的全部转换、护栏和缓存能力。
 
 ## 权重、回退与会话目标
 

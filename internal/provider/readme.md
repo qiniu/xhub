@@ -45,7 +45,7 @@ Registration creates neither accounts nor connections. Configure transport/endpo
 5. `../dataplane/transport/bypass_url.go`, `../dataplane/execution/official.go`: URL composition, native execution, task pinning and settlement.
 6. `all/all.go`: compile-time loading; rebuild and restart the gateway. Uploaded Go plugins are not hot-loaded.
 
-Credential type, connection name, `catalog_id`, upstream model ID, public model name and `transport` are different fields. Setting `custom_llm_provider: suno` does not select a music protocol. `model_info.transport` must be registered. Standard client endpoints derive from execution capability; Bypass endpoints require explicit `endpoint_types`.
+Credential type, connection name, `catalog_id`, upstream model ID, public model name and `transport` are different fields. Setting `custom_llm_provider: suno` does not select a music protocol. `model_info.transport` must be registered. Standard client endpoints and matching Chat Completions, Responses and Messages Bypass endpoints derive from execution capability. Other Bypass endpoints require explicit `endpoint_types`.
 
 | Directory | Responsibility |
 |---|---|

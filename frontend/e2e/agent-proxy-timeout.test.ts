@@ -25,7 +25,7 @@ test("slow agent response survives the console gateway proxy", async ({ page }) 
     await page.getByPlaceholder(t("Select a Model"), { exact: true }).click();
     await page.getByRole("option", { name, exact: true }).click();
     await page.getByPlaceholder(t("Select an endpoint"), { exact: true }).click();
-    await page.getByRole("option").filter({ hasText: /\/v1\/responses$/ }).click();
+    await page.getByRole("option").filter({ hasText: /(?:^|\s)\/v1\/responses$/ }).click();
     await page.getByPlaceholder(t("Type your message... (Shift+Enter for new line)")).filter({ visible: true }).fill("Reply with a short greeting.");
     const start = Date.now();
     const pending = page.waitForResponse(r => /\/responses$/.test(new URL(r.url()).pathname) && r.request().method() === "POST", { timeout: 90000 });
