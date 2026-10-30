@@ -98,6 +98,8 @@ jobs:
           E2E_RUN_DIR: ${{ github.workspace }}/.e2e/release
           E2E_PORTABLE_CONSOLE: '1'
           E2E_REDIS: '1'
+          # 该步骤运行发布验收子集；完整清单由专门的全量任务负责，避免把子集误判成全量失败。
+          E2E_FULL_COVERAGE: '0'
       # 独立无 Redis 链验证 PostgreSQL 待结算恢复，并覆盖 Agent 历史、流终态、取消、文档和 Key 生命周期。
       - name: API client reliability browser regression
         run: bash scripts/e2e.sh client-docs-url- client-cancellation- stream-terminal-sc- billing-pending-recovery usage-spool- key-lifecycle- agent-history- model-view- hard-budget- budget-reconciliation- messages-signed-history- claude-client-compat- user-bulk-budget- scenarios/enterprise/saml- scenarios/enterprise/sso-valid.test.ts scenarios/directory/sso-config.test.ts
@@ -106,6 +108,8 @@ jobs:
           E2E_BUILD_DIR: .next-agent-reliability
           E2E_PORTABLE_CONSOLE: '1'
           E2E_REDIS: '0'
+          # 该步骤同样只运行可靠性子集，不能要求覆盖全部业务清单。
+          E2E_FULL_COVERAGE: '0'
       - uses: actions/upload-artifact@v4
         if: always()
         with:

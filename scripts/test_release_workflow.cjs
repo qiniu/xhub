@@ -32,12 +32,13 @@ test('API client reliability gate runs all flows independently and preserves fai
   assert.ok(browser, '发布必须运行 API 客户端可靠性闭环');
   assert.equal(browser.env.E2E_REDIS, '0', 'PostgreSQL 待结算恢复必须在无 Redis 模式验证');
   assert.equal(browser.env.E2E_PORTABLE_CONSOLE, '1', '必须经过真实控制台 HTTP 代理');
+  assert.equal(browser.env.E2E_FULL_COVERAGE, '0', '可靠性子集不能误触发完整业务清单门禁');
   assert.equal(browser.env.E2E_BUILD_DIR, '.next-agent-reliability');
   assert.ok(browser.env.E2E_RUN_DIR.endsWith('/.e2e/release-agent-reliability'));
   const directory = mkdtempSync(join(tmpdir(), 'xhub-client-gate-'));
   try {
     mkdirSync(join(directory, 'scripts'));
-    writeFileSync(join(directory, 'scripts/e2e.sh'), '#!/bin/bash\nprintf "%s\\n" "$@" > arguments\nprintf "%s\\n" "$E2E_REDIS" "$E2E_PORTABLE_CONSOLE" > environment\nexit "$FIXTURE_STATUS"\n');
+    writeFileSync(join(directory, 'scripts/e2e.sh'), '#!/bin/bash\nprintf "%s\\n" "$@" > arguments\nprintf "%s\\n" "$E2E_REDIS" "$E2E_PORTABLE_CONSOLE" "$E2E_FULL_COVERAGE" > environment\nexit "$FIXTURE_STATUS"\n');
     for (const status of [0, 7]) {
       const result = spawnSync('bash', ['-c', browser.run], {
         cwd: directory, encoding: 'utf8',
@@ -49,7 +50,7 @@ test('API client reliability gate runs all flows independently and preserves fai
         'billing-pending-recovery', 'usage-spool-', 'key-lifecycle-', 'agent-history-', 'model-view-', 'hard-budget-', 'budget-reconciliation-', 'messages-signed-history-', 'claude-client-compat-', 'user-bulk-budget-',
         'scenarios/enterprise/saml-', 'scenarios/enterprise/sso-valid.test.ts', 'scenarios/directory/sso-config.test.ts',
       ]);
-      assert.equal(readFileSync(join(directory, 'environment'), 'utf8'), '0\n1\n');
+      assert.equal(readFileSync(join(directory, 'environment'), 'utf8'), '0\n1\n0\n');
     }
   } finally { rmSync(directory, { recursive: true, force: true }); }
   const upload = steps.find(item => item.uses === 'actions/upload-artifact@v4');
@@ -71,6 +72,7 @@ test('verification runs bilingual usage upgrade and monitor permission scenarios
   }
   assert.equal(browser.env.E2E_REDIS, '1', '升级验收必须使用专属 Redis 真实结算链');
   assert.equal(browser.env.E2E_PORTABLE_CONSOLE, '1', '发布必须继续验证 HTTP 控制台代理');
+  assert.equal(browser.env.E2E_FULL_COVERAGE, '0', '发布子集不能误触发完整业务清单门禁');
 });
 
 /** 按名称返回发布步骤；参数为名称，缺失时抛出断言；供测试调用，无副作用。 */
