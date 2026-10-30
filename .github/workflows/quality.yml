@@ -641,7 +641,7 @@ jobs:
       - name: Run real cache management regression
         env:
           XHUB_REGRESSION_COVERPROFILE: coverage/cache-config.out
-        run: bash scripts/regression.sh '^Test(CacheManagementTruth|CacheUnavailableManagement|CacheHitIsFreeAndLoggedAsOne)$'
+        run: bash scripts/regression.sh '^Test(RequestCachePolicy|CacheManagementTruth|CacheUnavailableManagement|CacheHitIsFreeAndLoggedAsOne)$'
       - name: Validate cache regression coverage
         shell: bash
         run: |

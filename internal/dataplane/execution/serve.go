@@ -81,6 +81,14 @@ func Serve(h dpcontract.Adapted, w http.ResponseWriter, r *http.Request, op stri
 		return
 	}
 	cfg := h.GatewayConfig()
+	cachePolicy := clientCachePolicy{read: true, write: true}
+	if dpdialogue.CallerProtocol(op) != "" {
+		cachePolicy, err = consumeClientCachePolicy(body)
+		if err != nil {
+			util.WriteTypedError(w, r.URL.Path, 400, "invalid_request", err.Error())
+			return
+		}
+	}
 	nativeEligible := op == "responses" && providerdeployment.NativeResponsesConfigured(cfg.ModelList) && h.NativeResponsesAllowed(p.UserID)
 	// 会话计划先于调度生成；这里只读偏好或父响应归属，最终候选仍要按当前配置重新验证。
 	if op == "responses" {
@@ -182,7 +190,7 @@ func Serve(h dpcontract.Adapted, w http.ResponseWriter, r *http.Request, op stri
 	stream, _ := body["stream"].(bool)
 	// 路由与回退配置已经进入缓存键，不再用配置是否存在决定缓存读取。
 	// Responses 的响应 ID 必须对应本次执行和上下文，不能复用已过期的响应缓存 ID。
-	if ck != "" && op != "responses" && !stream {
+	if cachePolicy.read && ck != "" && op != "responses" && !stream {
 		if hit, ok := h.ResponseCache().Get(ck); ok {
 			// 缓存记录实际执行模型和组；复用成功正文前仍检查当前权限和预算，
 			// 与首次调用检查同一范围，不能靠禁用整个回退功能来代替授权。
@@ -205,6 +213,10 @@ func Serve(h dpcontract.Adapted, w http.ResponseWriter, r *http.Request, op stri
 			return
 		}
 		util.Trace("process path=%s step=cache hit=false model=%s", r.URL.Path, alias)
+	}
+	// no-store仍可读取已有缓存，但本次执行不能写入；空键沿用内部诊断已有的禁止存储路径。
+	if !cachePolicy.write {
+		ck = ""
 	}
 
 	if err := router.ValidateStrategy(routeCfg.Strategy()); err != nil {
