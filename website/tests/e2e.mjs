@@ -266,9 +266,10 @@ try {
           const link = page.getByRole("article").locator(`a[href$="workflow-guide/${name}-${locale}.jpg"]`);
           await link.click();
           assert.equal(page.url(), `${base}assets/workflow-guide/${name}-${locale}.jpg`);
-          const original = await page.request.get(page.url());
-          assert.equal(original.status(), 200);
-          assert.match(original.headers()["content-type"], /image\/jpeg/);
+          // 原图由浏览器直接打开并解码，避免在已验证用户可见加载后再用独立请求重复下载大图；静态服务的 JPEG Content-Type 与字节由 server.test.mjs 覆盖。
+          const original = page.locator("img");
+          await expect(original).toBeVisible();
+          await expect.poll(() => original.evaluate((element) => element.complete && element.naturalWidth > 0), { message: `${name}-${locale} 原图应由浏览器完整加载` }).toBeTruthy();
           await page.goBack();
         }
       }
@@ -277,9 +278,10 @@ try {
     const screenshot = page.getByRole("img", { name: "中文模型供应商连接表单", exact: true });
     await screenshot.click();
     assert.equal(page.url(), `${base}assets/provider-guide/provider-form-zh.jpg`);
-    const response = await page.request.get(page.url());
-    assert.equal(response.status(), 200);
-    assert.match(response.headers()["content-type"], /image\/jpeg/);
+    // 截图原图使用真实浏览器页面解码验证，既覆盖用户点击后的结果，也不重复请求大图片造成本地预览连接偶发重置。
+    const original = page.locator("img");
+    await expect(original).toBeVisible();
+    await expect.poll(() => original.evaluate((element) => element.complete && element.naturalWidth > 0), { message: "供应商连接表单原图应由浏览器完整加载" }).toBeTruthy();
     await page.goBack();
     await page.getByRole("heading", { name: "XHub 客户使用与管理手册", exact: true }).waitFor();
     await screenshot.scrollIntoViewIfNeeded();
