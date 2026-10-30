@@ -7,7 +7,6 @@ import (
 	"strings"
 
 	"github.com/sunqirui1987/xhub/internal/authz"
-	"github.com/sunqirui1987/xhub/internal/config"
 	"github.com/sunqirui1987/xhub/internal/gateway/models"
 	"github.com/sunqirui1987/xhub/internal/gateway/templateauth"
 	llmdialogue "github.com/sunqirui1987/xhub/internal/llm/dialogue"
@@ -129,9 +128,7 @@ func (s *Server) routePreview(w http.ResponseWriter, r *http.Request) {
 		settings.Source = "draft"
 	}
 	// 预览与数据面从同一编译器读取模型默认、模板组和回退。
-	s.LockModels()
-	directory := append([]config.ModelEntry(nil), (*s.ModelTable())...)
-	s.UnlockModels()
+	directory := s.Models()
 	settings = router.Compile(settings, s.RecordStore(), directory)
 	settings = settings.ForModel(input.Model)
 	if settings.Err != nil {
@@ -155,9 +152,8 @@ func (s *Server) routePreview(w http.ResponseWriter, r *http.Request) {
 			}
 		}
 	}
-	s.LockModels()
-	list := append([]config.ModelEntry(nil), s.Models()...)
-	s.UnlockModels()
+	// 诊断与策略校验共用目录，避免管理更新插入两个读取之间。
+	list := directory
 	// 保留暂停部署以解释原因；实际匹配函数会排除它们。
 	matched := settings.Candidates(list, input.Model)
 	for _, dep := range list {

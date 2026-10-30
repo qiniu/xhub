@@ -987,7 +987,7 @@ jobs:
       - name: Run real model contract regression
         env:
           XHUB_REGRESSION_COVERPROFILE: coverage/model-contract.out
-        run: bash scripts/regression.sh '^Test(ModelContract|OfficialCredentialSupportsNativeModel|BypassBodyHTTPContract|BypassMultipartHTTPContract)'
+        run: bash scripts/regression.sh '^Test(ModelContract|OfficialCredentialSupportsNativeModel|BypassBodyHTTPContract|BypassMultipartHTTPContract|ModelViewHTTPContract|ModelViewRetryChecks|ModelViewPricingConnection)'
       - name: Validate regression coverage
         shell: bash
         run: |

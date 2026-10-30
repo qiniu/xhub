@@ -38,11 +38,11 @@ type cacheScopeHost struct {
 // RouteSettingsFor 是 cacheScopeHost 的测试接口实现。
 // 参数 p 为身份；有 h.settings 时返回指定快照，否则委托 logHost；供缓存配置切换测试，无存储副作用。
 // 调用方为本文件或同包的执行测试；仅模拟所述边界，不能据此推断生产宿主的行为。
-func (h *cacheScopeHost) RouteSettingsFor(p *auth.Principal) router.RouteSettings {
+func (h *cacheScopeHost) RouteSettingsFor(p *auth.Principal, models []config.ModelEntry) router.RouteSettings {
 	if h.settings != nil {
 		return *h.settings
 	}
-	return h.logHost.RouteSettingsFor(p)
+	return h.logHost.RouteSettingsFor(p, models)
 }
 
 // PlanRoute 是 cacheScopeHost 的测试接口实现。
@@ -102,7 +102,7 @@ func TestCacheHitRechecksActualTarget(t *testing.T) {
 	})}
 	cfg := chatConfig(config.ModelEntry{ModelName: "member", LiteLLMParams: map[string]any{"model": "openai/member", "api_base": "https://example.invalid/v1", "api_key": "test-key"}})
 	h := &cacheScopeHost{logHost: newLogHost(cfg, client), session: "group-session"}
-	settings := h.RouteSettingsFor(nil)
+	settings := h.RouteSettingsFor(nil, h.Models())
 	settings.RoutingGroups = []router.Group{{Name: "group", Models: []string{"member"}, Strategy: "traffic-split"}}
 	h.settings = &settings
 	for round := 0; round < 3; round++ {
@@ -135,7 +135,7 @@ func TestCacheScopeChangesWithConfigurationSessionAndQuery(t *testing.T) {
 			})}
 			cfg := chatConfig(config.ModelEntry{ModelName: "audit", LiteLLMParams: map[string]any{"model": "openai/audit", "api_base": "https://example.invalid/v1", "api_key": "test-key"}, ModelInfo: map[string]any{}})
 			h := &cacheScopeHost{logHost: newLogHost(cfg, client), session: "session-a"}
-			settings := h.RouteSettingsFor(nil)
+			settings := h.RouteSettingsFor(nil, h.Models())
 			switch change {
 			case "empty-fallback":
 				settings.ModelFallbacks = map[string]router.FallbackPolicy{"audit": {Fallbacks: []string{}, ContextWindow: []string{}, ContentPolicy: []string{}}}
@@ -150,7 +150,7 @@ func TestCacheScopeChangesWithConfigurationSessionAndQuery(t *testing.T) {
 			var body map[string]any
 			_ = json.Unmarshal(raw, &body)
 			raw, _ = json.Marshal(body)
-			scope, _ := json.Marshal(map[string]any{"models": cfg.ModelList, "router": h.RouteSettingsFor(nil).Settings, "model_defaults": h.RouteSettingsFor(nil).ModelDefaults, "session": h.session, "query": "", "routing_groups": h.RouteSettingsFor(nil).RoutingGroups, "fallbacks": h.RouteSettingsFor(nil).ModelFallbacks})
+			scope, _ := json.Marshal(map[string]any{"models": cfg.ModelList, "router": h.RouteSettingsFor(nil, h.Models()).Settings, "model_defaults": h.RouteSettingsFor(nil, h.Models()).ModelDefaults, "session": h.session, "query": "", "routing_groups": h.RouteSettingsFor(nil, h.Models()).RoutingGroups, "fallbacks": h.RouteSettingsFor(nil, h.Models()).ModelFallbacks})
 			h.cache.Set(util.CacheKey("user:log-user", "chat", "audit", string(raw), string(scope)), []byte(`{"usage":{"prompt_tokens":1,"completion_tokens":1}}`))
 			request.Body = io.NopCloser(strings.NewReader(string(raw)))
 			switch change {

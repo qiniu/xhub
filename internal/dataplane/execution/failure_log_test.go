@@ -83,14 +83,9 @@ func (h *logHost) ResolveRequest(*http.Request) (*auth.Principal, error) {
 // RouteSettingsFor 是 logHost 的测试接口实现。
 // 忽略身份参数并返回 BuiltinSettings；无外部查询，测试不依赖进程 cfg.RouterSettings 的旧字段。
 // 调用方为本文件或同包的执行测试；仅模拟所述边界，不能据此推断生产宿主的行为。
-func (h *logHost) RouteSettingsFor(*auth.Principal) router.RouteSettings {
+func (h *logHost) RouteSettingsFor(*auth.Principal, []config.ModelEntry) router.RouteSettings {
 	return router.BuiltinSettings()
 }
-
-// GatewayConfig 是 logHost 的测试接口实现。
-// 返回本夹具的 cfg 指针；无参数，供执行入口读取目录，不复制配置，不产生外部副作用。
-// 调用方为本文件或同包的执行测试；仅模拟所述边界，不能据此推断生产宿主的行为。
-func (h *logHost) GatewayConfig() *config.Config { return h.cfg }
 
 // HTTPClient 是 logHost 的测试接口实现。
 // 返回本夹具指定的 client 指针；无参数，由执行器调用测试上游，方法本身不拨号。
@@ -225,9 +220,9 @@ func (h *logHost) EnforceIdentityLimits(http.ResponseWriter, string, *auth.Princ
 func (h *logHost) Redis() *live.Client { return nil }
 
 // Models 是 logHost 的测试接口实现。
-// 返回 h.cfg.ModelList；无参数，不复制配置，用于接口能力检查，测试须提供非 nil cfg。
+// 无参数，返回 h.cfg.ModelList 及嵌套配置的独立副本；测试须提供非 nil cfg。
 // 调用方为本文件或同包的执行测试；仅模拟所述边界，不能据此推断生产宿主的行为。
-func (h *logHost) Models() []config.ModelEntry { return h.cfg.ModelList }
+func (h *logHost) Models() []config.ModelEntry { return config.CloneModels(h.cfg.ModelList) }
 
 // BusyMap 是 logHost 的测试接口实现。
 // 返回新建的空并发映射；无参数，表示测试没有正在占用的部署，不读取生产计数。
@@ -526,7 +521,7 @@ func TestServeLogsCacheHitAndStreamMetrics(t *testing.T) {
 			"api_base": "https://api.openai.com/v1",
 		},
 	}), nil)
-	scope, err := json.Marshal(map[string]any{"models": h.cfg.ModelList, "router": h.RouteSettingsFor(nil).Settings, "model_defaults": h.RouteSettingsFor(nil).ModelDefaults, "session": "", "query": "", "routing_groups": h.RouteSettingsFor(nil).RoutingGroups, "fallbacks": h.RouteSettingsFor(nil).ModelFallbacks})
+	scope, err := json.Marshal(map[string]any{"models": h.cfg.ModelList, "router": h.RouteSettingsFor(nil, h.Models()).Settings, "model_defaults": h.RouteSettingsFor(nil, h.Models()).ModelDefaults, "session": "", "query": "", "routing_groups": h.RouteSettingsFor(nil, h.Models()).RoutingGroups, "fallbacks": h.RouteSettingsFor(nil, h.Models()).ModelFallbacks})
 	if err != nil {
 		t.Fatal(err)
 	}

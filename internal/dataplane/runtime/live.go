@@ -30,8 +30,9 @@ func State(h Runtime) router.State {
 	if redis == nil {
 		return st
 	}
-	ids := make([]string, 0, len(h.Models()))
-	for _, m := range h.Models() {
+	models := h.Models()
+	ids := make([]string, 0, len(models))
+	for _, m := range models {
 		ids = append(ids, router.CooldownID(m))
 	}
 	st.Cooldown = redis.Cooled(ids)

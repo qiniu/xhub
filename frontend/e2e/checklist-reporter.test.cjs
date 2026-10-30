@@ -406,3 +406,21 @@ test('bypass body scenarios are registered and failures stay failures', () => {
   assert.equal(evaluateScenarios(catalog, results).passed, 1);
   assert.equal(evaluateScenarios(catalog, [{...results[1], title:'unknown body test'}]).unregistered.length, 1);
 });
+
+/** 目录热更新双语流程须进入全量分母；纯清单验证精确文件/标题及失败不可算通过，无待清理资源。 */
+test('model view scenarios are registered and failures stay failures', () => {
+  const fs = require('node:fs');
+  const path = require('node:path');
+  const {evaluateScenarios} = require('./scenario-coverage.cjs');
+  const catalog = require('./scenario-catalog.json');
+  const results = ['en', 'zh-CN'].map(locale => {
+    const file = `e2e/scenarios/regression/model-view-hot-update-${locale}.test.ts`;
+    assert.ok(fs.existsSync(path.join(__dirname, '..', file)));
+    return {file, title: 'model view hot update ' + locale, status: 'passed'};
+  });
+  assert.deepEqual(evaluateScenarios(catalog, results).unregistered, []);
+  assert.equal(evaluateScenarios(catalog, results).passed, 2);
+  results[0].status = 'failed';
+  assert.equal(evaluateScenarios(catalog, results).passed, 1);
+  assert.equal(evaluateScenarios(catalog, [{...results[1],title:'unknown model view'}]).unregistered.length, 1);
+});

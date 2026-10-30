@@ -3469,5 +3469,19 @@
     "title": "bypass request body and log lifecycle zh-CN",
     "kind": "implemented",
     "environment": "default offline"
+  },
+  {
+    "id": "REG-model-view-en",
+    "file": "e2e/scenarios/regression/model-view-hot-update-en.test.ts",
+    "title": "model view hot update en",
+    "kind": "implemented",
+    "environment": "default offline"
+  },
+  {
+    "id": "REG-model-view-zh-CN",
+    "file": "e2e/scenarios/regression/model-view-hot-update-zh-CN.test.ts",
+    "title": "model view hot update zh-CN",
+    "kind": "implemented",
+    "environment": "default offline"
   }
 ]

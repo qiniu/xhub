@@ -32,7 +32,9 @@ type fallbackNativeHost struct {
 // RouteSettingsFor 是 fallbackNativeHost 的测试接口实现。
 // 忽略身份，返回 h.policy；供 ServeBypass 测试请求级回退快照，不访问模板库。
 // 调用方为本文件或同包的执行测试；仅模拟所述边界，不能据此推断生产宿主的行为。
-func (h *fallbackNativeHost) RouteSettingsFor(*auth.Principal) router.RouteSettings { return h.policy }
+func (h *fallbackNativeHost) RouteSettingsFor(*auth.Principal, []config.ModelEntry) router.RouteSettings {
+	return h.policy
+}
 
 // TestNativeDedicatedFallbackChain 验证仅配置专用列表时，第一目标5xx后继续剩余目标或目标自身的通用链。
 // 参数 t 为测试上下文，无返回；本地HTTP模拟上下文和内容错误，验证普通4xx终止和异步禁用，Cleanup关闭服务。
@@ -108,7 +110,9 @@ type fallbackServeHost struct {
 // RouteSettingsFor 是 fallbackServeHost 的测试接口实现。
 // 忽略身份，返回 h.settings；供 Serve 测试回退配置，不查询数据库。
 // 调用方为本文件或同包的执行测试；仅模拟所述边界，不能据此推断生产宿主的行为。
-func (h *fallbackServeHost) RouteSettingsFor(*auth.Principal) router.RouteSettings { return h.settings }
+func (h *fallbackServeHost) RouteSettingsFor(*auth.Principal, []config.ModelEntry) router.RouteSettings {
+	return h.settings
+}
 
 // WriteChatJSON 是 fallbackServeHost 的测试接口实现。
 // 把参数 status/body 写入 w，忽略身份、缓存、计费参数及可变模型授权范围；无返回，供 HTTP 结果断言，不真实结算。
