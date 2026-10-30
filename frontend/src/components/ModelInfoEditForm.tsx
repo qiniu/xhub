@@ -1,4 +1,5 @@
 "use client";
+import { CachePriceWarning } from "./add_model/CachePriceWarning";
 
 import { zodResolver } from "@hookform/resolvers/zod";
 import { CircleHelp } from "lucide-react";
@@ -347,6 +348,8 @@ const ChipList: React.FC<{ values: unknown; emptyLabel: string }> = ({ values, e
   );
 };
 
+/** 旧模型详情编辑表单；props提供模型原值、可编辑状态及提交/取消回调，返回表单或只读字段。
+ * 缓存缺价只提示，不填默认值；提交沿用原权限、价格保存与预算规则。由模型详情调用。 */
 const ModelInfoEditForm: React.FC<ModelInfoEditFormProps> = ({
   localModelData,
   modelData,
@@ -514,17 +517,18 @@ const ModelInfoEditForm: React.FC<ModelInfoEditFormProps> = ({
                 </div>
               ))}
 
+            {isEditing && localModelData.model_info?.pricing_source === "manual" && <CachePriceWarning read={form.watch("cache_read_cost")} write={form.watch("cache_write_cost")} />}
             {pricingField(
               "cache_read_cost",
               t("Cache Read Cost (per 1M tokens)"),
-              t("Defaults to Input Cost if blank"),
-              t("If left blank on save, defaults to Input Cost."),
+              t("providerGuideUI.unset"),
+              t("cachePrice.blankHelp"),
             )}
             {pricingField(
               "cache_write_cost",
               t("Cache Write Cost (per 1M tokens)"),
-              t("Defaults to Input Cost if blank"),
-              t("If left blank on save, defaults to Input Cost (backend falls back to input_cost_per_token)."),
+              t("providerGuideUI.unset"),
+              t("cachePrice.blankHelp"),
             )}
 
             {textField("api_base", t("API Base"), t("Enter API base"), localModelData.litellm_params?.api_base)}

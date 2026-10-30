@@ -3469,5 +3469,12 @@
     "title": "request failure diagnostics and exact time filtering zh-CN",
     "kind": "implemented",
     "environment": "default offline"
+  },
+  {
+    "id": "REG-CACHE-PRICE",
+    "file": "e2e/cache-price-diagnostics.test.ts",
+    "title": "缓存价格缺项提示、补价与零价真实账单",
+    "kind": "implemented",
+    "environment": "default offline"
   }
 ]

@@ -1,4 +1,11 @@
 export const enPhrases: Record<string, string> = {
+  "cachePrice.warningTitle": "Incomplete cache pricing",
+  "cachePrice.missing": "Missing prices: {fields}. If the upstream reports these tokens, the request cannot be fully priced. Enter the supplier rate; use 0 only when explicitly free.",
+  "cachePrice.blankHelp": "Blank means unset, not the input price. Reported cache usage without a matching rate remains unpriced.",
+  "cachePrice.readMissing": "The upstream reported cache read tokens, but the model has no cache read price. Configure the price; this request has no complete bill.",
+  "cachePrice.writeMissing": "The upstream reported cache write tokens, but the model has no cache write price. Configure the price; this request has no complete bill.",
+  "cachePrice.unavailable": "The reported usage could not be priced completely. Check the model prices and upstream usage; this does not mean the request was free.",
+
   "To:": "To:",
   "Identity request failed ({value0})": "Identity request failed ({value0})",
   "Missing endpoint catalog": "Missing endpoint catalog",

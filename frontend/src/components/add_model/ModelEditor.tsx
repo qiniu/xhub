@@ -13,6 +13,7 @@ import { Input } from "@/components/ui/input";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
 import EndpointTypeField from "./EndpointTypeField";
+import { CachePriceWarning } from "./CachePriceWarning";
 import { BILLING_CATEGORIES, type BillingMode } from "./billing_categories";
 import {
   buildEditorModel,
@@ -526,6 +527,7 @@ export default function ModelEditor({
                           <option value="second">{t("providerGuideUI.seconds")}</option>
                         </select>
                       </div>
+                      {values.billing_mode === "token" && <CachePriceWarning read={values.cache_read_input_token_cost} write={values.cache_creation_input_token_cost} />}
                       {categories.map((category) => (
                         <fieldset key={category.id} className="space-y-3 rounded-lg border p-4">
                           <legend className="px-1 text-sm font-medium">{category.title}</legend>

@@ -1048,7 +1048,7 @@ jobs:
       - name: Run real usage contract regression
         env:
           XHUB_REGRESSION_COVERPROFILE: coverage/usage-contract.out
-        run: bash scripts/regression.sh '^Test(UsageContractRealTraffic|BodyReadDiagnostics|LogExactTimeWindow|ClientCancellationDoesNotCoolDeployment|AnthropicTokenCountContract|ErrorLogFilterContract|UpstreamDiagnosticsContract|RouteDiagnosticContract|NativeRouteDiagnosticContract|ResponsesNativeToolContinuation|StreamReadFailureDiagnostics|ResponsesFailedStreamCannotContinue|ResponseConnectionChanges)$'
+        run: bash scripts/regression.sh '^Test(CachePriceDiagnostics|UsageContractRealTraffic|BodyReadDiagnostics|LogExactTimeWindow|ClientCancellationDoesNotCoolDeployment|AnthropicTokenCountContract|ErrorLogFilterContract|UpstreamDiagnosticsContract|RouteDiagnosticContract|NativeRouteDiagnosticContract|ResponsesNativeToolContinuation|StreamReadFailureDiagnostics|ResponsesFailedStreamCannotContinue|ResponseConnectionChanges)$'
       - name: Validate regression coverage
         shell: bash
         run: |

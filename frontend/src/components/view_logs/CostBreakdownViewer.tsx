@@ -49,6 +49,8 @@ export interface CostBreakdown {
    */
   source?: "snapshot" | "recomputed";
   pricing_status?: "priced" | "unpriced";
+  /** 后台记录的安全未定价原因，只用于解释账单。 */
+  usage?: { PricingBlocked?: string };
 }
 
 interface CostBreakdownViewerProps {
@@ -92,6 +94,8 @@ export const CostBreakdownViewer: React.FC<CostBreakdownViewerProps> = ({
   const [open, setOpen] = useState(false);
   const isCached = String(cacheHit ?? "").toLowerCase() === "true";
   const isUnpriced = !isCached && costBreakdown?.pricing_status === "unpriced";
+  const pricingReason = costBreakdown?.usage?.PricingBlocked;
+  const reasonKey = pricingReason === "cache_read_price_missing" ? "cachePrice.readMissing" : pricingReason === "cache_write_price_missing" ? "cachePrice.writeMissing" : "cachePrice.unavailable";
   const hasTokenCounts = promptTokens !== undefined || completionTokens !== undefined;
 
   const hasCostBreakdown = costBreakdown?.input_cost !== undefined || costBreakdown?.output_cost !== undefined;
@@ -179,6 +183,7 @@ export const CostBreakdownViewer: React.FC<CostBreakdownViewerProps> = ({
         </CollapsibleTrigger>
         <CollapsibleContent>
           <div className="p-6 space-y-4">
+            {isUnpriced && pricingReason && <p role="status">{t(reasonKey)}</p>}
             {/* Step 1: Base Token Costs */}
             <div className="space-y-2 max-w-2xl">
               {(() => {
