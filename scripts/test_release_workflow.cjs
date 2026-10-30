@@ -637,3 +637,8 @@ test('release includes combined phase4 browser acceptance once per locale', () =
     assert.equal(source.split(scenario).length - 1, 1, `组合验收遗漏或重复: ${locale}`);
   }
 });
+
+// 缓存缺价提示必须进入真实发布浏览器门禁；检查既有步骤保留新场景，不用静态检查代替E2E。
+test('release verifies cache pricing warnings and actual bills', () => {
+ assert.ok(workflow.jobs.verify.steps.some(step => step.run?.includes('bash scripts/e2e.sh') && step.run.includes('cache-price-diagnostics.test.ts')));
+});

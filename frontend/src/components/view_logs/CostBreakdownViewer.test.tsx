@@ -477,3 +477,18 @@ it.each(["en", "zh-CN"] as const)("%s 完整显示小额费用并区分未知与
   rerender(<I18nProvider initialLocale={locale}><CostBreakdownViewer costBreakdown={{input_cost:0,output_cost:0,total_cost:0}} totalSpend={0} /></I18nProvider>);
   expect(screen.getAllByText("$0.00").length).toBeGreaterThan(0);
 });
+
+/** 真实双语组件验证缺价原因可见、未知错误不泄漏和缓存命中仍免费；自动卸载，不访问后台。 */
+for (const locale of ["en", "zh-CN"] as const) {
+  for (const code of ["cache_read_price_missing", "cache_write_price_missing", "private-internal-detail"]) {
+    it(`shows safe pricing reason ${locale} ${code}`, async () => {
+      window.localStorage.removeItem(LOCALE_COOKIE);
+      document.cookie = `${LOCALE_COOKIE}=; path=/; max-age=0`;
+      renderWithProviders(<I18nProvider initialLocale={locale}><CostBreakdownViewer costBreakdown={{ total_cost: 0, pricing_status: "unpriced", usage: { PricingBlocked: code } }} totalSpend={0}/></I18nProvider>);
+      await userEvent.click(screen.getByText(locale === "en" ? "Cost Breakdown" : "费用明细"));
+      expect(screen.getByRole("status")).toBeVisible();
+      expect(screen.getByRole("status")).not.toHaveTextContent("private-internal-detail");
+      expect(screen.getByRole("status")).toHaveTextContent(locale === "en" ? /price|priced/ : /价格|定价/);
+    });
+  }
+}

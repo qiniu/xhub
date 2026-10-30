@@ -238,7 +238,7 @@ test('model contract requires generated types and real deployment regression', (
 
 /** 日志契约作业必须实际执行HTTP/PG验证及清单漂移检查；只读YAML，不接触线上。 */
 test('usage contract includes real traffic and inventory gates', () => {
- assert.equal(step('usage-contract', 'Run real usage contract regression').run, "bash scripts/regression.sh '^Test(UsageContractRealTraffic|BodyReadDiagnostics|LogExactTimeWindow|ClientCancellationDoesNotCoolDeployment|AnthropicTokenCountContract|ErrorLogFilterContract|UpstreamDiagnosticsContract|RouteDiagnosticContract|NativeRouteDiagnosticContract|ResponsesNativeToolContinuation|StreamReadFailureDiagnostics|ResponsesFailedStreamCannotContinue|ResponseConnectionChanges)$'");
+ assert.equal(step('usage-contract', 'Run real usage contract regression').run, "bash scripts/regression.sh '^Test(CachePriceDiagnostics|UsageContractRealTraffic|BodyReadDiagnostics|LogExactTimeWindow|ClientCancellationDoesNotCoolDeployment|AnthropicTokenCountContract|ErrorLogFilterContract|UpstreamDiagnosticsContract|RouteDiagnosticContract|NativeRouteDiagnosticContract|ResponsesNativeToolContinuation|StreamReadFailureDiagnostics|ResponsesFailedStreamCannotContinue|ResponseConnectionChanges)$'");
  assert.match(step('usage-contract', 'Check core migration inventory').run, /contract-inventory.mjs --check/);
 });
 
