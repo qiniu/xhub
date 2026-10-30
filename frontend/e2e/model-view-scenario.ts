@@ -4,7 +4,7 @@ import { once } from "node:events";
 import { GATEWAY, loginAdmin, sessionBearer, stableGoto } from "./helpers";
 import { translate } from "../src/i18n/translate";
 
-/** 验证双语页面启停与真实对话并发、恢复后的型号/凭据更新和账单。
+/** 验证双语页面启停与真实对话并发、并发修改价格/地址/型号/凭据后的独立账单。
  * 前置真实浏览器/网关/隔离PG及本地协议上游；通道确认到达上游后点击停用，不依赖时间等待。
  * 请求等待同时识别直连和/gw代理路径，避免把已成功的更新误判为超时。
  * finally 释放在途请求、删除模型和凭据并关闭服务，运行器回收 schema 与日志。
@@ -12,7 +12,7 @@ import { translate } from "../src/i18n/translate";
 export function registerModelView(locale: "en" | "zh-CN") {
   test(`model view hot update ${locale}`, async ({ page }) => {
     const tr = (key: string, params?: Record<string, string>) => translate(locale, key, params);
-    const received: { model: string; authorization?: string }[] = [];
+    const received: { model: string; authorization?: string; path?: string; content: string }[] = [];
     let enter!: () => void;
     let release!: () => void;
     const entered = new Promise<void>(resolve => { enter = resolve; });
@@ -21,10 +21,12 @@ export function registerModelView(locale: "en" | "zh-CN") {
       const chunks: Buffer[] = [];
       for await (const chunk of req) chunks.push(Buffer.from(chunk));
       const body = JSON.parse(Buffer.concat(chunks).toString());
-      received.push({ model: body.model, authorization: req.headers.authorization });
+      const sequence = received.length + 1;
+      const observed = { model: body.model, authorization: req.headers.authorization, path: req.url, content: body.messages[0].content };
+      received.push(observed);
       if (received.length === 1) { enter(); await barrier; }
       res.writeHead(200, { "Content-Type": "application/json" });
-      const response = { id: `chat_view_${received.length}`, object: "chat.completion", choices: [{ index: 0, message: { role: "assistant", content: "View accepted" }, finish_reason: "stop" }], usage: { prompt_tokens: 8, completion_tokens: 2, total_tokens: 10 } };
+      const response = { id: `chat_view_${sequence}`, object: "chat.completion", choices: [{ index: 0, message: { role: "assistant", content: "View accepted" }, finish_reason: "stop" }], usage: { prompt_tokens: 8, completion_tokens: 2, total_tokens: 10 } };
       res.end(JSON.stringify(response));
     });
     upstream.listen(0, "127.0.0.1");
@@ -71,33 +73,39 @@ export function registerModelView(locale: "en" | "zh-CN") {
         expect(denied.text).toContain("error");
       }
       expect(received).toHaveLength(1);
-      release();
-      const completed = await active;
-      expect(completed.status, completed.text).toBe(200);
-      expect(completed.text).toContain("View accepted");
-      expect(received[0]).toEqual({ model: "wire-before", authorization: "Bearer view-before" });
+      expect((await page.request.post(GATEWAY + "/model/update", { headers, data: { id, litellm_params: { model: "wire-after", input_cost_per_token: 0.00001, output_cost_per_token: 0.00002 } } })).status()).toBe(200);
+      expect((await page.request.patch(GATEWAY + "/credentials/" + credential, { headers, data: { credential_values: { api_key: "view-after", api_base: `http://127.0.0.1:${port}/changed/v1` } } })).status()).toBe(200);
       pending = page.waitForResponse(r => new URL(r.url()).pathname.replace(/^\/gw(?=\/)/, "") === "/model/" + id + "/update" && r.request().method() === "PATCH");
       await toggle.click();
       expect((await pending).status()).toBe(200);
       await expect(toggle).toBeChecked();
-      expect((await page.request.post(GATEWAY + "/model/update", { headers, data: { id, litellm_params: { model: "wire-after" } } })).status()).toBe(200);
-      expect((await page.request.patch(GATEWAY + "/credentials/" + credential, { headers, data: { credential_values: { api_key: "view-after" } } })).status()).toBe(200);
-      const results = [completed];
+      // 让新请求先结束，再释放旧请求，验证每个调用的价格计划不会相互覆盖。
+      const results = [];
       for (const path of ["/v1/chat/completions", "/bypass/openai/v1/chat/completions"]) {
         const result = await call(path);
         expect(result.status, result.text).toBe(200);
         expect(result.text).toContain("View accepted");
         results.push(result);
       }
-      expect(received).toEqual([{ model: "wire-before", authorization: "Bearer view-before" }, { model: "wire-after", authorization: "Bearer view-after" }, { model: "wire-after", authorization: "Bearer view-after" }]);
-      for (const result of results) {
+      release();
+      const completed = await active;
+      expect(completed.status, completed.text).toBe(200);
+      expect(completed.text).toContain("View accepted");
+      results.unshift(completed);
+      const content = "Reply briefly. 保留原文";
+      expect(received).toEqual([
+        { model: "wire-before", authorization: "Bearer view-before", path: "/v1/chat/completions", content },
+        { model: "wire-after", authorization: "Bearer view-after", path: "/changed/v1/chat/completions", content },
+        { model: "wire-after", authorization: "Bearer view-after", path: "/changed/v1/chat/completions", content },
+      ]);
+      for (const [index, result] of results.entries()) {
         expect(result.callID).toBeTruthy();
         await expect.poll(async () => {
           const response = await page.request.get(GATEWAY + "/spend/logs/ui/" + result.callID, { headers });
           if (!response.ok()) return null;
           const log = await response.json();
           return { status: log.status, spend: Number(log.spend) };
-        }).toEqual({ status: "success", spend: 0.000012 });
+        }).toEqual({ status: "success", spend: expect.closeTo(index === 0 ? 0.000012 : 0.00012, 12) });
       }
       await stableGoto(page, "/logs?log_id=" + results[2].callID);
       await expect(page.getByRole("dialog")).toContainText(model);

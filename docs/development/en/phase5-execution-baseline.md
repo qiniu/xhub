@@ -4,7 +4,7 @@ Date: 2026-10-29. Proposal #241. Baseline main `09273d4d`. See the [fixed execut
 
 ## Status
 
-P0 has an initial ownership/test inventory with explicit gaps. P1 has local implementation and verification; CI, merge and deployment remain separate. P2 model-directory isolation has local evidence but pricing/connection update combinations and multi-store reads still need audit. P3 attempt results, P4 retries/resources, P5 history/logging/settlement and P6 combined acceptance remain pending. This is not phase-wide completion.
+P0 has an initial ownership/test inventory with explicit gaps. P1 has local implementation and verification; CI, merge and deployment remain separate. P2 model-directory isolation, pricing/connection update combinations and the multi-store read audit now have local evidence; CI, merge and combined acceptance remain separate. No atomic multi-store configuration update is promised. P3 attempt results, P4 retries/resources, P5 history/logging/settlement and P6 combined acceptance remain pending. This is not phase-wide completion.
 
 ## Ownership audit
 
@@ -92,3 +92,45 @@ Failure evidence is retained: expected old-getter failures and one unused-import
 Commands and evidence locations are listed in the [Chinese report](../zh-CN/phase5-execution-baseline.md). Local evidence: `.verification/phase5/P2/`, `.e2e/runs/regression-xHgU1Dlp/`, and `.e2e/phase5-p2-registered/`. Three 100-model nested-directory benchmarks measured 119570–139957 ns/op, approximately 142656 B/op and 2701 allocations/op; this measures isolation cost, not end-to-end latency improvement.
 
 No schema migration, merge or deployment. Reverting code does not revert configuration, spend or history. Permissions, budgets and the 70% patch gate are unchanged.
+
+
+## P2 pricing, connection and storage-read acceptance (2026-10-29)
+
+Based on #243 at `6a3f7da8`. This batch adds tests, CI selection and evidence only: no production, authorization, budget, pricing-rule or 70% patch-gate changes. No new product defect was reproduced.
+
+| Boundary | Observed behavior and limit |
+| --- | --- |
+| Model directory | Captured after admission/guardrails for standard requests and before alias resolution for Bypass creation. Compilation, candidates, diagnostics and cache scope share it. Native Responses eligibility still observes a separate earlier directory before history restoration. |
+| Identity/template | Identity selects a template ID; RouteSettingsFor reads the IAM row later. Lookup failure is rejected; a deleted row uses the existing default behavior. No transaction with the model directory. |
+| Defaults/fallbacks | Compile reads model_defaults then model_fallbacks separately. Store JSON decoding returns fresh objects; errors block compilation. The two reads can observe different commits. Existing unit and real routing regressions cover merging, failures and next-request updates. |
+| Named credentials | AttachCredential reads an uncached GetKV per candidate. Address/key stay attached through retries of that candidate; another candidate/request reads again. Caller authorization and balance checks remain live. |
+| Price plan | Every PrepareBudgetAttempt classifies token-only pricing then copies deployment/catalog prices. Submitted attempts use their own plan, including keys without a budget cap. Classification and copying are separate catalog reads: changing billing dimensions between them is not an atomic operation and is not dynamically verified here. |
+| Settlement | recordSpend first looks up current prices, then overrides with the frozen soft plan when present. The initial lookup is redundant for those calls and remains a P5 cleanup candidate. Missing prices must not silently reuse another plan. |
+| Responses ownership | Connection identity is bound before submission and checked again for continuation. A late old response cannot authorize its cursor on the new connection. |
+
+These are existing observation boundaries, not a configuration-version transaction. Cross-instance propagation, interleaved commits between storage reads and token/non-token changes before price-plan capture are explicitly outside this dynamic proof. Atomic publication requires a separate version/transaction design rather than silently changing locks or authorization caching.
+
+New TestModelViewPricingConnection covers 8 combinations: Chat/Responses, standard/Bypass, capped/uncapped key budget (verified in the database). Two real local HTTP upstreams, real management routes and isolated PostgreSQL hold an old call while changing model, tenfold pricing, address and key. The new call finishes first. Assertions cover actual target/credentials, five accounting scopes, individual logs, and 409/zero calls/zero added spend for the old Responses cursor.
+
+TestSoftPricePlanCatalogVersions covers separate old/new catalog plans, catalog deletion, zero usage, invalid usage and missing prices. Existing registered bilingual browser scenarios now disable the model, prove rejected calls never reach upstream, change configuration during an active call, enable it, complete new calls before the old one, verify each price and inspect the log UI. Original bilingual user input is preserved. The new regression is included in the real model CI job and coverage collection.
+
+Results: 500 unit/race leaves passed; 49 related real HTTP/PG leaves passed; final new-regression rerun 8 passed; restored price unit rerun 2 passed; 107 workflow/release/checklist tests passed. No skips/failures in accepted runs. The first browser run failed 2/2 because exact equality rejected `0.00012000000000000002` versus `0.00012`; cleanup succeeded. Using 12-digit precision preserved detection of tenfold mispricing. The accepted browser run passed 2/2 with no retries/skips, test_exit=0 and cleanup_exit=0; only 2/487 registered scenarios were selected. ESLint ended with zero warnings/errors; Go vet passed. Website tests passed 52/52 and the build generated 443 documentation pages and 2 homepages. The existing Next AVIF optimization warning remains.
+
+Local negative controls: rereading the deleted catalog during Charge failed both new unit leaves; bypassing the frozen-price override failed one real Chat regression on the old bill. Both product files were restored in finally, checked for no diff and retested. These deliberate mutations are test-validation evidence, not claimed existing bugs.
+
+Commands and full result counts are mirrored in the Chinese section above. Reproduction:
+
+```bash
+XHUB_REGRESSION_STRICT=1 go test -race ./internal/gateway/billing ./internal/router ./internal/config -count=1 -json
+XHUB_REGRESSION_COVERPROFILE="$PWD/.verification/phase5/P2-pricing/regression.out" bash scripts/regression.sh '^Test(ModelView.*|HardBudgetTierCatalogChanges|ResponseConnectionChanges|RouteTemplate.*|RoutePreviewMatchesInference|ModelFallback.*)$'
+XHUB_REGRESSION_COVERPROFILE="$PWD/.verification/phase5/P2-pricing/final-regression.out" bash scripts/regression.sh '^TestModelViewPricingConnection$'
+go test -race ./internal/gateway/billing -run '^TestSoftPricePlanCatalogVersions$' -count=1 -json
+E2E_RUN_DIR="$PWD/.e2e/model-view-pricing-accepted" bash scripts/e2e.sh model-view-hot-update-
+node --test scripts/test_quality_workflow.cjs scripts/test_release_workflow.cjs frontend/e2e/checklist-reporter.test.cjs
+(cd frontend && ./node_modules/.bin/eslint e2e/model-view-scenario.ts)
+go vet ./cmd/regression ./internal/gateway/billing ./internal/router
+npm test --prefix website
+npm run build --prefix website
+```
+
+Raw local evidence: `.verification/phase5/P2-pricing/`; related regression `.e2e/runs/regression-uZhp2bDt/`, final 8 leaves `.e2e/runs/regression-GNf7IEjT/`; initial browser failure `.e2e/model-view-pricing/`, accepted browser HTML and cleanup status `.e2e/model-view-pricing-accepted/`. Real suppliers, production proxies, multi-instance propagation, SSO and long-running external clients remain unverified. P3–P6 remain pending.
