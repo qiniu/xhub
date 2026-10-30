@@ -4,7 +4,7 @@ import { waitForLog } from "./product-fixes-scenario";
 import { translate, type Locale } from "../src/i18n/translate";
 
 /** 注册真实缓存页面与数据面验收；locale为语言，返回无。前置隔离网关、PG及本地模型。
- * 验证不支持设置、命中零费用、页面清理后未命中及真实401失败恢复。仅改请求头注入失败，不mock响应。
+ * 验证不支持设置、命中零费用、客户端no-cache/no-store、页面清理和真实401失败恢复；浏览器同源请求不mock响应。
  * finally移除路由并真实清理缓存；登录/日志由运行器严格删除私有schema。
  */
 export function registerCacheManagement(locale: Locale) {
@@ -49,6 +49,25 @@ export function registerCacheManagement(locale: Locale) {
         const row = await waitForLog(page.request, headers, response.headers()["x-litellm-call-id"]);
         const cost = Number(row.spend);
         if (index === 1) expect(cost).toBe(0); else expect(cost).toBeGreaterThan(0);
+      }
+      // 同源浏览器经过真实Next代理；每次强制刷新必须重新出站并产生独立账单，不能只检查请求参数。
+      for (let index = 0; index < 2; index++) {
+        const fresh = await page.evaluate(async ({ key, body }) => {
+          const response = await fetch("/gw/v1/chat/completions", { method: "POST", headers: { Authorization: "Bearer " + key, "Content-Type": "application/json" }, body: JSON.stringify({ ...body, cache: { "no-cache": true } }) });
+          return { status: response.status, hit: response.headers.get("x-litellm-cache-hit"), id: response.headers.get("x-litellm-call-id"), text: await response.text() };
+        }, { key, body });
+        expect(fresh.status, fresh.text).toBe(200);
+        expect(fresh.hit).not.toBe("true");
+        const log = await waitForLog(page.request, headers, fresh.id!);
+        expect(Number(log.spend)).toBeGreaterThan(0);
+        expect(String(log.cache_hit)).toBe("false");
+      }
+      const privateBody = { ...body, messages: [{ role: "user", content: "Do not store this response." }] };
+      for (let index = 0; index < 3; index++) {
+        const response = await page.request.post(GATEWAY + "/v1/chat/completions", { headers: inferenceHeaders, data: index < 2 ? { ...privateBody, cache: { "no-store": true } } : privateBody });
+        expect(response.status(), await response.text()).toBe(200);
+        expect(response.headers()["x-litellm-cache-hit"]).not.toBe("true");
+        expect(Number((await waitForLog(page.request, headers, response.headers()["x-litellm-call-id"])).spend)).toBeGreaterThan(0);
       }
       // 修改请求鉴权以触发真实后台401，保留浏览器登录会话；不伪造成功或失败响应。
       await page.route("**/flushall", (route) => route.continue({ headers: { ...route.request().headers(), authorization: "Bearer invalid-cache-test" } }));
