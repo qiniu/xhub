@@ -8031,8 +8031,8 @@ export const enPhrases: Record<string, string> = {
   "Enter a FAL task path as the upstream model, for example byteplus/seedance-2.0/text-to-video.":
     "Enter a FAL task path as the upstream model, for example byteplus/seedance-2.0/text-to-video.",
   "XHub public endpoints": "XHub public endpoints",
-  "Standard endpoints are enabled automatically and use the same public model name.":
-    "Standard endpoints are enabled automatically and use the same public model name.",
+  "modelEndpoints.automaticDescription":
+    "Standard endpoints and matching Chat Completions, Responses or Messages passthrough endpoints are enabled automatically. Choose the request path to use standard processing or passthrough; both use the same public model name.",
   "This model uses a provider-specific protocol. The passthrough endpoints below are enabled from registered capabilities.":
     "This model uses a provider-specific protocol. The passthrough endpoints below are enabled from registered capabilities.",
   "Enabled endpoints": "Enabled endpoints",

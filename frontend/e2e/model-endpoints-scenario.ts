@@ -1189,10 +1189,8 @@ test("upstream-only chat automatically exposes all customer dialogue APIs", asyn
       id = (await created.json()).model_info.id;
       const available = await page.request.get(GATEWAY + "/model/available", { headers });
       const deployment = (await available.json()).data.find((row: { id: string }) => row.id === name);
-      expect(deployment.endpoints).toHaveLength(7);
-      expect(
-        deployment.endpoints.some((entry: { endpoint_id: string }) => entry.endpoint_id.startsWith("bypass:")),
-      ).toBe(false);
+      expect(deployment.endpoints).toHaveLength(8);
+      expect(deployment.endpoints.filter((entry: { endpoint_id: string }) => entry.endpoint_id.startsWith("bypass:")).map((entry: { endpoint_id: string }) => entry.endpoint_id)).toEqual(["bypass:openai-chat"]);
       await stableGoto(page, "/models-and-endpoints");
       await page.getByRole("tab", { name: t("pages.models.all") }).click();
       await openModelDetails(page, name);
@@ -1208,7 +1206,9 @@ test("upstream-only chat automatically exposes all customer dialogue APIs", asyn
       await stableGoto(page, "/playground");
       await page.getByPlaceholder(t("Select a Model"), { exact: true }).click();
       await page.getByRole("option", { name, exact: true }).click();
+      // 从真实端点选择器选择默认透传，并验证原生响应和实际账单。
       for (const target of [
+        { path: "/bypass/openai/v1/chat/completions", google: true },
         { path: "/v1/chat/completions", google: false },
         { path: "/v1/responses", google: false },
         { path: "/v1/messages", google: false },
@@ -1216,8 +1216,8 @@ test("upstream-only chat automatically exposes all customer dialogue APIs", asyn
         { path: "/vertex/v1/models/" + name + ":generateContent", google: true },
       ]) {
         await page.getByPlaceholder(t("Select an endpoint"), { exact: true }).click();
-        await expect(page.getByRole("option")).toHaveCount(7);
-        await page.getByRole("option").filter({ hasText: target.path }).click();
+        await expect(page.getByRole("option")).toHaveCount(8);
+        await page.getByRole("option").filter({ hasText: " · " + target.path }).click();
         // SDK 在代理根地址下使用无 /v1 前缀路径，原生编辑器使用完整注册路径；两者均为网关真实入口。
         const pending = page.waitForResponse(
           (response) =>
@@ -1228,7 +1228,7 @@ test("upstream-only chat automatically exposes all customer dialogue APIs", asyn
         if (target.google) {
           await page
             .getByLabel("原生请求参数")
-            .fill(JSON.stringify({ contents: [{ role: "user", parts: [{ text: "hello" }] }] }));
+            .fill(JSON.stringify(target.path.startsWith("/bypass/") ? { messages: [{ role: "user", content: "Say hello." }], max_tokens: 32 } : { contents: [{ role: "user", parts: [{ text: "hello" }] }] }));
           await page.getByRole("button", { name: "提交请求", exact: true }).click();
         } else {
           await page.getByRole("button", { name: t("Clear Chat"), exact: true }).click();
@@ -1298,10 +1298,8 @@ test("upstream-only responses automatically exposes all customer dialogue APIs",
       id = (await created.json()).model_info.id;
       const available = await page.request.get(GATEWAY + "/model/available", { headers });
       const deployment = (await available.json()).data.find((row: { id: string }) => row.id === name);
-      expect(deployment.endpoints).toHaveLength(7);
-      expect(
-        deployment.endpoints.some((entry: { endpoint_id: string }) => entry.endpoint_id.startsWith("bypass:")),
-      ).toBe(false);
+      expect(deployment.endpoints).toHaveLength(8);
+      expect(deployment.endpoints.filter((entry: { endpoint_id: string }) => entry.endpoint_id.startsWith("bypass:")).map((entry: { endpoint_id: string }) => entry.endpoint_id)).toEqual(["bypass:openai-responses"]);
       await stableGoto(page, "/models-and-endpoints");
       await page.getByRole("tab", { name: t("pages.models.all") }).click();
       await openModelDetails(page, name);
@@ -1317,7 +1315,9 @@ test("upstream-only responses automatically exposes all customer dialogue APIs",
       await stableGoto(page, "/playground");
       await page.getByPlaceholder(t("Select a Model"), { exact: true }).click();
       await page.getByRole("option", { name, exact: true }).click();
+      // 从真实端点选择器选择默认透传，并验证原生响应和实际账单。
       for (const target of [
+        { path: "/bypass/openai/v1/responses", google: false },
         { path: "/v1/chat/completions", google: false },
         { path: "/v1/responses", google: false },
         { path: "/v1/messages", google: false },
@@ -1325,8 +1325,8 @@ test("upstream-only responses automatically exposes all customer dialogue APIs",
         { path: "/vertex/v1/models/" + name + ":generateContent", google: true },
       ]) {
         await page.getByPlaceholder(t("Select an endpoint"), { exact: true }).click();
-        await expect(page.getByRole("option")).toHaveCount(7);
-        await page.getByRole("option").filter({ hasText: target.path }).click();
+        await expect(page.getByRole("option")).toHaveCount(8);
+        await page.getByRole("option").filter({ hasText: " · " + target.path }).click();
         // SDK 在代理根地址下使用无 /v1 前缀路径，原生编辑器使用完整注册路径；两者均为网关真实入口。
         const pending = page.waitForResponse(
           (response) =>
@@ -1407,10 +1407,8 @@ test("upstream-only claude automatically exposes all customer dialogue APIs", as
       id = (await created.json()).model_info.id;
       const available = await page.request.get(GATEWAY + "/model/available", { headers });
       const deployment = (await available.json()).data.find((row: { id: string }) => row.id === name);
-      expect(deployment.endpoints).toHaveLength(7);
-      expect(
-        deployment.endpoints.some((entry: { endpoint_id: string }) => entry.endpoint_id.startsWith("bypass:")),
-      ).toBe(false);
+      expect(deployment.endpoints).toHaveLength(8);
+      expect(deployment.endpoints.filter((entry: { endpoint_id: string }) => entry.endpoint_id.startsWith("bypass:")).map((entry: { endpoint_id: string }) => entry.endpoint_id)).toEqual(["bypass:anthropic-messages"]);
       await stableGoto(page, "/models-and-endpoints");
       await page.getByRole("tab", { name: t("pages.models.all") }).click();
       await openModelDetails(page, name);
@@ -1426,7 +1424,9 @@ test("upstream-only claude automatically exposes all customer dialogue APIs", as
       await stableGoto(page, "/playground");
       await page.getByPlaceholder(t("Select a Model"), { exact: true }).click();
       await page.getByRole("option", { name, exact: true }).click();
+      // 从真实端点选择器选择默认透传，并验证原生响应和实际账单。
       for (const target of [
+        { path: "/bypass/anthropic/v1/messages", google: false },
         { path: "/v1/chat/completions", google: false },
         { path: "/v1/responses", google: false },
         { path: "/v1/messages", google: false },
@@ -1434,8 +1434,8 @@ test("upstream-only claude automatically exposes all customer dialogue APIs", as
         { path: "/vertex/v1/models/" + name + ":generateContent", google: true },
       ]) {
         await page.getByPlaceholder(t("Select an endpoint"), { exact: true }).click();
-        await expect(page.getByRole("option")).toHaveCount(7);
-        await page.getByRole("option").filter({ hasText: target.path }).click();
+        await expect(page.getByRole("option")).toHaveCount(8);
+        await page.getByRole("option").filter({ hasText: " · " + target.path }).click();
         // SDK 在代理根地址下使用无 /v1 前缀路径，原生编辑器使用完整注册路径；两者均为网关真实入口。
         const pending = page.waitForResponse(
           (response) =>

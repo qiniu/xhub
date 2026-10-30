@@ -162,8 +162,8 @@ describe("model scoped endpoint transports", () => {
     await user.click(screen.getByRole("button", { name: "English" }));
     expect(await screen.findByText(/Enter a FAL task path/)).toHaveTextContent("byteplus/seedance-2.0/text-to-video");
   });
-  /** 前置对话目录和真实表单；验证默认折叠、键盘展开、无路径项、直通勾选及反复折叠不丢声明；自动卸载清理。 */
-  it("collapses endpoint cards by default and preserves optional bypass selections", async () => {
+  /** 前置对话目录和真实表单；验证默认折叠、键盘展开、无路径项、旧声明自动展示透传、双语切换及折叠不改写草稿；自动卸载清理。 */
+  it("shows automatic bypass without rewriting existing declarations", async () => {
     vi.mocked(apiClient.get).mockResolvedValue({
       endpoint_types: [
         {
@@ -194,13 +194,16 @@ describe("model scoped endpoint transports", () => {
     });
     const user = userEvent.setup();
     render(
-      <EndpointForm
-        defaultValues={{
-          model: "group/model",
-          transport: "bypass_openai_responses",
-          endpoint_types: ["chat", "gemini", "messages"],
-        }}
-      />,
+      <I18nProvider initialLocale="zh-CN">
+        <LocaleControls />
+        <EndpointForm
+          defaultValues={{
+            model: "group/model",
+            transport: "bypass_openai_responses",
+            endpoint_types: ["chat", "gemini", "messages"],
+          }}
+        />
+      </I18nProvider>,
     );
     const region = await screen.findByRole("region", { name: "XHub 对外接口" });
     const toggle = within(region).getByRole("button", { name: "XHub 对外接口" });
@@ -212,22 +215,62 @@ describe("model scoped endpoint transports", () => {
     toggle.focus();
     await user.keyboard("{Enter}");
     expect(toggle).toHaveAttribute("aria-expanded", "true");
-    expect(within(region).getAllByRole("listitem")).toHaveLength(3);
+    expect(within(region).getAllByRole("listitem")).toHaveLength(4);
     const gemini = within(region).getByRole("listitem", { name: "Gemini · Generate Content" });
     expect(within(gemini).getByText("/v1beta/models/{model}:generateContent").tagName).toBe("CODE");
     expect(within(gemini).getByText("/v1beta/models/{model}:streamGenerateContent").tagName).toBe("CODE");
-    const bypass = within(region).getByRole("checkbox", { name: "Bypass · OpenAI Responses" });
-    expect(bypass).not.toBeChecked();
-    await user.click(bypass);
-    expect(bypass).toBeChecked();
-    expect(screen.getByLabelText("部署声明")).toHaveTextContent("bypass:openai-responses");
+    const bypass = within(region).getByRole("listitem", { name: "Bypass · OpenAI Responses" });
+    expect(within(bypass).getByText("已启用")).toBeVisible();
+    expect(within(region).queryByRole("checkbox")).not.toBeInTheDocument();
+    expect(within(region).getByText(/调用时通过请求路径/)).toBeVisible();
     await user.click(toggle);
     expect(bypass).not.toBeVisible();
-    expect(screen.getByLabelText("部署声明")).toHaveTextContent("bypass:openai-responses");
+    await user.click(toggle);
+    expect(bypass).toBeVisible();
+    await user.click(screen.getByRole("button", { name: "English" }));
+    expect(within(bypass).getByText("Enabled")).toBeVisible();
+    expect(within(region).getByText(/Choose the request path/)).toBeVisible();
+    expect(screen.getByLabelText("部署声明")).toHaveTextContent('"endpoint_types":["chat","gemini","messages"]');
+    expect(screen.getByLabelText("部署声明")).toHaveTextContent('"model":"group/model"');
+  });
+  /** 前置 Gemini 标准和原生目录；验证不在默认范围的透传仍可勾选、取消和折叠保留，组件卸载清理。 */
+  it("keeps other bypass endpoints optional", async () => {
+    vi.mocked(apiClient.get).mockResolvedValue({
+      endpoint_types: [
+        {
+          id: "gemini",
+          label: "Gemini",
+          kind: "adapted",
+          protocol: "gemini",
+          paths: ["/v1beta/models/{model}:generateContent"],
+        },
+        {
+          id: "bypass:gemini",
+          label: "Bypass · Gemini",
+          kind: "bypass",
+          protocol: "gemini",
+          paths: ["/bypass/gemini/v1beta/models/{model}:generateContent"],
+        },
+      ],
+      transports: [{ id: "gemini_generate_content", endpoint_id: "gemini", protocol: "gemini", kind: "adapted" }],
+    });
+    const user = userEvent.setup();
+    render(
+      <EndpointForm
+        defaultValues={{ model: "custom-model", transport: "gemini_generate_content", endpoint_types: ["gemini"] }}
+      />,
+    );
+    const toggle = await screen.findByRole("button", { name: "XHub 对外接口" });
+    await user.click(toggle);
+    const bypass = screen.getByRole("checkbox", { name: "Bypass · Gemini" });
+    expect(bypass).not.toBeChecked();
+    await user.click(bypass);
+    expect(screen.getByLabelText("部署声明")).toHaveTextContent('"endpoint_types":["gemini","bypass:gemini"]');
+    await user.click(toggle);
     await user.click(toggle);
     expect(bypass).toBeChecked();
     await user.click(bypass);
-    expect(screen.getByLabelText("部署声明")).toHaveTextContent('"endpoint_types":["chat","gemini","messages"]');
+    expect(screen.getByLabelText("部署声明")).toHaveTextContent('"endpoint_types":["gemini"]');
   });
   // 前置真实表单与确定性目录；验证加载、失败和声明联动，测试库自动卸载，无持久数据。
   it("settles while the endpoint catalog is loading and applies defaults when it arrives", async () => {
