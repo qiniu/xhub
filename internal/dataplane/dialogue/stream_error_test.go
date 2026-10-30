@@ -1,6 +1,7 @@
 package dialogue
 
 import (
+	"context"
 	"fmt"
 	"io"
 	"net/http"
@@ -9,6 +10,29 @@ import (
 	"testing"
 	"time"
 )
+
+// TestStreamCancellationEvent 验证三种入站协议的网关取消事件均保留来源及未知发起方。
+// 参数t为上下文；本地context错误不得标为供应商错误，Responses仍输出failed而非completed；纯内存，无清理。
+func TestStreamCancellationEvent(t *testing.T) {
+	for _, protocol := range []string{"openai-chat", "openai-responses", "anthropic-messages"} {
+		t.Run(protocol, func(t *testing.T) {
+			event, payload := streamFailureEvent(context.Canceled, protocol, "resp-cancel")
+			fields, _ := payload["error"].(map[string]any)
+			if protocol == "openai-responses" {
+				response := payload["response"].(map[string]any)
+				fields = response["error"].(map[string]any)
+				if event != "response.failed" || response["status"] != "failed" || response["id"] != "resp-cancel" {
+					t.Fatalf("Responses失败终态不正确: %v", payload)
+				}
+			} else if event != "error" {
+				t.Fatalf("错误事件名称不正确: %s", event)
+			}
+			if payload["error_origin"] != "gateway" || payload["cancellation_source"] != "unknown" || fields["code"] != "request_canceled" {
+				t.Fatalf("取消事件虚构供应商错误或发起方: %v", payload)
+			}
+		})
+	}
+}
 
 // TestStreamErrorDetailsMatrix 验证 Chat/Responses/Messages 原生与转换流在首帧/中途失败均保留诊断。
 // 使用内存 SSE；参数 t 为上下文，核对 code/type/message/request_id、不产生成功终态，正文由管道关闭，无外部清理。
