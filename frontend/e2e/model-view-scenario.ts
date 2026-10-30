@@ -6,6 +6,7 @@ import { translate } from "../src/i18n/translate";
 
 /** 验证双语页面启停与真实对话并发、恢复后的型号/凭据更新和账单。
  * 前置真实浏览器/网关/隔离PG及本地协议上游；通道确认到达上游后点击停用，不依赖时间等待。
+ * 请求等待同时识别直连和/gw代理路径，避免把已成功的更新误判为超时。
  * finally 释放在途请求、删除模型和凭据并关闭服务，运行器回收 schema 与日志。
  */
 export function registerModelView(locale: "en" | "zh-CN") {
@@ -60,7 +61,7 @@ export function registerModelView(locale: "en" | "zh-CN") {
       }, { bearer, model, path });
       const active = call("/v1/chat/completions");
       await entered;
-      let pending = page.waitForResponse(r => new URL(r.url()).pathname === "/model/" + id + "/update" && r.request().method() === "PATCH");
+      let pending = page.waitForResponse(r => new URL(r.url()).pathname.replace(/^\/gw(?=\/)/, "") === "/model/" + id + "/update" && r.request().method() === "PATCH");
       await toggle.click();
       expect((await pending).status()).toBe(200);
       await expect(toggle).not.toBeChecked();
@@ -75,7 +76,7 @@ export function registerModelView(locale: "en" | "zh-CN") {
       expect(completed.status, completed.text).toBe(200);
       expect(completed.text).toContain("View accepted");
       expect(received[0]).toEqual({ model: "wire-before", authorization: "Bearer view-before" });
-      pending = page.waitForResponse(r => new URL(r.url()).pathname === "/model/" + id + "/update" && r.request().method() === "PATCH");
+      pending = page.waitForResponse(r => new URL(r.url()).pathname.replace(/^\/gw(?=\/)/, "") === "/model/" + id + "/update" && r.request().method() === "PATCH");
       await toggle.click();
       expect((await pending).status()).toBe(200);
       await expect(toggle).toBeChecked();
