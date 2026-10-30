@@ -48,7 +48,7 @@ test("真实验收按部署行核对单入口和 chat · responses 并完成浏�
     await page.getByRole("option", { name, exact: true }).click();
     for (const endpoint of ["chat/completions", "responses"]) {
       await page.getByPlaceholder(t("Select an endpoint"), { exact: true }).click();
-      await page.getByRole("option").filter({ hasText: new RegExp("/v1/" + endpoint + "$") }).click();
+      await page.getByRole("option").filter({ hasText: new RegExp("(?:^|\\s)/v1/" + endpoint + "$") }).click();
       await page.getByPlaceholder(t("Type your message... (Shift+Enter for new line)")).filter({ visible: true }).fill("grouped endpoint acceptance");
       const pending = page.waitForResponse(response => new URL(response.url()).pathname.endsWith("/" + endpoint) && response.request().method() === "POST");
       await page.getByRole("button", { name: t("Send message") }).click();

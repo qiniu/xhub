@@ -12,7 +12,7 @@ test("Responses incremental continuation SSE", async ({ page }) => {
     await page.getByPlaceholder(t("Select a Model"), { exact: true }).click();
     await page.getByRole("option", { name: "e2e-responses-history", exact: true }).click();
     await page.getByPlaceholder(t("Select an endpoint"), { exact: true }).click();
-    await page.getByRole("option").filter({ hasText: /\/v1\/responses$/ }).click();
+    await page.getByRole("option").filter({ hasText: /(?:^|\s)\/v1\/responses$/ }).click();
     await expect(page.getByRole("switch", { name: t("Use API session management") })).toBeChecked();
     const headers = { Authorization: "Bearer " + await sessionBearer(page) };
     let previous = "";
@@ -28,7 +28,7 @@ test("Responses incremental continuation SSE", async ({ page }) => {
         await page.getByPlaceholder(t("Select a Model"), { exact: true }).click();
         await page.getByRole("option", { name: "e2e-responses-history", exact: true }).click();
         await page.getByPlaceholder(t("Select an endpoint"), { exact: true }).click();
-        await page.getByRole("option").filter({ hasText: /\/v1\/responses$/ }).click();
+        await page.getByRole("option").filter({ hasText: /(?:^|\s)\/v1\/responses$/ }).click();
         await expect(page.getByText("history-ok-2", { exact: true })).toBeVisible();
       }
       await page.getByPlaceholder(t("Type your message... (Shift+Enter for new line)")).filter({ visible: true }).fill("continuation-" + turn);
@@ -98,7 +98,7 @@ test("Responses incremental continuation JSON", async ({ page }) => {
     await page.getByPlaceholder(t("Select a Model"), { exact: true }).click();
     await page.getByRole("option", { name: "e2e-responses-history", exact: true }).click();
     await page.getByPlaceholder(t("Select an endpoint"), { exact: true }).click();
-    await page.getByRole("option").filter({ hasText: /\/v1\/responses$/ }).click();
+    await page.getByRole("option").filter({ hasText: /(?:^|\s)\/v1\/responses$/ }).click();
     await expect(page.getByRole("switch", { name: t("Use API session management") })).toBeChecked();
     const headers = { Authorization: "Bearer " + await sessionBearer(page) };
     let previous = "";
@@ -114,7 +114,7 @@ test("Responses incremental continuation JSON", async ({ page }) => {
         await page.getByPlaceholder(t("Select a Model"), { exact: true }).click();
         await page.getByRole("option", { name: "e2e-responses-history", exact: true }).click();
         await page.getByPlaceholder(t("Select an endpoint"), { exact: true }).click();
-        await page.getByRole("option").filter({ hasText: /\/v1\/responses$/ }).click();
+        await page.getByRole("option").filter({ hasText: /(?:^|\s)\/v1\/responses$/ }).click();
         await expect(page.getByText("history-ok-2", { exact: true })).toBeVisible();
       }
       await page.getByPlaceholder(t("Type your message... (Shift+Enter for new line)")).filter({ visible: true }).fill("continuation-" + turn);

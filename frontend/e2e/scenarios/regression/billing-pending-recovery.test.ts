@@ -42,7 +42,7 @@ test("pending billing survives database transaction failure without Redis", asyn
     await page.getByPlaceholder(t("Select an endpoint"), { exact: true }).click();
     await page
       .getByRole("option")
-      .filter({ hasText: /\/v1\/chat\/completions$/ })
+      .filter({ hasText: /(?:^|\s)\/v1\/chat\/completions$/ })
       .click();
     await page
       .getByPlaceholder(t("Type your message... (Shift+Enter for new line)"))
