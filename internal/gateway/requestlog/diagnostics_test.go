@@ -1,6 +1,7 @@
 package requestlog
 
 import (
+	"encoding/json"
 	dpdiagnostics "github.com/sunqirui1987/xhub/internal/dataplane/diagnostics"
 	"strings"
 	"testing"
@@ -32,5 +33,20 @@ func TestFailureJSONPreservesTerminalError(t *testing.T) {
 				t.Fatalf("尾部错误丢失: %s", got)
 			}
 		})
+	}
+}
+
+// TestCancellationFailureJSON 保留独立上游错误且没有上游证据时明确为空，不再把部分生成内容当成错误；纯内存无清理。
+func TestCancellationFailureJSON(t *testing.T) {
+	for _, observed := range []bool{false, true} {
+		d := &dpdiagnostics.UpstreamDiagnostics{StatusCode: 200, Failure: &dpdiagnostics.Failure{Kind: "request_canceled", Phase: "response_transfer", CancellationSource: "unknown"}}
+		if observed {
+			d.Error = map[string]any{"error": map[string]any{"code": "vendor_overloaded"}, "request_id": "vendor-trace"}
+		}
+		raw := FailureJSON(d, "data: partial generated content")
+		var got map[string]any
+		if json.Unmarshal([]byte(raw), &got) != nil || got["diagnostics"] == nil || (got["upstream_error"] != nil) != observed {
+			t.Fatalf("取消证据丢失: %s", raw)
+		}
 	}
 }

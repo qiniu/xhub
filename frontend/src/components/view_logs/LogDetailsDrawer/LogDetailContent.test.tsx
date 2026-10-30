@@ -127,3 +127,16 @@ it.each(["en", "zh-CN"] as const)("%s 请求详情展示明确推理强度及未
   expect(screen.getByText(locale === "en" ? "Not recorded" : "未记录")).toBeVisible();
   expect(screen.queryByText("high (reasoning_effort=high)")).not.toBeInTheDocument();
 });
+
+/** 前置取消日志含独立传输事实；验证中英文、上游证据缺失提示和原错误不被翻译，自动卸载清理。 */
+it.each(["zh-CN", "en"] as const)("%s 取消诊断不推断用户停止或供应商正常", (locale) => {
+ const failure={kind:"request_canceled",phase:"response_transfer",cancellation_source:"unknown",elapsed_ms:60123,transport_error:"context canceled"};
+ const {rerender}=render(<I18nProvider initialLocale={locale}><LogDetailContent logEntry={logEntry({metadata:{upstream_response:{status_code:0,failure}}})} /></I18nProvider>);
+ const region=screen.getByRole("region",{name:translate(locale,"logDiagnostics.title")});
+ expect(region).toHaveTextContent(translate(locale,"logDiagnostics.cancelUnknown"));
+ expect(region).toHaveTextContent(translate(locale,"logDiagnostics.noUpstreamError"));
+ expect(region).toHaveTextContent("60123");
+ rerender(<I18nProvider initialLocale={locale}><LogDetailContent logEntry={logEntry({metadata:{upstream_response:{status_code:200,failure,error:{error:{code:"vendor_disconnect",message:"Original vendor error"}}}}})} /></I18nProvider>);
+ expect(region).toHaveTextContent("Original vendor error");
+ expect(region).not.toHaveTextContent(translate(locale,"logDiagnostics.noUpstreamError"));
+});

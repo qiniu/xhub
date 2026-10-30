@@ -68,9 +68,12 @@ async function waitForStoredLog(page: Page, headers: Record<string, string>, cal
  * 调用场景：错误日志和普通日志 tab 共用；只操作可访问名称与当前测试行，不触碰其他日志。
  */
 async function openLogDetails(page: Page, callId: string): Promise<void> {
-  const search = page.getByPlaceholder(/按 ID 搜索日志|Search logs by ID/);
+  // 页签切换动画中两个面板可能同时可见，按选中页签的可访问名称定位，不能全页面找同名输入。
+  const selected = page.getByRole("tab", { selected: true, name: /^(日志|Logs|错误日志|Error Logs)$/ });
+  const panel = page.getByRole("tabpanel", { name: (await selected.innerText()).trim(), exact: true });
+  const search = panel.getByPlaceholder(/按 ID 搜索日志|Search logs by ID/);
   await search.fill(callId);
-  const row = page.getByRole("row").filter({ hasText: callId });
+  const row = panel.getByRole("row").filter({ hasText: callId });
   await expect(row, `应在当前日志 tab 找到请求 ${callId}`).toBeVisible();
   await row.click();
   await expect(page.getByRole("dialog")).toBeVisible();
@@ -161,7 +164,7 @@ test("错误日志详情完整显示上游正文并可返回普通日志", async
     await stableGoto(page, "/logs");
 
     // 验证互斥筛选通过后台分页生效，普通日志不出现失败请求，错误日志不出现成功请求。
-    const search = page.getByPlaceholder(/按 ID 搜索日志|Search logs by ID/);
+    const search = page.getByPlaceholder(/按 ID 搜索日志|Search logs by ID/).filter({ visible: true });
     await search.fill(failedCallId);
     await expect(page.getByRole("row").filter({ hasText: failedCallId })).toHaveCount(0);
     await expect(page.getByTestId("pagination-range")).toHaveText(t("consoleDirectory.pagination.empty"));
@@ -250,7 +253,7 @@ test("退役接口不进入模型日志且真实推理错误继续可见", async
   const callId = rejected.headers()["x-litellm-call-id"];
   await waitForStoredLog(page, headers, callId);
   await stableGoto(page, "/logs");
-  const search = page.getByPlaceholder(/按 ID 搜索日志|Search logs by ID/);
+  const search = page.getByPlaceholder(/按 ID 搜索日志|Search logs by ID/).filter({ visible: true });
   for (const tabName of [/^(日志|Logs)$/, /错误日志|Error Logs/]) {
     await page.getByRole("tab", { name: tabName, exact: true }).click();
     for (const id of retiredIds) {
@@ -288,7 +291,7 @@ test("错误日志独立记录并显示诊断：text", async ({ page }) => {
       expect(callId).toBeTruthy();
       await waitForStoredLog(page, headers, callId);
       await stableGoto(page, "/logs");
-      await page.getByPlaceholder(/按 ID 搜索日志|Search logs by ID/).fill(callId);
+      await page.getByPlaceholder(/按 ID 搜索日志|Search logs by ID/).filter({ visible: true }).fill(callId);
       await expect(page.getByTestId("pagination-range")).toHaveText(t("consoleDirectory.pagination.empty"));
       await expect(page.getByRole("row").filter({ hasText: callId })).toHaveCount(0);
       await page.getByRole("tab", { name: /错误日志|Error Logs/, exact: true }).click();
@@ -331,7 +334,7 @@ test("错误日志独立记录并显示诊断：network", async ({ page }) => {
       expect(callId).toBeTruthy();
       await waitForStoredLog(page, headers, callId);
       await stableGoto(page, "/logs");
-      await page.getByPlaceholder(/按 ID 搜索日志|Search logs by ID/).fill(callId);
+      await page.getByPlaceholder(/按 ID 搜索日志|Search logs by ID/).filter({ visible: true }).fill(callId);
       await expect(page.getByTestId("pagination-range")).toHaveText(t("consoleDirectory.pagination.empty"));
       await expect(page.getByRole("row").filter({ hasText: callId })).toHaveCount(0);
       await page.getByRole("tab", { name: /错误日志|Error Logs/, exact: true }).click();
@@ -374,7 +377,7 @@ test("错误日志独立记录并显示诊断：rejected", async ({ page }) => {
       expect(callId).toBeTruthy();
       await waitForStoredLog(page, headers, callId);
       await stableGoto(page, "/logs");
-      await page.getByPlaceholder(/按 ID 搜索日志|Search logs by ID/).fill(callId);
+      await page.getByPlaceholder(/按 ID 搜索日志|Search logs by ID/).filter({ visible: true }).fill(callId);
       await expect(page.getByTestId("pagination-range")).toHaveText(t("consoleDirectory.pagination.empty"));
       await expect(page.getByRole("row").filter({ hasText: callId })).toHaveCount(0);
       await page.getByRole("tab", { name: /错误日志|Error Logs/, exact: true }).click();

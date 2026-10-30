@@ -4,6 +4,7 @@ import (
 	"net/http/httptest"
 	"net/url"
 	"testing"
+	"time"
 
 	"github.com/sunqirui1987/xhub/internal/authz"
 	"github.com/sunqirui1987/xhub/internal/iam"
@@ -12,17 +13,26 @@ import (
 // TestTaskStatusFilters 验证日志查询接受任务阶段和旧失败筛选，未知状态不扩大筛选；纯函数测试无数据清理。
 func TestTaskStatusFilters(t *testing.T) {
 	// 普通日志由 non_error 明确指定，不能退化为不带条件的全部日志。
-	got := logQuery(httptest.NewRequest("GET", "/spend/logs/ui?status_filter=non_error", nil), &authz.Scope{})
+	got, err := logQuery(httptest.NewRequest("GET", "/spend/logs/ui?status_filter=non_error", nil), &authz.Scope{})
+	if err != nil {
+		t.Fatal(err)
+	}
 	if got.Status != "non_error" {
 		t.Fatalf("普通日志分类丢失: %q", got.Status)
 	}
-	searched := logQuery(httptest.NewRequest("GET", "/spend/logs/ui?request_id=exact-id&search=partial-id", nil), &authz.Scope{})
+	searched, err := logQuery(httptest.NewRequest("GET", "/spend/logs/ui?request_id=exact-id&search=partial-id", nil), &authz.Scope{})
+	if err != nil {
+		t.Fatal(err)
+	}
 	if searched.RequestID != "exact-id" || searched.Search != "partial-id" {
 		t.Fatalf("请求 ID 筛选丢失: %+v", searched)
 	}
 	for _, tc := range []struct{ input, want string }{{"executing", "executing"}, {"polling", "polling"}, {"completed", "completed"}, {"success", "success"}, {"failed", "error"}, {"error", "error"}, {"unknown", ""}, {"", ""}} {
 		raw := url.Values{"status_filter": {tc.input}}
-		got := logQuery(httptest.NewRequest("GET", "/spend/logs/ui?"+raw.Encode(), nil), &authz.Scope{})
+		got, err := logQuery(httptest.NewRequest("GET", "/spend/logs/ui?"+raw.Encode(), nil), &authz.Scope{})
+		if err != nil {
+			t.Fatal(err)
+		}
 		if got.Status != tc.want {
 			t.Fatalf("status filter %q = %q, want %q", tc.input, got.Status, tc.want)
 		}
@@ -113,7 +123,10 @@ func TestLogPaginationQuery(t *testing.T) {
 		raw, field string
 		asc        bool
 	}{{"", "", false}, {"sort_by=spend&sort_order=asc", "spend", true}, {"sort_by=unknown&sort_order=broken", "unknown", false}} {
-		q := logQuery(httptest.NewRequest("GET", "/?"+c.raw, nil), &authz.Scope{})
+		q, err := logQuery(httptest.NewRequest("GET", "/?"+c.raw, nil), &authz.Scope{})
+		if err != nil {
+			t.Fatal(err)
+		}
 		if q.SortBy != c.field || q.SortAsc != c.asc {
 			t.Fatalf("日志排序条件错误: %+v", q)
 		}
@@ -168,9 +181,44 @@ func TestLogErrorFilters(t *testing.T) {
 		{"broken", "%_' OR true --", "broken"}, {"600", "Message With Spaces", "600"},
 	} {
 		raw := url.Values{"error_code": {tc.code}, "error_message": {tc.message}}
-		q := logQuery(httptest.NewRequest("GET", "/spend/logs/ui?"+raw.Encode(), nil), &authz.Scope{})
+		q, err := logQuery(httptest.NewRequest("GET", "/spend/logs/ui?"+raw.Encode(), nil), &authz.Scope{})
+		if err != nil {
+			t.Fatal(err)
+		}
 		if q.ErrorCode != tc.want || q.ErrorMessage != tc.message {
 			t.Fatalf("错误筛选未原样进入查询: %+v", q)
+		}
+	}
+}
+
+// TestLogExactWindow 验证控制台 UTC 时间和带时区时间不丢失，日期结束仍包含整天；纯查询无持久化清理。
+func TestLogExactWindow(t *testing.T) {
+	for _, tc := range []struct{ from, to, wantFrom, wantTo string }{
+		{"2026-10-29 02:52:00", "2026-10-30 02:52:00", "2026-10-29T02:52:00Z", "2026-10-30T02:52:00Z"},
+		{"2026-10-29T10:52:00+08:00", "2026-10-30T10:52:00.123+08:00", "2026-10-29T02:52:00Z", "2026-10-30T02:52:00.123Z"},
+		{"2026-10-29", "2026-10-30", "2026-10-29T00:00:00Z", "2026-10-30T23:59:59.999999999Z"},
+	} {
+		q, err := logQuery(httptest.NewRequest("GET", "/?"+url.Values{"start_date": {tc.from}, "end_date": {tc.to}}.Encode(), nil), &authz.Scope{})
+		if err != nil {
+			t.Fatal(err)
+		}
+		if q.From.UTC().Format(time.RFC3339Nano) != tc.wantFrom || q.To.UTC().Format(time.RFC3339Nano) != tc.wantTo {
+			t.Errorf("时间条件丢失或范围扩大: %+v", q)
+		}
+	}
+}
+
+// TestLogInvalidWindow 验证非法、反向及空白时间拒绝查询；空边界仍兼容，纯函数无清理。
+func TestLogInvalidWindow(t *testing.T) {
+	for _, tc := range []struct {
+		from, to string
+		bad      bool
+	}{
+		{"", "", false}, {"2026-10-30", "", false}, {"bad", "", true}, {"", "bad", true}, {" ", "", true}, {"2026-10-31", "2026-10-30", true},
+	} {
+		_, err := logQuery(httptest.NewRequest("GET", "/?"+url.Values{"start_date": {tc.from}, "end_date": {tc.to}}.Encode(), nil), &authz.Scope{})
+		if (err != nil) != tc.bad {
+			t.Errorf("无效时间窗口校验错误: %+v err=%v", tc, err)
 		}
 	}
 }

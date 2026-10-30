@@ -6,9 +6,9 @@
 
 | 操作 | 行为 | HTTP 状态 |
 | --- | --- | --- |
-| `GET /spend/logs/v2` | 权限范围内日志，page无效回退1，page_size超出1..200回退50；日期按UTC含结束日；会话聚合先分组后分页；未声明筛选不保证有效 | 200, 400, 401, 403, 404, 409, 500, 503 |
-| `GET /spend/logs/ui` | 权限范围内日志，page无效回退1，page_size超出1..200回退50；日期按UTC含结束日；会话聚合先分组后分页；未声明筛选不保证有效 | 200, 400, 401, 403, 404, 409, 500, 503 |
-| `GET /spend/logs/session/ui` | 权限范围内日志，page无效回退1，page_size超出1..200回退50；日期按UTC含结束日；会话聚合先分组后分页；未声明筛选不保证有效 | 200, 400, 401, 403, 404, 409, 500, 503 |
+| `GET /spend/logs/v2` | 权限范围内日志，page无效回退1，page_size超出1..200回退50；日期按UTC含结束日；完整时间精确过滤，非法或倒置窗口返回400；会话聚合先分组后分页；未声明筛选不保证有效 | 200, 400, 401, 403, 404, 409, 500, 503 |
+| `GET /spend/logs/ui` | 权限范围内日志，page无效回退1，page_size超出1..200回退50；日期按UTC含结束日；完整时间精确过滤，非法或倒置窗口返回400；会话聚合先分组后分页；未声明筛选不保证有效 | 200, 400, 401, 403, 404, 409, 500, 503 |
+| `GET /spend/logs/session/ui` | 权限范围内日志，page无效回退1，page_size超出1..200回退50；日期按UTC含结束日；完整时间精确过滤，非法或倒置窗口返回400；会话聚合先分组后分页；未声明筛选不保证有效 | 200, 400, 401, 403, 404, 409, 500, 503 |
 | `GET /spend/logs/ui/{request_id}` | 范围外与不存在均404；管理员读取他人详情记审计；正文缺失可为空，非JSON上游响应为字符串；并非所有错误均有账单 | 200, 400, 401, 403, 404, 409, 500, 503 |
 | `GET /user/daily/activity` | 授权后按天汇总；分页合计仅当前页，aggregated合计全范围；无效日期保留开放边界；缓存未知不填0 | 200, 400, 401, 403, 404, 409, 500, 503 |
 | `GET /user/daily/activity/aggregated` | 授权后按天汇总；分页合计仅当前页，aggregated合计全范围；无效日期保留开放边界；缓存未知不填0 | 200, 400, 401, 403, 404, 409, 500, 503 |
@@ -18,7 +18,7 @@
 
 ### GET /spend/logs/v2
 
-权限范围内日志，page无效回退1，page_size超出1..200回退50；日期按UTC含结束日；会话聚合先分组后分页；未声明筛选不保证有效
+权限范围内日志，page无效回退1，page_size超出1..200回退50；日期按UTC含结束日；完整时间精确过滤，非法或倒置窗口返回400；会话聚合先分组后分页；未声明筛选不保证有效
 
 ```json
 [
@@ -27,14 +27,16 @@
     "name": "start_date",
     "schema": {
       "type": "string"
-    }
+    },
+    "description": "支持 YYYY-MM-DD（UTC整天）、YYYY-MM-DD HH:mm:ss（UTC）或 RFC3339；完整结束时间不延长一天"
   },
   {
     "in": "query",
     "name": "end_date",
     "schema": {
       "type": "string"
-    }
+    },
+    "description": "支持 YYYY-MM-DD（UTC整天）、YYYY-MM-DD HH:mm:ss（UTC）或 RFC3339；完整结束时间不延长一天"
   },
   {
     "in": "query",
@@ -147,7 +149,7 @@
 
 ### GET /spend/logs/ui
 
-权限范围内日志，page无效回退1，page_size超出1..200回退50；日期按UTC含结束日；会话聚合先分组后分页；未声明筛选不保证有效
+权限范围内日志，page无效回退1，page_size超出1..200回退50；日期按UTC含结束日；完整时间精确过滤，非法或倒置窗口返回400；会话聚合先分组后分页；未声明筛选不保证有效
 
 ```json
 [
@@ -156,14 +158,16 @@
     "name": "start_date",
     "schema": {
       "type": "string"
-    }
+    },
+    "description": "支持 YYYY-MM-DD（UTC整天）、YYYY-MM-DD HH:mm:ss（UTC）或 RFC3339；完整结束时间不延长一天"
   },
   {
     "in": "query",
     "name": "end_date",
     "schema": {
       "type": "string"
-    }
+    },
+    "description": "支持 YYYY-MM-DD（UTC整天）、YYYY-MM-DD HH:mm:ss（UTC）或 RFC3339；完整结束时间不延长一天"
   },
   {
     "in": "query",
@@ -276,7 +280,7 @@
 
 ### GET /spend/logs/session/ui
 
-权限范围内日志，page无效回退1，page_size超出1..200回退50；日期按UTC含结束日；会话聚合先分组后分页；未声明筛选不保证有效
+权限范围内日志，page无效回退1，page_size超出1..200回退50；日期按UTC含结束日；完整时间精确过滤，非法或倒置窗口返回400；会话聚合先分组后分页；未声明筛选不保证有效
 
 ```json
 [
@@ -285,14 +289,16 @@
     "name": "start_date",
     "schema": {
       "type": "string"
-    }
+    },
+    "description": "支持 YYYY-MM-DD（UTC整天）、YYYY-MM-DD HH:mm:ss（UTC）或 RFC3339；完整结束时间不延长一天"
   },
   {
     "in": "query",
     "name": "end_date",
     "schema": {
       "type": "string"
-    }
+    },
+    "description": "支持 YYYY-MM-DD（UTC整天）、YYYY-MM-DD HH:mm:ss（UTC）或 RFC3339；完整结束时间不延长一天"
   },
   {
     "in": "query",

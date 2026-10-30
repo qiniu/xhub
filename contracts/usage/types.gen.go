@@ -277,7 +277,10 @@ type OrganizationDailyUsageParams struct {
 
 // ListSessionLogsParams defines parameters for ListSessionLogs.
 type ListSessionLogsParams struct {
-	StartDate      *string `form:"start_date,omitempty" json:"start_date,omitempty"`
+	// StartDate 支持 YYYY-MM-DD（UTC整天）、YYYY-MM-DD HH:mm:ss（UTC）或 RFC3339；完整结束时间不延长一天 / Accepts UTC dates, UTC date-times, or RFC3339. Timestamp end bounds are not extended by one day.
+	StartDate *string `form:"start_date,omitempty" json:"start_date,omitempty"`
+
+	// EndDate 支持 YYYY-MM-DD（UTC整天）、YYYY-MM-DD HH:mm:ss（UTC）或 RFC3339；完整结束时间不延长一天 / Accepts UTC dates, UTC date-times, or RFC3339. Timestamp end bounds are not extended by one day.
 	EndDate        *string `form:"end_date,omitempty" json:"end_date,omitempty"`
 	Page           *string `form:"page,omitempty" json:"page,omitempty"`
 	PageSize       *string `form:"page_size,omitempty" json:"page_size,omitempty"`
@@ -298,7 +301,10 @@ type ListSessionLogsParams struct {
 
 // ListUILogsParams defines parameters for ListUILogs.
 type ListUILogsParams struct {
-	StartDate      *string `form:"start_date,omitempty" json:"start_date,omitempty"`
+	// StartDate 支持 YYYY-MM-DD（UTC整天）、YYYY-MM-DD HH:mm:ss（UTC）或 RFC3339；完整结束时间不延长一天 / Accepts UTC dates, UTC date-times, or RFC3339. Timestamp end bounds are not extended by one day.
+	StartDate *string `form:"start_date,omitempty" json:"start_date,omitempty"`
+
+	// EndDate 支持 YYYY-MM-DD（UTC整天）、YYYY-MM-DD HH:mm:ss（UTC）或 RFC3339；完整结束时间不延长一天 / Accepts UTC dates, UTC date-times, or RFC3339. Timestamp end bounds are not extended by one day.
 	EndDate        *string `form:"end_date,omitempty" json:"end_date,omitempty"`
 	Page           *string `form:"page,omitempty" json:"page,omitempty"`
 	PageSize       *string `form:"page_size,omitempty" json:"page_size,omitempty"`
@@ -319,7 +325,10 @@ type ListUILogsParams struct {
 
 // ListLogsParams defines parameters for ListLogs.
 type ListLogsParams struct {
-	StartDate      *string `form:"start_date,omitempty" json:"start_date,omitempty"`
+	// StartDate 支持 YYYY-MM-DD（UTC整天）、YYYY-MM-DD HH:mm:ss（UTC）或 RFC3339；完整结束时间不延长一天 / Accepts UTC dates, UTC date-times, or RFC3339. Timestamp end bounds are not extended by one day.
+	StartDate *string `form:"start_date,omitempty" json:"start_date,omitempty"`
+
+	// EndDate 支持 YYYY-MM-DD（UTC整天）、YYYY-MM-DD HH:mm:ss（UTC）或 RFC3339；完整结束时间不延长一天 / Accepts UTC dates, UTC date-times, or RFC3339. Timestamp end bounds are not extended by one day.
 	EndDate        *string `form:"end_date,omitempty" json:"end_date,omitempty"`
 	Page           *string `form:"page,omitempty" json:"page,omitempty"`
 	PageSize       *string `form:"page_size,omitempty" json:"page_size,omitempty"`

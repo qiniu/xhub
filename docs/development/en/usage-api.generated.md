@@ -6,8 +6,8 @@ Generated from OpenAPI; existing authorization and billing remain unchanged. See
 
 | Operation | Behavior | HTTP statuses |
 | --- | --- | --- |
-| `GET /spend/logs/v2` | Scoped logs; invalid page defaults to 1, page_size outside 1..200 defaults to 50; UTC inclusive dates; session grouping before pagination; undeclared filters not guaranteed | 200, 400, 401, 403, 404, 409, 500, 503 |
-| `GET /spend/logs/ui` | Scoped logs; invalid page defaults to 1, page_size outside 1..200 defaults to 50; UTC inclusive dates; session grouping before pagination; undeclared filters not guaranteed | 200, 400, 401, 403, 404, 409, 500, 503 |
+| `GET /spend/logs/v2` | Scoped logs; invalid page defaults to 1, page_size outside 1..200 defaults to 50; UTC inclusive dates; exact timestamps; invalid or reversed windows return 400; session grouping before pagination; undeclared filters not guaranteed | 200, 400, 401, 403, 404, 409, 500, 503 |
+| `GET /spend/logs/ui` | Scoped logs; invalid page defaults to 1, page_size outside 1..200 defaults to 50; UTC inclusive dates; exact timestamps; invalid or reversed windows return 400; session grouping before pagination; undeclared filters not guaranteed | 200, 400, 401, 403, 404, 409, 500, 503 |
 | `GET /spend/logs/session/ui` | Empty session_id returns empty page before authentication under existing behavior | 200, 400, 401, 403, 404, 409, 500, 503 |
 | `GET /spend/logs/ui/{request_id}` | Out-of-scope and missing records are 404; admin cross-user reads audited; missing bodies may be empty and non-JSON upstream bodies strings; not every failure has a usage record | 200, 400, 401, 403, 404, 409, 500, 503 |
 | `GET /user/daily/activity` | Scoped daily aggregates; paged totals cover current page, aggregated totals entire range; invalid dates leave bounds open; unknown cache tokens omitted | 200, 400, 401, 403, 404, 409, 500, 503 |
@@ -18,7 +18,7 @@ Generated from OpenAPI; existing authorization and billing remain unchanged. See
 
 ### GET /spend/logs/v2
 
-Scoped logs; invalid page defaults to 1, page_size outside 1..200 defaults to 50; UTC inclusive dates; session grouping before pagination; undeclared filters not guaranteed
+Scoped logs; invalid page defaults to 1, page_size outside 1..200 defaults to 50; UTC inclusive dates; exact timestamps; invalid or reversed windows return 400; session grouping before pagination; undeclared filters not guaranteed
 
 ```json
 [
@@ -27,14 +27,16 @@ Scoped logs; invalid page defaults to 1, page_size outside 1..200 defaults to 50
     "name": "start_date",
     "schema": {
       "type": "string"
-    }
+    },
+    "description": "Accepts UTC dates, UTC date-times, or RFC3339. Timestamp end bounds are not extended by one day."
   },
   {
     "in": "query",
     "name": "end_date",
     "schema": {
       "type": "string"
-    }
+    },
+    "description": "Accepts UTC dates, UTC date-times, or RFC3339. Timestamp end bounds are not extended by one day."
   },
   {
     "in": "query",
@@ -147,7 +149,7 @@ Scoped logs; invalid page defaults to 1, page_size outside 1..200 defaults to 50
 
 ### GET /spend/logs/ui
 
-Scoped logs; invalid page defaults to 1, page_size outside 1..200 defaults to 50; UTC inclusive dates; session grouping before pagination; undeclared filters not guaranteed
+Scoped logs; invalid page defaults to 1, page_size outside 1..200 defaults to 50; UTC inclusive dates; exact timestamps; invalid or reversed windows return 400; session grouping before pagination; undeclared filters not guaranteed
 
 ```json
 [
@@ -156,14 +158,16 @@ Scoped logs; invalid page defaults to 1, page_size outside 1..200 defaults to 50
     "name": "start_date",
     "schema": {
       "type": "string"
-    }
+    },
+    "description": "Accepts UTC dates, UTC date-times, or RFC3339. Timestamp end bounds are not extended by one day."
   },
   {
     "in": "query",
     "name": "end_date",
     "schema": {
       "type": "string"
-    }
+    },
+    "description": "Accepts UTC dates, UTC date-times, or RFC3339. Timestamp end bounds are not extended by one day."
   },
   {
     "in": "query",
@@ -285,14 +289,16 @@ Empty session_id returns empty page before authentication under existing behavio
     "name": "start_date",
     "schema": {
       "type": "string"
-    }
+    },
+    "description": "Accepts UTC dates, UTC date-times, or RFC3339. Timestamp end bounds are not extended by one day."
   },
   {
     "in": "query",
     "name": "end_date",
     "schema": {
       "type": "string"
-    }
+    },
+    "description": "Accepts UTC dates, UTC date-times, or RFC3339. Timestamp end bounds are not extended by one day."
   },
   {
     "in": "query",

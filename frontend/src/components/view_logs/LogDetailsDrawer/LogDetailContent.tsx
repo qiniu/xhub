@@ -118,6 +118,17 @@ export function LogDetailContent({ logEntry, isLoadingDetails = false, accessTok
 
   return (
     <div style={{ padding: `${DRAWER_CONTENT_PADDING} ${DRAWER_CONTENT_PADDING} 0` }}>
+      {(metadata.upstream_response?.failure || metadata.upstream_response?.routing || metadata.upstream_response?.rate_limit) && (
+        <section aria-label={t("logDiagnostics.title")} className="mb-6 rounded-lg border p-4">
+          <h3 className="font-semibold">{t("logDiagnostics.title")}</h3>
+          {metadata.upstream_response.failure?.cancellation_source === "unknown" && <p>{t("logDiagnostics.cancelUnknown")}</p>}
+          <pre className="max-h-64 overflow-auto whitespace-pre-wrap break-all text-xs">{JSON.stringify(metadata.upstream_response.failure ?? metadata.upstream_response.routing ?? metadata.upstream_response.rate_limit, null, 2)}</pre>
+          <h4>{t("logDiagnostics.upstreamError")}</h4>
+          {metadata.upstream_response.error
+            ? <pre className="max-h-64 overflow-auto whitespace-pre-wrap break-all text-xs">{JSON.stringify(metadata.upstream_response.error, null, 2)}</pre>
+            : <p>{t("logDiagnostics.noUpstreamError")}</p>}
+        </section>
+      )}
       {metadata.upstream_response && (
         <section aria-label={t("Upstream Response")} className="mb-6 rounded-lg border p-4">
           {/* 以请求 ID 隔离展开状态，避免查看下一条日志时继承上一条的展开状态。 */}
@@ -134,7 +145,8 @@ export function LogDetailContent({ logEntry, isLoadingDetails = false, accessTok
               <p role="status" className="mt-2 text-sm text-muted-foreground">{t("providerGuideUI.searchDropped", { capabilities: metadata.upstream_response.dropped_capabilities.join(", ") })}</p>
             )}
             <CollapsibleContent className="pt-3">
-              <p>{t("HTTP Status")}: {metadata.upstream_response.status_code}</p>
+              <p>{t("HTTP Status")}: {metadata.upstream_response.status_code || t("logDiagnostics.noResponse")}</p>
+              {metadata.upstream_response.read_error && <p role="alert">{metadata.upstream_response.read_error}</p>}
               {metadata.upstream_response.usage_parse_error && <p role="alert">{metadata.upstream_response.usage_parse_error}</p>}
               <h4>{t("Upstream Response Headers")}</h4>
               <pre className="max-h-64 overflow-auto whitespace-pre-wrap break-all text-xs">{JSON.stringify(metadata.upstream_response.headers, null, 2)}</pre>

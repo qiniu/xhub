@@ -3,6 +3,7 @@
 package routing
 
 import (
+	"encoding/json"
 	"strings"
 	"testing"
 
@@ -64,6 +65,14 @@ func TestRouteDiagnosisStages(t *testing.T) {
 			active, _ := DropDisabled(tc.list)
 			eligible, _ := providerdeployment.Candidates(active, "chat", nil)
 			d := DiagnoseRoute(tc.list, eligible, alias, "chat", s, tc.state, nil, false)
+			snapshot := d.Snapshot(s, "live")
+			raw, err := json.Marshal(snapshot)
+			if err != nil || snapshot["compatible"] != tc.compatible || snapshot["available"] != tc.available || strings.Contains(string(raw), "private") {
+				t.Fatalf("路由持久化诊断错误或泄漏: %s %v", raw, err)
+			}
+			if tc.name == "cooldown" && snapshot["required_deployment_reason"] != "deployment is cooling down" {
+				t.Fatalf("续接冷却原因不明确: %v", snapshot)
+			}
 			if d.matched != tc.matched || d.compatible != tc.compatible || d.available != tc.available {
 				t.Fatalf("阶段计数错误: %+v", d)
 			}

@@ -12,6 +12,7 @@ package gateway
 import (
 	"bufio"
 	"bytes"
+	"context"
 	"crypto/sha256"
 	"encoding/json"
 	"errors"
@@ -27,6 +28,8 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/sunqirui1987/xhub/internal/authz"
 	"github.com/sunqirui1987/xhub/internal/catalog"
+	dpcontract "github.com/sunqirui1987/xhub/internal/dataplane/contract"
+	dpdiagnostics "github.com/sunqirui1987/xhub/internal/dataplane/diagnostics"
 	providercontract "github.com/sunqirui1987/xhub/internal/provider/contract"
 	providerregistry "github.com/sunqirui1987/xhub/internal/provider/registry"
 	"github.com/sunqirui1987/xhub/internal/util"
@@ -108,6 +111,7 @@ func (s *Server) Handler() http.Handler {
 			util.Info("%s %s %d %s", r.Method, r.URL.Path, lw.code, time.Since(start))
 			if lw.code >= 400 {
 				s.recordEarlyError(lw, r, raw, body, start)
+				s.ReleaseCall(lw.Header().Get("x-litellm-call-id"))
 				note := lw.note
 				if note == "" {
 					note = "request failed"
@@ -128,7 +132,14 @@ func (s *Server) Handler() http.Handler {
 		var readErr error
 		raw, readErr = io.ReadAll(http.MaxBytesReader(w, r.Body, 64<<20))
 		if readErr != nil {
-			util.WriteTypedError(w, r.URL.Path, http.StatusRequestEntityTooLarge, "invalid_request", "request body exceeds limit or cannot be read")
+			failure := dpdiagnostics.ObserveFailure(r.Context(), "request_body", readErr, time.Since(start))
+			bytesRead := int64(len(raw))
+			failure.BytesRead = &bytesRead
+			failure.BodyLimit = 64 << 20
+			status, kind, message := dpdiagnostics.BodyFailureStatus(failure)
+			dpdiagnostics.RecordEarlyFailure(w, &dpdiagnostics.UpstreamDiagnostics{Failure: failure})
+			util.Info("process step=request_body call_id=%q status=%d kind=%q bytes_read=%d limit=%d elapsed_ms=%d cause=%q context_error=%q", callID, status, failure.Kind, bytesRead, failure.BodyLimit, failure.ElapsedMS, failure.TransportError, failure.RequestContextError)
+			util.WriteTypedError(w, r.URL.Path, status, kind, message)
 			return
 		}
 		r.Body = io.NopCloser(bytes.NewReader(raw))
@@ -191,7 +202,7 @@ func (s *Server) Handler() http.Handler {
 		}
 		if catalog.IsDataPlanePath(r.URL.Path) {
 			w.Header().Set("x-litellm-response-duration-ms", strconv.FormatInt(time.Since(start).Milliseconds(), 10))
-			if w.Header().Get("x-litellm-model-api-base") == "" {
+			if w.Header().Get("x-litellm-model-api-base") == "" && r.Context().Err() == nil {
 				if p, err := s.resolve(r); err == nil && p != nil && p.Key != nil {
 					s.setChatHeaders(w, p, w.Header().Get("x-litellm-model-name"), w.Header().Get("x-litellm-model-api-base"))
 				}
@@ -410,6 +421,8 @@ func errorNote(body []byte) string {
 
 // statusRecorder records the status written to the client so the access log can print it.
 type statusRecorder struct {
+	// 请求私有的准入失败快照，在执行器释放临时账单后仍能由外层补记日志。
+	failureDiagnostics *dpdiagnostics.UpstreamDiagnostics
 	http.ResponseWriter
 	code int
 	set  bool
@@ -495,8 +508,13 @@ func (s *Server) recordEarlyError(lw *statusRecorder, r *http.Request, raw []byt
 	if alias == "" {
 		alias = strings.TrimSpace(str(body["model"]))
 	}
-	p, _ := s.resolve(r)
+	// 仅为失败日志补齐身份，使用短时独立上下文，避免已取消的请求制造第二条鉴权错误。
+	// resolve 仍执行原鉴权，不放行请求、不改权限；查不到身份则保留匿名日志。
+	identityCtx, cancel := context.WithTimeout(context.WithoutCancel(r.Context()), 2*time.Second)
+	defer cancel()
+	p, _ := s.resolve(r.WithContext(identityCtx))
 	// 使用实际响应正文，而不是重新构造错误包络，确保日志与调用方看到的字节一致。
+	s.AnnotateCall(callID, dpcontract.CallNote{Upstream: lw.failureDiagnostics})
 	s.rememberExchange(callID, r, raw, lw.body.Bytes())
 	s.recordSpend(lw, p, callID, alias, "request", nil, start, false, lw.code, "")
 }
@@ -566,4 +584,10 @@ func (h *holdWriter) Write(p []byte) (int, error) {
 		h.hdr = true
 	}
 	return h.buf.Write(p)
+}
+
+// SetFailureDiagnostics 接收准入拒绝的只读快照；RecordEarlyFailure 调用，不写客户端输出。
+// 参数为本次诊断，返回无；对象随请求释放，不延长全局临时账单的生命周期。
+func (s *statusRecorder) SetFailureDiagnostics(d *dpdiagnostics.UpstreamDiagnostics) {
+	s.failureDiagnostics = d
 }
