@@ -45,6 +45,13 @@ func diagnosticHeaders(headers http.Header) http.Header {
 // 参数 upstream 为观测事实、fallback 为原失败正文；recordSpend 调用，返回日志错误详情；不改客户端或响应正文。
 // 非流内供应商错误或序列化失败沿用原文，不能用 HTTP 成功握手替换最终失败状态。
 func FailureJSON(upstream *dpdiagnostics.UpstreamDiagnostics, fallback string) string {
+	// 取消不能把整个部分 SSE 当作错误原因；保留独立供应商错误，未观测到时显式为 null。
+	if upstream != nil && upstream.Failure != nil && upstream.Failure.Kind == "request_canceled" {
+		raw, err := json.Marshal(map[string]any{"error": map[string]any{"type": "request_canceled", "message": "request connection canceled; initiator unknown"}, "diagnostics": upstream.Failure, "upstream_error": upstream.Error})
+		if err == nil {
+			return string(raw)
+		}
+	}
 	if upstream == nil || upstream.StatusCode >= 400 || upstream.Error == nil {
 		return fallback
 	}

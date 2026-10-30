@@ -65,7 +65,11 @@ func LogsV2(s Host, w http.ResponseWriter, r *http.Request) {
 	if page < 1 {
 		page = 1
 	}
-	q := logQuery(r, sc)
+	q, queryErr := logQuery(r, sc)
+	if queryErr != nil {
+		util.WriteError(w, 400, "invalid_request", queryErr.Error())
+		return
+	}
 	q.Limit = pageSize
 	q.Offset = util.Offset(page, pageSize)
 
@@ -195,16 +199,28 @@ func collapseSessions(rows []map[string]any) []map[string]any {
 
 // logQuery builds the scoped log query from the request's filters. The scope is applied first and the filters only narrow inside it, so `user_id` or `api_key` from the query string can never widen a read beyond what the scope allows.
 // 参数 r（*http.Request）：入站 HTTP 请求；sc（*authz.Scope）：日志查询使用的权限范围。
+// 返回错误表示非法或倒置的时间窗口，调用方必须拒绝查询，不能忽略条件。
 // 返回 UsageQuery（iam.UsageQuery）：在权限范围之内、再按请求筛选收窄的日志查询。筛选不能把范围扩大。
 // 调用：仅在 reports.go 内使用
 // 错误码按最终客户端状态精确匹配，消息按完整诊断正文匹配；非法码不会扩大查询。
 // 测试：reports_test.go；排序字段由 iam 白名单处理，未知方向使用降序。
-func logQuery(r *http.Request, sc *authz.Scope) iam.UsageQuery {
+func logQuery(r *http.Request, sc *authz.Scope) (iam.UsageQuery, error) {
 	raw := r.URL.Query()
+	from, err := logTime(raw.Get("start_date"), false)
+	if err != nil {
+		return iam.UsageQuery{}, err
+	}
+	to, err := logTime(raw.Get("end_date"), true)
+	if err != nil {
+		return iam.UsageQuery{}, err
+	}
+	if !from.IsZero() && !to.IsZero() && from.After(to) {
+		return iam.UsageQuery{}, errors.New("start_date must not be after end_date")
+	}
 	q := iam.UsageQuery{
 		Cond:         sc.Cond,
-		From:         parseDay(raw.Get("start_date")),
-		To:           parseDayEnd(raw.Get("end_date")),
+		From:         from,
+		To:           to,
 		UserID:       raw.Get("user_id"),
 		TeamID:       raw.Get("team_id"),
 		KeyID:        raw.Get("api_key"),
@@ -223,7 +239,7 @@ func logQuery(r *http.Request, sc *authz.Scope) iam.UsageQuery {
 	case "failed", "error":
 		q.Status = "error"
 	}
-	return q
+	return q, nil
 }
 
 // parseDayEnd extends an inclusive end date to the last instant of that day, so a window of one day covers the whole day rather than just midnight.
@@ -595,7 +611,11 @@ func LogByID(s Host, w http.ResponseWriter, r *http.Request) {
 		util.WriteError(w, 404, "not_found", "log not found")
 		return
 	}
-	q := logQuery(r, sc)
+	q, queryErr := logQuery(r, sc)
+	if queryErr != nil {
+		util.WriteError(w, 400, "invalid_request", queryErr.Error())
+		return
+	}
 	event, err := db.GetUsageEvent(r.Context(), q, id)
 	if err != nil {
 		s.WriteIAMError(w, r, err)
@@ -1183,6 +1203,7 @@ func openGlobal(s Host, w http.ResponseWriter, r *http.Request) (*authz.Scope, b
 
 // globalQuery builds the query for a global report from the request's window and filters.
 // 参数 r（*http.Request）：入站 HTTP 请求；sc（*authz.Scope）：global查询使用的权限范围。
+// 返回错误表示非法或倒置的时间窗口，调用方必须拒绝查询，不能忽略条件。
 // 返回 UsageQuery（iam.UsageQuery）：全局报表的查询。时间窗和筛选都落在权限范围之内。
 // 调用：仅在 reports.go 内使用
 // 测试：无直接单测
@@ -1212,4 +1233,22 @@ func globalDaily(s Host, r *http.Request, sc *authz.Scope) ([]iam.DailyRow, erro
 		return nil, nil
 	}
 	return db.DailyUsage(r.Context(), globalQuery(r, sc), 0)
+}
+
+// logTime 解析日志边界：旧日期按 UTC 整天，完整时间精确到输入精度。
+// 参数 value 为空时表示未限定，end 仅扩展日期终点；返回时间或验证错误。
+// logQuery 调用；控制台旧无时区格式明确按 UTC，不受服务器时区影响；非法输入不返回无界查询。
+func logTime(value string, end bool) (time.Time, error) {
+	if value == "" {
+		return time.Time{}, nil
+	}
+	for _, layout := range []string{time.RFC3339Nano, "2006-01-02 15:04:05", "2006-01-02"} {
+		if parsed, err := time.Parse(layout, value); err == nil {
+			if end && layout == "2006-01-02" {
+				parsed = parsed.Add(24*time.Hour - time.Nanosecond)
+			}
+			return parsed, nil
+		}
+	}
+	return time.Time{}, errors.New("start_date and end_date must be dates or valid timestamps")
 }

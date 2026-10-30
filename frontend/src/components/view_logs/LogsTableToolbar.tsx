@@ -30,6 +30,7 @@ interface LogsTableToolbarProps {
   onResetFilters: () => void;
 }
 
+/** 展示日志筛选工具条；参数为时间、实时刷新及过滤状态和回调，返回可访问且国际化的控件。仅通知调用方更新查询，不读取或修改日志数据。 */
 export function LogsTableToolbar({
   startTime,
   onStartTimeChange,
@@ -110,6 +111,7 @@ export function LogsTableToolbar({
           <Input
             type="datetime-local"
             className="w-auto"
+            aria-label={t("logDiagnostics.startTime")}
             value={startTime}
             onChange={(event) => {
               onStartTimeChange(event.target.value);
@@ -120,6 +122,7 @@ export function LogsTableToolbar({
           <Input
             type="datetime-local"
             className="w-auto"
+            aria-label={t("logDiagnostics.endTime")}
             value={endTime}
             onChange={(event) => {
               onEndTimeChange(event.target.value);

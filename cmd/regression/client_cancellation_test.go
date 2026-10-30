@@ -165,6 +165,15 @@ func TestClientCancellationDoesNotCoolDeployment(t *testing.T) {
 					for _, row := range rows {
 						if stringField(row, "status") == "error" {
 							cancelled++
+							detail := logDetail(t, h, a.session, stringField(row, "request_id"))
+							diagnostic := detail["metadata"].(map[string]any)["upstream_response"].(map[string]any)
+							failure, ok := diagnostic["failure"].(map[string]any)
+							if !ok || failure["kind"] != "request_canceled" || failure["request_context_error"] != "context canceled" || failure["cancellation_source"] != "unknown" || failure["transport_error"] == "" {
+								t.Fatalf("取消证据缺失或擅自归因用户: %v", diagnostic)
+							}
+							if strings.Contains(fmt.Sprint(detail["error"]), "data:") || !strings.Contains(fmt.Sprint(detail["error"]), `"upstream_error":null`) {
+								t.Fatalf("部分流被当成错误或虚构供应商错误: %v", detail["error"])
+							}
 							if spend, ok := floatField(row, "spend"); !ok || spend != 0 {
 								t.Errorf("canceled call charged: %v", row)
 							}

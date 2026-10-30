@@ -1041,12 +1041,14 @@ jobs:
       # 真实 HTTP/PG 契约回归不可由仅检查文件的生成器测试代替。
       - name: Prepare contract database
         run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends redis-server
           cp configs/config.example.yaml configs/config.yaml
           docker compose up -d --wait postgres redis
       - name: Run real usage contract regression
         env:
           XHUB_REGRESSION_COVERPROFILE: coverage/usage-contract.out
-        run: bash scripts/regression.sh '^TestUsageContractRealTraffic$'
+        run: bash scripts/regression.sh '^Test(UsageContractRealTraffic|BodyReadDiagnostics|LogExactTimeWindow|ClientCancellationDoesNotCoolDeployment|AnthropicTokenCountContract|ErrorLogFilterContract|UpstreamDiagnosticsContract|RouteDiagnosticContract|NativeRouteDiagnosticContract|ResponsesNativeToolContinuation|StreamReadFailureDiagnostics|ResponsesFailedStreamCannotContinue|ResponseConnectionChanges)$'
       - name: Validate regression coverage
         shell: bash
         run: |

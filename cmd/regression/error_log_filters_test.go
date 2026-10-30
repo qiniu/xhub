@@ -50,6 +50,11 @@ func TestErrorLogFilterContract(t *testing.T) {
 	}
 	rateID := got.header("x-litellm-call-id")
 	rateLog := logDetail(t, h, owner.session, rateID)
+	rateDiagnostic := rateLog["metadata"].(map[string]any)["upstream_response"].(map[string]any)["rate_limit"].(map[string]any)
+	ratePath := rateDiagnostic["effective_path"].([]any)
+	if rateDiagnostic["rejected"] != "key rpm_limit" || len(ratePath) == 0 || ratePath[0].(map[string]any)["rpm_limit"] != float64(0) {
+		t.Fatalf("未保存实际限流来源: %v", rateDiagnostic)
+	}
 	if rateLog["error"] != got.text() {
 		t.Fatal("速率日志正文与客户端不一致")
 	}

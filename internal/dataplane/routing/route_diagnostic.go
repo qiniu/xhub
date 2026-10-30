@@ -151,3 +151,44 @@ func (d routeDiagnosis) Failure(alias string) (int, string, string) {
 	}
 	return 503, "model_unavailable", "model " + alias + " has no available deployment; check cooldowns and route allocations"
 }
+
+// Snapshot 投影路由失败的阶段计数、配置来源与逐部署排除原因，供授权请求日志使用。
+// 参数 settings 为当前有效模板，pinned 为续接必须使用的稳定部署ID；返回独立JSON对象。
+// 执行器仅在拒绝时保存，最多100个候选并标注截断；不保存密钥/地址/请求正文，不推断冷却最初诱因。
+func (d routeDiagnosis) Snapshot(settings router.RouteSettings, pinned string) map[string]any {
+	candidates := make([]map[string]any, 0, min(100, len(d.decisions)))
+	pinReason := "not_in_matched_candidates"
+	for i, decision := range d.decisions {
+		dep := decision.Deployment
+		reason := decision.Reason
+		cooling := d.state.Cooldown[router.CooldownID(dep)]
+		weight, exists := d.state.Allocations[router.DeploymentID(dep)]
+		if !exists {
+			weight = 1
+		}
+		if reason == "" && cooling {
+			reason = "deployment is cooling down"
+		}
+		if reason == "" && router.IsSplitStrategy(settings.Strategy()) && (weight <= 0 || math.IsNaN(weight) || math.IsInf(weight, 0)) {
+			reason = "deployment has no allocated traffic"
+		}
+		if reason == "" {
+			reason = "eligible"
+		}
+		if router.DeploymentID(dep) == pinned {
+			pinReason = reason
+		}
+		if i < 100 {
+			candidates = append(candidates, map[string]any{"deployment_id": router.DeploymentID(dep), "transport": providerdeployment.SelectedTransport(dep), "reason": reason, "cooling": cooling})
+		}
+	}
+	result := map[string]any{"endpoint": d.endpoint, "matched": d.matched, "disabled": d.disabled, "compatible": d.compatible, "available": d.available, "cooling": d.cooling, "zero_weight": d.zeroWeight, "strategy": settings.Strategy(), "template_id": settings.TemplateID, "template_source": settings.Source, "candidates": candidates, "candidates_truncated": len(d.decisions) > 100}
+	if pinned != "" {
+		result["required_deployment_id"] = pinned
+		if pinReason == "eligible" {
+			pinReason = "current route or affinity validation excluded the original target"
+		}
+		result["required_deployment_reason"] = pinReason
+	}
+	return result
+}

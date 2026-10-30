@@ -120,6 +120,13 @@ export function registerClientScenario(locale: Locale) {
       }
       await stableGoto(page, "/logs");
       await expect(page.getByRole("main")).toContainText(name);
+      await page.getByRole("tab", {name:tr("Error Logs"),exact:true}).click();
+      await page.getByPlaceholder(/按 ID 搜索日志|Search logs by ID/).filter({ visible: true }).fill(calls[0]);
+      await page.getByRole("row").filter({hasText:calls[0]}).click();
+      const diagnostic=page.getByRole("region",{name:tr("logDiagnostics.title")});
+      await expect(diagnostic).toContainText("request_canceled");
+      await expect(diagnostic).toContainText(tr("logDiagnostics.cancelUnknown"));
+      await expect(diagnostic).toContainText(tr("logDiagnostics.noUpstreamError"));
     } finally {
       if (key)
         expect((await page.request.post(GATEWAY + "/key/delete", { headers, data: { keys: [key] } })).status()).toBe(

@@ -85,8 +85,14 @@ func TestResponseConnectionChanges(t *testing.T) {
 					t.Fatalf("完整历史不能正常续接: %s", blocked.describe())
 				}
 				// 普通请求成功不能重绑旧游标；仍必须拒绝从新连接读取原响应。
-				if got := h.doHeaders("POST", path, owner.key, previous, headers); got.status != 409 || calls.Load() != expectedCalls {
+				got := h.doHeaders("POST", path, owner.key, previous, headers)
+				if got.status != 409 || calls.Load() != expectedCalls {
 					t.Fatalf("旧游标被普通请求重新授权: %s", got.describe())
+				}
+				detail := logDetail(t, h, owner.session, got.header("x-litellm-call-id"))
+				route := detail["metadata"].(map[string]any)["upstream_response"].(map[string]any)["routing"].(map[string]any)
+				if route["required_deployment_reason"] != "connection_identity_changed_or_missing" {
+					t.Fatalf("连接改变的拒绝缺少原因: %v", route)
 				}
 				h.flushSpend()
 				for _, response := range []reply{first, valid, fresh} {

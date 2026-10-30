@@ -13,8 +13,8 @@
     "/spend/logs/v2": {
       "get": {
         "operationId": "listLogs",
-        "summary": "权限范围内日志，page无效回退1，page_size超出1..200回退50；日期按UTC含结束日；会话聚合先分组后分页；未声明筛选不保证有效 / Scoped logs; invalid page defaults to 1, page_size outside 1..200 defaults to 50; UTC inclusive dates; session grouping before pagination; undeclared filters not guaranteed",
-        "description": "权限范围内日志，page无效回退1，page_size超出1..200回退50；日期按UTC含结束日；会话聚合先分组后分页；未声明筛选不保证有效 / Scoped logs; invalid page defaults to 1, page_size outside 1..200 defaults to 50; UTC inclusive dates; session grouping before pagination; undeclared filters not guaranteed",
+        "summary": "权限范围内日志，page无效回退1，page_size超出1..200回退50；日期按UTC含结束日；完整时间精确过滤，非法或倒置窗口返回400；会话聚合先分组后分页；未声明筛选不保证有效 / Scoped logs; invalid page defaults to 1, page_size outside 1..200 defaults to 50; UTC inclusive dates; exact timestamps; invalid or reversed windows return 400; session grouping before pagination; undeclared filters not guaranteed",
+        "description": "权限范围内日志，page无效回退1，page_size超出1..200回退50；日期按UTC含结束日；完整时间精确过滤，非法或倒置窗口返回400；会话聚合先分组后分页；未声明筛选不保证有效 / Scoped logs; invalid page defaults to 1, page_size outside 1..200 defaults to 50; UTC inclusive dates; exact timestamps; invalid or reversed windows return 400; session grouping before pagination; undeclared filters not guaranteed",
         "responses": {
           "200": {
             "description": "实际结果 / Actual result",
@@ -54,14 +54,16 @@
             "name": "start_date",
             "schema": {
               "type": "string"
-            }
+            },
+            "description": "支持 YYYY-MM-DD（UTC整天）、YYYY-MM-DD HH:mm:ss（UTC）或 RFC3339；完整结束时间不延长一天 / Accepts UTC dates, UTC date-times, or RFC3339. Timestamp end bounds are not extended by one day."
           },
           {
             "in": "query",
             "name": "end_date",
             "schema": {
               "type": "string"
-            }
+            },
+            "description": "支持 YYYY-MM-DD（UTC整天）、YYYY-MM-DD HH:mm:ss（UTC）或 RFC3339；完整结束时间不延长一天 / Accepts UTC dates, UTC date-times, or RFC3339. Timestamp end bounds are not extended by one day."
           },
           {
             "in": "query",
@@ -174,8 +176,8 @@
     "/spend/logs/ui": {
       "get": {
         "operationId": "listUILogs",
-        "summary": "权限范围内日志，page无效回退1，page_size超出1..200回退50；日期按UTC含结束日；会话聚合先分组后分页；未声明筛选不保证有效 / Scoped logs; invalid page defaults to 1, page_size outside 1..200 defaults to 50; UTC inclusive dates; session grouping before pagination; undeclared filters not guaranteed",
-        "description": "权限范围内日志，page无效回退1，page_size超出1..200回退50；日期按UTC含结束日；会话聚合先分组后分页；未声明筛选不保证有效 / Scoped logs; invalid page defaults to 1, page_size outside 1..200 defaults to 50; UTC inclusive dates; session grouping before pagination; undeclared filters not guaranteed",
+        "summary": "权限范围内日志，page无效回退1，page_size超出1..200回退50；日期按UTC含结束日；完整时间精确过滤，非法或倒置窗口返回400；会话聚合先分组后分页；未声明筛选不保证有效 / Scoped logs; invalid page defaults to 1, page_size outside 1..200 defaults to 50; UTC inclusive dates; exact timestamps; invalid or reversed windows return 400; session grouping before pagination; undeclared filters not guaranteed",
+        "description": "权限范围内日志，page无效回退1，page_size超出1..200回退50；日期按UTC含结束日；完整时间精确过滤，非法或倒置窗口返回400；会话聚合先分组后分页；未声明筛选不保证有效 / Scoped logs; invalid page defaults to 1, page_size outside 1..200 defaults to 50; UTC inclusive dates; exact timestamps; invalid or reversed windows return 400; session grouping before pagination; undeclared filters not guaranteed",
         "responses": {
           "200": {
             "description": "实际结果 / Actual result",
@@ -215,14 +217,16 @@
             "name": "start_date",
             "schema": {
               "type": "string"
-            }
+            },
+            "description": "支持 YYYY-MM-DD（UTC整天）、YYYY-MM-DD HH:mm:ss（UTC）或 RFC3339；完整结束时间不延长一天 / Accepts UTC dates, UTC date-times, or RFC3339. Timestamp end bounds are not extended by one day."
           },
           {
             "in": "query",
             "name": "end_date",
             "schema": {
               "type": "string"
-            }
+            },
+            "description": "支持 YYYY-MM-DD（UTC整天）、YYYY-MM-DD HH:mm:ss（UTC）或 RFC3339；完整结束时间不延长一天 / Accepts UTC dates, UTC date-times, or RFC3339. Timestamp end bounds are not extended by one day."
           },
           {
             "in": "query",
@@ -335,8 +339,8 @@
     "/spend/logs/session/ui": {
       "get": {
         "operationId": "listSessionLogs",
-        "summary": "权限范围内日志，page无效回退1，page_size超出1..200回退50；日期按UTC含结束日；会话聚合先分组后分页；未声明筛选不保证有效 / Scoped logs; invalid page defaults to 1, page_size outside 1..200 defaults to 50; UTC inclusive dates; session grouping before pagination; undeclared filters not guaranteed；session_id空时既有接口在鉴权前返回空页 / Empty session_id returns empty page before authentication under existing behavior",
-        "description": "权限范围内日志，page无效回退1，page_size超出1..200回退50；日期按UTC含结束日；会话聚合先分组后分页；未声明筛选不保证有效 / Scoped logs; invalid page defaults to 1, page_size outside 1..200 defaults to 50; UTC inclusive dates; session grouping before pagination; undeclared filters not guaranteed；session_id空时既有接口在鉴权前返回空页 / Empty session_id returns empty page before authentication under existing behavior",
+        "summary": "权限范围内日志，page无效回退1，page_size超出1..200回退50；日期按UTC含结束日；完整时间精确过滤，非法或倒置窗口返回400；会话聚合先分组后分页；未声明筛选不保证有效 / Scoped logs; invalid page defaults to 1, page_size outside 1..200 defaults to 50; UTC inclusive dates; exact timestamps; invalid or reversed windows return 400; session grouping before pagination; undeclared filters not guaranteed；session_id空时既有接口在鉴权前返回空页 / Empty session_id returns empty page before authentication under existing behavior",
+        "description": "权限范围内日志，page无效回退1，page_size超出1..200回退50；日期按UTC含结束日；完整时间精确过滤，非法或倒置窗口返回400；会话聚合先分组后分页；未声明筛选不保证有效 / Scoped logs; invalid page defaults to 1, page_size outside 1..200 defaults to 50; UTC inclusive dates; exact timestamps; invalid or reversed windows return 400; session grouping before pagination; undeclared filters not guaranteed；session_id空时既有接口在鉴权前返回空页 / Empty session_id returns empty page before authentication under existing behavior",
         "responses": {
           "200": {
             "description": "实际结果 / Actual result",
@@ -376,14 +380,16 @@
             "name": "start_date",
             "schema": {
               "type": "string"
-            }
+            },
+            "description": "支持 YYYY-MM-DD（UTC整天）、YYYY-MM-DD HH:mm:ss（UTC）或 RFC3339；完整结束时间不延长一天 / Accepts UTC dates, UTC date-times, or RFC3339. Timestamp end bounds are not extended by one day."
           },
           {
             "in": "query",
             "name": "end_date",
             "schema": {
               "type": "string"
-            }
+            },
+            "description": "支持 YYYY-MM-DD（UTC整天）、YYYY-MM-DD HH:mm:ss（UTC）或 RFC3339；完整结束时间不延长一天 / Accepts UTC dates, UTC date-times, or RFC3339. Timestamp end bounds are not extended by one day."
           },
           {
             "in": "query",

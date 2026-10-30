@@ -86,6 +86,11 @@ func TestResponsesNativeToolContinuation(t *testing.T) {
 			if unavailable.status != 409 || !strings.Contains(string(unavailable.body), "continuation_unavailable") {
 				t.Fatalf("原部署不可用未阻止续接: %s", unavailable.describe())
 			}
+			detail := logDetail(t, h, admin, unavailable.header("x-litellm-call-id"))
+			route := detail["metadata"].(map[string]any)["upstream_response"].(map[string]any)["routing"].(map[string]any)
+			if route["required_deployment_id"] != deploymentID || route["required_deployment_reason"] != "deployment disabled" {
+				t.Fatalf("续接没有保留实际停用原因: %v", route)
+			}
 			mu.Lock()
 			count := len(requests)
 			mu.Unlock()
