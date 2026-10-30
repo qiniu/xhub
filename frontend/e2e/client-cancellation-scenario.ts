@@ -114,6 +114,8 @@ export function registerClientScenario(locale: Locale) {
             const detail = await page.request.get(GATEWAY + "/spend/logs/ui/" + callID, { headers });
             if (!detail.ok()) return null;
             const row = await detail.json();
+            expect(JSON.parse(row.error)).toMatchObject({error:{type:"request_canceled"},upstream_error:null});
+            expect(row.metadata.upstream_response.failure).toMatchObject({kind:"request_canceled",cancellation_source:"unknown"});
             return { status: row.status, spend: Number(row.spend) };
           })
           .toEqual({ status: "error", spend: 0 });

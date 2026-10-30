@@ -11,6 +11,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/sunqirui1987/xhub/internal/iam"
 	"github.com/sunqirui1987/xhub/internal/router"
 )
 
@@ -38,14 +39,18 @@ func cancellationRows(t *testing.T, h *harness, admin, model string, want int) [
 }
 
 // TestClientCancellationDoesNotCoolDeployment 验证用户主动取消不会成为部署健康失败，且不应影响另一租户访问健康模型。
-// 参数t为测试上下文；每例使用真实HTTP、私有PostgreSQL和专用随机端口Redis；覆盖首帧前/后与禁用冷却控制。
+// 参数t为测试上下文；每例使用真实HTTP、私有PostgreSQL和专用随机端口Redis；覆盖Chat/Responses、首帧前/后与禁用冷却控制。
 // 所有上游均为本地夹具，取消由真实request context传播；日志落库后再观察冷却，不依赖固定等待；cleanup回收全部资源。
 func TestClientCancellationDoesNotCoolDeployment(t *testing.T) {
-	for _, native := range []bool{false, true} {
+	for _, endpoint := range []string{"chat", "responses", "bypass"} {
+		native := endpoint == "bypass"
 		for _, phase := range []string{"before_headers", "after_frame"} {
 			for _, enabled := range []bool{true, false} {
-				name := fmt.Sprintf("%s_cooldown_%v_native_%v", phase, enabled, native)
+				name := fmt.Sprintf("%s_cooldown_%v_%s", phase, enabled, endpoint)
 				path := "/v1/chat/completions"
+				if endpoint == "responses" {
+					path = "/v1/responses"
+				}
 				if native {
 					path = "/bypass/openai/v1/chat/completions"
 				}
@@ -99,6 +104,9 @@ func TestClientCancellationDoesNotCoolDeployment(t *testing.T) {
 					for n := 0; n < cancels; n++ {
 						ctx, cancel := context.WithTimeout(t.Context(), 3*time.Second)
 						body := fmt.Sprintf(`{"model":%q,"messages":[{"role":"user","content":"Generate a long answer"}],"stream":true}`, model)
+						if endpoint == "responses" {
+							body = fmt.Sprintf(`{"model":%q,"input":"Generate a long answer","stream":true}`, model)
+						}
 						req, _ := http.NewRequestWithContext(ctx, "POST", h.server.URL+path, strings.NewReader(body))
 						req.Header.Set("Authorization", "Bearer "+a.key)
 						req.Header.Set("Content-Type", "application/json")
@@ -154,7 +162,11 @@ func TestClientCancellationDoesNotCoolDeployment(t *testing.T) {
 					failureCount, _ := rdb.Get(t.Context(), "xhub:fails:"+id).Int()
 					cooldown := rdb.Exists(t.Context(), "xhub:cooldown:"+id).Val()
 					before := calls.Load()
-					probe := h.do("POST", path, b.key, chatRequest(model, "After another user cancelled"))
+					probeBody := chatRequest(model, "After another user cancelled")
+					if endpoint == "responses" {
+						probeBody = map[string]any{"model": model, "input": "After another user cancelled"}
+					}
+					probe := h.do("POST", path, b.key, probeBody)
 					after := calls.Load()
 					wantRows := cancels + 1
 					if probe.status == 200 {
@@ -173,6 +185,16 @@ func TestClientCancellationDoesNotCoolDeployment(t *testing.T) {
 							}
 							if strings.Contains(fmt.Sprint(detail["error"]), "data:") || !strings.Contains(fmt.Sprint(detail["error"]), `"upstream_error":null`) {
 								t.Fatalf("部分流被当成错误或虚构供应商错误: %v", detail["error"])
+							}
+							if !native && phase == "after_frame" {
+								var stored iam.RequestLog
+								found, err := h.db.Engine.Where("request_id = ?", stringField(row, "request_id")).Get(&stored)
+								if err != nil || !found {
+									t.Fatalf("取消后的真实流日志未保存: found=%v err=%v", found, err)
+								}
+								if !strings.Contains(stored.ResponseBody, `"code":"request_canceled"`) || !strings.Contains(stored.ResponseBody, `"error_origin":"gateway"`) || strings.Contains(stored.ResponseBody, `"code":"upstream_error"`) {
+									t.Fatalf("网关生成的取消事件不能冒充供应商错误: %s", stored.ResponseBody)
+								}
 							}
 							if spend, ok := floatField(row, "spend"); !ok || spend != 0 {
 								t.Errorf("canceled call charged: %v", row)

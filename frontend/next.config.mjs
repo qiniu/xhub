@@ -15,6 +15,10 @@ const nextConfig = {
     useTypeScriptCli: false,
     // 推理请求可能长时间没有首字节；覆盖框架默认的 30 秒代理超时，网关和调用方仍各自执行自己的截止时间。
     proxyTimeout: 600_000,
+    // 网关允许64MiB正文；Next默认10MiB只截断不拒绝，会使Content-Length不符而挂起。
+    // 留1MiB余量覆盖框架丢弃越界整块的行为，让网关先读到第64MiB+1字节并返回413。
+    // 这是代理缓存上限，不提高网关准入限制；固定长度和分块上传由真实E2E验证。
+    proxyClientMaxBodySize: 65 * 1024 * 1024,
   },
   compiler: {
     removeConsole: process.env.NODE_ENV === "production" ? { exclude: ["error", "warn"] } : false,
