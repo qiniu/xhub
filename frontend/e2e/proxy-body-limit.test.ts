@@ -167,17 +167,17 @@ test("console proxy preserves large bodies and rejects oversize without truncati
     expect(received, "拒绝请求不能到达上游").toHaveLength(5);
     await stableGoto(page, "/logs");
     await page.getByRole("tab", { name: translate("zh-CN", "Error Logs"), exact: true }).click();
-    await page
-      .getByPlaceholder(/按 ID 搜索日志|Search logs by ID/)
-      .filter({ visible: true })
-      .fill(failureID);
-    await page.getByRole("row").filter({ hasText: failureID }).click();
+    // 切换期间普通日志和错误日志可能同时可见，按目标面板定位，避免读取另一个列表的同名控件或同一请求。
+    const errorPanel = page.getByRole("tabpanel", { name: translate("zh-CN", "Error Logs"), exact: true });
+    await errorPanel.getByPlaceholder(/按 ID 搜索日志|Search logs by ID/).fill(failureID);
+    await errorPanel.getByRole("row").filter({ hasText: failureID }).click();
     for (const locale of ["zh-CN", "en"] as const) {
       if (locale === "en") {
         // 详情弹窗打开时外层导航不可访问；先关闭，再像用户一样切换语言并重新打开同一日志。
         await page.keyboard.press("Escape");
         await page.getByRole("button", { name: "English", exact: true }).click();
-        await page.getByRole("row").filter({ hasText: failureID }).click();
+        await page.getByRole("tabpanel", { name: translate(locale, "Error Logs"), exact: true })
+          .getByRole("row").filter({ hasText: failureID }).click();
       }
       const region = page.getByRole("region", { name: translate(locale, "logDiagnostics.title") });
       await expect(region).toContainText("body_too_large");
