@@ -18,7 +18,7 @@ Generated from OpenAPI; existing authorization and billing remain unchanged. See
 
 ### GET /spend/logs/v2
 
-Filters are AND-combined within the authorized scope before pagination; invalid error codes or cache conditions return 400.
+Scoped logs; invalid page defaults to 1, page_size outside 1..200 defaults to 50; UTC inclusive dates; exact timestamps; invalid or reversed windows return 400; session grouping before pagination; undeclared filters not guaranteed; Filters are AND-combined within the authorized scope before pagination; invalid error codes or cache conditions return 400.
 
 ```json
 [
@@ -197,7 +197,7 @@ Filters are AND-combined within the authorized scope before pagination; invalid 
 
 ### GET /spend/logs/ui
 
-Filters are AND-combined within the authorized scope before pagination; invalid error codes or cache conditions return 400.
+Scoped logs; invalid page defaults to 1, page_size outside 1..200 defaults to 50; UTC inclusive dates; exact timestamps; invalid or reversed windows return 400; session grouping before pagination; undeclared filters not guaranteed; Filters are AND-combined within the authorized scope before pagination; invalid error codes or cache conditions return 400.
 
 ```json
 [
@@ -376,7 +376,7 @@ Filters are AND-combined within the authorized scope before pagination; invalid 
 
 ### GET /spend/logs/session/ui
 
-Filters are AND-combined within the authorized scope before pagination; invalid error codes or cache conditions return 400.
+Scoped logs; invalid page defaults to 1, page_size outside 1..200 defaults to 50; UTC inclusive dates; exact timestamps; invalid or reversed windows return 400; session grouping before pagination; undeclared filters not guaranteed; Empty session_id returns empty page before authentication under existing behavior; Filters are AND-combined within the authorized scope before pagination; invalid error codes or cache conditions return 400.
 
 ```json
 [

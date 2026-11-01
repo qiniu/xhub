@@ -8,8 +8,7 @@ export interface paths {
         };
         /**
          * 权限范围内日志，page无效回退1，page_size超出1..200回退50；日期按UTC含结束日；完整时间精确过滤，非法或倒置窗口返回400；会话聚合先分组后分页；未声明筛选不保证有效 / Scoped logs; invalid page defaults to 1, page_size outside 1..200 defaults to 50; UTC inclusive dates; exact timestamps; invalid or reversed windows return 400; session grouping before pagination; undeclared filters not guaranteed
-         * @description 权限范围内日志，page无效回退1，page_size超出1..200回退50；日期按UTC含结束日；完整时间精确过滤，非法或倒置窗口返回400；会话聚合先分组后分页；未声明筛选不保证有效 / Scoped logs; invalid page defaults to 1, page_size outside 1..200 defaults to 50; UTC inclusive dates; exact timestamps; invalid or reversed windows return 400; session grouping before pagination; undeclared filters not guaranteed
-         *     筛选条件在权限范围内按且组合，先筛选再分页；非法错误码或缓存条件返回400 / Filters are AND-combined within the authorized scope before pagination; invalid error codes or cache conditions return 400.
+         * @description 权限范围内日志，page无效回退1，page_size超出1..200回退50；日期按UTC含结束日；完整时间精确过滤，非法或倒置窗口返回400；会话聚合先分组后分页；未声明筛选不保证有效；筛选条件在权限范围内按且组合，先筛选再分页；非法错误码或缓存条件返回400 / Scoped logs; invalid page defaults to 1, page_size outside 1..200 defaults to 50; UTC inclusive dates; exact timestamps; invalid or reversed windows return 400; session grouping before pagination; undeclared filters not guaranteed; Filters are AND-combined within the authorized scope before pagination; invalid error codes or cache conditions return 400.
          */
         get: operations["listLogs"];
         put?: never;
@@ -29,8 +28,7 @@ export interface paths {
         };
         /**
          * 权限范围内日志，page无效回退1，page_size超出1..200回退50；日期按UTC含结束日；完整时间精确过滤，非法或倒置窗口返回400；会话聚合先分组后分页；未声明筛选不保证有效 / Scoped logs; invalid page defaults to 1, page_size outside 1..200 defaults to 50; UTC inclusive dates; exact timestamps; invalid or reversed windows return 400; session grouping before pagination; undeclared filters not guaranteed
-         * @description 权限范围内日志，page无效回退1，page_size超出1..200回退50；日期按UTC含结束日；完整时间精确过滤，非法或倒置窗口返回400；会话聚合先分组后分页；未声明筛选不保证有效 / Scoped logs; invalid page defaults to 1, page_size outside 1..200 defaults to 50; UTC inclusive dates; exact timestamps; invalid or reversed windows return 400; session grouping before pagination; undeclared filters not guaranteed
-         *     筛选条件在权限范围内按且组合，先筛选再分页；非法错误码或缓存条件返回400 / Filters are AND-combined within the authorized scope before pagination; invalid error codes or cache conditions return 400.
+         * @description 权限范围内日志，page无效回退1，page_size超出1..200回退50；日期按UTC含结束日；完整时间精确过滤，非法或倒置窗口返回400；会话聚合先分组后分页；未声明筛选不保证有效；筛选条件在权限范围内按且组合，先筛选再分页；非法错误码或缓存条件返回400 / Scoped logs; invalid page defaults to 1, page_size outside 1..200 defaults to 50; UTC inclusive dates; exact timestamps; invalid or reversed windows return 400; session grouping before pagination; undeclared filters not guaranteed; Filters are AND-combined within the authorized scope before pagination; invalid error codes or cache conditions return 400.
          */
         get: operations["listUILogs"];
         put?: never;
@@ -50,8 +48,7 @@ export interface paths {
         };
         /**
          * 权限范围内日志，page无效回退1，page_size超出1..200回退50；日期按UTC含结束日；完整时间精确过滤，非法或倒置窗口返回400；会话聚合先分组后分页；未声明筛选不保证有效 / Scoped logs; invalid page defaults to 1, page_size outside 1..200 defaults to 50; UTC inclusive dates; exact timestamps; invalid or reversed windows return 400; session grouping before pagination; undeclared filters not guaranteed；session_id空时既有接口在鉴权前返回空页 / Empty session_id returns empty page before authentication under existing behavior
-         * @description 权限范围内日志，page无效回退1，page_size超出1..200回退50；日期按UTC含结束日；完整时间精确过滤，非法或倒置窗口返回400；会话聚合先分组后分页；未声明筛选不保证有效 / Scoped logs; invalid page defaults to 1, page_size outside 1..200 defaults to 50; UTC inclusive dates; exact timestamps; invalid or reversed windows return 400; session grouping before pagination; undeclared filters not guaranteed；session_id空时既有接口在鉴权前返回空页 / Empty session_id returns empty page before authentication under existing behavior
-         *     筛选条件在权限范围内按且组合，先筛选再分页；非法错误码或缓存条件返回400 / Filters are AND-combined within the authorized scope before pagination; invalid error codes or cache conditions return 400.
+         * @description 权限范围内日志，page无效回退1，page_size超出1..200回退50；日期按UTC含结束日；完整时间精确过滤，非法或倒置窗口返回400；会话聚合先分组后分页；未声明筛选不保证有效；session_id空时既有接口在鉴权前返回空页；筛选条件在权限范围内按且组合，先筛选再分页；非法错误码或缓存条件返回400 / Scoped logs; invalid page defaults to 1, page_size outside 1..200 defaults to 50; UTC inclusive dates; exact timestamps; invalid or reversed windows return 400; session grouping before pagination; undeclared filters not guaranteed; Empty session_id returns empty page before authentication under existing behavior; Filters are AND-combined within the authorized scope before pagination; invalid error codes or cache conditions return 400.
          */
         get: operations["listSessionLogs"];
         put?: never;
