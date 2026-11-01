@@ -120,8 +120,10 @@ func verifyCodexAgentConversation(t *testing.T) {
 			}
 		}
 		cost, _ := floatField(bill, "spend")
-		if cost != expectedCost() {
-			t.Fatalf("Codex 逐轮金额错误：%v", bill)
+		// 接口金额已规范化；用夹具 11 个输入、5 个输出的精确十进制结果核对，不能比较结算内部的浮点尾数。
+		const wantCost = 11*testInputRate + 5*testOutputRate
+		if cost != wantCost {
+			t.Fatalf("Codex 第 %d 轮金额错误：实际=%.18g 预期=%.18g", index+1, cost, float64(wantCost))
 		}
 		proxy := bill["proxy_server_request"].(map[string]any)
 		storedBody := proxy["body"].(map[string]any)

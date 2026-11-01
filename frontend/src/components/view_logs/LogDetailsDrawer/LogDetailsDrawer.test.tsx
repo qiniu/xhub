@@ -7,14 +7,14 @@ import { sessionSpendLogsCall } from "../../networking";
 import { LogEntry } from "../columns";
 import { AutoRouterModelGroupsProvider } from "@/components/shared/table_cells";
 
-const detailCapture = vi.hoisted(() => ({ data: null as Record<string, unknown> | null, render: vi.fn(), header: vi.fn() }));
+const detailCapture = vi.hoisted(() => ({ error: false, retry: vi.fn(), data: null as Record<string, unknown> | null, render: vi.fn(), header: vi.fn() }));
 
 vi.mock("../../networking", () => ({
   sessionSpendLogsCall: vi.fn(),
 }));
 
 vi.mock("@/app/(dashboard)/hooks/logDetails/useLogDetails", () => ({
-  useLogDetails: () => ({ data: detailCapture.data, isLoading: false }),
+  useLogDetails: () => ({ data: detailCapture.data, isLoading: false, isError: detailCapture.error, refetch: detailCapture.retry }),
 }));
 
 vi.mock("./LogDetailContent", () => ({
@@ -265,4 +265,16 @@ it("uses the latest task lifecycle status from detail in the header", async () =
     render(<QueryClientProvider client={client}><LogDetailsDrawer open onClose={() => {}} logEntry={makeLog({ status: "executing" })} accessToken="token" /></QueryClientProvider>);
     await waitFor(() => expect(detailCapture.header).toHaveBeenLastCalledWith(expect.objectContaining({ statusLabel: t("Completed") })));
   } finally { detailCapture.data = null; client.clear(); }
+});
+
+/** 前置懒加载接口失败；抽屉显示明确错误并提供重试，不能伪装成空正文；finally 清理 mock 与缓存。 */
+it("shows lazy detail failure with a retry action", async () => {
+  detailCapture.error = true;
+  const client = new QueryClient({defaultOptions:{queries:{retry:false}}});
+  try {
+    render(<QueryClientProvider client={client}><LogDetailsDrawer open onClose={()=>{}} logEntry={makeLog({})} accessToken="token" /></QueryClientProvider>);
+    expect(await screen.findByRole("alert")).toHaveTextContent(t("logsUX.detailFailed"));
+    fireEvent.click(screen.getByRole("button",{name:t("Refresh"),exact:true}));
+    expect(detailCapture.retry).toHaveBeenCalled();
+  } finally {detailCapture.error=false;detailCapture.retry.mockClear();client.clear();}
 });

@@ -419,6 +419,45 @@ func TestACachedCallIsNotBilledAtTheInputRate(t *testing.T) {
 	}
 }
 
+// TestCostResponseAndLogUseStableDecimalMoney 验证真实请求链路不会把浮点尾数暴露给调用方或日志页。
+// 前置条件是隔离 PostgreSQL、本地假上游和一张包含缓存费率的部署；验证结果是响应头和详情接口都返回稳定金额；测试结束由 harness 清理模型、密钥和账单。
+func TestCostResponseAndLogUseStableDecimalMoney(t *testing.T) {
+	h := newHarness(t)
+	admin := h.adminSession()
+	tn := h.provision(t, admin, "money-format")
+	h.flushSpend()
+
+	addPricedModel(t, h, admin, "regression-money-format", []any{
+		map[string]any{"measure": "token", "unit_size": 1, "side": "input", "variant": "uncached", "window": "all", "source_key": "input", "usd": 0.000002},
+		map[string]any{"measure": "token", "unit_size": 1, "side": "cache_read", "window": "all", "source_key": "cache", "usd": 0.0000001},
+		map[string]any{"measure": "token", "unit_size": 1, "side": "output", "window": "all", "source_key": "output", "usd": 0.00001},
+	}, "chat")
+	h.usageOverride("regression-money-format", map[string]any{
+		"prompt_tokens": 28123, "completion_tokens": 117,
+		"prompt_tokens_details": map[string]any{"cached_tokens": 25856},
+	})
+
+	r := h.ok(http.MethodPost, "/v1/chat/completions", tn.key, chatRequest("regression-money-format", "money precision"))
+	if got, want := r.header("x-litellm-response-cost"), "0.0082896"; got != want {
+		t.Fatalf("response cost = %q, want %q", got, want)
+	}
+	callID := r.header("x-litellm-call-id")
+	h.flushSpend()
+	detailResponse := h.ok(http.MethodGet, "/spend/logs/ui/"+callID, admin, nil)
+	if strings.Contains(detailResponse.text(), "0.008289600000000001") {
+		t.Fatalf("log detail exposed a binary float tail: %s", truncate(detailResponse.text(), 500))
+	}
+	detail := detailResponse.json()
+	if got := numberOrZero(detail["spend"]); got != 0.0082896 {
+		t.Fatalf("log spend = %.18f, want 0.0082896", got)
+	}
+	bill, _ := detail["metadata"].(map[string]any)
+	costBreakdown, _ := bill["cost_breakdown"].(map[string]any)
+	if got := numberOrZero(costBreakdown["total_cost"]); got != 0.0082896 {
+		t.Fatalf("breakdown total = %.18f, want 0.0082896", got)
+	}
+}
+
 // cacheReadRate 是一段缓存读的每 token 价，比输入价低两个数量级，
 // 用来证明缓存那一档真的被用上了，而不是被当成输入价。
 const cacheReadRate = 0.0000003

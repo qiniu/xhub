@@ -132,3 +132,20 @@ test("legacy operation bookmarks map to Swagger deep links safely", () => {
   assert.match(html, /post-usernew/);
   assert.throws(() => referenceRedirect("bad", "", {}, []));
 });
+
+/** 前置真实日志契约；新增筛选说明与参数在中英文 Swagger 中完整保留且不混语，源对象不变，无外部写入。 */
+test("log filter descriptions retain all conditions in both languages", () => {
+  const spec = JSON.parse(entries.find(e => e.domain === "usage").raw);
+  for (const route of ["/spend/logs/v2", "/spend/logs/ui", "/spend/logs/session/ui"]) {
+    const en = localizedSpec(spec, "en").paths[route].get;
+    const zh = localizedSpec(spec, "zh").paths[route].get;
+    assert.doesNotMatch(en.description, /[\u4e00-\u9fff]/);
+    assert.match(en.description, /AND-combined.*before pagination/);
+    assert.match(zh.description, /按且组合，先筛选再分页/);
+    assert.doesNotMatch(zh.description, /AND-combined/);
+    for (const name of ["key_hash", "key_alias", "supplier", "inbound_endpoint", "cache_hit_filter", "error_message"]) {
+      assert.doesNotMatch(en.parameters.find(p => p.name === name).description, /[\u4e00-\u9fff]/);
+      assert.match(zh.parameters.find(p => p.name === name).description, /[\u4e00-\u9fff]/);
+    }
+  }
+});

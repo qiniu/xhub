@@ -20,6 +20,8 @@ export interface PaginatedResponse {
 }
 
 export const LOG_FILTER_IDS = {
+  SUPPLIER: "supplier",
+  ENDPOINT: "inbound_endpoint",
   TEAM_ID: "team_id",
   STATUS: "status",
   CACHE_STATUS: "cache_hit",
@@ -37,6 +39,8 @@ export const LOG_FILTER_IDS = {
 } as const;
 
 export const LOG_FILTER_LABELS: Record<string, string> = {
+  [LOG_FILTER_IDS.SUPPLIER]: "logsUX.supplier",
+  [LOG_FILTER_IDS.ENDPOINT]: "requestMetrics.inbound",
   [LOG_FILTER_IDS.TEAM_ID]: "Team ID",
   [LOG_FILTER_IDS.STATUS]: "Status",
   [LOG_FILTER_IDS.CACHE_STATUS]: "Cache",
@@ -57,17 +61,34 @@ export interface LogsWindow {
   end_date: string;
 }
 
+/** 日志预设窗口的显式时长，供筛选面板与查询共用；value 为正数，unit 使用 Moment 的时间单位。 */
+export interface LogsPresetInterval {
+  value: number;
+  unit: string;
+}
+
+export const DEFAULT_LOGS_INTERVAL: LogsPresetInterval = { value: 24, unit: "hours" };
+
+/** 把时间条件转换为 UTC 查询边界，供列表与用户目录共用；自定义范围读取本地输入，预设范围读取显式时长。
+ * presetEndMs 为本次刷新终点，presetInterval 为已选预设；返回起止字符串，无副作用。非法预设抛错，避免无声查询零窗口。
+ * 预设不能从不带时区的墙钟字符串反推时长：夏令时回拨会出现两个相同的 01:30，跳时则可能相差两小时。
+ */
 export const formatLogsWindow = (
   startTime: string,
   endTime: string,
   isCustomDate: boolean,
   presetEndMs: number = Date.now(),
-): LogsWindow => ({
-  start_date: moment(startTime).utc().format("YYYY-MM-DD HH:mm:ss"),
-  end_date: isCustomDate
-    ? moment(endTime).utc().format("YYYY-MM-DD HH:mm:ss")
-    : moment(presetEndMs).utc().format("YYYY-MM-DD HH:mm:ss"),
-});
+  presetInterval: LogsPresetInterval = DEFAULT_LOGS_INTERVAL,
+): LogsWindow => {
+  const duration = moment.duration(presetInterval.value, presetInterval.unit as moment.unitOfTime.DurationConstructor).asMilliseconds();
+  if (!isCustomDate && (!Number.isFinite(duration) || duration <= 0)) {
+    throw new RangeError("Log preset duration must be positive and finite");
+  }
+  return {
+    start_date: (isCustomDate ? moment(startTime) : moment(presetEndMs - duration)).utc().format("YYYY-MM-DD HH:mm:ss"),
+    end_date: (isCustomDate ? moment(endTime) : moment(presetEndMs)).utc().format("YYYY-MM-DD HH:mm:ss"),
+  };
+};
 
 export const LOGS_WINDOW_TICK_MS = 60000;
 
@@ -108,11 +129,11 @@ export function useLogFilterLogic({
   columnFilters,
   activeTab,
   isLiveTail,
-  excludeInternalHealthChecks,
   startTime,
   endTime,
   pagination,
   isCustomDate,
+  presetInterval = DEFAULT_LOGS_INTERVAL,
   sorting,
   sessionCursors = {},
   errorsOnly = false,
@@ -124,11 +145,12 @@ export function useLogFilterLogic({
   columnFilters: ColumnFiltersState;
   activeTab: string;
   isLiveTail: boolean;
-  excludeInternalHealthChecks: boolean;
+  excludeInternalHealthChecks?: boolean; // 兼容旧调用方，不发送后台未实现的条件。
   startTime: string;
   endTime: string;
   pagination: PaginationState;
   isCustomDate: boolean;
+  presetInterval?: LogsPresetInterval;
   sorting: SortingState;
   sessionCursors?: Record<number, string>;
   errorsOnly?: boolean;
@@ -144,15 +166,18 @@ export function useLogFilterLogic({
     queryKey: [
       "logs",
       "table",
+      accessToken,
+      userID,
+      userRole,
       pagination.pageIndex,
       pageSize,
       startTime,
       endTime,
       isCustomDate,
+      presetInterval,
       columnFilters,
       sortBy,
       sortOrder,
-      excludeInternalHealthChecks,
       sessionCursor,
       errorsOnly,
     ],
@@ -167,7 +192,7 @@ export function useLogFilterLogic({
         };
       }
 
-      const window = formatLogsWindow(startTime, endTime, isCustomDate);
+      const window = formatLogsWindow(startTime, endTime, isCustomDate, Date.now(), presetInterval);
 
       const userIdFilter = getFilterValue(columnFilters, LOG_FILTER_IDS.USER_ID);
       const pickedModel = getFilterValue(columnFilters, LOG_FILTER_IDS.MODEL_ID);
@@ -185,24 +210,23 @@ export function useLogFilterLogic({
         page: pagination.pageIndex + 1,
         page_size: pageSize,
         params: {
-          api_key: getFilterValue(columnFilters, LOG_FILTER_IDS.KEY_HASH),
+          key_hash: getFilterValue(columnFilters, LOG_FILTER_IDS.KEY_HASH),
+          supplier: getFilterValue(columnFilters, LOG_FILTER_IDS.SUPPLIER),
+          inbound_endpoint: getFilterValue(columnFilters, LOG_FILTER_IDS.ENDPOINT),
           team_id: getFilterValue(columnFilters, LOG_FILTER_IDS.TEAM_ID),
           request_id: getFilterValue(columnFilters, LOG_FILTER_IDS.REQUEST_ID),
           search: getFilterValue(columnFilters, LOG_FILTER_IDS.SEARCH),
           session_id: getFilterValue(columnFilters, LOG_FILTER_IDS.SESSION_ID),
           user_id: userIdFilter,
-          end_user: getFilterValue(columnFilters, LOG_FILTER_IDS.END_USER),
           // 在后台过滤后再分页，防止失败行占用普通日志页或被会话合并隐藏。
           status_filter: errorsOnly ? "error" : ordinaryStatus,
           cache_hit_filter: getFilterValue(columnFilters, LOG_FILTER_IDS.CACHE_STATUS),
-          model_id: pickedModel,
           model: typedModel || pickedModel,
           key_alias: getFilterValue(columnFilters, LOG_FILTER_IDS.KEY_ALIAS),
           error_code: getFilterValue(columnFilters, LOG_FILTER_IDS.ERROR_CODE),
           error_message: getFilterValue(columnFilters, LOG_FILTER_IDS.ERROR_MESSAGE),
           sort_by: sortBy,
           sort_order: sortOrder,
-          exclude_internal_health_checks: excludeInternalHealthChecks,
           group_by_session: !errorsOnly,
           session_cursor: sessionCursor,
         },

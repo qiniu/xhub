@@ -1,7 +1,7 @@
 "use client";
 
 import { useDebouncedValue } from "@tanstack/react-pacer/debouncer";
-import { useQuery, type UseQueryOptions } from "@tanstack/react-query";
+import { useQuery } from "@tanstack/react-query";
 import type { ColumnFiltersState, OnChangeFn, PaginationState, SortingState } from "@tanstack/react-table";
 import moment from "moment";
 import { useCallback, useEffect, useMemo, useState } from "react";
@@ -9,24 +9,23 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { DEFAULT_PAGE_SIZE_OPTIONS } from "@/components/shared/DataTable";
 import { AutoRouterModelGroupsProvider } from "@/components/shared/table_cells";
 import { DEBOUNCE_WAIT_MS } from "@/utils/debounceConstants";
-import { uiSpendLogsCall } from "../networking";
+import { logDetailsQueryOptions } from "@/app/(dashboard)/hooks/logDetails/useLogDetails";
 import type { LogEntry } from "./columns";
 import { useT } from "@/i18n";
 import {
   DEFAULT_LOGS_SORTING,
+  DEFAULT_LOGS_INTERVAL,
   formatLogsWindow,
   getLogsWindowEndBound,
   LOG_FILTER_IDS,
-  type PaginatedResponse,
   useLogFilterLogic,
 } from "./log_filter_logic";
 import { useLogDetailRouting } from "./logDetailRouting";
 import { LogDetailsDrawer } from "./LogDetailsDrawer";
-import { LiveTailBanner, LogsTableToolbar } from "./LogsTableToolbar";
+import { LogsTableToolbar } from "./LogsTableToolbar";
 import { RequestLogsTable } from "./RequestLogsTable";
 
 const PAGE_SIZE = DEFAULT_PAGE_SIZE_OPTIONS[0];
-const DEFAULT_INTERVAL = { value: 24, unit: "hours" };
 const matchesLogId = (log: LogEntry, logId: string) => log.request_id === logId || log.litellm_call_id === logId;
 const findLogById = (logs: readonly LogEntry[], logId: string): LogEntry | null =>
   logs.find((log) => log.request_id === logId) ?? logs.find((log) => log.litellm_call_id === logId) ?? null;
@@ -53,7 +52,7 @@ export default function RequestLogsPanel({ accessToken, token, userRole, userID,
   const [startTime, setStartTime] = useState<string>(moment().subtract(24, "hours").format("YYYY-MM-DDTHH:mm"));
   const [endTime, setEndTime] = useState<string>(moment().format("YYYY-MM-DDTHH:mm"));
   const [isCustomDate, setIsCustomDate] = useState(false);
-  const [selectedTimeInterval, setSelectedTimeInterval] = useState<{ value: number; unit: string }>(DEFAULT_INTERVAL);
+  const [selectedTimeInterval, setSelectedTimeInterval] = useState<{ value: number; unit: string }>(DEFAULT_LOGS_INTERVAL);
 
   const [selectedLog, setSelectedLog] = useState<LogEntry | null>(null);
 
@@ -68,20 +67,12 @@ export default function RequestLogsPanel({ accessToken, token, userRole, userID,
 
   const [isLiveTail, setIsLiveTail] = useState<boolean>(() => {
     const storedValue = sessionStorage.getItem("isLiveTail");
-    return storedValue !== null ? JSON.parse(storedValue) : true;
+    return storedValue !== "false";
   });
 
   useEffect(() => {
     sessionStorage.setItem("isLiveTail", JSON.stringify(isLiveTail));
   }, [isLiveTail]);
-
-  const [excludeInternalHealthChecks, setExcludeInternalHealthChecks] = useState<boolean>(
-    () => sessionStorage.getItem("excludeInternalHealthChecks") === "true",
-  );
-
-  useEffect(() => {
-    sessionStorage.setItem("excludeInternalHealthChecks", JSON.stringify(excludeInternalHealthChecks));
-  }, [excludeInternalHealthChecks]);
 
   const searchTerm = useMemo(() => {
     const entry = columnFilters.find((filter) => filter.id === LOG_FILTER_IDS.SEARCH);
@@ -101,44 +92,30 @@ export default function RequestLogsPanel({ accessToken, token, userRole, userID,
     columnFilters: queryColumnFilters,
     activeTab: isActive ? "request logs" : "inactive",
     isLiveTail,
-    excludeInternalHealthChecks,
     startTime,
     endTime,
     pagination,
     isCustomDate,
+    presetInterval: selectedTimeInterval,
     sorting,
     sessionCursors,
     errorsOnly,
   });
 
-  // Follow the table's own last fetch so a live-tail refresh carries the filter
-  // window with it; before the first fetch, fall back to the stored end time.
+  // 用户选项查询沿用日志窗口，自动刷新时同步移动边界。
   const windowEndBound = getLogsWindowEndBound(logsQuery.dataUpdatedAt || Date.parse(endTime));
   const logsWindow = useMemo(
-    () => formatLogsWindow(startTime, endTime, isCustomDate, windowEndBound),
-    [startTime, endTime, isCustomDate, windowEndBound],
+    () => formatLogsWindow(startTime, endTime, isCustomDate, windowEndBound, selectedTimeInterval),
+    [startTime, endTime, isCustomDate, windowEndBound, selectedTimeInterval],
   );
 
-  const urlLogQueryOptions: UseQueryOptions<LogEntry | null> = {
-    queryKey: ["logs", "byId", urlLogId, accessToken],
-    queryFn: async () => {
-      if (urlLogId === null) return null;
-      const window = formatLogsWindow(startTime, endTime, isCustomDate);
-      const response: PaginatedResponse = await uiSpendLogsCall({
-        accessToken,
-        start_date: window.start_date,
-        end_date: window.end_date,
-        page: 1,
-        page_size: 1,
-        params: { request_id: urlLogId },
-      });
-      return findLogById(response.data, urlLogId);
-    },
-    enabled: urlLogId !== null && !(selectedLog !== null && matchesLogId(selectedLog, urlLogId)),
-    staleTime: Infinity,
+  // 深链接和抽屉使用相同缓存键及有效期，已下载的完整正文只读一次。
+  const urlLogQueryOptions = {
+    ...logDetailsQueryOptions(accessToken, urlLogId ?? undefined),
+    enabled: !!accessToken && urlLogId !== null && !(selectedLog !== null && matchesLogId(selectedLog, urlLogId)),
   };
 
-  const { data: urlLog } = useQuery(urlLogQueryOptions);
+  const { data: urlLog, isError: detailError } = useQuery(urlLogQueryOptions);
 
   const displayLog = useMemo<LogEntry | null>(() => {
     if (urlLogId === null) return null;
@@ -214,20 +191,12 @@ export default function RequestLogsPanel({ accessToken, token, userRole, userID,
     [usesSessionCursor, pagination, filteredLogs.next_session_cursor, logsQuery.isPlaceholderData],
   );
 
-  const handleExcludeInternalHealthChecksChange = useCallback(
-    (value: boolean) => {
-      setExcludeInternalHealthChecks(value);
-      resetToFirstPage();
-    },
-    [resetToFirstPage],
-  );
-
   const handleResetFilters = useCallback(() => {
     setColumnFilters([]);
     setStartTime(moment().subtract(24, "hours").format("YYYY-MM-DDTHH:mm"));
     setEndTime(moment().format("YYYY-MM-DDTHH:mm"));
     setIsCustomDate(false);
-    setSelectedTimeInterval(DEFAULT_INTERVAL);
+    setSelectedTimeInterval(DEFAULT_LOGS_INTERVAL);
     resetToFirstPage();
   }, [resetToFirstPage]);
 
@@ -266,10 +235,12 @@ export default function RequestLogsPanel({ accessToken, token, userRole, userID,
         <h1 className="text-xl font-semibold">{errorsOnly ? t("Error Logs") : t("pages.logs.title")}</h1>
       </div>
 
-      {isLiveTail && pagination.pageIndex === 0 && <LiveTailBanner onStop={() => setIsLiveTail(false)} />}
+      {logsQuery.isError && <p role="alert" className="mb-3 text-destructive">{t("logsUX.loadFailed")}</p>}
+      {detailError && <p role="alert" className="mb-3 text-destructive">{t("logsUX.detailFailed")}</p>}
 
       <RequestLogsTable
         data={rows}
+        hasLoadError={logsQuery.isError}
         rowCount={rowCount}
         isLoading={logsQuery.isLoading || logsQuery.isPlaceholderData}
         isRefreshing={logsQuery.isFetching}
@@ -299,8 +270,6 @@ export default function RequestLogsPanel({ accessToken, token, userRole, userID,
             onSelectedTimeIntervalChange={setSelectedTimeInterval}
             isLiveTail={isLiveTail}
             onIsLiveTailChange={setIsLiveTail}
-            excludeInternalHealthChecks={excludeInternalHealthChecks}
-            onExcludeInternalHealthChecksChange={handleExcludeInternalHealthChecksChange}
             onResetToFirstPage={resetToFirstPage}
             onResetFilters={handleResetFilters}
           />
@@ -318,7 +287,7 @@ export default function RequestLogsPanel({ accessToken, token, userRole, userID,
         accessToken={accessToken}
         allLogs={rows}
         onSelectLog={handleSelectLog}
-        startTime={moment(startTime).utc().format(t("YYYY-MM-DD HH:mm:ss"))}
+        startTime={undefined}
       />
     </AutoRouterModelGroupsProvider>
   );

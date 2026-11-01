@@ -8,7 +8,7 @@ export interface paths {
         };
         /**
          * 权限范围内日志，page无效回退1，page_size超出1..200回退50；日期按UTC含结束日；完整时间精确过滤，非法或倒置窗口返回400；会话聚合先分组后分页；未声明筛选不保证有效 / Scoped logs; invalid page defaults to 1, page_size outside 1..200 defaults to 50; UTC inclusive dates; exact timestamps; invalid or reversed windows return 400; session grouping before pagination; undeclared filters not guaranteed
-         * @description 权限范围内日志，page无效回退1，page_size超出1..200回退50；日期按UTC含结束日；完整时间精确过滤，非法或倒置窗口返回400；会话聚合先分组后分页；未声明筛选不保证有效 / Scoped logs; invalid page defaults to 1, page_size outside 1..200 defaults to 50; UTC inclusive dates; exact timestamps; invalid or reversed windows return 400; session grouping before pagination; undeclared filters not guaranteed
+         * @description 权限范围内日志，page无效回退1，page_size超出1..200回退50；日期按UTC含结束日；完整时间精确过滤，非法或倒置窗口返回400；会话聚合先分组后分页；未声明筛选不保证有效；筛选条件在权限范围内按且组合，先筛选再分页；非法错误码或缓存条件返回400 / Scoped logs; invalid page defaults to 1, page_size outside 1..200 defaults to 50; UTC inclusive dates; exact timestamps; invalid or reversed windows return 400; session grouping before pagination; undeclared filters not guaranteed; Filters are AND-combined within the authorized scope before pagination; invalid error codes or cache conditions return 400.
          */
         get: operations["listLogs"];
         put?: never;
@@ -28,7 +28,7 @@ export interface paths {
         };
         /**
          * 权限范围内日志，page无效回退1，page_size超出1..200回退50；日期按UTC含结束日；完整时间精确过滤，非法或倒置窗口返回400；会话聚合先分组后分页；未声明筛选不保证有效 / Scoped logs; invalid page defaults to 1, page_size outside 1..200 defaults to 50; UTC inclusive dates; exact timestamps; invalid or reversed windows return 400; session grouping before pagination; undeclared filters not guaranteed
-         * @description 权限范围内日志，page无效回退1，page_size超出1..200回退50；日期按UTC含结束日；完整时间精确过滤，非法或倒置窗口返回400；会话聚合先分组后分页；未声明筛选不保证有效 / Scoped logs; invalid page defaults to 1, page_size outside 1..200 defaults to 50; UTC inclusive dates; exact timestamps; invalid or reversed windows return 400; session grouping before pagination; undeclared filters not guaranteed
+         * @description 权限范围内日志，page无效回退1，page_size超出1..200回退50；日期按UTC含结束日；完整时间精确过滤，非法或倒置窗口返回400；会话聚合先分组后分页；未声明筛选不保证有效；筛选条件在权限范围内按且组合，先筛选再分页；非法错误码或缓存条件返回400 / Scoped logs; invalid page defaults to 1, page_size outside 1..200 defaults to 50; UTC inclusive dates; exact timestamps; invalid or reversed windows return 400; session grouping before pagination; undeclared filters not guaranteed; Filters are AND-combined within the authorized scope before pagination; invalid error codes or cache conditions return 400.
          */
         get: operations["listUILogs"];
         put?: never;
@@ -48,7 +48,7 @@ export interface paths {
         };
         /**
          * 权限范围内日志，page无效回退1，page_size超出1..200回退50；日期按UTC含结束日；完整时间精确过滤，非法或倒置窗口返回400；会话聚合先分组后分页；未声明筛选不保证有效 / Scoped logs; invalid page defaults to 1, page_size outside 1..200 defaults to 50; UTC inclusive dates; exact timestamps; invalid or reversed windows return 400; session grouping before pagination; undeclared filters not guaranteed；session_id空时既有接口在鉴权前返回空页 / Empty session_id returns empty page before authentication under existing behavior
-         * @description 权限范围内日志，page无效回退1，page_size超出1..200回退50；日期按UTC含结束日；完整时间精确过滤，非法或倒置窗口返回400；会话聚合先分组后分页；未声明筛选不保证有效 / Scoped logs; invalid page defaults to 1, page_size outside 1..200 defaults to 50; UTC inclusive dates; exact timestamps; invalid or reversed windows return 400; session grouping before pagination; undeclared filters not guaranteed；session_id空时既有接口在鉴权前返回空页 / Empty session_id returns empty page before authentication under existing behavior
+         * @description 权限范围内日志，page无效回退1，page_size超出1..200回退50；日期按UTC含结束日；完整时间精确过滤，非法或倒置窗口返回400；会话聚合先分组后分页；未声明筛选不保证有效；session_id空时既有接口在鉴权前返回空页；筛选条件在权限范围内按且组合，先筛选再分页；非法错误码或缓存条件返回400 / Scoped logs; invalid page defaults to 1, page_size outside 1..200 defaults to 50; UTC inclusive dates; exact timestamps; invalid or reversed windows return 400; session grouping before pagination; undeclared filters not guaranteed; Empty session_id returns empty page before authentication under existing behavior; Filters are AND-combined within the authorized scope before pagination; invalid error codes or cache conditions return 400.
          */
         get: operations["listSessionLogs"];
         put?: never;
@@ -470,12 +470,24 @@ export interface operations {
                 session_id?: string;
                 request_id?: string;
                 search?: string;
+                /** @description 最终 HTTP 状态精确匹配，100至599；非法非空值返回400 / Exact final HTTP status from 100 to 599; invalid non-empty values return 400 */
                 error_code?: string;
+                /** @description 完整错误正文中不区分大小写的字面子串；%和_不是通配符 / Case-insensitive literal substring of the full error; % and _ are not wildcards */
                 error_message?: string;
                 sort_by?: string;
                 sort_order?: string;
                 status_filter?: string;
                 group_by_session?: string;
+                /** @description 密钥 Hash 精确匹配；api_key 仍指密钥 ID / Exact recorded key hash; api_key still means key ID */
+                key_hash?: string;
+                /** @description 调用时的密钥别名精确匹配，包含历史别名 / Exact recorded key alias, including historical aliases */
+                key_alias?: string;
+                /** @description 调用时的供应商连接名精确匹配 / Exact recorded supplier connection name */
+                supplier?: string;
+                /** @description 入站路径精确匹配 / Exact inbound path */
+                inbound_endpoint?: string;
+                /** @description 网关响应缓存命中或未命中，不是上游提示词缓存；非法值返回400 / Gateway response cache hit or miss, not provider prompt cache; invalid values return 400 */
+                cache_hit_filter?: "" | "hit" | "miss";
             };
             header?: never;
             path?: never;
@@ -517,12 +529,24 @@ export interface operations {
                 session_id?: string;
                 request_id?: string;
                 search?: string;
+                /** @description 最终 HTTP 状态精确匹配，100至599；非法非空值返回400 / Exact final HTTP status from 100 to 599; invalid non-empty values return 400 */
                 error_code?: string;
+                /** @description 完整错误正文中不区分大小写的字面子串；%和_不是通配符 / Case-insensitive literal substring of the full error; % and _ are not wildcards */
                 error_message?: string;
                 sort_by?: string;
                 sort_order?: string;
                 status_filter?: string;
                 group_by_session?: string;
+                /** @description 密钥 Hash 精确匹配；api_key 仍指密钥 ID / Exact recorded key hash; api_key still means key ID */
+                key_hash?: string;
+                /** @description 调用时的密钥别名精确匹配，包含历史别名 / Exact recorded key alias, including historical aliases */
+                key_alias?: string;
+                /** @description 调用时的供应商连接名精确匹配 / Exact recorded supplier connection name */
+                supplier?: string;
+                /** @description 入站路径精确匹配 / Exact inbound path */
+                inbound_endpoint?: string;
+                /** @description 网关响应缓存命中或未命中，不是上游提示词缓存；非法值返回400 / Gateway response cache hit or miss, not provider prompt cache; invalid values return 400 */
+                cache_hit_filter?: "" | "hit" | "miss";
             };
             header?: never;
             path?: never;
@@ -564,12 +588,24 @@ export interface operations {
                 session_id?: string;
                 request_id?: string;
                 search?: string;
+                /** @description 最终 HTTP 状态精确匹配，100至599；非法非空值返回400 / Exact final HTTP status from 100 to 599; invalid non-empty values return 400 */
                 error_code?: string;
+                /** @description 完整错误正文中不区分大小写的字面子串；%和_不是通配符 / Case-insensitive literal substring of the full error; % and _ are not wildcards */
                 error_message?: string;
                 sort_by?: string;
                 sort_order?: string;
                 status_filter?: string;
                 group_by_session?: string;
+                /** @description 密钥 Hash 精确匹配；api_key 仍指密钥 ID / Exact recorded key hash; api_key still means key ID */
+                key_hash?: string;
+                /** @description 调用时的密钥别名精确匹配，包含历史别名 / Exact recorded key alias, including historical aliases */
+                key_alias?: string;
+                /** @description 调用时的供应商连接名精确匹配 / Exact recorded supplier connection name */
+                supplier?: string;
+                /** @description 入站路径精确匹配 / Exact inbound path */
+                inbound_endpoint?: string;
+                /** @description 网关响应缓存命中或未命中，不是上游提示词缓存；非法值返回400 / Gateway response cache hit or miss, not provider prompt cache; invalid values return 400 */
+                cache_hit_filter?: "" | "hit" | "miss";
             };
             header?: never;
             path?: never;

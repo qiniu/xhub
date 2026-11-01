@@ -18,7 +18,7 @@ Generated from OpenAPI; existing authorization and billing remain unchanged. See
 
 ### GET /spend/logs/v2
 
-Scoped logs; invalid page defaults to 1, page_size outside 1..200 defaults to 50; UTC inclusive dates; exact timestamps; invalid or reversed windows return 400; session grouping before pagination; undeclared filters not guaranteed
+Scoped logs; invalid page defaults to 1, page_size outside 1..200 defaults to 50; UTC inclusive dates; exact timestamps; invalid or reversed windows return 400; session grouping before pagination; undeclared filters not guaranteed; Filters are AND-combined within the authorized scope before pagination; invalid error codes or cache conditions return 400.
 
 ```json
 [
@@ -106,14 +106,16 @@ Scoped logs; invalid page defaults to 1, page_size outside 1..200 defaults to 50
     "name": "error_code",
     "schema": {
       "type": "string"
-    }
+    },
+    "description": "Exact final HTTP status from 100 to 599; invalid non-empty values return 400"
   },
   {
     "in": "query",
     "name": "error_message",
     "schema": {
       "type": "string"
-    }
+    },
+    "description": "Case-insensitive literal substring of the full error; % and _ are not wildcards"
   },
   {
     "in": "query",
@@ -142,6 +144,52 @@ Scoped logs; invalid page defaults to 1, page_size outside 1..200 defaults to 50
     "schema": {
       "type": "string"
     }
+  },
+  {
+    "in": "query",
+    "name": "key_hash",
+    "schema": {
+      "type": "string"
+    },
+    "description": "Exact recorded key hash; api_key still means key ID"
+  },
+  {
+    "in": "query",
+    "name": "key_alias",
+    "schema": {
+      "type": "string"
+    },
+    "description": "Exact recorded key alias, including historical aliases"
+  },
+  {
+    "in": "query",
+    "name": "supplier",
+    "schema": {
+      "type": "string"
+    },
+    "description": "Exact recorded supplier connection name"
+  },
+  {
+    "in": "query",
+    "name": "inbound_endpoint",
+    "schema": {
+      "type": "string"
+    },
+    "description": "Exact inbound path"
+  },
+  {
+    "in": "query",
+    "name": "cache_hit_filter",
+    "schema": {
+      "type": "string",
+      "enum": [
+        "",
+        "hit",
+        "miss"
+      ]
+    },
+    "description": "Gateway response cache hit or miss, not provider prompt cache; invalid values return 400",
+    "allowEmptyValue": true
   }
 ]
 ```
@@ -149,7 +197,7 @@ Scoped logs; invalid page defaults to 1, page_size outside 1..200 defaults to 50
 
 ### GET /spend/logs/ui
 
-Scoped logs; invalid page defaults to 1, page_size outside 1..200 defaults to 50; UTC inclusive dates; exact timestamps; invalid or reversed windows return 400; session grouping before pagination; undeclared filters not guaranteed
+Scoped logs; invalid page defaults to 1, page_size outside 1..200 defaults to 50; UTC inclusive dates; exact timestamps; invalid or reversed windows return 400; session grouping before pagination; undeclared filters not guaranteed; Filters are AND-combined within the authorized scope before pagination; invalid error codes or cache conditions return 400.
 
 ```json
 [
@@ -237,14 +285,16 @@ Scoped logs; invalid page defaults to 1, page_size outside 1..200 defaults to 50
     "name": "error_code",
     "schema": {
       "type": "string"
-    }
+    },
+    "description": "Exact final HTTP status from 100 to 599; invalid non-empty values return 400"
   },
   {
     "in": "query",
     "name": "error_message",
     "schema": {
       "type": "string"
-    }
+    },
+    "description": "Case-insensitive literal substring of the full error; % and _ are not wildcards"
   },
   {
     "in": "query",
@@ -273,6 +323,52 @@ Scoped logs; invalid page defaults to 1, page_size outside 1..200 defaults to 50
     "schema": {
       "type": "string"
     }
+  },
+  {
+    "in": "query",
+    "name": "key_hash",
+    "schema": {
+      "type": "string"
+    },
+    "description": "Exact recorded key hash; api_key still means key ID"
+  },
+  {
+    "in": "query",
+    "name": "key_alias",
+    "schema": {
+      "type": "string"
+    },
+    "description": "Exact recorded key alias, including historical aliases"
+  },
+  {
+    "in": "query",
+    "name": "supplier",
+    "schema": {
+      "type": "string"
+    },
+    "description": "Exact recorded supplier connection name"
+  },
+  {
+    "in": "query",
+    "name": "inbound_endpoint",
+    "schema": {
+      "type": "string"
+    },
+    "description": "Exact inbound path"
+  },
+  {
+    "in": "query",
+    "name": "cache_hit_filter",
+    "schema": {
+      "type": "string",
+      "enum": [
+        "",
+        "hit",
+        "miss"
+      ]
+    },
+    "description": "Gateway response cache hit or miss, not provider prompt cache; invalid values return 400",
+    "allowEmptyValue": true
   }
 ]
 ```
@@ -280,7 +376,7 @@ Scoped logs; invalid page defaults to 1, page_size outside 1..200 defaults to 50
 
 ### GET /spend/logs/session/ui
 
-Empty session_id returns empty page before authentication under existing behavior
+Scoped logs; invalid page defaults to 1, page_size outside 1..200 defaults to 50; UTC inclusive dates; exact timestamps; invalid or reversed windows return 400; session grouping before pagination; undeclared filters not guaranteed; Empty session_id returns empty page before authentication under existing behavior; Filters are AND-combined within the authorized scope before pagination; invalid error codes or cache conditions return 400.
 
 ```json
 [
@@ -368,14 +464,16 @@ Empty session_id returns empty page before authentication under existing behavio
     "name": "error_code",
     "schema": {
       "type": "string"
-    }
+    },
+    "description": "Exact final HTTP status from 100 to 599; invalid non-empty values return 400"
   },
   {
     "in": "query",
     "name": "error_message",
     "schema": {
       "type": "string"
-    }
+    },
+    "description": "Case-insensitive literal substring of the full error; % and _ are not wildcards"
   },
   {
     "in": "query",
@@ -404,6 +502,52 @@ Empty session_id returns empty page before authentication under existing behavio
     "schema": {
       "type": "string"
     }
+  },
+  {
+    "in": "query",
+    "name": "key_hash",
+    "schema": {
+      "type": "string"
+    },
+    "description": "Exact recorded key hash; api_key still means key ID"
+  },
+  {
+    "in": "query",
+    "name": "key_alias",
+    "schema": {
+      "type": "string"
+    },
+    "description": "Exact recorded key alias, including historical aliases"
+  },
+  {
+    "in": "query",
+    "name": "supplier",
+    "schema": {
+      "type": "string"
+    },
+    "description": "Exact recorded supplier connection name"
+  },
+  {
+    "in": "query",
+    "name": "inbound_endpoint",
+    "schema": {
+      "type": "string"
+    },
+    "description": "Exact inbound path"
+  },
+  {
+    "in": "query",
+    "name": "cache_hit_filter",
+    "schema": {
+      "type": "string",
+      "enum": [
+        "",
+        "hit",
+        "miss"
+      ]
+    },
+    "description": "Gateway response cache hit or miss, not provider prompt cache; invalid values return 400",
+    "allowEmptyValue": true
   }
 ]
 ```

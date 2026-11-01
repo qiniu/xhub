@@ -95,15 +95,16 @@ describe("useLogFilterLogic", () => {
 
   describe("column filters map onto backend query params", () => {
     const cases: ReadonlyArray<{ id: string; value: string; param: string }> = [
-      { id: LOG_FILTER_IDS.KEY_HASH, value: "sk-hash-1", param: "api_key" },
+      { id: LOG_FILTER_IDS.KEY_HASH, value: "sk-hash-1", param: "key_hash" },
       { id: LOG_FILTER_IDS.TEAM_ID, value: "team-1", param: "team_id" },
       { id: LOG_FILTER_IDS.REQUEST_ID, value: "req-1", param: "request_id" },
       { id: LOG_FILTER_IDS.SESSION_ID, value: "sess-1", param: "session_id" },
-      { id: LOG_FILTER_IDS.END_USER, value: "end-user-1", param: "end_user" },
+      { id: LOG_FILTER_IDS.SUPPLIER, value: "supplier-1", param: "supplier" },
+      { id: LOG_FILTER_IDS.ENDPOINT, value: "/v1/responses", param: "inbound_endpoint" },
       { id: LOG_FILTER_IDS.STATUS, value: "success", param: "status_filter" },
       { id: LOG_FILTER_IDS.CACHE_STATUS, value: "hit", param: "cache_hit_filter" },
       { id: LOG_FILTER_IDS.CACHE_STATUS, value: "miss", param: "cache_hit_filter" },
-      { id: LOG_FILTER_IDS.MODEL_ID, value: "model-uuid-1", param: "model_id" },
+      { id: LOG_FILTER_IDS.MODEL_ID, value: "model-uuid-1", param: "model" },
       { id: LOG_FILTER_IDS.PUBLIC_MODEL_OR_SEARCH_TOOL, value: "gpt-4o", param: "model" },
       { id: LOG_FILTER_IDS.KEY_ALIAS, value: "alias-1", param: "key_alias" },
       { id: LOG_FILTER_IDS.ERROR_CODE, value: "429", param: "error_code" },
@@ -181,7 +182,6 @@ describe("useLogFilterLogic", () => {
       ["pagination", { pagination: { pageIndex: 1, pageSize: 50 } }],
       ["startTime", { startTime: "2025-02-02T00:00:00" }],
       ["columnFilters", { columnFilters: [{ id: LOG_FILTER_IDS.TEAM_ID, value: "team-2" }] }],
-      ["excludeInternalHealthChecks", { excludeInternalHealthChecks: true }],
     ])("refetches when %s changes", async (_label, nextProps) => {
       const { rerender } = renderHook((props: HookOverrides) => useLogFilterLogic({ ...defaultProps, ...props }), {
         wrapper,
@@ -194,20 +194,12 @@ describe("useLogFilterLogic", () => {
     });
   });
 
-  describe("hide health checks toggle", () => {
-    it("passes exclude_internal_health_checks when the toggle is on", async () => {
-      renderFilterHook({ excludeInternalHealthChecks: true });
-
-      await waitFor(() => expect(uiSpendLogsCall).toHaveBeenCalled());
-      expect(lastCallParams()?.params).toMatchObject({ exclude_internal_health_checks: true });
-    });
-
-    it("passes exclude_internal_health_checks as false when the toggle is off", async () => {
-      renderFilterHook();
-
-      await waitFor(() => expect(uiSpendLogsCall).toHaveBeenCalled());
-      expect(lastCallParams()?.params).toMatchObject({ exclude_internal_health_checks: false });
-    });
+  /** 前置旧客户端残留 end_user 和健康开关；验证不发送后台未支持的条件；缓存和 mock 自动清理。 */
+  it("does not send unsupported legacy filters", async () => {
+    renderFilterHook({ excludeInternalHealthChecks: true, columnFilters: [{id: LOG_FILTER_IDS.END_USER, value: "legacy"}] });
+    await waitFor(() => expect(uiSpendLogsCall).toHaveBeenCalled());
+    expect(lastCallParams()?.params?.exclude_internal_health_checks).toBeUndefined();
+    expect(lastCallParams()?.params?.end_user).toBeUndefined();
   });
 
   describe("query enablement", () => {
@@ -372,4 +364,44 @@ describe("formatLogsWindow preset end bound", () => {
       moment("2026-07-24T06:00").utc().format("YYYY-MM-DD HH:mm:ss"),
     );
   });
+});
+
+/** 前置一小时前选择的 24 小时预设；刷新时两端同时平移且持续 24 小时；纯计算无需清理。 */
+it("keeps a rolling preset at the chosen duration", () => {
+  const now = Date.UTC(2026, 10, 1, 12);
+  const window = formatLogsWindow("2026-10-31T11:00:00Z", "2026-11-01T11:00:00Z", false, now);
+  expect(window.start_date).toBe("2026-10-31 12:00:00");
+  expect(window.end_date).toBe("2026-11-01 12:00:00");
+});
+
+/** 前置纽约夏令时回拨/跳时后选中最近一小时；墙钟字符串有歧义仍按预设时长查 UTC，纯计算无需清理。 */
+it.each([
+  ["2026-11-01T01:30", "2026-11-01T01:30", "2026-11-01T06:30:00Z", "2026-11-01 05:30:00", "2026-11-01 06:30:00"],
+  ["2026-03-08T01:30", "2026-03-08T03:30", "2026-03-08T07:30:00Z", "2026-03-08 06:30:00", "2026-03-08 07:30:00"],
+])("keeps the selected hour across DST from %s to %s", (start, end, now, expectedStart, expectedEnd) => {
+  const window = formatLogsWindow(start, end, false, Date.parse(now), { value: 1, unit: "hours" });
+  expect(window).toEqual({ start_date: expectedStart, end_date: expectedEnd });
+});
+
+/** 前置内部预设出现零、负值或非有限输入；必须显式拒绝而非请求空窗口，纯计算无需清理。 */
+it.each([0, -1, Number.NaN, Number.POSITIVE_INFINITY])("rejects invalid preset duration %s", (value) => {
+  expect(() => formatLogsWindow("", "", false, Date.now(), { value, unit: "hours" })).toThrow(RangeError);
+});
+
+/** 前置相同墙钟输入但选择不同预设；查询缓存必须按时长区分并真实更新 API 参数，结束清理缓存与组件。 */
+it("refetches when the selected interval changes despite identical wall-clock inputs", async () => {
+  const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+  vi.mocked(uiSpendLogsCall).mockClear().mockResolvedValue(emptyResponse);
+  const view = renderHook((value: number) => useLogFilterLogic({ ...defaultProps,
+    startTime: "2026-11-01T01:30", endTime: "2026-11-01T01:30", isCustomDate: false,
+    presetInterval: { value, unit: "minutes" },
+  }), { initialProps: 60, wrapper: ({ children }: { children: ReactNode }) => <QueryClientProvider client={client}>{children}</QueryClientProvider> });
+  try {
+    await waitFor(() => expect(uiSpendLogsCall).toHaveBeenCalledTimes(1));
+    const duration = () => moment.utc(lastCallParams()?.end_date).diff(moment.utc(lastCallParams()?.start_date), "minutes");
+    expect(duration()).toBe(60);
+    view.rerender(15);
+    await waitFor(() => expect(uiSpendLogsCall).toHaveBeenCalledTimes(2));
+    expect(duration()).toBe(15);
+  } finally { view.unmount(); client.clear(); }
 });
