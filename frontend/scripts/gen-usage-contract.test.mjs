@@ -32,6 +32,16 @@ test("usage contract generators cover real routes and reject all artifact drift"
   }
   assert.match(artifacts["docs/development/en/usage-api.generated.md"], /not every failure has a usage record/);
   assert.match(artifacts["docs/development/zh-CN/usage-api.generated.md"], /并非所有错误均有账单/);
+  // 三个日志操作的单语描述必须同时保留旧分页/时间规则和新组合筛选规则，防止只保留分隔符一侧的末句。
+  for (const route of ["/spend/logs/v2", "/spend/logs/ui", "/spend/logs/session/ui"]) {
+    const heading = `### GET ${route}\n\n`;
+    const en = artifacts["docs/development/en/usage-api.generated.md"].split(heading)[1].split("\n\n")[0];
+    const zh = artifacts["docs/development/zh-CN/usage-api.generated.md"].split(heading)[1].split("\n\n")[0];
+    assert.match(en, /Scoped logs.*invalid page.*exact timestamps.*AND-combined.*return 400/);
+    assert.doesNotMatch(en, /[\u4e00-\u9fff]/);
+    assert.match(zh, /权限范围内日志.*page无效.*完整时间.*按且组合.*返回400/);
+    assert.doesNotMatch(zh, /Scoped logs|AND-combined/);
+  }
   const root = mkdtempSync(join(tmpdir(), "xhub-usage-"));
   try {
     assert.throws(() => syncArtifacts(root, artifacts, true), /ENOENT/);

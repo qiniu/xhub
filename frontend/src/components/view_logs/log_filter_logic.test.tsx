@@ -373,3 +373,35 @@ it("keeps a rolling preset at the chosen duration", () => {
   expect(window.start_date).toBe("2026-10-31 12:00:00");
   expect(window.end_date).toBe("2026-11-01 12:00:00");
 });
+
+/** 前置纽约夏令时回拨/跳时后选中最近一小时；墙钟字符串有歧义仍按预设时长查 UTC，纯计算无需清理。 */
+it.each([
+  ["2026-11-01T01:30", "2026-11-01T01:30", "2026-11-01T06:30:00Z", "2026-11-01 05:30:00", "2026-11-01 06:30:00"],
+  ["2026-03-08T01:30", "2026-03-08T03:30", "2026-03-08T07:30:00Z", "2026-03-08 06:30:00", "2026-03-08 07:30:00"],
+])("keeps the selected hour across DST from %s to %s", (start, end, now, expectedStart, expectedEnd) => {
+  const window = formatLogsWindow(start, end, false, Date.parse(now), { value: 1, unit: "hours" });
+  expect(window).toEqual({ start_date: expectedStart, end_date: expectedEnd });
+});
+
+/** 前置内部预设出现零、负值或非有限输入；必须显式拒绝而非请求空窗口，纯计算无需清理。 */
+it.each([0, -1, Number.NaN, Number.POSITIVE_INFINITY])("rejects invalid preset duration %s", (value) => {
+  expect(() => formatLogsWindow("", "", false, Date.now(), { value, unit: "hours" })).toThrow(RangeError);
+});
+
+/** 前置相同墙钟输入但选择不同预设；查询缓存必须按时长区分并真实更新 API 参数，结束清理缓存与组件。 */
+it("refetches when the selected interval changes despite identical wall-clock inputs", async () => {
+  const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+  vi.mocked(uiSpendLogsCall).mockClear().mockResolvedValue(emptyResponse);
+  const view = renderHook((value: number) => useLogFilterLogic({ ...defaultProps,
+    startTime: "2026-11-01T01:30", endTime: "2026-11-01T01:30", isCustomDate: false,
+    presetInterval: { value, unit: "minutes" },
+  }), { initialProps: 60, wrapper: ({ children }: { children: ReactNode }) => <QueryClientProvider client={client}>{children}</QueryClientProvider> });
+  try {
+    await waitFor(() => expect(uiSpendLogsCall).toHaveBeenCalledTimes(1));
+    const duration = () => moment.utc(lastCallParams()?.end_date).diff(moment.utc(lastCallParams()?.start_date), "minutes");
+    expect(duration()).toBe(60);
+    view.rerender(15);
+    await waitFor(() => expect(uiSpendLogsCall).toHaveBeenCalledTimes(2));
+    expect(duration()).toBe(15);
+  } finally { view.unmount(); client.clear(); }
+});

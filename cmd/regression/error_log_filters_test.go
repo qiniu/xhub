@@ -75,7 +75,7 @@ func TestErrorLogFilterContract(t *testing.T) {
 	}{
 		{"403", "budget_exceeded", len(ids)}, {"429", "rpm_limit", 1}, {"403", "rpm_limit", 0},
 		{"402", "", 1}, {"403", "", len(ids) + 1}, {"", "budget_exceeded", len(ids)},
-		{"403", "' OR true --", 0}, {"broken", "", 0}, {"600", "", 0},
+		{"403", "' OR true --", 0},
 	} {
 		q := url.Values{"status_filter": {"error"}, "error_code": {tc.code}, "error_message": {tc.message}, "page_size": {"2"}}
 		result := h.ok("GET", "/spend/logs/ui?"+q.Encode(), owner.session, nil)
@@ -86,6 +86,23 @@ func TestErrorLogFilterContract(t *testing.T) {
 		invisible := h.ok("GET", "/spend/logs/ui?"+q.Encode(), other.session, nil)
 		if len(rowsOf(invisible, "data")) != 0 {
 			t.Fatalf("筛选越权: %s", invisible.describe())
+		}
+	}
+	// 合法条件零匹配返回空页，非法条件必须返回错误信封，不能与“查不到记录”混淆。
+	for _, route := range []string{"/spend/logs/ui", "/spend/logs/v2", "/spend/logs/session/ui"} {
+		for _, code := range []string{"broken", "600", "99", "-1"} {
+			for _, session := range []string{owner.session, other.session} {
+				q := url.Values{"error_code": {code}, "session_id": {"filter-contract"}}
+				result := h.do("GET", route+"?"+q.Encode(), session, nil)
+				if result.status != 400 {
+					t.Fatalf("%s 非法错误码 %q 应返回400: %s", route, code, result.describe())
+				}
+				body := result.json()
+				errBody, ok := body["error"].(map[string]any)
+				if !ok || errBody["code"] != "400" || errBody["type"] != "invalid_request" || errBody["message"] == "" || body["data"] != nil {
+					t.Fatalf("%s 非法错误码 %q 未返回明确错误信封: %s", route, code, result.describe())
+				}
+			}
 		}
 	}
 	// 认证失败不能冒认用户；注册Bypass仍必须落日志，仅管理员能够读取。

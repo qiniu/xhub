@@ -1,4 +1,4 @@
-import { expect, test, type APIRequestContext, type Page } from "@playwright/test";
+import { expect, test, type APIRequestContext, type Page, type Request } from "@playwright/test";
 
 import { translate } from "../src/i18n/translate";
 import { GATEWAY, UPSTREAM, loginAdmin, sessionBearer, stableGoto, t } from "./helpers";
@@ -183,12 +183,60 @@ async function verifyLogDatesAndLink(page: Page, failedCallId: string): Promise<
   await page.getByLabel("Start time",{exact:true}).fill("2021-01-01T12:00");
   expect((await invalid).status()).toBe(400);
   await expect(page.getByRole("alert").filter({hasText:"Logs could not be loaded"})).toBeVisible();
-  const detail=page.waitForResponse(r=>new URL(r.url()).pathname === "/spend/logs/ui/"+failedCallId);
-  await stableGoto(page,"/logs?log_id="+failedCallId);
-  const direct=await detail;
-  expect(direct.status()).toBe(200);
-  expect(new URL(direct.url()).searchParams.get("start_date") || "").toBe("");
-  await expect(page.getByRole("dialog").getByRole("alert")).toContainText("502");
+  const detailPath = "/spend/logs/ui/" + failedCallId;
+  const detailRequests: Request[] = [];
+  // 只统计浏览器页面发出的真实详情读取，忽略测试夹具的预检请求；完整打开/关闭后必须恰好一次。
+  const observeDetail = (request: Request) => { if (new URL(request.url()).pathname === detailPath) detailRequests.push(request); };
+  page.on("request", observeDetail);
+  try {
+    const detail = page.waitForResponse(r => new URL(r.url()).pathname === detailPath);
+    await stableGoto(page, "/logs?log_id=" + failedCallId);
+    const direct = await detail;
+    expect(direct.status()).toBe(200);
+    expect(new URL(direct.url()).searchParams.get("start_date") || "").toBe("");
+    const dialog = page.getByRole("dialog");
+    await expect(dialog.getByRole("alert")).toContainText("502");
+    await expect(dialog.getByRole("region", { name: "Full Error Details" })).toContainText("e2e-json-terminal-cause");
+    await page.keyboard.press("Escape");
+    await expect(dialog).toBeHidden();
+    expect(detailRequests.length, "深链接与抽屉应复用同一次完整正文读取").toBe(1);
+  } finally { page.off("request", observeDetail); }
+}
+
+/** 在纽约夏令时重复小时选择最近一小时；参数为已登录页面及本例真实成功调用 ID。
+ * 使用独立浏览器时区与固定 Date 验证实际网关收到 05:30–06:30 UTC，再恢复当前时间查到真实日志；finally 关闭上下文，数据仍由场景清理。
+ */
+async function verifyDSTPreset(page: Page, successCallId: string): Promise<void> {
+  const browser = page.context().browser();
+  expect(browser).not.toBeNull();
+  const context = await browser!.newContext({ timezoneId: "America/New_York", baseURL: new URL(page.url()).origin,
+    storageState: await page.context().storageState() });
+  try {
+    const dstPage = await context.newPage();
+    await dstPage.clock.setFixedTime(new Date("2026-11-01T06:30:00Z"));
+    await stableGoto(dstPage, "/logs");
+    await dstPage.getByRole("button", { name: "English", exact: true }).click();
+    await dstPage.getByRole("switch", { name: "Refresh every 15 seconds" }).uncheck();
+    await dstPage.getByRole("button", { name: "Last 24 Hours", exact: true }).click();
+    const responsePromise = dstPage.waitForResponse(response => {
+      const url = new URL(response.url());
+      return url.pathname === "/spend/logs/ui" && url.searchParams.get("end_date") === "2026-11-01 06:30:00"
+        && url.searchParams.get("start_date") !== "2026-10-31 06:30:00";
+    });
+    await dstPage.getByRole("button", { name: "Last Hour", exact: true }).click();
+    const response = await responsePromise;
+    expect(response.status()).toBe(200);
+    const params = new URL(response.url()).searchParams;
+    expect(params.get("start_date")).toBe("2026-11-01 05:30:00");
+    expect(params.get("end_date")).toBe("2026-11-01 06:30:00");
+    const result = await response.json();
+    expect(Array.isArray(result.data)).toBe(true);
+    expect(typeof result.total).toBe("number");
+    // 恢复实际时间后，同一浏览器预设仍能查询本例刚才通过真实数据面生成的日志。
+    await dstPage.clock.setFixedTime(new Date());
+    await dstPage.getByRole("tabpanel", { name: "Logs", exact: true }).getByPlaceholder(/Search logs by ID/).fill(successCallId);
+    await expect(dstPage.getByRole("row").filter({ hasText: successCallId })).toBeVisible();
+  } finally { await context.close(); }
 }
 
 /** 用途：注册独立场景「错误日志详情完整显示上游正文并可返回普通日志」；无参数、无返回值。前置真实浏览器、私有数据库和本地上游；验证页面及原始契约，保留原套件前后置清理，运行器最终回收专属 schema。异常由 Playwright 单独记录。 */
@@ -306,6 +354,7 @@ test("错误日志详情完整显示上游正文并可返回普通日志", async
     await page.keyboard.press("Escape");
     await page.getByRole("button", {name:"English",exact:true}).click();
     await verifyLogDatesAndLink(page, failedCallId);
+    await verifyDSTPreset(page, successCallId);
   } finally {
     try {
       const restored = logging?.stored_in_db

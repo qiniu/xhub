@@ -61,14 +61,29 @@ export interface LogsWindow {
   end_date: string;
 }
 
-/** 把页面本地时间转换为 UTC 查询边界；预设窗口随刷新整体平移，避免“最近一天”不断扩大。自定义窗口固定，无副作用。 */
+/** 日志预设窗口的显式时长，供筛选面板与查询共用；value 为正数，unit 使用 Moment 的时间单位。 */
+export interface LogsPresetInterval {
+  value: number;
+  unit: string;
+}
+
+export const DEFAULT_LOGS_INTERVAL: LogsPresetInterval = { value: 24, unit: "hours" };
+
+/** 把时间条件转换为 UTC 查询边界，供列表与用户目录共用；自定义范围读取本地输入，预设范围读取显式时长。
+ * presetEndMs 为本次刷新终点，presetInterval 为已选预设；返回起止字符串，无副作用。非法预设抛错，避免无声查询零窗口。
+ * 预设不能从不带时区的墙钟字符串反推时长：夏令时回拨会出现两个相同的 01:30，跳时则可能相差两小时。
+ */
 export const formatLogsWindow = (
   startTime: string,
   endTime: string,
   isCustomDate: boolean,
   presetEndMs: number = Date.now(),
+  presetInterval: LogsPresetInterval = DEFAULT_LOGS_INTERVAL,
 ): LogsWindow => {
-  const duration = Math.max(0, moment(endTime).valueOf() - moment(startTime).valueOf());
+  const duration = moment.duration(presetInterval.value, presetInterval.unit as moment.unitOfTime.DurationConstructor).asMilliseconds();
+  if (!isCustomDate && (!Number.isFinite(duration) || duration <= 0)) {
+    throw new RangeError("Log preset duration must be positive and finite");
+  }
   return {
     start_date: (isCustomDate ? moment(startTime) : moment(presetEndMs - duration)).utc().format("YYYY-MM-DD HH:mm:ss"),
     end_date: (isCustomDate ? moment(endTime) : moment(presetEndMs)).utc().format("YYYY-MM-DD HH:mm:ss"),
@@ -118,6 +133,7 @@ export function useLogFilterLogic({
   endTime,
   pagination,
   isCustomDate,
+  presetInterval = DEFAULT_LOGS_INTERVAL,
   sorting,
   sessionCursors = {},
   errorsOnly = false,
@@ -134,6 +150,7 @@ export function useLogFilterLogic({
   endTime: string;
   pagination: PaginationState;
   isCustomDate: boolean;
+  presetInterval?: LogsPresetInterval;
   sorting: SortingState;
   sessionCursors?: Record<number, string>;
   errorsOnly?: boolean;
@@ -157,6 +174,7 @@ export function useLogFilterLogic({
       startTime,
       endTime,
       isCustomDate,
+      presetInterval,
       columnFilters,
       sortBy,
       sortOrder,
@@ -174,7 +192,7 @@ export function useLogFilterLogic({
         };
       }
 
-      const window = formatLogsWindow(startTime, endTime, isCustomDate);
+      const window = formatLogsWindow(startTime, endTime, isCustomDate, Date.now(), presetInterval);
 
       const userIdFilter = getFilterValue(columnFilters, LOG_FILTER_IDS.USER_ID);
       const pickedModel = getFilterValue(columnFilters, LOG_FILTER_IDS.MODEL_ID);

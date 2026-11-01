@@ -1,7 +1,7 @@
 "use client";
 
 import { useDebouncedValue } from "@tanstack/react-pacer/debouncer";
-import { useQuery, type UseQueryOptions } from "@tanstack/react-query";
+import { useQuery } from "@tanstack/react-query";
 import type { ColumnFiltersState, OnChangeFn, PaginationState, SortingState } from "@tanstack/react-table";
 import moment from "moment";
 import { useCallback, useEffect, useMemo, useState } from "react";
@@ -9,11 +9,12 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { DEFAULT_PAGE_SIZE_OPTIONS } from "@/components/shared/DataTable";
 import { AutoRouterModelGroupsProvider } from "@/components/shared/table_cells";
 import { DEBOUNCE_WAIT_MS } from "@/utils/debounceConstants";
-import { uiSpendLogDetailsCall } from "../networking";
+import { logDetailsQueryOptions } from "@/app/(dashboard)/hooks/logDetails/useLogDetails";
 import type { LogEntry } from "./columns";
 import { useT } from "@/i18n";
 import {
   DEFAULT_LOGS_SORTING,
+  DEFAULT_LOGS_INTERVAL,
   formatLogsWindow,
   getLogsWindowEndBound,
   LOG_FILTER_IDS,
@@ -25,7 +26,6 @@ import { LogsTableToolbar } from "./LogsTableToolbar";
 import { RequestLogsTable } from "./RequestLogsTable";
 
 const PAGE_SIZE = DEFAULT_PAGE_SIZE_OPTIONS[0];
-const DEFAULT_INTERVAL = { value: 24, unit: "hours" };
 const matchesLogId = (log: LogEntry, logId: string) => log.request_id === logId || log.litellm_call_id === logId;
 const findLogById = (logs: readonly LogEntry[], logId: string): LogEntry | null =>
   logs.find((log) => log.request_id === logId) ?? logs.find((log) => log.litellm_call_id === logId) ?? null;
@@ -52,7 +52,7 @@ export default function RequestLogsPanel({ accessToken, token, userRole, userID,
   const [startTime, setStartTime] = useState<string>(moment().subtract(24, "hours").format("YYYY-MM-DDTHH:mm"));
   const [endTime, setEndTime] = useState<string>(moment().format("YYYY-MM-DDTHH:mm"));
   const [isCustomDate, setIsCustomDate] = useState(false);
-  const [selectedTimeInterval, setSelectedTimeInterval] = useState<{ value: number; unit: string }>(DEFAULT_INTERVAL);
+  const [selectedTimeInterval, setSelectedTimeInterval] = useState<{ value: number; unit: string }>(DEFAULT_LOGS_INTERVAL);
 
   const [selectedLog, setSelectedLog] = useState<LogEntry | null>(null);
 
@@ -96,6 +96,7 @@ export default function RequestLogsPanel({ accessToken, token, userRole, userID,
     endTime,
     pagination,
     isCustomDate,
+    presetInterval: selectedTimeInterval,
     sorting,
     sessionCursors,
     errorsOnly,
@@ -104,19 +105,14 @@ export default function RequestLogsPanel({ accessToken, token, userRole, userID,
   // 用户选项查询沿用日志窗口，自动刷新时同步移动边界。
   const windowEndBound = getLogsWindowEndBound(logsQuery.dataUpdatedAt || Date.parse(endTime));
   const logsWindow = useMemo(
-    () => formatLogsWindow(startTime, endTime, isCustomDate, windowEndBound),
-    [startTime, endTime, isCustomDate, windowEndBound],
+    () => formatLogsWindow(startTime, endTime, isCustomDate, windowEndBound, selectedTimeInterval),
+    [startTime, endTime, isCustomDate, windowEndBound, selectedTimeInterval],
   );
 
-  const urlLogQueryOptions: UseQueryOptions<LogEntry | null> = {
-    queryKey: ["logs", "byId", urlLogId, accessToken],
-    queryFn: async () => {
-      if (urlLogId === null) return null;
-      // 深链接直接查询授权详情，不继承列表的时间窗、状态或分页。
-      return await uiSpendLogDetailsCall(accessToken, urlLogId, "");
-    },
-    enabled: urlLogId !== null && !(selectedLog !== null && matchesLogId(selectedLog, urlLogId)),
-    staleTime: Infinity,
+  // 深链接和抽屉使用相同缓存键及有效期，已下载的完整正文只读一次。
+  const urlLogQueryOptions = {
+    ...logDetailsQueryOptions(accessToken, urlLogId ?? undefined),
+    enabled: !!accessToken && urlLogId !== null && !(selectedLog !== null && matchesLogId(selectedLog, urlLogId)),
   };
 
   const { data: urlLog, isError: detailError } = useQuery(urlLogQueryOptions);
@@ -200,7 +196,7 @@ export default function RequestLogsPanel({ accessToken, token, userRole, userID,
     setStartTime(moment().subtract(24, "hours").format("YYYY-MM-DDTHH:mm"));
     setEndTime(moment().format("YYYY-MM-DDTHH:mm"));
     setIsCustomDate(false);
-    setSelectedTimeInterval(DEFAULT_INTERVAL);
+    setSelectedTimeInterval(DEFAULT_LOGS_INTERVAL);
     resetToFirstPage();
   }, [resetToFirstPage]);
 
