@@ -114,6 +114,8 @@ export function registerClientScenario(locale: Locale) {
             const detail = await page.request.get(GATEWAY + "/spend/logs/ui/" + callID, { headers });
             if (!detail.ok()) return null;
             const row = await detail.json();
+            expect(JSON.parse(row.error)).toMatchObject({error:{type:"request_canceled"},upstream_error:null});
+            expect(row.metadata.upstream_response.failure).toMatchObject({kind:"request_canceled",cancellation_source:"unknown"});
             return { status: row.status, spend: Number(row.spend) };
           })
           .toEqual({ status: "error", spend: 0 });
@@ -121,8 +123,10 @@ export function registerClientScenario(locale: Locale) {
       await stableGoto(page, "/logs");
       await expect(page.getByRole("main")).toContainText(name);
       await page.getByRole("tab", {name:tr("Error Logs"),exact:true}).click();
-      await page.getByPlaceholder(/按 ID 搜索日志|Search logs by ID/).filter({ visible: true }).fill(calls[0]);
-      await page.getByRole("row").filter({hasText:calls[0]}).click();
+      // 页签过渡时两个面板可能同时可见；限定目标页签，保持严格唯一匹配，不依赖动画时长。
+      const errorPanel = page.getByRole("tabpanel", {name:tr("Error Logs"),exact:true});
+      await errorPanel.getByPlaceholder(/按 ID 搜索日志|Search logs by ID/).fill(calls[0]);
+      await errorPanel.getByRole("row").filter({hasText:calls[0]}).click();
       const diagnostic=page.getByRole("region",{name:tr("logDiagnostics.title")});
       await expect(diagnostic).toContainText("request_canceled");
       await expect(diagnostic).toContainText(tr("logDiagnostics.cancelUnknown"));

@@ -1,13 +1,52 @@
 package diagnostics
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"io"
+	"net"
 	"net/http"
+	"os"
 	"strings"
 	"testing"
 )
+
+// TestLocalStreamFailureClassification 验证本地取消、超时、断流不伪装成供应商明确错误。
+// 参数 t 为测试上下文；输入含包装错误及明确供应商错误，验证稳定类型和原文保留；纯内存，无清理。
+func TestLocalStreamFailureClassification(t *testing.T) {
+	for _, tc := range []struct {
+		name string
+		err  error
+		kind string
+	}{
+		{"cancel", context.Canceled, "request_canceled"},
+		{"wrapped_cancel", fmt.Errorf("read: %w", context.Canceled), "request_canceled"},
+		{"deadline", context.DeadlineExceeded, "request_timeout"},
+		{"network_timeout", &net.OpError{Op: "read", Net: "tcp", Err: os.ErrDeadlineExceeded}, "request_timeout"},
+		{"truncated", io.ErrUnexpectedEOF, "stream_transport_error"},
+		{"decode", errors.New("invalid event"), "stream_transport_error"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			got := ErrorEnvelope(tc.err)
+			fields := got["error"].(map[string]any)
+			if fields["type"] != tc.kind || fields["code"] != tc.kind {
+				t.Fatalf("本地失败被误分类: %v", got)
+			}
+			if got["error_origin"] != "gateway" || fields["message"] == "" {
+				t.Fatalf("本地错误来源或详情缺失: %v", got)
+			}
+			if tc.kind == "request_canceled" && got["cancellation_source"] != "unknown" {
+				t.Fatalf("不能把取消推断为用户操作: %v", got)
+			}
+		})
+	}
+	vendor := &UpstreamError{Envelope: map[string]any{"error": map[string]any{"code": "upstream_error", "message": "context canceled"}, "request_id": "vendor-1"}}
+	if got := ErrorEnvelope(fmt.Errorf("wrapped: %w", vendor)); got["error_origin"] != nil || got["request_id"] != "vendor-1" {
+		t.Fatalf("供应商原始错误不能被重新归因: %v", got)
+	}
+}
 
 // TestUpstreamErrorExtraction 用内存事件验证正常、嵌套、字符串、缺失和非法输入边界。
 // 参数 t 为测试上下文；保留供应商错误及关联 ID，未命中不报错；无外部资源需清理。

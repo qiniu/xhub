@@ -5,10 +5,12 @@ import (
 	"io"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 )
 
 // TestStreamReadFailureDiagnostics 真实上游在首帧后截断chunked连接，两种执行入口应记录502和原始读取原因。
+// 没有供应商明确错误时，标准入口生成的传输失败事件必须标记gateway来源，不能误标用户取消。
 // 前置本地HTTP供应商、隔离PG；不使用供应商密钥；服务、连接和schema由Cleanup回收。
 func TestStreamReadFailureDiagnostics(t *testing.T) {
 	for _, native := range []bool{false, true} {
@@ -48,6 +50,12 @@ func TestStreamReadFailureDiagnostics(t *testing.T) {
 			failure := upstream["failure"].(map[string]any)
 			if upstream["read_error"] != "unexpected EOF" || failure["phase"] != "response_transfer" || failure["transport_error"] == "" || failure["cancellation_source"] != nil {
 				t.Fatalf("上游流截断证据缺失或错误归因为用户取消: %v", upstream)
+			}
+			if upstream["error"] != nil {
+				t.Fatalf("连接截断不能虚构供应商错误对象: %v", upstream)
+			}
+			if !native && (!strings.Contains(response.text(), `"code":"stream_transport_error"`) || !strings.Contains(response.text(), `"error_origin":"gateway"`)) {
+				t.Fatalf("本地生成的失败事件未正确分类: %s", response.text())
 			}
 		})
 	}

@@ -3457,6 +3457,13 @@
     "environment": "default offline"
   },
   {
+    "id": "REG-proxy-body-limit",
+    "file": "e2e/proxy-body-limit.test.ts",
+    "title": "console proxy preserves large bodies and rejects oversize without truncation",
+    "kind": "implemented",
+    "environment": "default offline"
+  },
+  {
     "id": "REG-request-diagnostics-en",
     "file": "e2e/scenarios/regression/request-diagnostics-en.test.ts",
     "title": "request failure diagnostics and exact time filtering en",
