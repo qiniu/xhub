@@ -158,6 +158,30 @@ describe("RequestLogsPanel", () => {
     debounce.settled = null;
   });
 
+  /** 前置流式与同步日志；TPS 默认隐藏，通过列菜单开启后保留真实数值与无样本状态，finally 清理组件和缓存。 */
+  it("restores the optional TPS column through its accessible menu", async () => {
+    respondWith([
+      logEntry({ request_id: "streamed-speed", streamed: true, tps: 25 }),
+      logEntry({ request_id: "sync-speed", streamed: false, tps: null }),
+    ]);
+    const view = renderPanel();
+    const user = userEvent.setup();
+    try {
+      await screen.findByText("streamed-speed");
+      expect(screen.queryByRole("columnheader", { name: "TPS (tokens/s)", exact: true })).not.toBeInTheDocument();
+      await user.click(screen.getByRole("button", { name: "Columns", exact: true }));
+      const option = await screen.findByRole("menuitemcheckbox", { name: "TPS (tokens/s)", exact: true });
+      expect(option).not.toBeChecked();
+      await user.click(option);
+      expect(option).toBeChecked();
+      await user.keyboard("{Escape}");
+      const index = screen.getAllByRole("columnheader").findIndex(cell => cell.textContent === "TPS (tokens/s)");
+      expect(index).toBeGreaterThanOrEqual(0);
+      expect(within(screen.getByRole("row", { name: /streamed-speed/ })).getAllByRole("cell")[index]).toHaveTextContent("25.00");
+      expect(within(screen.getByRole("row", { name: /sync-speed/ })).getAllByRole("cell")[index]).toHaveTextContent("—");
+    } finally { view.unmount(); testQueryClient.clear(); }
+  });
+
   /** 前置正常/错误日志包含历史 Hash 且密钥接口会失败；验证文本不请求密钥、行点击仍打开日志详情。
    * 参数 errorsOnly 控制面板种类；测试框架卸载组件，beforeEach 清理查询缓存、会话状态与 mock。 */
   it.each([false, true])("never fetches key info when clicking a hash in errorsOnly=%s", async (errorsOnly) => {
