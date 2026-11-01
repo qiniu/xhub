@@ -95,15 +95,16 @@ describe("useLogFilterLogic", () => {
 
   describe("column filters map onto backend query params", () => {
     const cases: ReadonlyArray<{ id: string; value: string; param: string }> = [
-      { id: LOG_FILTER_IDS.KEY_HASH, value: "sk-hash-1", param: "api_key" },
+      { id: LOG_FILTER_IDS.KEY_HASH, value: "sk-hash-1", param: "key_hash" },
       { id: LOG_FILTER_IDS.TEAM_ID, value: "team-1", param: "team_id" },
       { id: LOG_FILTER_IDS.REQUEST_ID, value: "req-1", param: "request_id" },
       { id: LOG_FILTER_IDS.SESSION_ID, value: "sess-1", param: "session_id" },
-      { id: LOG_FILTER_IDS.END_USER, value: "end-user-1", param: "end_user" },
+      { id: LOG_FILTER_IDS.SUPPLIER, value: "supplier-1", param: "supplier" },
+      { id: LOG_FILTER_IDS.ENDPOINT, value: "/v1/responses", param: "inbound_endpoint" },
       { id: LOG_FILTER_IDS.STATUS, value: "success", param: "status_filter" },
       { id: LOG_FILTER_IDS.CACHE_STATUS, value: "hit", param: "cache_hit_filter" },
       { id: LOG_FILTER_IDS.CACHE_STATUS, value: "miss", param: "cache_hit_filter" },
-      { id: LOG_FILTER_IDS.MODEL_ID, value: "model-uuid-1", param: "model_id" },
+      { id: LOG_FILTER_IDS.MODEL_ID, value: "model-uuid-1", param: "model" },
       { id: LOG_FILTER_IDS.PUBLIC_MODEL_OR_SEARCH_TOOL, value: "gpt-4o", param: "model" },
       { id: LOG_FILTER_IDS.KEY_ALIAS, value: "alias-1", param: "key_alias" },
       { id: LOG_FILTER_IDS.ERROR_CODE, value: "429", param: "error_code" },
@@ -181,7 +182,6 @@ describe("useLogFilterLogic", () => {
       ["pagination", { pagination: { pageIndex: 1, pageSize: 50 } }],
       ["startTime", { startTime: "2025-02-02T00:00:00" }],
       ["columnFilters", { columnFilters: [{ id: LOG_FILTER_IDS.TEAM_ID, value: "team-2" }] }],
-      ["excludeInternalHealthChecks", { excludeInternalHealthChecks: true }],
     ])("refetches when %s changes", async (_label, nextProps) => {
       const { rerender } = renderHook((props: HookOverrides) => useLogFilterLogic({ ...defaultProps, ...props }), {
         wrapper,
@@ -194,20 +194,12 @@ describe("useLogFilterLogic", () => {
     });
   });
 
-  describe("hide health checks toggle", () => {
-    it("passes exclude_internal_health_checks when the toggle is on", async () => {
-      renderFilterHook({ excludeInternalHealthChecks: true });
-
-      await waitFor(() => expect(uiSpendLogsCall).toHaveBeenCalled());
-      expect(lastCallParams()?.params).toMatchObject({ exclude_internal_health_checks: true });
-    });
-
-    it("passes exclude_internal_health_checks as false when the toggle is off", async () => {
-      renderFilterHook();
-
-      await waitFor(() => expect(uiSpendLogsCall).toHaveBeenCalled());
-      expect(lastCallParams()?.params).toMatchObject({ exclude_internal_health_checks: false });
-    });
+  /** 前置旧客户端残留 end_user 和健康开关；验证不发送后台未支持的条件；缓存和 mock 自动清理。 */
+  it("does not send unsupported legacy filters", async () => {
+    renderFilterHook({ excludeInternalHealthChecks: true, columnFilters: [{id: LOG_FILTER_IDS.END_USER, value: "legacy"}] });
+    await waitFor(() => expect(uiSpendLogsCall).toHaveBeenCalled());
+    expect(lastCallParams()?.params?.exclude_internal_health_checks).toBeUndefined();
+    expect(lastCallParams()?.params?.end_user).toBeUndefined();
   });
 
   describe("query enablement", () => {
@@ -372,4 +364,12 @@ describe("formatLogsWindow preset end bound", () => {
       moment("2026-07-24T06:00").utc().format("YYYY-MM-DD HH:mm:ss"),
     );
   });
+});
+
+/** 前置一小时前选择的 24 小时预设；刷新时两端同时平移且持续 24 小时；纯计算无需清理。 */
+it("keeps a rolling preset at the chosen duration", () => {
+  const now = Date.UTC(2026, 10, 1, 12);
+  const window = formatLogsWindow("2026-10-31T11:00:00Z", "2026-11-01T11:00:00Z", false, now);
+  expect(window.start_date).toBe("2026-10-31 12:00:00");
+  expect(window.end_date).toBe("2026-11-01 12:00:00");
 });

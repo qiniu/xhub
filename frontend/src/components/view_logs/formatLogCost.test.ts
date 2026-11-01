@@ -23,3 +23,9 @@ describe("日志费用状态", () => {
     expect(formatLogCost(amount, { metadata: { cost_breakdown: { pricing_status: pricingStatus } }, cache_hit: cacheHit })).toBe(expected);
   });
 });
+
+/** 前置后台浮点加法产生尾数或极小非零金额；格式化不显示浮点尾数、不归零微小费用，纯函数无需清理。 */
+it("normalizes float tails while preserving tiny nonzero charges", () => {
+  expect(formatLogCost(0.008289600000000001)).toBe("$0.0082896");
+  expect(formatLogCost(0.000000000000000001)).toBe("$0.000000000000000001");
+});

@@ -91,6 +91,14 @@ describe("LogDetailContent", () => {
     expect(screen.getByText("Request Details")).toBeInTheDocument();
   });
 
+  /** 前置后端可能返回带二进制浮点尾数的费用；验证日志详情保留有效小额并隐藏浮点尾数，组件卸载自动清理。 */
+  it("formats spend without exposing a floating point tail", () => {
+    render(<LogDetailContent logEntry={createLogEntry({ spend: 0.008289600000000001 })} />);
+
+    expect(screen.getAllByText("$0.0082896").length).toBeGreaterThan(0);
+    expect(screen.queryByText("$0.008289600000000001")).not.toBeInTheDocument();
+  });
+
   it("should display Request Details with model, provider, and call type", () => {
     render(
       <LogDetailContent
@@ -125,7 +133,7 @@ describe("LogDetailContent", () => {
       />,
     );
 
-    expect(screen.getByText("Request Failed")).toBeInTheDocument();
+    expect(screen.getByText("Request failed")).toBeInTheDocument();
     expect(screen.getByText("rate_limit")).toBeInTheDocument();
     expect(screen.getByText("Too many requests")).toBeInTheDocument();
   });

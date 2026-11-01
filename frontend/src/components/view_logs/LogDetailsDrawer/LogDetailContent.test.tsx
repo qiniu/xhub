@@ -86,7 +86,7 @@ describe("上游响应折叠", () => {
       http_status: 502, upstream_response: { status_code: 502, headers: {}, trailers: { "X-Trailer": ["last"] },
         usage_reported: false, usage_parse_error: "invalid upstream usage" },
     } })} />);
-    expect(screen.getByText("Request Failed")).toBeVisible();
+    expect(screen.getByText("Service error")).toBeVisible();
     expect(screen.getByRole("region", { name: "Full Error Details" })).toHaveTextContent("upstream failed");
     const region = screen.getByRole("region", { name: "Upstream Response" });
     expect(within(region).queryByRole("alert")).not.toBeInTheDocument();

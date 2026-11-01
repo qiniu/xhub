@@ -480,6 +480,10 @@ export function LogDetailsDrawer({
               environment={environment}
             />
             <div className="flex-1 overflow-y-auto">
+              {logDetails.isError && <div role="alert" className="m-4 rounded-md border border-destructive/30 p-3 text-sm text-destructive">
+                {t("logsUX.detailFailed")}
+                <button type="button" className="ml-2 underline" onClick={() => void logDetails.refetch()}>{t("Refresh")}</button>
+              </div>}
               <LogDetailContent
                 logEntry={enrichedLog}
                 isLoadingDetails={isLoadingDetails}

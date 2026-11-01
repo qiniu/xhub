@@ -24,6 +24,12 @@ test("usage contract generators cover real routes and reject all artifact drift"
     "organizationDailyUsage",
   ])
     assert.ok(ts.includes(op), op);
+  // 新筛选须同时进入生成客户端和双语接口参考，防止 UI 支持但 Swagger 未声明。
+  for (const field of ["key_hash", "key_alias", "supplier", "inbound_endpoint", "cache_hit_filter"]) {
+    assert.ok(ts.includes(`${field}?:`), field);
+    assert.ok(artifacts["docs/development/en/usage-api.generated.md"].includes(field), field);
+    assert.ok(artifacts["docs/development/zh-CN/usage-api.generated.md"].includes(field), field);
+  }
   assert.match(artifacts["docs/development/en/usage-api.generated.md"], /not every failure has a usage record/);
   assert.match(artifacts["docs/development/zh-CN/usage-api.generated.md"], /并非所有错误均有账单/);
   const root = mkdtempSync(join(tmpdir(), "xhub-usage-"));
