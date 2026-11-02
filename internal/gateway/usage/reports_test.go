@@ -1,6 +1,8 @@
 package usage
 
 import (
+	"errors"
+	"fmt"
 	"net/http/httptest"
 	"net/url"
 	"testing"
@@ -9,6 +11,24 @@ import (
 	"github.com/sunqirui1987/xhub/internal/authz"
 	"github.com/sunqirui1987/xhub/internal/iam"
 )
+
+// TestDetailBodyOrMissing 区分真实正文、历史缺行和数据库故障；纯函数无需资源或清理。
+func TestDetailBodyOrMissing(t *testing.T) {
+	body := &iam.RequestLog{RequestID: "stored", ResponseBody: "answer"}
+	got, err := detailBodyOrMissing("stored", body, nil)
+	if err != nil || got != body {
+		t.Fatal("已有正文不应被替换", got, err)
+	}
+	got, err = detailBodyOrMissing("history", nil, fmt.Errorf("wrapped: %w", iam.ErrNotFound))
+	if err != nil || got == nil || got.RequestID != "history" || got.ResponseBody != "" {
+		t.Fatal("历史缺行应保留空正文", got, err)
+	}
+	failure := errors.New("connection lost")
+	got, err = detailBodyOrMissing("failed", nil, failure)
+	if got != nil || !errors.Is(err, failure) {
+		t.Fatal("存储失败不得伪装为空正文", got, err)
+	}
+}
 
 // TestLogTimeAndValidation 验证日期、精确时间和时区边界，以及无效条件返回错误；纯请求解析测试，无外部依赖和清理。
 func TestLogTimeAndValidation(t *testing.T) {

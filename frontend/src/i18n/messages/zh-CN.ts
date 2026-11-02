@@ -11,6 +11,10 @@ import { cacheAdminZhCN } from "./cacheAdmin.zh-CN";
 
 export const zhCN = {
   logsUX: {
+    bodyUnavailable: "此日志暂无可展示的请求和响应正文，原因未记录；其他已记录的信息仍可查看。",
+    firstResponse: "上游首响应字节耗时（秒）",
+    relatedCache: "关联请求（缓存键）", relatedPrompt: "关联请求（提示词）",
+    resizeDrawer: "拖动或左右方向键调整详情宽度", expandDrawer: "展开详情", restoreDrawer: "恢复详情宽度", team: "团队", teamUnknown: "未记录团队",
     apply: "应用筛选",
     lastMinute: "最近 1 分钟",
     last15Minutes: "最近 15 分钟",

@@ -58,6 +58,8 @@ export interface LogDetailContentProps {
   logEntry: LogEntry;
   /** When true, log details (messages/response) are still being lazy-loaded. */
   isLoadingDetails?: boolean;
+  /** 详情请求失败时由抽屉展示错误和重试，不把失败误报为历史正文缺失。 */
+  isDetailsError?: boolean;
   accessToken?: string | null;
 }
 
@@ -69,7 +71,7 @@ export interface LogDetailContentProps {
  * 推理强度只展示明确快照，缺省为未知；金额格式化不修改计费或用户内容。
  */
 /** 日志抽屉正文：按 logEntry 展示原始协议证据与国际化诊断，读取失败时说明正文省略；返回详情组件，不修改请求或费用。 */
-export function LogDetailContent({ logEntry, isLoadingDetails = false, accessToken }: LogDetailContentProps) {
+export function LogDetailContent({ logEntry, isLoadingDetails = false, isDetailsError = false, accessToken }: LogDetailContentProps) {
   const t = useT();
   const metadata = logEntry.metadata || {};
   const hasError = isRequestFailure(logEntry);
@@ -85,7 +87,7 @@ export function LogDetailContent({ logEntry, isLoadingDetails = false, accessTok
   const hasMessages = checkHasMessages(logEntry.messages);
   const hasResponse = checkHasResponse(logEntry.response);
   // Don't show "missing data" warning while details are still loading
-  const missingData = !hasMessages && !hasResponse && !hasError && !isLoadingDetails;
+  const missingData = !hasMessages && !hasResponse && !hasError && !isLoadingDetails && !isDetailsError;
 
   // Guardrail data
   const guardrailInfo = metadata?.guardrail_information;
@@ -567,7 +569,7 @@ function MetricsSection({ logEntry, metadata }: { logEntry: LogEntry; metadata: 
               {logEntry.request_duration_ms != null ? (logEntry.request_duration_ms / 1000).toFixed(3) : "-"} s
             </DescriptionItem>
             {ttftMs != null && ttftMs >= 0 && (
-              <DescriptionItem label={t("requestMetrics.ttft")}>{(ttftMs / 1000).toFixed(2)} s</DescriptionItem>
+              <DescriptionItem label={t("logsUX.firstResponse")}>{(ttftMs / 1000).toFixed(2)} s</DescriptionItem>
             )}
 
             {showResponseCache && (

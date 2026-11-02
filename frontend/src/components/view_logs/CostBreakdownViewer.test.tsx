@@ -20,6 +20,16 @@ it("preserves the LLM acronym in the Chinese cost breakdown", async () => {
   expect(screen.queryByText(/法学硕士/)).not.toBeInTheDocument();
 });
 
+/** 中文分时标签须由已确认的快照触发；固定价和未知历史不显示时段；测试自动卸载清理。 */
+it("only labels confirmed price windows in Chinese", () => {
+  window.localStorage.removeItem(LOCALE_COOKIE);
+  document.cookie = `${LOCALE_COOKIE}=; path=/; max-age=0`;
+  const { rerender } = renderWithProviders(<I18nProvider initialLocale="zh-CN"><CostBreakdownViewer costBreakdown={{input_cost:1,window:"peak",pricing_window:"peak"}} totalSpend={1} /></I18nProvider>);
+  expect(screen.getByText("高峰时段")).toBeVisible();
+  rerender(<I18nProvider initialLocale="zh-CN"><CostBreakdownViewer costBreakdown={{input_cost:1,window:"peak"}} totalSpend={1} /></I18nProvider>);
+  expect(screen.queryByText("高峰时段")).not.toBeInTheDocument();
+});
+
 /** 展开当前费用面板；无参数及返回值，供组件交互断言调用，测试自动卸载清理。 */
 async function expandCostBreakdown() {
   const user = userEvent.setup();
@@ -319,7 +329,7 @@ describe("CostBreakdownViewer", () => {
       input_cost: 0.002,
       output_cost: 0.004,
       total_cost: 0.006,
-      window: "peak",
+      window: "peak", pricing_window: "peak",
     };
 
     renderWithProviders(<CostBreakdownViewer costBreakdown={breakdown} totalSpend={0.006} />);
@@ -328,7 +338,7 @@ describe("CostBreakdownViewer", () => {
   });
 
   it("marks an off-peak call distinctly from a peak one", async () => {
-    const peak: CostBreakdown = { input_cost: 0.002, output_cost: 0.004, total_cost: 0.006, window: "peak" };
+    const peak: CostBreakdown = { input_cost: 0.002, output_cost: 0.004, total_cost: 0.006, window: "peak", pricing_window: "peak" };
     const { unmount } = renderWithProviders(<CostBreakdownViewer costBreakdown={peak} totalSpend={0.006} />);
     expect(screen.getByText("Peak hours")).toBeInTheDocument();
     unmount();
@@ -337,10 +347,22 @@ describe("CostBreakdownViewer", () => {
       input_cost: 0.001,
       output_cost: 0.002,
       total_cost: 0.003,
-      window: "offpeak",
+      window: "offpeak", pricing_window: "offpeak",
     };
     renderWithProviders(<CostBreakdownViewer costBreakdown={offpeak} totalSpend={0.003} />);
     expect(screen.queryByText("Peak hours")).not.toBeInTheDocument();
+    expect(screen.getByText("Off-peak")).toBeInTheDocument();
+  });
+
+  /** 固定价、旧快照及未定价均不推断分时；前置费用数据，测试自动卸载清理。 */
+  it.each([
+    {input_cost: 1, window: "peak"},
+    {input_cost: 1, window: "offpeak", pricing_window: undefined},
+    {input_cost: 1, window: "peak", pricing_window: "peak", pricing_status: "unpriced"},
+  ] as CostBreakdown[])("hides billing period without reliable priced evidence", (breakdown) => {
+    renderWithProviders(<CostBreakdownViewer costBreakdown={breakdown} totalSpend={0} />);
+    expect(screen.queryByText("Peak hours")).not.toBeInTheDocument();
+    expect(screen.queryByText("Off-peak")).not.toBeInTheDocument();
   });
 
   it("labels a recalculated row as recalculated instead of as the original record", async () => {

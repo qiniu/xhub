@@ -320,6 +320,16 @@ test("错误日志详情完整显示上游正文并可返回普通日志", async
     await page.getByRole("tab", { name: /^(日志|Logs)$/, exact: true }).click();
     await openLogDetails(page, successCallId);
     const successDialog = page.getByRole("dialog");
+    // 键盘调整、全屏和恢复均操作真实抽屉；完成后继续读取真实后台日志。
+    const resizer = successDialog.getByRole("separator", { name: /拖动或左右方向键调整详情宽度|Resize detail panel with drag or arrow keys/ });
+    await expect(resizer).toBeVisible();
+    const widthBefore = (await successDialog.boundingBox())!.width;
+    await resizer.focus();
+    await page.keyboard.press("ArrowLeft");
+    await expect.poll(async () => (await successDialog.boundingBox())!.width).toBeGreaterThan(widthBefore);
+    await successDialog.getByRole("button", { name: /展开详情|Expand details/ }).click();
+    await expect(successDialog.getByRole("button", { name: /恢复详情宽度|Restore details width/ })).toBeVisible();
+    await successDialog.getByRole("button", { name: /恢复详情宽度|Restore details width/ }).click();
     // 真实成功请求落库后检查技术缩写，防止日志页面重新出现学位误译；schema 由全局清理回收。
     await expect(successDialog).not.toContainText("法学硕士");
     await verifyUpstreamCollapse(page, headers, successCallId, 200);
@@ -338,6 +348,27 @@ test("错误日志详情完整显示上游正文并可返回普通日志", async
     }
     await page.screenshot({ path: "../.e2e/upstream-response-collapsed.png", fullPage: true });
     await page.keyboard.press("Escape");
+    // 关闭正文保存后发起真实请求：已记录的用量及上游证据仍可查看，原因未知不能展示伪配置结论。
+    const disabled = await page.request.post(GATEWAY + "/config/update", { headers,
+      data: { general_settings: { store_prompts_in_spend_logs: false } } });
+    expect(disabled.status()).toBe(200);
+    const noBody = await page.request.post(GATEWAY + "/chat/completions", {
+      headers, data: { model: successModel, messages: [{ role: "user", content: "Verify the request summary remains available." }] },
+    });
+    expect(noBody.status()).toBe(200);
+    const noBodyId = noBody.headers()["x-litellm-call-id"];
+    expect(noBodyId).toBeTruthy();
+    await waitForStoredLog(page, headers, noBodyId);
+    const noBodyDetail = await page.request.get(GATEWAY + "/spend/logs/ui/" + noBodyId, { headers });
+    const noBodyData = await noBodyDetail.json();
+    expect(noBodyData.metadata.upstream_response.status_code).toBe(200);
+    expect(Number(noBodyData.spend)).toBeGreaterThan(0);
+    await openLogDetails(page, noBodyId);
+    const noBodyDialog = page.getByRole("dialog");
+    await expect(noBodyDialog.getByRole("note")).toContainText(/原因未记录|reason was not recorded/);
+    await expect(noBodyDialog).not.toContainText("store_model_in_db");
+    await verifyUpstreamCollapse(page, headers, noBodyId, 200);
+    await page.keyboard.press("Escape");
     // 删除配置后仍读取调用时快照，切换语言不改变原始上游地址或用户请求正文。
     for (const id of deploymentIds) {
       const deleted = await page.request.post(GATEWAY + "/model/delete", { headers, data: { id } });
@@ -346,6 +377,7 @@ test("错误日志详情完整显示上游正文并可返回普通日志", async
     deploymentIds.length = 0;
     await page.getByRole("button", { name: "English", exact: true }).click();
     await openLogDetails(page, successCallId);
+    await expect(page.getByRole("dialog").getByRole("separator", { name: translate("en", "logsUX.resizeDrawer") })).toBeVisible();
     await verifyUpstreamCollapse(page, headers, successCallId, 200);
     await page.keyboard.press("Escape");
     await page.getByRole("button", { name: translate("en", "language.zhCN"), exact: true }).click();

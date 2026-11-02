@@ -425,6 +425,10 @@ func costBreakdown(e iam.UsageEvent) map[string]any {
 		if snap.PricingStatus == "unpriced" {
 			return out
 		}
+		// window 是调用时间所在的时段，固定价也会填；只有快照明确记录实际命中分时费率时才能说明本次按分时计价。
+		if window := snapshotPricingWindow(snap); window != "" {
+			out["pricing_window"] = window
+		}
 		for _, rate := range snap.Applied {
 			amount := catalog.RoundMoney(rate.Quantity * rate.USD)
 			switch rate.Side {
@@ -503,6 +507,28 @@ func costBreakdown(e iam.UsageEvent) map[string]any {
 	return out
 }
 
+// snapshotPricingWindow 判断历史快照是否证明确实命中与调用时段一致的分时费率。
+// 参数 snap 是已经解析的调用快照；返回 peak/offpeak 或空串；缺失及冲突均不猜测。
+// 调用：costBreakdown；不读取当前价格、不修改快照或费用。
+func snapshotPricingWindow(snap *catalog.PriceSnapshot) string {
+	if snap == nil || (snap.Window != "peak" && snap.Window != "offpeak") || snap.PricingStatus == "unpriced" {
+		return ""
+	}
+	found := false
+	for _, rate := range snap.Applied {
+		if rate.RateWindow == "peak" || rate.RateWindow == "offpeak" {
+			if rate.RateWindow != snap.Window {
+				return ""
+			}
+			found = true
+		}
+	}
+	if !found {
+		return ""
+	}
+	return snap.Window
+}
+
 // parsePriceSnapshot decodes a stored snapshot. A row that was never priced has
 // an empty column, and a payload that does not decode is treated the same way
 // rather than failing the whole log page.
@@ -538,14 +564,15 @@ func appliedRateRows(applied []catalog.AppliedRate) []map[string]any {
 	out := make([]map[string]any, 0, len(applied))
 	for _, rate := range applied {
 		out = append(out, map[string]any{
-			"measure":    rate.Measure,
-			"side":       rate.Side,
-			"variant":    rate.Variant,
-			"unit_size":  rate.UnitSize,
-			"usd":        rate.USD,
-			"quantity":   rate.Quantity,
-			"cost":       catalog.RoundMoney(rate.Quantity * rate.USD),
-			"source_key": rate.SourceKey,
+			"measure":     rate.Measure,
+			"side":        rate.Side,
+			"variant":     rate.Variant,
+			"unit_size":   rate.UnitSize,
+			"usd":         rate.USD,
+			"quantity":    rate.Quantity,
+			"cost":        catalog.RoundMoney(rate.Quantity * rate.USD),
+			"source_key":  rate.SourceKey,
+			"rate_window": rate.RateWindow,
 		})
 	}
 	return out
@@ -638,8 +665,11 @@ func LogByID(s Host, w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	body, err := db.GetRequestLog(r.Context(), id)
+	body, err = detailBodyOrMissing(id, body, err)
 	if err != nil {
-		body = &iam.RequestLog{RequestID: id}
+		// 查询异常不能伪装成未保存正文；由统一错误处理记录原因并向用户返回可重试的失败。
+		s.WriteIAMError(w, r, err)
+		return
 	}
 	if p.UserID != "" && event.UserID != p.UserID {
 		if err := s.AuditLogRead(r, p, id, *event); err != nil {
@@ -662,6 +692,15 @@ func LogByID(s Host, w http.ResponseWriter, r *http.Request) {
 		row["proxy_server_request"] = jsonOrEmpty(body.ProxyRequest)
 	}
 	util.WriteJSON(w, 200, row)
+}
+
+// detailBodyOrMissing 区分历史正文缺行与存储读取失败，供 LogByID 在已验证日志权限后使用。
+// 参数 id 为请求标识，body 和 err 为存储返回；缺行返回空正文与 nil，读取失败原样返回错误，不产生副作用。
+func detailBodyOrMissing(id string, body *iam.RequestLog, err error) (*iam.RequestLog, error) {
+	if errors.Is(err, iam.ErrNotFound) {
+		return &iam.RequestLog{RequestID: id}, nil
+	}
+	return body, err
 }
 
 // jsonOrEmpty decodes a stored body for display. A body that is not JSON, or is empty, is returned as an empty document rather than as a parse error.

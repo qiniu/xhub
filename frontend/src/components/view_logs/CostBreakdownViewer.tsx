@@ -32,11 +32,10 @@ export interface CostBreakdown {
   margin_percent?: number;
   margin_fixed_amount?: number;
   margin_total_amount?: number;
-  /**
-   * 这次调用落在哪个计费时段。分时定价的模型（忙时价是闲时价的两倍）
-   * 靠它解释账单为什么是这个数。
-   */
+  /** 历史兼容字段：请求开始时所处时段，不能单独证明该请求按分时费率计价。 */
   window?: string;
+  /** 历史快照证实使用分时费率的时段，缺失表示不能确定，不根据请求时间猜测。 */
+  pricing_window?: "peak" | "offpeak";
   /** 这次实际用到的费率，带数量和单位。日志详情直接读它，不重算。 */
   applied?: AppliedRate[];
   /**
@@ -156,14 +155,13 @@ export const CostBreakdownViewer: React.FC<CostBreakdownViewerProps> = ({
           <div className="flex items-center justify-between w-full">
             <h3 className="text-lg font-medium text-foreground">{t("Cost Breakdown")}</h3>
             <div className="flex items-center space-x-2 mr-4">
-              {/* 分时定价的模型要标出这次落在哪一档：忙时价是闲时价的两倍，
-                  不说的话运维会以为价目表记错了。 */}
-              {costBreakdown?.window === "peak" && (
+              {/* 只展示历史快照可证实的分时费率；固定价、重算及缺证据均不猜测。 */}
+              {!isCached && !isUnpriced && costBreakdown?.pricing_window === "peak" && (
                 <span className="rounded bg-amber-100 px-1.5 py-0.5 text-xs font-medium text-amber-900">
                   {t("Peak hours")}
                 </span>
               )}
-              {costBreakdown?.window === "offpeak" && (
+              {!isCached && !isUnpriced && costBreakdown?.pricing_window === "offpeak" && (
                 <span className="rounded bg-muted px-1.5 py-0.5 text-xs font-medium text-muted-foreground">
                   {t("Off-peak")}
                 </span>
