@@ -239,6 +239,40 @@ async function verifyDSTPreset(page: Page, successCallId: string): Promise<void>
   } finally { await context.close(); }
 }
 
+/** 验证真实日志在桌面边界宽度的无障碍范围及手机展开、折叠操作；page 为浏览器，callId 为真实请求。
+ * 通过深链接读取隔离后台日志并操作真实页面；finally 恢复视口及本地宽度偏好，日志由测试运行器清理。 */
+async function verifyResponsiveLogDrawer(page: Page, callId: string): Promise<void> {
+  const originalViewport = page.viewportSize();
+  const priorWidth = await page.evaluate(() => localStorage.getItem("xhub.logDetails.widthPercent"));
+  try {
+    await page.setViewportSize({ width: 1030, height: 800 });
+    await page.evaluate(() => localStorage.setItem("xhub.logDetails.widthPercent", "40"));
+    await stableGoto(page, "/logs?log_id=" + encodeURIComponent(callId));
+    const dialog = page.getByRole("dialog");
+    const resizer = dialog.getByRole("separator", { name: /拖动或左右方向键调整详情宽度|Resize detail panel with drag or arrow keys/ });
+    await expect(resizer).toBeVisible();
+    await expect(resizer).toHaveAttribute("aria-valuemin", "63");
+    await expect(resizer).toHaveAttribute("aria-valuenow", "63");
+    await page.keyboard.press("Escape");
+
+    await page.setViewportSize({ width: 390, height: 844 });
+    await stableGoto(page, "/logs?log_id=" + encodeURIComponent(callId));
+    await expect(dialog).toBeVisible();
+    await expect(dialog.getByRole("separator", { name: /拖动或左右方向键调整详情宽度|Resize detail panel with drag or arrow keys/ })).toHaveCount(0);
+    const expand = dialog.getByRole("button", { name: /展开追踪侧栏|Expand trace sidebar/ });
+    await expand.click();
+    const collapse = dialog.getByRole("button", { name: /折叠跟踪侧边栏|Collapse trace sidebar/ });
+    await expect(collapse).toBeVisible();
+    // 使用真实点击检验命中测试；如果按钮被详情头或侧栏遮挡，Playwright 会报告拦截而非假通过。
+    await collapse.click();
+    await expect(expand).toBeVisible();
+    await page.keyboard.press("Escape");
+  } finally {
+    await page.evaluate((value) => value === null ? localStorage.removeItem("xhub.logDetails.widthPercent") : localStorage.setItem("xhub.logDetails.widthPercent", value), priorWidth);
+    if (originalViewport) await page.setViewportSize(originalViewport);
+  }
+}
+
 /** 用途：注册独立场景「错误日志详情完整显示上游正文并可返回普通日志」；无参数、无返回值。前置真实浏览器、私有数据库和本地上游；验证页面及原始契约，保留原套件前后置清理，运行器最终回收专属 schema。异常由 Playwright 单独记录。 */
 export function registerSC020() {
 
@@ -387,6 +421,7 @@ test("错误日志详情完整显示上游正文并可返回普通日志", async
     await page.getByRole("button", {name:"English",exact:true}).click();
     await verifyLogDatesAndLink(page, failedCallId);
     await verifyDSTPreset(page, successCallId);
+    await verifyResponsiveLogDrawer(page, successCallId);
   } finally {
     try {
       const restored = logging?.stored_in_db

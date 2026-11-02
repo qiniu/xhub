@@ -374,7 +374,7 @@ export function LogDetailsDrawer({
           {logEntry?.request_id ? t("Request {value0} details", { value0: (logEntry.request_id) }) : t("Request details")}
         </SheetTitle>
         {!isCompact && <button type="button" role="separator" aria-orientation="vertical" aria-label={t("logsUX.resizeDrawer")}
-          aria-valuemin={Math.ceil(minimumWidth)} aria-valuemax={100} aria-valuenow={isExpanded ? 100 : Math.round(displayedWidth)}
+          aria-valuemin={Math.ceil(minimumWidth)} aria-valuemax={100} aria-valuenow={isExpanded ? 100 : Math.max(Math.ceil(minimumWidth), Math.round(displayedWidth))}
           className="absolute inset-y-0 left-0 z-raised flex w-2 cursor-ew-resize touch-none items-center justify-center hover:bg-primary/20 focus-visible:ring-2 focus-visible:ring-ring"
           onPointerDown={(event) => { dragging.current = true; event.currentTarget.setPointerCapture?.(event.pointerId); }}
           onPointerMove={(event) => { if (dragging.current && window.innerWidth > 0) updateDrawerWidth((window.innerWidth - event.clientX) / window.innerWidth * 100); }}
@@ -384,15 +384,16 @@ export function LogDetailsDrawer({
           onKeyDown={(event) => { if (event.key === "ArrowLeft" || event.key === "ArrowRight") { event.preventDefault(); updateDrawerWidth((isExpanded ? 100 : displayedWidth) + (event.key === "ArrowLeft" ? 5 : -5)); } }}
         ><span aria-hidden="true" className="h-12 w-1 rounded-full bg-border" /></button>}
         <div style={{ height: "100%" }} className="flex relative min-w-0">
+          {/* 窄屏侧栏悬浮于详情头部之上，折叠按钮再高一层，保证触屏始终可收起。 */}
           {!isSidebarCollapsed && (
             <SidebarToggle
               isCollapsed={false}
               onToggle={() => setIsSidebarCollapsed(true)}
-              className="absolute top-2 left-2 z-raised"
+              className="absolute top-2 left-2 z-raised max-sm:z-floating"
             />
           )}
           {!isSidebarCollapsed && (
-            <div className="border-r border-border bg-muted flex shrink-0 flex-col w-[clamp(160px,24%,256px)] max-sm:absolute max-sm:inset-y-0 max-sm:left-0 max-sm:z-raised max-sm:w-[min(80vw,256px)]">
+            <div className="border-r border-border bg-muted flex shrink-0 flex-col w-[clamp(160px,24%,256px)] max-sm:absolute max-sm:inset-y-0 max-sm:left-0 max-sm:z-sticky max-sm:w-[min(80vw,256px)]">
               <div className="pl-12 pr-3 py-2 border-b border-border bg-card">
                 <div className="flex items-start justify-between gap-2">
                   <div className="min-w-0">

@@ -1,5 +1,5 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 import { t } from "@/i18n";
 import { LogDetailsDrawer } from "./LogDetailsDrawer";
@@ -334,6 +334,27 @@ it("falls back safely when a saved width is invalid", async () => {
   } finally {if (previous === null) window.localStorage.removeItem(key); else window.localStorage.setItem(key,previous); client.clear();}
 });
 
+/** 前置 1030px 桌面视口及低于最小值的已保存宽度；辅助技术读到的当前值不得小于最小值，结束后恢复偏好和视口。 */
+it("keeps the accessible current width within a fractional viewport minimum", async () => {
+  const key = "xhub.logDetails.widthPercent";
+  const previous = window.localStorage.getItem(key);
+  const previousWidth = window.innerWidth;
+  Object.defineProperty(window, "innerWidth", { configurable: true, value: 1030 });
+  window.localStorage.setItem(key, "40");
+  const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+  try {
+    render(<QueryClientProvider client={client}><LogDetailsDrawer open onClose={() => {}} logEntry={makeLog({})} accessToken="token" /></QueryClientProvider>);
+    const handle = await screen.findByRole("separator", { name: t("logsUX.resizeDrawer") });
+    await waitFor(() => expect(handle).toHaveAttribute("aria-valuemin", "63"));
+    expect(Number(handle.getAttribute("aria-valuenow"))).toBeGreaterThanOrEqual(Number(handle.getAttribute("aria-valuemin")));
+    expect(Number(handle.getAttribute("aria-valuenow"))).toBeLessThanOrEqual(Number(handle.getAttribute("aria-valuemax")));
+  } finally {
+    if (previous === null) window.localStorage.removeItem(key); else window.localStorage.setItem(key, previous);
+    Object.defineProperty(window, "innerWidth", { configurable: true, value: previousWidth });
+    client.clear();
+  }
+});
+
 /** 前置手机宽度并展示真实日志；验证自动全宽及收起侧栏，最后恢复视口和查询缓存。 */
 it("uses full width and collapses the sidebar on narrow screens", async () => {
   const previousWidth = window.innerWidth;
@@ -345,5 +366,12 @@ it("uses full width and collapses the sidebar on narrow screens", async () => {
     await waitFor(() => expect(detailCapture.header).toHaveBeenLastCalledWith(expect.objectContaining({isSidebarCollapsed:true})));
     expect(screen.queryByRole("separator", {name:t("logsUX.resizeDrawer")})).not.toBeInTheDocument();
     expect(screen.getByRole("dialog")).toHaveStyle({width:"100%"});
+    // 窄屏展开时侧栏及其折叠按钮必须高于详情头部，避免按钮被遮挡。
+    act(() => detailCapture.header.mock.lastCall?.[0].onToggleSidebar());
+    const collapse = screen.getByRole("button", { name: t("Collapse trace sidebar") });
+    expect(collapse).toHaveClass("max-sm:z-floating");
+    expect(screen.getByRole("button", { name: t("Copy trace id") }).closest("[class*='max-sm:z-sticky']")).toBeInTheDocument();
+    fireEvent.click(collapse);
+    await waitFor(() => expect(detailCapture.header).toHaveBeenLastCalledWith(expect.objectContaining({isSidebarCollapsed:true})));
   } finally {Object.defineProperty(window,"innerWidth",{configurable:true,value:previousWidth});client.clear();}
 });
