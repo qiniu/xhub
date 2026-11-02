@@ -8,6 +8,17 @@ import (
 	"github.com/sunqirui1987/xhub/internal/config"
 )
 
+// TestBudgetAddChargeRetainsRateWindow 验证冻结费率的实际时段进入账单而金额不变；内存数据无需清理。
+func TestBudgetAddChargeRetainsRateWindow(t *testing.T) {
+	for _, window := range []string{"all", "peak", "offpeak", ""} {
+		c := catalog.Charge{}
+		budgetAddCharge(&c, catalog.Rate{Measure: "token", Side: "input", Window: window, USD: 0.25}, 2)
+		if c.Input != 0.5 || len(c.Applied) != 1 || c.Applied[0].RateWindow != window {
+			t.Fatalf("时段 %q 的账单事实不一致：%+v", window, c)
+		}
+	}
+}
+
 // billingPeak 返回固定中国时区高峰时刻；无参数，计价单测调用，无时钟依赖或副作用。
 func billingPeak() time.Time {
 	return time.Date(2026, 3, 2, 10, 0, 0, 0, time.FixedZone("CST", 8*60*60))

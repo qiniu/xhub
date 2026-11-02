@@ -10,6 +10,10 @@ import { cacheAdminEn } from "./cacheAdmin.en";
 
 export const en = {
   logsUX: {
+    bodyUnavailable: "This log has no request or response body available. The reason was not recorded; other recorded details remain available.",
+    firstResponse: "First upstream response byte (s)",
+    relatedCache: "Related requests (cache key)", relatedPrompt: "Related requests (prompt)",
+    resizeDrawer: "Resize detail panel with drag or arrow keys", expandDrawer: "Expand details", restoreDrawer: "Restore details width", team: "Team", teamUnknown: "Team not recorded",
     keyFingerprint: "Key fingerprint (SHA-256)",
     keyFingerprintHelp: "A fingerprint identifies a key; it is not the secret key. Enter the complete SHA-256 hash for an exact match.",
     suggestionsLoading: "Loading suggestions…",

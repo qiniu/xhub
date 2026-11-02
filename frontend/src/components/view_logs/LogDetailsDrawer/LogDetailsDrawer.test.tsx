@@ -1,5 +1,5 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 import { t } from "@/i18n";
 import { LogDetailsDrawer } from "./LogDetailsDrawer";
@@ -117,12 +117,21 @@ it("merges complete lazy-loaded error diagnostics", async () => {
 });
 
 describe("LogDetailsDrawer session sidebar sorting", () => {
+  /** 前置不同来源的关联日志；仅缓存键和提示词使用推断标签，缺失来源不凭 ID 猜测；测试框架清理 DOM。 */
+  it.each([
+    ["cache_key", "logsUX.relatedCache"], ["prompt", "logsUX.relatedPrompt"],
+    ["explicit", "Session"], [undefined, "Session"],
+  ])("labels the logged session source %s accurately", async (source, label) => {
+    renderSessionDrawer([makeLog({model:"source-model", session_source:source})]);
+    await screen.findByText("source-model");
+    expect(screen.getByText(t(label))).toBeVisible();
+  });
   /** 前置含未定价零账单的会话，验证合计不冒充免费；响应缓存零值仍为真实零，自动卸载且查询客户端仅存内存。 */
   it.each([false, true])("preserves session pricing state with cache hit %s", async (cached) => {
     renderSessionDrawer([makeLog({ model: "unknown-price", spend: 0, cache_hit: cached,
       metadata: { cost_breakdown: { pricing_status: "unpriced" } } })]);
     await screen.findByText("unknown-price");
-    if (cached) expect(screen.getByText(/\$0\.00/)).toBeVisible();
+    if (cached) expect(screen.getAllByText(/\$0\.00/).length).toBeGreaterThan(0);
     else expect(screen.queryByText(/\$0\.00/)).not.toBeInTheDocument();
   });
   /** 前置四条会话日志含提示词缓存，验证侧栏明确统计响应缓存且不混算；渲染由测试框架自动清理。 */
@@ -274,7 +283,95 @@ it("shows lazy detail failure with a retry action", async () => {
   try {
     render(<QueryClientProvider client={client}><LogDetailsDrawer open onClose={()=>{}} logEntry={makeLog({})} accessToken="token" /></QueryClientProvider>);
     expect(await screen.findByRole("alert")).toHaveTextContent(t("logsUX.detailFailed"));
+    expect(detailCapture.render).toHaveBeenLastCalledWith(expect.objectContaining({isDetailsError:true}));
     fireEvent.click(screen.getByRole("button",{name:t("Refresh"),exact:true}));
     expect(detailCapture.retry).toHaveBeenCalled();
   } finally {detailCapture.error=false;detailCapture.retry.mockClear();client.clear();}
+});
+
+/** 前置桌面视口和已保存宽度；左右方向键调整并持久化且限制边界，卸载后恢复本地偏好和查询缓存。 */
+it("resizes the details panel with the keyboard and preserves its preference", async () => {
+  const key = "xhub.logDetails.widthPercent";
+  const previous = window.localStorage.getItem(key);
+  const previousWidth = window.innerWidth;
+  Object.defineProperty(window, "innerWidth", { configurable: true, value: 1280 });
+  window.localStorage.setItem(key, "70");
+  const client = new QueryClient({defaultOptions:{queries:{retry:false}}});
+  try {
+    render(<QueryClientProvider client={client}><LogDetailsDrawer open onClose={()=>{}} logEntry={makeLog({})} accessToken="token" /></QueryClientProvider>);
+    const handle = await screen.findByRole("separator", {name:t("logsUX.resizeDrawer")});
+    await waitFor(() => expect(handle).toHaveAttribute("aria-valuenow", "70"));
+    fireEvent.keyDown(handle, {key:"ArrowLeft"});
+    expect(handle).toHaveAttribute("aria-valuenow", "75");
+    expect(window.localStorage.getItem(key)).toBe("75");
+    for (let i=0; i<20; i++) fireEvent.keyDown(handle, {key:"ArrowRight"});
+    expect(handle).toHaveAttribute("aria-valuenow", "50");
+    expect(window.localStorage.getItem(key)).toBe("50");
+    fireEvent.pointerDown(handle, {pointerId:1});
+    fireEvent(handle, new MouseEvent("pointermove", {bubbles:true, clientX:256}));
+    expect(handle).toHaveAttribute("aria-valuenow", "80");
+    fireEvent.pointerUp(handle, {pointerId:1});
+    fireEvent(handle, new MouseEvent("pointermove", {bubbles:true, clientX:512}));
+    expect(handle).toHaveAttribute("aria-valuenow", "80");
+  } finally {
+    if (previous === null) window.localStorage.removeItem(key); else window.localStorage.setItem(key,previous);
+    Object.defineProperty(window, "innerWidth", { configurable:true, value:previousWidth });
+    client.clear();
+  }
+});
+
+/** 前置非法保存偏好；抽屉必须使用安全宽度，不能把 NaN 交给页面；最后恢复本地存储。 */
+it("falls back safely when a saved width is invalid", async () => {
+  const key = "xhub.logDetails.widthPercent";
+  const previous = window.localStorage.getItem(key);
+  window.localStorage.setItem(key, "broken");
+  const client = new QueryClient({defaultOptions:{queries:{retry:false}}});
+  try {
+    render(<QueryClientProvider client={client}><LogDetailsDrawer open onClose={()=>{}} logEntry={makeLog({})} accessToken="token" /></QueryClientProvider>);
+    const handle = await screen.findByRole("separator", {name:t("logsUX.resizeDrawer")});
+    expect(Number(handle.getAttribute("aria-valuenow"))).toBeGreaterThanOrEqual(40);
+    expect(Number(handle.getAttribute("aria-valuenow"))).toBeLessThanOrEqual(100);
+  } finally {if (previous === null) window.localStorage.removeItem(key); else window.localStorage.setItem(key,previous); client.clear();}
+});
+
+/** 前置 1030px 桌面视口及低于最小值的已保存宽度；辅助技术读到的当前值不得小于最小值，结束后恢复偏好和视口。 */
+it("keeps the accessible current width within a fractional viewport minimum", async () => {
+  const key = "xhub.logDetails.widthPercent";
+  const previous = window.localStorage.getItem(key);
+  const previousWidth = window.innerWidth;
+  Object.defineProperty(window, "innerWidth", { configurable: true, value: 1030 });
+  window.localStorage.setItem(key, "40");
+  const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+  try {
+    render(<QueryClientProvider client={client}><LogDetailsDrawer open onClose={() => {}} logEntry={makeLog({})} accessToken="token" /></QueryClientProvider>);
+    const handle = await screen.findByRole("separator", { name: t("logsUX.resizeDrawer") });
+    await waitFor(() => expect(handle).toHaveAttribute("aria-valuemin", "63"));
+    expect(Number(handle.getAttribute("aria-valuenow"))).toBeGreaterThanOrEqual(Number(handle.getAttribute("aria-valuemin")));
+    expect(Number(handle.getAttribute("aria-valuenow"))).toBeLessThanOrEqual(Number(handle.getAttribute("aria-valuemax")));
+  } finally {
+    if (previous === null) window.localStorage.removeItem(key); else window.localStorage.setItem(key, previous);
+    Object.defineProperty(window, "innerWidth", { configurable: true, value: previousWidth });
+    client.clear();
+  }
+});
+
+/** 前置手机宽度并展示真实日志；验证自动全宽及收起侧栏，最后恢复视口和查询缓存。 */
+it("uses full width and collapses the sidebar on narrow screens", async () => {
+  const previousWidth = window.innerWidth;
+  Object.defineProperty(window, "innerWidth", { configurable:true, value:375 });
+  const client = new QueryClient({defaultOptions:{queries:{retry:false}}});
+  detailCapture.header.mockClear();
+  try {
+    render(<QueryClientProvider client={client}><LogDetailsDrawer open onClose={()=>{}} logEntry={makeLog({})} accessToken="token" /></QueryClientProvider>);
+    await waitFor(() => expect(detailCapture.header).toHaveBeenLastCalledWith(expect.objectContaining({isSidebarCollapsed:true})));
+    expect(screen.queryByRole("separator", {name:t("logsUX.resizeDrawer")})).not.toBeInTheDocument();
+    expect(screen.getByRole("dialog")).toHaveStyle({width:"100%"});
+    // 窄屏展开时侧栏及其折叠按钮必须高于详情头部，避免按钮被遮挡。
+    act(() => detailCapture.header.mock.lastCall?.[0].onToggleSidebar());
+    const collapse = screen.getByRole("button", { name: t("Collapse trace sidebar") });
+    expect(collapse).toHaveClass("max-sm:z-floating");
+    expect(screen.getByRole("button", { name: t("Copy trace id") }).closest("[class*='max-sm:z-sticky']")).toBeInTheDocument();
+    fireEvent.click(collapse);
+    await waitFor(() => expect(detailCapture.header).toHaveBeenLastCalledWith(expect.objectContaining({isSidebarCollapsed:true})));
+  } finally {Object.defineProperty(window,"innerWidth",{configurable:true,value:previousWidth});client.clear();}
 });

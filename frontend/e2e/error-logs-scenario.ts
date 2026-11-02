@@ -158,7 +158,9 @@ async function verifyLogFilters(page: Page, model: string, callId: string): Prom
   await expect(drawer.getByLabel("错误消息",{exact:true})).toHaveValue("用户原文");
   await expect(drawer.getByText("高级筛选",{exact:true})).toBeVisible();
   await expect(drawer.getByRole("button",{name:/应用筛选|应用过滤/})).toBeVisible();
-  await page.keyboard.press("Escape");
+  // 模型建议下拉框可能自动获得焦点；点击抽屉关闭按钮，避免 Escape 只关闭内层下拉框。
+  await drawer.getByRole("button", { name: translate("zh-CN", "Close"), exact: true }).click();
+  await expect(drawer).toBeHidden();
   await page.getByRole("button",{name:"English",exact:true}).click();
   await page.getByRole("button",{name:"Reset Filters",exact:true}).click();
   await expect(page.getByRole("row").filter({hasText:callId})).toBeVisible();
@@ -186,10 +188,11 @@ async function verifyLogDatesAndLink(page: Page, failedCallId: string): Promise<
   const detailPath = "/spend/logs/ui/" + failedCallId;
   const detailRequests: Request[] = [];
   // 只统计浏览器页面发出的真实详情读取，忽略测试夹具的预检请求；完整打开/关闭后必须恰好一次。
-  const observeDetail = (request: Request) => { if (new URL(request.url()).pathname === detailPath) detailRequests.push(request); };
+  // 独立控制台经 /gw 代理，直连环境则没有此前缀；两种环境都统计同一详情路径。
+  const observeDetail = (request: Request) => { if ([detailPath, `/gw${detailPath}`].includes(new URL(request.url()).pathname)) detailRequests.push(request); };
   page.on("request", observeDetail);
   try {
-    const detail = page.waitForResponse(r => new URL(r.url()).pathname === detailPath);
+    const detail = page.waitForResponse(r => [detailPath, `/gw${detailPath}`].includes(new URL(r.url()).pathname));
     await stableGoto(page, "/logs?log_id=" + failedCallId);
     const direct = await detail;
     expect(direct.status()).toBe(200);
@@ -220,7 +223,8 @@ async function verifyDSTPreset(page: Page, successCallId: string): Promise<void>
     await dstPage.getByRole("button", { name: "Last 24 Hours", exact: true }).click();
     const responsePromise = dstPage.waitForResponse(response => {
       const url = new URL(response.url());
-      return url.pathname === "/spend/logs/ui" && url.searchParams.get("end_date") === "2026-11-01 06:30:00"
+      // 路径兼容独立控制台的 /gw 代理和本地网关直连，仍验证真实响应状态及精确时间。
+      return ["/spend/logs/ui", "/gw/spend/logs/ui"].includes(url.pathname) && url.searchParams.get("end_date") === "2026-11-01 06:30:00"
         && url.searchParams.get("start_date") !== "2026-10-31 06:30:00";
     });
     await dstPage.getByRole("button", { name: "Last Hour", exact: true }).click();
@@ -237,6 +241,40 @@ async function verifyDSTPreset(page: Page, successCallId: string): Promise<void>
     await dstPage.getByRole("tabpanel", { name: "Logs", exact: true }).getByPlaceholder(/Search logs by ID/).fill(successCallId);
     await expect(dstPage.getByRole("row").filter({ hasText: successCallId })).toBeVisible();
   } finally { await context.close(); }
+}
+
+/** 验证真实日志在桌面边界宽度的无障碍范围及手机展开、折叠操作；page 为浏览器，callId 为真实请求。
+ * 通过深链接读取隔离后台日志并操作真实页面；finally 恢复视口及本地宽度偏好，日志由测试运行器清理。 */
+async function verifyResponsiveLogDrawer(page: Page, callId: string): Promise<void> {
+  const originalViewport = page.viewportSize();
+  const priorWidth = await page.evaluate(() => localStorage.getItem("xhub.logDetails.widthPercent"));
+  try {
+    await page.setViewportSize({ width: 1030, height: 800 });
+    await page.evaluate(() => localStorage.setItem("xhub.logDetails.widthPercent", "40"));
+    await stableGoto(page, "/logs?log_id=" + encodeURIComponent(callId));
+    const dialog = page.getByRole("dialog");
+    const resizer = dialog.getByRole("separator", { name: /拖动或左右方向键调整详情宽度|Resize detail panel with drag or arrow keys/ });
+    await expect(resizer).toBeVisible();
+    await expect(resizer).toHaveAttribute("aria-valuemin", "63");
+    await expect(resizer).toHaveAttribute("aria-valuenow", "63");
+    await page.keyboard.press("Escape");
+
+    await page.setViewportSize({ width: 390, height: 844 });
+    await stableGoto(page, "/logs?log_id=" + encodeURIComponent(callId));
+    await expect(dialog).toBeVisible();
+    await expect(dialog.getByRole("separator", { name: /拖动或左右方向键调整详情宽度|Resize detail panel with drag or arrow keys/ })).toHaveCount(0);
+    const expand = dialog.getByRole("button", { name: /展开追踪侧栏|Expand trace sidebar/ });
+    await expand.click();
+    const collapse = dialog.getByRole("button", { name: /折叠跟踪侧边栏|Collapse trace sidebar/ });
+    await expect(collapse).toBeVisible();
+    // 使用真实点击检验命中测试；如果按钮被详情头或侧栏遮挡，Playwright 会报告拦截而非假通过。
+    await collapse.click();
+    await expect(expand).toBeVisible();
+    await page.keyboard.press("Escape");
+  } finally {
+    await page.evaluate((value) => value === null ? localStorage.removeItem("xhub.logDetails.widthPercent") : localStorage.setItem("xhub.logDetails.widthPercent", value), priorWidth);
+    if (originalViewport) await page.setViewportSize(originalViewport);
+  }
 }
 
 /** 用途：注册独立场景「错误日志详情完整显示上游正文并可返回普通日志」；无参数、无返回值。前置真实浏览器、私有数据库和本地上游；验证页面及原始契约，保留原套件前后置清理，运行器最终回收专属 schema。异常由 Playwright 单独记录。 */
@@ -320,6 +358,16 @@ test("错误日志详情完整显示上游正文并可返回普通日志", async
     await page.getByRole("tab", { name: /^(日志|Logs)$/, exact: true }).click();
     await openLogDetails(page, successCallId);
     const successDialog = page.getByRole("dialog");
+    // 键盘调整、全屏和恢复均操作真实抽屉；完成后继续读取真实后台日志。
+    const resizer = successDialog.getByRole("separator", { name: /拖动或左右方向键调整详情宽度|Resize detail panel with drag or arrow keys/ });
+    await expect(resizer).toBeVisible();
+    const widthBefore = (await successDialog.boundingBox())!.width;
+    await resizer.focus();
+    await page.keyboard.press("ArrowLeft");
+    await expect.poll(async () => (await successDialog.boundingBox())!.width).toBeGreaterThan(widthBefore);
+    await successDialog.getByRole("button", { name: /展开详情|Expand details/ }).click();
+    await expect(successDialog.getByRole("button", { name: /恢复详情宽度|Restore details width/ })).toBeVisible();
+    await successDialog.getByRole("button", { name: /恢复详情宽度|Restore details width/ }).click();
     // 真实成功请求落库后检查技术缩写，防止日志页面重新出现学位误译；schema 由全局清理回收。
     await expect(successDialog).not.toContainText("法学硕士");
     await verifyUpstreamCollapse(page, headers, successCallId, 200);
@@ -338,6 +386,27 @@ test("错误日志详情完整显示上游正文并可返回普通日志", async
     }
     await page.screenshot({ path: "../.e2e/upstream-response-collapsed.png", fullPage: true });
     await page.keyboard.press("Escape");
+    // 关闭正文保存后发起真实请求：已记录的用量及上游证据仍可查看，原因未知不能展示伪配置结论。
+    const disabled = await page.request.post(GATEWAY + "/config/update", { headers,
+      data: { general_settings: { store_prompts_in_spend_logs: false } } });
+    expect(disabled.status()).toBe(200);
+    const noBody = await page.request.post(GATEWAY + "/chat/completions", {
+      headers, data: { model: successModel, messages: [{ role: "user", content: "Verify the request summary remains available." }] },
+    });
+    expect(noBody.status()).toBe(200);
+    const noBodyId = noBody.headers()["x-litellm-call-id"];
+    expect(noBodyId).toBeTruthy();
+    await waitForStoredLog(page, headers, noBodyId);
+    const noBodyDetail = await page.request.get(GATEWAY + "/spend/logs/ui/" + noBodyId, { headers });
+    const noBodyData = await noBodyDetail.json();
+    expect(noBodyData.metadata.upstream_response.status_code).toBe(200);
+    expect(Number(noBodyData.spend)).toBeGreaterThan(0);
+    await openLogDetails(page, noBodyId);
+    const noBodyDialog = page.getByRole("dialog");
+    await expect(noBodyDialog.getByRole("note")).toContainText(/原因未记录|reason was not recorded/);
+    await expect(noBodyDialog).not.toContainText("store_model_in_db");
+    await verifyUpstreamCollapse(page, headers, noBodyId, 200);
+    await page.keyboard.press("Escape");
     // 删除配置后仍读取调用时快照，切换语言不改变原始上游地址或用户请求正文。
     for (const id of deploymentIds) {
       const deleted = await page.request.post(GATEWAY + "/model/delete", { headers, data: { id } });
@@ -346,6 +415,7 @@ test("错误日志详情完整显示上游正文并可返回普通日志", async
     deploymentIds.length = 0;
     await page.getByRole("button", { name: "English", exact: true }).click();
     await openLogDetails(page, successCallId);
+    await expect(page.getByRole("dialog").getByRole("separator", { name: translate("en", "logsUX.resizeDrawer") })).toBeVisible();
     await verifyUpstreamCollapse(page, headers, successCallId, 200);
     await page.keyboard.press("Escape");
     await page.getByRole("button", { name: translate("en", "language.zhCN"), exact: true }).click();
@@ -355,6 +425,7 @@ test("错误日志详情完整显示上游正文并可返回普通日志", async
     await page.getByRole("button", {name:"English",exact:true}).click();
     await verifyLogDatesAndLink(page, failedCallId);
     await verifyDSTPreset(page, successCallId);
+    await verifyResponsiveLogDrawer(page, successCallId);
   } finally {
     try {
       const restored = logging?.stored_in_db

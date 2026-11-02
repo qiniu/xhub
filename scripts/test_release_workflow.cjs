@@ -45,6 +45,7 @@ test('API client reliability gate runs all flows independently and preserves fai
       });
       assert.equal(result.status, status, '浏览器失败必须阻断发布：' + result.stderr);
       assert.deepEqual(readFileSync(join(directory, 'arguments'), 'utf8').trim().split('\n'), [
+        'scenarios/legacy/error-logs/sc-020.test.ts',
         'proxy-body-limit.test.ts', 'client-docs-url-', 'client-cancellation-', 'stream-terminal-sc-',
         'billing-pending-recovery', 'usage-spool-', 'key-lifecycle-', 'agent-history-', 'hard-budget-', 'budget-reconciliation-', 'messages-signed-history-', 'claude-client-compat-', 'user-bulk-budget-',
         'scenarios/enterprise/saml-', 'scenarios/enterprise/sso-valid.test.ts', 'scenarios/directory/sso-config.test.ts',
