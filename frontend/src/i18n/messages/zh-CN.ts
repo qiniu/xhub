@@ -317,6 +317,7 @@ export const zhCN = {
     enableName: "启用 {name}", disableName: "停用 {name}", error: "目录操作失败，请检查权限与配置后重试。",
   },
   providerGuideUI: providerGuideUIZhCN,
+  usageBudget: { title: "个人预算", amounts: "已记账消费：{spent}；预算上限：{limit}；账面剩余：{remaining}。", exceeded: "已超出个人上限 {amount}。", resetUnknown: "刷新周期未知", note: "账面剩余未包含在途费用，也不代表密钥、团队、项目或组织额度一定允许请求。", rangeSpend: "所选时段支出" },
   quotaGuide: {
     personalUnlimited: "未设置个人上限",
     personalTitle: "个人预算（美元）",
