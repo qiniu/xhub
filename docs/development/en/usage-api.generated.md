@@ -15,6 +15,7 @@ Generated from OpenAPI; existing authorization and billing remain unchanged. See
 | `GET /team/daily/activity` | Scoped daily aggregates; paged totals cover current page, aggregated totals entire range; invalid dates leave bounds open; unknown cache tokens omitted | 200, 400, 401, 403, 404, 409, 500, 503 |
 | `GET /team/daily/activity/aggregated` | Scoped daily aggregates; paged totals cover current page, aggregated totals entire range; invalid dates leave bounds open; unknown cache tokens omitted | 200, 400, 401, 403, 404, 409, 500, 503 |
 | `GET /organization/daily/activity` | Scoped daily aggregates; paged totals cover current page, aggregated totals entire range; invalid dates leave bounds open; unknown cache tokens omitted | 200, 400, 401, 403, 404, 409, 500, 503 |
+| `GET /spend/logs/ui/filter-options` | Log filter suggestions | 200, 400, 401, 403, 500, 503 |
 
 ### GET /spend/logs/v2
 
@@ -1006,6 +1007,77 @@ Scoped daily aggregates; paged totals cover current page, aggregated totals enti
 ```
 
 
+### GET /spend/logs/ui/filter-options
+
+Return candidates from logs visible to the caller; model and supplier also require current model authorization and an enabled deployment. Never return plaintext keys or bodies.
+
+```json
+[
+  {
+    "name": "field",
+    "in": "query",
+    "required": true,
+    "schema": {
+      "type": "string",
+      "enum": [
+        "model",
+        "key_alias",
+        "key_hash",
+        "supplier",
+        "inbound_endpoint"
+      ]
+    },
+    "description": "Candidate field"
+  },
+  {
+    "name": "start_date",
+    "in": "query",
+    "required": true,
+    "description": "Authorized query start",
+    "schema": {
+      "type": "string"
+    }
+  },
+  {
+    "name": "end_date",
+    "in": "query",
+    "required": true,
+    "description": "Authorized query end, at most 366 days",
+    "schema": {
+      "type": "string"
+    }
+  },
+  {
+    "name": "q",
+    "in": "query",
+    "required": false,
+    "description": "Case-insensitive literal substring, up to 128 characters",
+    "schema": {
+      "type": "string"
+    }
+  },
+  {
+    "name": "page",
+    "in": "query",
+    "required": false,
+    "description": "Page 1–100, default 1",
+    "schema": {
+      "type": "string"
+    }
+  },
+  {
+    "name": "page_size",
+    "in": "query",
+    "required": false,
+    "description": "Page size 1–50, default 50",
+    "schema": {
+      "type": "string"
+    }
+  }
+]
+```
+
+
 ## Schemas
 
 ### Error
@@ -1876,5 +1948,36 @@ Scoped daily aggregates; paged totals cover current page, aggregated totals enti
     "metrics",
     "metadata"
   ]
+}
+```
+
+### LogFilterOptionPage
+
+```json
+{
+  "type": "object",
+  "required": [
+    "data",
+    "page",
+    "page_size",
+    "has_more"
+  ],
+  "properties": {
+    "data": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "page": {
+      "type": "integer"
+    },
+    "page_size": {
+      "type": "integer"
+    },
+    "has_more": {
+      "type": "boolean"
+    }
+  }
 }
 ```

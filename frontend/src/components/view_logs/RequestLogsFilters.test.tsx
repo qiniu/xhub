@@ -14,7 +14,9 @@ vi.mock("@/app/(dashboard)/hooks/sessionIdentity/useSessionIdentity", () => ({
 }));
 vi.mock("@/app/(dashboard)/hooks/useIsOrgAdmin", () => ({ default: () => false }));
 vi.mock("@/app/(dashboard)/hooks/spendLogs/useSpendLogUsers", () => ({ useInfiniteSpendLogUsers: vi.fn() }));
+vi.mock("./useLogFilterSuggestions", () => ({ useLogFilterSuggestions: vi.fn() }));
 import { useInfiniteSpendLogUsers } from "@/app/(dashboard)/hooks/spendLogs/useSpendLogUsers";
+import { useLogFilterSuggestions } from "./useLogFilterSuggestions";
 const emptyQuery = {
   data: { pages: [], pageParams: [] },
   fetchNextPage: vi.fn(),
@@ -57,14 +59,16 @@ describe("RequestLogsFilters", () => {
     vi.mocked(useInfiniteSpendLogUsers).mockReturnValue(
       emptyQuery as unknown as ReturnType<typeof useInfiniteSpendLogUsers>,
     );
+    vi.mocked(useLogFilterSuggestions).mockReturnValue({ data: { data: [], page: 1, page_size: 50, has_more: false }, isError: false, isLoading: false, isPendingQuery: false } as unknown as ReturnType<typeof useLogFilterSuggestions>);
   });
 
   /** 前置普通日志；常用模型和账号直接可见，高级筛选折叠且不出现未实现字段；自动卸载。 */
   it("prioritizes common filters and removes unsupported or duplicated inputs", () => {
     renderFilters();
     expect(screen.getByLabelText("Model")).toBeVisible();
+    expect(screen.getByText(/Suggestions come from all logs you can access/)).toBeVisible();
     expect(screen.getByPlaceholderText("Search an internal user")).toBeVisible();
-    expect(screen.getByLabelText("Key Hash")).not.toBeVisible();
+    expect(screen.getByLabelText("Key fingerprint (SHA-256)")).not.toBeVisible();
     expect(screen.queryByText("End User")).not.toBeInTheDocument();
     expect(screen.queryByText("Public model / search tool")).not.toBeInTheDocument();
     expect(screen.queryByText("Error Message")).not.toBeInTheDocument();
@@ -96,6 +100,70 @@ describe("RequestLogsFilters", () => {
     await user.type(screen.getByLabelText("Key Alias"), "deleted-key");
     expect(screen.getByLabelText("Model")).toHaveValue("retired-模型");
     expect(screen.getByLabelText("Key Alias")).toHaveValue("deleted-key");
+  });
+
+  /** 前置本账号可见候选；键盘选择应写入完整值，指纹只缩略显示且非密钥明文；测试框架清理 DOM。 */
+  it("selects a complete fingerprint without submitting the abbreviated label", async () => {
+    const hash = "sha256-" + "0123456789abcdef".repeat(4);
+    vi.mocked(useLogFilterSuggestions).mockImplementation((field) => ({ data: { data: field === "key_hash" ? [hash] : [], page: 1, page_size: 50, has_more: false }, isError: false, isLoading: false, isPendingQuery: false }) as unknown as ReturnType<typeof useLogFilterSuggestions>);
+    const user = userEvent.setup();
+    renderWithProviders(<StatefulFilters />);
+    await user.click(screen.getByText("Advanced filters"));
+    const input = screen.getByLabelText("Key fingerprint (SHA-256)");
+    await user.click(input);
+    const option = await screen.findByRole("option", { name: "sha256-01234…89abcdef" });
+    expect(option).not.toHaveTextContent(hash);
+    await user.click(option);
+    expect(input).toHaveValue(hash);
+    expect(screen.getByText(/not the secret key/i)).toBeVisible();
+  });
+
+  /** 各字段选择已授权提示后保留完整原文，允许继续手动编辑；组件和查询由框架清理。 */
+  it.each([
+    ["model", "Model", "public-model"],
+    ["key_alias", "Key Alias", "my-key"],
+    ["supplier", "Supplier connection", "supplier-one"],
+    ["inbound_endpoint", "Inbound", "/v1/responses"],
+  ] as const)("selects a %s suggestion", async (field, label, value) => {
+    vi.mocked(useLogFilterSuggestions).mockImplementation((f) => ({ data: { data: f === field ? [value] : [], page: 1, page_size: 50, has_more: false }, isError: false, isLoading: false, isPendingQuery: false }) as unknown as ReturnType<typeof useLogFilterSuggestions>);
+    const user = userEvent.setup();
+    renderWithProviders(<StatefulFilters />);
+    if (field !== "model") await user.click(screen.getByText("Advanced filters"));
+    const input = screen.getByLabelText(label);
+    await user.click(input);
+    await user.click(await screen.findByRole("option", { name: value, exact: true }));
+    expect(input).toHaveValue(value);
+  });
+
+  /** 限量结果必须提示缩小搜索范围，不误称已返回全部；组件卸载清理。 */
+  it("reports additional suggestion pages", async () => {
+    vi.mocked(useLogFilterSuggestions).mockReturnValue({ data: { data: ["one"], page: 1, page_size: 50, has_more: true }, isError: false, isLoading: false, isPendingQuery: false } as unknown as ReturnType<typeof useLogFilterSuggestions>);
+    renderFilters();
+    await userEvent.click(screen.getByLabelText("Model"));
+    expect(await screen.findByText(/More results are available/)).toBeVisible();
+  });
+
+  /** 查询失败和部分候选不得妨碍手工输入；候选失败仅影响提示，测试框架清理 DOM。 */
+  it("keeps manual historical input on a suggestion failure", async () => {
+    vi.mocked(useLogFilterSuggestions).mockReturnValue({ data: undefined, isError: true, isLoading: false, isPendingQuery: false } as unknown as ReturnType<typeof useLogFilterSuggestions>);
+    const user = userEvent.setup();
+    renderWithProviders(<StatefulFilters />);
+    const model = screen.getByLabelText("Model");
+    await user.click(model);
+    expect(await screen.findByText(/Suggestions could not be loaded/)).toBeVisible();
+    await user.type(model, "retired-模型");
+    await user.click(screen.getByText("Advanced filters"));
+    expect(model).toHaveValue("retired-模型");
+  });
+
+  /** 中文过滤器显示明确指纹说明，查询草稿保留用户内容；测试框架清理 DOM 与语言。 */
+  it("translates the fingerprint label and guidance", async () => {
+    setActiveLocale("zh-CN");
+    renderFilters();
+    expect(screen.getByText(/提示选项来自所选时间内有权查看的全部日志/)).toBeVisible();
+    await userEvent.click(screen.getByText("高级筛选"));
+    expect(screen.getByLabelText("密钥指纹（SHA-256）")).toBeVisible();
+    expect(screen.getByText(/并非密钥明文/)).toBeVisible();
   });
 
   /** 前置分页用户选项；选择后发送准确 user_id，文字搜索发送时间范围与查询，不跨权限拉取全目录；mock 清理。 */

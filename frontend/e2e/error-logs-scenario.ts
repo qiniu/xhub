@@ -158,7 +158,9 @@ async function verifyLogFilters(page: Page, model: string, callId: string): Prom
   await expect(drawer.getByLabel("错误消息",{exact:true})).toHaveValue("用户原文");
   await expect(drawer.getByText("高级筛选",{exact:true})).toBeVisible();
   await expect(drawer.getByRole("button",{name:/应用筛选|应用过滤/})).toBeVisible();
-  await page.keyboard.press("Escape");
+  // 模型建议下拉框可能自动获得焦点；点击抽屉关闭按钮，避免 Escape 只关闭内层下拉框。
+  await drawer.getByRole("button", { name: translate("zh-CN", "Close"), exact: true }).click();
+  await expect(drawer).toBeHidden();
   await page.getByRole("button",{name:"English",exact:true}).click();
   await page.getByRole("button",{name:"Reset Filters",exact:true}).click();
   await expect(page.getByRole("row").filter({hasText:callId})).toBeVisible();
@@ -186,10 +188,11 @@ async function verifyLogDatesAndLink(page: Page, failedCallId: string): Promise<
   const detailPath = "/spend/logs/ui/" + failedCallId;
   const detailRequests: Request[] = [];
   // 只统计浏览器页面发出的真实详情读取，忽略测试夹具的预检请求；完整打开/关闭后必须恰好一次。
-  const observeDetail = (request: Request) => { if (new URL(request.url()).pathname === detailPath) detailRequests.push(request); };
+  // 独立控制台经 /gw 代理，直连环境则没有此前缀；两种环境都统计同一详情路径。
+  const observeDetail = (request: Request) => { if ([detailPath, `/gw${detailPath}`].includes(new URL(request.url()).pathname)) detailRequests.push(request); };
   page.on("request", observeDetail);
   try {
-    const detail = page.waitForResponse(r => new URL(r.url()).pathname === detailPath);
+    const detail = page.waitForResponse(r => [detailPath, `/gw${detailPath}`].includes(new URL(r.url()).pathname));
     await stableGoto(page, "/logs?log_id=" + failedCallId);
     const direct = await detail;
     expect(direct.status()).toBe(200);
@@ -220,7 +223,8 @@ async function verifyDSTPreset(page: Page, successCallId: string): Promise<void>
     await dstPage.getByRole("button", { name: "Last 24 Hours", exact: true }).click();
     const responsePromise = dstPage.waitForResponse(response => {
       const url = new URL(response.url());
-      return url.pathname === "/spend/logs/ui" && url.searchParams.get("end_date") === "2026-11-01 06:30:00"
+      // 路径兼容独立控制台的 /gw 代理和本地网关直连，仍验证真实响应状态及精确时间。
+      return ["/spend/logs/ui", "/gw/spend/logs/ui"].includes(url.pathname) && url.searchParams.get("end_date") === "2026-11-01 06:30:00"
         && url.searchParams.get("start_date") !== "2026-10-31 06:30:00";
     });
     await dstPage.getByRole("button", { name: "Last Hour", exact: true }).click();

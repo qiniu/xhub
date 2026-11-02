@@ -2501,6 +2501,17 @@
       "status": "core-contracted"
     },
     {
+      "route": "GET /spend/logs/ui/filter-options",
+      "sources": [
+        "internal/gateway/usage/mount.go"
+      ],
+      "contract": {
+        "domain": "usage",
+        "operation": "listLogFilterOptions"
+      },
+      "status": "core-contracted"
+    },
+    {
       "route": "GET /spend/logs/v2",
       "sources": [
         "catalog",

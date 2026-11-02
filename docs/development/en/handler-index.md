@@ -14,6 +14,10 @@ rg 'GET|POST|DELETE|PATCH' internal/gateway/*/mount.go
 | Preferences | [prefs/mount.go](../../../internal/gateway/prefs/mount.go) |
 | Usage | [usage/mount.go](../../../internal/gateway/usage/mount.go) |
 
+| Method and path | Handler | Registration source |
+| --- | --- | --- |
+| `GET /spend/logs/ui/filter-options` | `LogFilterOptions` | [mount.go](../../../internal/gateway/usage/mount.go) |
+
 [Consumer API guide](api-reference.md)
 
 [SAML configuration and metadata registration](saml-login.md)

@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   monitorOptions,
   parseMonitorData,
+  reconcileMonitorFilters,
   chartRows,
   localDate,
   seriesKey,
@@ -26,8 +27,8 @@ describe("model monitor data", () => {
       expect(() => parseMonitorData(value)).toThrow("monitor_response_invalid");
     }
   });
-  /** 前置配置与历史身份，验证无调用选项、删除历史和去重；输入只读，无清理需求。 */
-  it("merges configured identities with authorized history", () => {
+  /** 候选由当前授权目录决定，历史数据不能重新加入已撤权选项；纯函数、无需清理。 */
+  it("does not promote history into the current directory", () => {
     const options = [
       { supplier: "b", model: "unused" },
       { supplier: "a", model: "same" },
@@ -36,8 +37,18 @@ describe("model monitor data", () => {
       { supplier: "a", model: "same" },
       { supplier: "deleted", model: "historic" },
     ] as MonitorRow[];
-    expect(monitorOptions({ options, models } as MonitorData)).toEqual([options[1], options[0], models[1]]);
+    expect(monitorOptions({ options, models } as MonitorData)).toEqual([options[1], options[0]]);
     expect(monitorOptions({ options: [], models: [] } as unknown as MonitorData)).toEqual([]);
+  });
+  /** 前置候选未就绪、已授权和已撤权三种状态，验证仅依据成功返回的目录修正筛选；无副作用。 */
+  it("reconciles filters only against a loaded directory", () => {
+    const options = [{ supplier: "a", model: "m" }, { supplier: "b", model: "other" }];
+    expect(reconcileMonitorFilters(null, "old", "old-model")).toEqual({ supplier: "old", model: "old-model" });
+    expect(reconcileMonitorFilters(options, "a", "m")).toEqual({ supplier: "a", model: "m" });
+    expect(reconcileMonitorFilters(options, "old", "m")).toEqual({ supplier: "", model: "" });
+    expect(reconcileMonitorFilters(options, "a", "other")).toEqual({ supplier: "a", model: "" });
+    expect(reconcileMonitorFilters(options, "", "other")).toEqual({ supplier: "", model: "other" });
+    expect(reconcileMonitorFilters([], "a", "m")).toEqual({ supplier: "", model: "" });
   });
   it("validates date bounds and local date", () => {
     expect(validWindow("2026-01-01", "2026-03-31")).toBe(true);

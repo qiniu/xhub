@@ -10,9 +10,9 @@ const root = new URL("../../", import.meta.url).pathname;
 const entries = await loadReferences(root);
 const inventory = JSON.parse(await readFile(root + "contracts/migration-inventory.json", "utf8"));
 
-/** 验证公开集合来自真实五域契约且只包含48操作；前置仓库文件，不调用网络或修改资源。 */
+/** 验证公开集合来自真实五域契约且只包含49操作；前置仓库文件，不调用网络或修改资源。 */
 test("Swagger only publishes the five contracted domains", () => {
-  assert.deepEqual(entries.map(e => [e.domain, e.count]), [["suppliers",5],["users",11],["keys",14],["models",9],["usage",9]]);
+  assert.deepEqual(entries.map(e => [e.domain, e.count]), [["suppliers",5],["users",11],["keys",14],["models",9],["usage",10]]);
   for (const { raw } of entries) assert.ok(!Object.keys(JSON.parse(raw).paths).some(p => p.startsWith("/bypass/")));
 });
 
@@ -73,7 +73,7 @@ test("Swagger defaults to read only and does not persist auth", () => {
 test("reference pages expose scope and local assets in both languages", () => {
   for (const lang of ["zh", "en"]) {
     const html = referencePage(lang, entries);
-    assert.match(html, /48/); assert.match(html, /Bypass/); assert.match(html, /SSO\/SCIM/);
+    assert.match(html, /49/); assert.match(html, /Bypass/); assert.match(html, /SSO\/SCIM/);
     assert.match(html, /\.\.\/assets\/swagger-ui-bundle.js/);
     assert.doesNotMatch(html, /https:\/\/xapi|cdn\./);
     assert.equal((html.match(/<option /g) || []).length, 5);
