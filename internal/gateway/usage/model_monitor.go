@@ -11,6 +11,7 @@ import (
 	"github.com/sunqirui1987/xhub/internal/auth"
 	"github.com/sunqirui1987/xhub/internal/config"
 	"github.com/sunqirui1987/xhub/internal/iam"
+	"github.com/sunqirui1987/xhub/internal/llm/credentials"
 	"github.com/sunqirui1987/xhub/internal/util"
 )
 
@@ -55,7 +56,7 @@ func ModelMonitor(s Host, w http.ResponseWriter, r *http.Request) {
 		rows, err = db.ModelMonitor(r.Context(), q, tz)
 	} else {
 		// 聚合桶未保存公开别名，不能在权限收窄后按供应商＋实际模型猜测历史归属。
-		rows, err = db.ModelMonitorCurrent(r.Context(), q, tz, modelMonitorDeployments(list, allowed))
+		rows, err = db.ModelMonitorCurrent(r.Context(), q, tz, modelMonitorDeployments(list, allowed), allowed)
 	}
 	if err != nil {
 		s.WriteIAMError(w, r, err)
@@ -113,6 +114,20 @@ type modelMonitorOption struct {
 	Model    string `json:"model"`
 }
 
+// resolvedMonitorIdentity 使用数据面相同的参数展开方法读取连接和上游模型。
+// 输入为部署配置副本，返回脱敏连接及实际模型；只水合身份字段，不读取或返回密钥、不改写配置。
+// 模型监控及日志筛选候选共用；未设置的环境变量按执行链展开为空，无法解析的地址不会进入目录。
+func resolvedMonitorIdentity(entry config.ModelEntry) (string, string) {
+	params := make(map[string]any, 3)
+	for _, key := range []string{"model", "api_base", "litellm_credential_name"} {
+		if value, ok := entry.LiteLLMParams[key]; ok {
+			params[key] = value
+		}
+	}
+	entry.LiteLLMParams = credentials.Hydrate(params, nil)
+	return entry.MonitorIdentity()
+}
+
 // modelMonitorOptions 从配置 list 提取去重排序目录，handler 和单元测试调用。
 // allowed 为许可别名，nil 不限制、空切片拒绝全部；禁用部署与供应商壳不属于当前可用目录。
 // 返回非 nil 目录，空配置返回空数组；不访问账单、不修改配置。
@@ -127,7 +142,7 @@ func modelMonitorOptions(list []config.ModelEntry, allowed []string) []modelMoni
 		if strings.TrimSpace(entry.ModelName) == "" || entry.Disabled() || entry.ModelInfo["role"] == "provider" || (allowed != nil && !grants[entry.ModelName]) {
 			continue
 		}
-		supplier, model := entry.MonitorIdentity()
+		supplier, model := resolvedMonitorIdentity(entry)
 		if supplier == "" || model == "" {
 			continue
 		}
@@ -155,20 +170,28 @@ func modelMonitorDeployments(list []config.ModelEntry, allowed []string) []iam.M
 	for _, alias := range allowed {
 		grants[alias] = true
 	}
+	type identity struct{ supplier, model string }
 	ambiguous := map[iam.MonitorDeployment]bool{}
+	crossAmbiguous := map[identity]bool{}
 	for _, entry := range list {
-		if !entry.Disabled() || entry.ModelInfo["role"] == "provider" {
+		if entry.ModelInfo["role"] == "provider" {
 			continue
 		}
-		supplier, model := entry.MonitorIdentity()
-		ambiguous[iam.MonitorDeployment{Alias: entry.ModelName, Supplier: supplier, Model: model}] = true
+		supplier, model := resolvedMonitorIdentity(entry)
+		if entry.Disabled() {
+			ambiguous[iam.MonitorDeployment{Alias: entry.ModelName, Supplier: supplier, Model: model}] = true
+		}
+		// 组或回退的历史事件未记实际成员别名；同一身份存在停用或无权部署时不能猜测来源。
+		if entry.Disabled() || (allowed != nil && !grants[entry.ModelName]) {
+			crossAmbiguous[identity{supplier, model}] = true
+		}
 	}
 	out := []iam.MonitorDeployment{}
 	for _, entry := range list {
 		if strings.TrimSpace(entry.ModelName) == "" || entry.Disabled() || entry.ModelInfo["role"] == "provider" || (allowed != nil && !grants[entry.ModelName]) {
 			continue
 		}
-		supplier, model := entry.MonitorIdentity()
+		supplier, model := resolvedMonitorIdentity(entry)
 		if supplier == "" || model == "" {
 			continue
 		}
@@ -176,6 +199,7 @@ func modelMonitorDeployments(list []config.ModelEntry, allowed []string) []iam.M
 		if ambiguous[id] {
 			continue
 		}
+		id.CrossSafe = !crossAmbiguous[identity{supplier, model}]
 		out = append(out, id)
 	}
 	return out

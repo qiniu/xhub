@@ -26,7 +26,7 @@ func logOptionPairs(entries []config.ModelEntry, allowed []string) []iam.LogOpti
 		if entry.Disabled() || entry.ModelInfo["role"] == "provider" || strings.TrimSpace(entry.ModelName) == "" || (allowed != nil && !grants[entry.ModelName]) {
 			continue
 		}
-		supplier, _ := entry.MonitorIdentity()
+		supplier, _ := resolvedMonitorIdentity(entry)
 		pair := iam.LogOptionDeployment{Model: entry.ModelName, Supplier: supplier}
 		if !seen[pair] {
 			seen[pair] = true
@@ -82,15 +82,20 @@ func LogFilterOptions(s Host, w http.ResponseWriter, r *http.Request) {
 	ctx, cancel := context.WithTimeout(r.Context(), 5*time.Second)
 	defer cancel()
 	var pairs []iam.LogOptionDeployment
+	var deployments []iam.MonitorDeployment
+	var allowed []string
 	if field == "model" || field == "supplier" {
-		allowed, e := modelMonitorAllowedModels(ctx, db, p, "")
+		var e error
+		allowed, e = modelMonitorAllowedModels(ctx, db, p, "")
 		if e != nil {
 			s.WriteIAMError(w, r, e)
 			return
 		}
-		pairs = logOptionPairs(s.ModelList(), allowed)
+		list := s.ModelList()
+		pairs = logOptionPairs(list, allowed)
+		deployments = modelMonitorDeployments(list, allowed)
 	}
-	rows, more, err := db.ListLogFilterOptions(ctx, q, field, search, page, size, pairs)
+	rows, more, err := db.ListLogFilterOptions(ctx, q, field, search, page, size, pairs, deployments, allowed)
 	if err != nil {
 		s.WriteIAMError(w, r, err)
 		return

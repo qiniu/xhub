@@ -27,7 +27,11 @@ export function registerLogFilterOptionsScenario(locale: "en" | "zh-CN") {
       for (let i = 0; i < 2; i++) {
         await create("/credentials", { credential_name: suppliers[i], credential_info: { custom_llm_provider: "openai" }, credential_values: { api_base: UPSTREAM, api_key: "sk-fake" } });
         credentials.push(suppliers[i]);
-        const model = await create("/model/new", { model_name: aliases[i], litellm_params: { model: prefix + "-actual", litellm_credential_name: suppliers[i], custom_llm_provider: "openai", input_cost_per_token: 0.01, output_cost_per_token: 0.02 }, model_info: { transport: "bypass_openai_chat", pricing_source: "manual" } });
+        // 第一名用户的部署从网关进程环境解析实际模型和内联地址，覆盖真实推理到候选的完整链路。
+        const params = i === 0
+          ? { model: "os.environ/E2E_MONITOR_TEST_MODEL", api_base: "os.environ/E2E_UPSTREAM", api_key: "sk-fake" }
+          : { model: prefix + "-actual", litellm_credential_name: suppliers[i] };
+        const model = await create("/model/new", { model_name: aliases[i], litellm_params: { ...params, custom_llm_provider: "openai", input_cost_per_token: 0.01, output_cost_per_token: 0.02 }, model_info: { transport: "bypass_openai_chat", pricing_source: "manual" } });
         models.push(model.model_info.id);
         const org = await create("/organization/new", { organization_alias: prefix + "-org-" + i, models: [aliases[i]] });
         orgs.push(org.organization_id);
@@ -56,7 +60,7 @@ export function registerLogFilterOptionsScenario(locale: "en" | "zh-CN") {
       const dialog = page.getByRole("dialog");
       const labels = ["Model", "Key Alias", "logsUX.keyFingerprint", "logsUX.supplier", "requestMetrics.inbound"];
       const fields = ["model", "key_alias", "key_hash", "supplier", "inbound_endpoint"];
-      const values = [aliases[0], keyAliases[0], fingerprint, suppliers[0], "/v1/chat/completions"];
+      const values = [aliases[0], keyAliases[0], fingerprint, UPSTREAM, "/v1/chat/completions"];
       const foreign = [aliases[1], keyAliases[1], foreignFingerprint, suppliers[1], ""];
       for (let i = 0; i < fields.length; i++) {
         await open.click();

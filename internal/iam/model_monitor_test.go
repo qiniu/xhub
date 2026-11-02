@@ -31,28 +31,78 @@ func TestModelMonitorCurrentMatchesBuckets(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	got, err := db.ModelMonitorCurrent(ctx, q, 0, []MonitorDeployment{deployment, deployment})
+	got, err := db.ModelMonitorCurrent(ctx, q, 0, []MonitorDeployment{deployment, deployment}, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
 	if !reflect.DeepEqual(got, want) {
 		t.Fatalf("授权明细统计与原计时口径不一致：got=%+v want=%+v", got, want)
 	}
-	if rows, err := db.ModelMonitorCurrent(ctx, q, 0, nil); err != nil || len(rows) != 0 {
+	if rows, err := db.ModelMonitorCurrent(ctx, q, 0, nil, nil); err != nil || len(rows) != 0 {
 		t.Fatalf("无授权部署应返回空结果：%+v %v", rows, err)
 	}
 	bad := q
 	bad.Cond = nil
-	if _, err := db.ModelMonitorCurrent(ctx, bad, 0, []MonitorDeployment{deployment}); err == nil {
+	if _, err := db.ModelMonitorCurrent(ctx, bad, 0, []MonitorDeployment{deployment}, nil); err == nil {
 		t.Fatal("缺少权限条件必须拒绝")
 	}
-	if _, err := db.ModelMonitorCurrent(ctx, q, 1, []MonitorDeployment{deployment}); err == nil {
+	if _, err := db.ModelMonitorCurrent(ctx, q, 1, []MonitorDeployment{deployment}, nil); err == nil {
 		t.Fatal("非法时区必须拒绝")
 	}
 	cancelled, cancel := context.WithCancel(ctx)
 	cancel()
-	if _, err := db.ModelMonitorCurrent(cancelled, q, 0, []MonitorDeployment{deployment}); err == nil {
+	if _, err := db.ModelMonitorCurrent(cancelled, q, 0, []MonitorDeployment{deployment}, nil); err == nil {
 		t.Fatal("数据库查询失败不能返回假成功")
+	}
+}
+
+// TestModelMonitorCurrentCrossAlias 验证组或回退的原始来源授权及实际部署身份双重限制。
+// 在私有数据库写入隔离测试记录，覆盖授权、撤权、未限定及共享身份歧义，testDB 在结束时清理。
+func TestModelMonitorCurrentCrossAlias(t *testing.T) {
+	db := testDB(t)
+	ctx := context.Background()
+	base := UsageRecord{TS: time.Date(2026, 1, 1, 0, 3, 0, 0, time.UTC), OwnerType: OwnerPersonal, UserID: "owner", Supplier: "supplier", UpstreamModel: "actual", Status: "success", CallType: "chat", HTTPStatus: 200}
+	for _, alias := range []string{"member", "group", "revoked"} {
+		r := base
+		r.RequestID, r.Model = "cross-"+alias, alias
+		if err := db.RecordUsage(ctx, []UsageRecord{r}); err != nil {
+			t.Fatal(err)
+		}
+	}
+	other := base
+	other.RequestID, other.UserID, other.Model = "cross-other", "foreign", "group"
+	if err := db.RecordUsage(ctx, []UsageRecord{other}); err != nil {
+		t.Fatal(err)
+	}
+	q := ModelMonitorQuery{UsageQuery: UsageQuery{Cond: builder.Eq{"user_id": "owner"}, From: time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC), To: time.Date(2026, 1, 2, 0, 0, 0, 0, time.UTC)}}
+	dep := MonitorDeployment{Alias: "member", Supplier: "supplier", Model: "actual", CrossSafe: true}
+	for _, tc := range []struct {
+		name    string
+		allowed []string
+		safe    bool
+		want    int64
+	}{
+		{"authorized group and member", []string{"member", "group"}, true, 2},
+		{"source revoked", []string{"member"}, true, 1},
+		{"unrestricted source", nil, true, 3},
+		{"ambiguous destination", []string{"member", "group"}, false, 1},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			dep.CrossSafe = tc.safe
+			rows, err := db.ModelMonitorCurrent(ctx, q, 0, []MonitorDeployment{dep}, tc.allowed)
+			if err != nil {
+				t.Fatal(err)
+			}
+			for _, row := range rows {
+				if row.Kind == "summary" {
+					if row.Requests != tc.want {
+						t.Fatalf("来源或目标授权错误: got=%d want=%d", row.Requests, tc.want)
+					}
+					return
+				}
+			}
+			t.Fatal("缺少监控汇总行")
+		})
 	}
 }
 
@@ -78,7 +128,7 @@ func TestModelMonitorCurrentSelectivePlan(t *testing.T) {
 		t.Log(row["QUERY PLAN"])
 	}
 	q := ModelMonitorQuery{UsageQuery: UsageQuery{Cond: builder.Eq{"user_id": "user-1"}, From: time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC), To: time.Date(2026, 1, 2, 0, 0, 0, 0, time.UTC)}}
-	rows, err := db.ModelMonitorCurrent(ctx, q, 0, []MonitorDeployment{{Alias: "alias", Supplier: "supplier", Model: "actual"}})
+	rows, err := db.ModelMonitorCurrent(ctx, q, 0, []MonitorDeployment{{Alias: "alias", Supplier: "supplier", Model: "actual"}}, nil)
 	if err != nil {
 		t.Fatal(err)
 	}

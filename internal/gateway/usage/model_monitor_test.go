@@ -106,6 +106,30 @@ func TestModelMonitorOptions(t *testing.T) {
 	}
 }
 
+// TestMonitorDirectoryResolvesEnvironment 验证目录使用与执行链一致的环境变量展开。
+// 测试覆盖模型、内联连接、缺失变量和脱敏，t.Setenv 会自动恢复环境，配置不能被原地修改。
+func TestMonitorDirectoryResolvesEnvironment(t *testing.T) {
+	t.Setenv("XHUB_MONITOR_UNIT_MODEL", "actual-env")
+	t.Setenv("XHUB_MONITOR_UNIT_BASE", "https://user:secret@provider.example/v1?key=secret")
+	entry := config.ModelEntry{ModelName: "alias", LiteLLMParams: map[string]any{"model": "os.environ/XHUB_MONITOR_UNIT_MODEL", "api_base": "os.environ/XHUB_MONITOR_UNIT_BASE"}}
+	list := []config.ModelEntry{entry}
+	want := []modelMonitorOption{{Supplier: "https://provider.example/v1", Model: "actual-env"}}
+	if got := modelMonitorOptions(list, []string{"alias"}); !reflect.DeepEqual(got, want) {
+		t.Fatalf("环境变量模型目录错误: got=%v want=%v", got, want)
+	}
+	pairs := logOptionPairs(list, []string{"alias"})
+	if len(pairs) != 1 || pairs[0].Supplier != want[0].Supplier {
+		t.Fatalf("日志候选应使用解析及脱敏的连接: %v", pairs)
+	}
+	if entry.LiteLLMParams["model"] != "os.environ/XHUB_MONITOR_UNIT_MODEL" {
+		t.Fatal("读取目录不能改写原始部署配置")
+	}
+	t.Setenv("XHUB_MONITOR_UNIT_BASE", "")
+	if got := modelMonitorOptions(list, nil); len(got) != 0 {
+		t.Fatalf("缺少连接地址时不能伪造目录: %v", got)
+	}
+}
+
 // TestModelMonitorDeployments 区分共享实际模型的公开别名、停用部署及拒绝全部，纯内存测试无需清理。
 func TestModelMonitorDeployments(t *testing.T) {
 	list := []config.ModelEntry{
@@ -121,9 +145,18 @@ func TestModelMonitorDeployments(t *testing.T) {
 	if len(modelMonitorDeployments(list, []string{})) != 0 {
 		t.Fatal("空权限必须拒绝全部")
 	}
+	all := modelMonitorDeployments(list, []string{"a", "b"})
+	if len(all) != 2 || !all[0].CrossSafe || !all[1].CrossSafe {
+		t.Fatalf("共享上游的两个启用授权部署可以安全匹配组请求：%+v", all)
+	}
+	if got[0].CrossSafe {
+		t.Fatal("共享身份包含未授权部署时，不得猜测组或回退的实际来源")
+	}
 	// 两个部署三元组相同但一个停用时，历史账单无法区分来源，不得猜测属于启用部署。
-	list = append(list, config.ModelEntry{ModelName:"a", LiteLLMParams:map[string]any{"model":"shared", "litellm_credential_name":"supplier"}, ModelInfo:map[string]any{"disabled":true}})
-	if len(modelMonitorDeployments(list, []string{"a"})) != 0 { t.Fatal("同身份启停冲突应保守排除历史统计") }
+	list = append(list, config.ModelEntry{ModelName: "a", LiteLLMParams: map[string]any{"model": "shared", "litellm_credential_name": "supplier"}, ModelInfo: map[string]any{"disabled": true}})
+	if len(modelMonitorDeployments(list, []string{"a"})) != 0 {
+		t.Fatal("同身份启停冲突应保守排除历史统计")
+	}
 }
 
 // TestModelMonitorQuery 验证默认七日、四分之一小时时区、筛选和错误日期；无写入及清理需求。

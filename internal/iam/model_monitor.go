@@ -36,19 +36,20 @@ type ModelMonitorQuery struct {
 	Supplier string
 }
 
-// MonitorDeployment 是当前启用且授权的真实部署身份；公开别名与调用时供应商、上游模型须同时匹配。
-// 普通用户监控查询使用，避免相同供应商与上游模型下不同公开别名的历史消费被混合。
+// MonitorDeployment 是当前启用且授权的部署身份；CrossSafe 表示该连接及上游型号没有无权或停用的共享部署。
+// 普通用户监控查询使用；直接请求匹配别名，只有 CrossSafe 为真时才允许匹配路由组或回退来源。
 type MonitorDeployment struct {
-	Alias    string `json:"alias"`
-	Supplier string `json:"supplier"`
-	Model    string `json:"model"`
+	Alias     string `json:"alias"`
+	Supplier  string `json:"supplier"`
+	Model     string `json:"model"`
+	CrossSafe bool   `json:"cross_safe"`
 }
 
-// ModelMonitorCurrent 按当前授权部署三元组查询原始使用记录并精确聚合，不改变账单。
-// ctx/q/tzMinutes 控制已鉴权的范围、时间及用户筛选，deployments 是服务端实时计算的当前有效部署。
+// ModelMonitorCurrent 按当前授权部署与来源别名筛选原始使用记录并聚合，不改变账单。
+// ctx/q/tzMinutes 控制已鉴权的范围、时间及用户筛选，deployments 是当前有效部署，allowed 是来源授权（nil 不限）。
 // 返回汇总、模型和日期趋势；空部署返回空汇总，存储或授权条件异常返回错误，不退化成全量数据。
 // 模型监控接口调用；必须回查 usage_events，因为历史预聚合桶未保存公开别名、无法安全区分撤销授权的同上游请求。
-func (db *DB) ModelMonitorCurrent(ctx context.Context, q ModelMonitorQuery, tzMinutes int, deployments []MonitorDeployment) ([]ModelMonitorRow, error) {
+func (db *DB) ModelMonitorCurrent(ctx context.Context, q ModelMonitorQuery, tzMinutes int, deployments []MonitorDeployment, allowed []string) ([]ModelMonitorRow, error) {
 	if q.Status != "" || q.SessionID != "" || q.RequestID != "" || q.Search != "" || q.Cond == nil || q.From.IsZero() || q.To.IsZero() || !q.From.Before(q.To) || q.To.Sub(q.From) > 90*24*time.Hour || tzMinutes < -840 || tzMinutes > 840 || tzMinutes%15 != 0 || !q.From.Equal(q.From.Truncate(15*time.Minute)) || !q.To.Equal(q.To.Truncate(15*time.Minute)) {
 		return nil, fmt.Errorf("invalid model monitor scope or window")
 	}
@@ -59,13 +60,24 @@ func (db *DB) ModelMonitorCurrent(ctx context.Context, q ModelMonitorQuery, tzMi
 	if err != nil {
 		return nil, err
 	}
+	// nil 代表来源不限；非 nil 空集合代表全部拒绝，不能被 JSON null 当成不限。
+	unrestricted := allowed == nil
+	if allowed == nil {
+		allowed = []string{}
+	}
+	aliases, err := json.Marshal(allowed)
+	if err != nil {
+		return nil, err
+	}
 	// 明细查询不能依赖聚合桶，需要限制查询时间；超时向调用方返回错误，不能伪装成空统计。
 	queryCtx, cancel := context.WithTimeout(ctx, 15*time.Second)
 	defer cancel()
 	s := db.session(queryCtx).Table("usage_events").Where(q.Cond).And("ts >= ? AND ts < ?", q.From.UTC(), q.To.UTC())
 	defer s.Close()
 	// JSON 仅包含服务端配置与授权结果，不拼接请求输入；EXISTS 避免重复部署对同一账单重复计数。
-	s = s.And(`EXISTS (SELECT 1 FROM jsonb_to_recordset(?::jsonb) AS d(alias text, supplier text, model text) WHERE d.alias = usage_events.model AND d.supplier = usage_events.supplier AND d.model = usage_events.upstream_model)`, string(raw)).And("status NOT IN (?, ?)", "executing", "polling")
+	// 请求别名与实际身份均匹配时按该身份展示；组和回退的跨别名匹配还须来源仍授权且共享身份无歧义。
+	// 历史事件没有实际成员 ID，直接匹配不证明具体部署；无权访问的身份不能通过组名绕过。
+	s = s.And(`EXISTS (SELECT 1 FROM jsonb_to_recordset(?::jsonb) AS d(alias text, supplier text, model text, cross_safe boolean) WHERE d.supplier = usage_events.supplier AND d.model = usage_events.upstream_model AND (d.alias = usage_events.model OR (d.cross_safe AND (? OR usage_events.model IN (SELECT jsonb_array_elements_text(?::jsonb))))))`, string(raw), unrestricted, string(aliases)).And("status NOT IN (?, ?)", "executing", "polling")
 	for _, f := range []struct{ column, value string }{{"user_id", q.UserID}, {"team_id", q.TeamID}, {"project_id", q.ProjectID}, {"key_id", q.KeyID}, {"upstream_model", q.Model}, {"supplier", q.Supplier}} {
 		if f.value != "" {
 			s = s.And(f.column+" = ?", f.value)
