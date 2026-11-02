@@ -109,7 +109,7 @@ export function registerAccessGroupConfigService(locale: Locale) {
     await expect(page.getByTestId("my-model-gpt-4o-mini")).toBeVisible();
     await expect(page.getByTestId("my-model-not-a-granted-model")).toHaveCount(0);
     await stableGoto(page, "/usage");
-    await expect(page.getByText(translate(locale, "{value0} limit", { value0: "$500.0000" }), { exact: true })).toBeVisible();
+    await expect(page.getByRole("region", { name: tr("usageBudget.title") })).toContainText("$500.0000");
     await stableGoto(page, "/playground");
     await page.getByPlaceholder(tr("Select a Model"), { exact: true }).click();
     await page.getByRole("option", { name: /gpt-4o-mini/ }).click();
