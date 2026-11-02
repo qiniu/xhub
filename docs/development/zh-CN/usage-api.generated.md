@@ -15,6 +15,7 @@
 | `GET /team/daily/activity` | 授权后按天汇总；分页合计仅当前页，aggregated合计全范围；无效日期保留开放边界；缓存未知不填0 | 200, 400, 401, 403, 404, 409, 500, 503 |
 | `GET /team/daily/activity/aggregated` | 授权后按天汇总；分页合计仅当前页，aggregated合计全范围；无效日期保留开放边界；缓存未知不填0 | 200, 400, 401, 403, 404, 409, 500, 503 |
 | `GET /organization/daily/activity` | 授权后按天汇总；分页合计仅当前页，aggregated合计全范围；无效日期保留开放边界；缓存未知不填0 | 200, 400, 401, 403, 404, 409, 500, 503 |
+| `GET /spend/logs/ui/filter-options` | 日志筛选候选 | 200, 400, 401, 403, 500, 503 |
 
 ### GET /spend/logs/v2
 
@@ -1006,6 +1007,77 @@
 ```
 
 
+### GET /spend/logs/ui/filter-options
+
+只返回当前账号有权查看的日志候选；模型和供应商还需当前模型授权及启用部署，不返回明文密钥或正文
+
+```json
+[
+  {
+    "name": "field",
+    "in": "query",
+    "required": true,
+    "schema": {
+      "type": "string",
+      "enum": [
+        "model",
+        "key_alias",
+        "key_hash",
+        "supplier",
+        "inbound_endpoint"
+      ]
+    },
+    "description": "候选字段"
+  },
+  {
+    "name": "start_date",
+    "in": "query",
+    "required": true,
+    "description": "授权范围内查询起始时间",
+    "schema": {
+      "type": "string"
+    }
+  },
+  {
+    "name": "end_date",
+    "in": "query",
+    "required": true,
+    "description": "授权范围内查询结束时间，最多366天",
+    "schema": {
+      "type": "string"
+    }
+  },
+  {
+    "name": "q",
+    "in": "query",
+    "required": false,
+    "description": "不区分大小写的字面子串，最多128字符",
+    "schema": {
+      "type": "string"
+    }
+  },
+  {
+    "name": "page",
+    "in": "query",
+    "required": false,
+    "description": "页码 1–100，默认 1",
+    "schema": {
+      "type": "string"
+    }
+  },
+  {
+    "name": "page_size",
+    "in": "query",
+    "required": false,
+    "description": "每页 1–50 条，默认 50",
+    "schema": {
+      "type": "string"
+    }
+  }
+]
+```
+
+
 ## 数据结构
 
 ### Error
@@ -1876,5 +1948,36 @@
     "metrics",
     "metadata"
   ]
+}
+```
+
+### LogFilterOptionPage
+
+```json
+{
+  "type": "object",
+  "required": [
+    "data",
+    "page",
+    "page_size",
+    "has_more"
+  ],
+  "properties": {
+    "data": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "page": {
+      "type": "integer"
+    },
+    "page_size": {
+      "type": "integer"
+    },
+    "has_more": {
+      "type": "boolean"
+    }
+  }
 }
 ```

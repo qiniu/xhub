@@ -10,6 +10,13 @@ import { cacheAdminEn } from "./cacheAdmin.en";
 
 export const en = {
   logsUX: {
+    keyFingerprint: "Key fingerprint (SHA-256)",
+    keyFingerprintHelp: "A fingerprint identifies a key; it is not the secret key. Enter the complete SHA-256 hash for an exact match.",
+    suggestionsLoading: "Loading suggestions…",
+    suggestionsEmpty: "No matching suggestions. You can enter a value manually.",
+    suggestionsFailed: "Suggestions could not be loaded. Try a shorter time range or enter a value manually.",
+    suggestionsMore: "More results are available. Type more to narrow the suggestions.",
+    suggestionsScope: "Suggestions come from all logs you can access in the selected time range and ignore other filters. Models and suppliers are limited to currently authorized, enabled deployments.",
     apply: "Apply Filters",
     lastMinute: "Last Minute",
     last15Minutes: "Last 15 Minutes",
@@ -211,6 +218,7 @@ export const en = {
  session: { inferred: "Inferred session", logoutFailed: "Unable to sign out. Please try again." },
  requestMetrics: {endpoints: "Endpoints", inbound: "Inbound", outbound: "Outbound", duration: "Total time (s)", ttft: "TTFT (s)", tps: "TPS (tokens/s)", definition: "TTFT measures the first upstream response byte, not necessarily the first visible token. TPS = output tokens / (total time − TTFT), for successful uncached streaming text only; synchronous requests have no TPS sample."},
  monitor: {
+  currentScopeNote: "Only historical requests attributable to currently authorized and enabled deployments are included; older records that cannot be attributed may be excluded. See Usage or Logs for complete historical spending.",
   "title": "Model Monitor",
   "description": "Compare every supplier connection and actual upstream model. Statistics update when billing is persisted.",
   "start": "Start date",

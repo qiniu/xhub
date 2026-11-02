@@ -27,6 +27,7 @@ import { ERROR_CODE_OPTIONS } from "./constants";
 import { LOG_FILTER_IDS, LOG_FILTER_LABELS, type LogsWindow } from "./log_filter_logic";
 import { getActiveLocale, useT } from "@/i18n";
 import { translate } from "@/i18n/translate";
+import { useLogFilterSuggestions, type LogSuggestionField } from "./useLogFilterSuggestions";
 
 const ALL_VALUE = "all";
 
@@ -76,17 +77,44 @@ function TeamFilterField({
   );
 }
 
-/** 模型筛选接受公开名称，包括停用或删除的历史型号；返回文本控件，仅收窄查询，不依赖当前可用模型目录。 */
-function ModelFilterField({ value, onChange }: { value: string; onChange: (value: string | undefined) => void }) {
+/** 可输入的筛选建议；field/window 限定权限与时间，value/onChange 维护原始草稿。
+ * 返回支持键盘选择和自由输入的控件；候选只用于便捷选择，失败、分页或缺少历史值时不改变筛选语义。 */
+function SuggestedFilterField({ field, label, value, onChange, logsWindow, placeholder }: {
+  field: LogSuggestionField; label: string; value: string; onChange: (value: string | undefined) => void;
+  logsWindow: LogsWindow; placeholder?: string;
+}) {
   const t = useT();
+  const [open, setOpen] = useState(false);
+  const suggestions = useLogFilterSuggestions(field, logsWindow, value, open);
+  // 指纹只缩略展示，但选项对象保留完整值；任何查询都使用原值，绝不使用显示缩略值。
+  const items = useMemo<SearchSelectOption[]>(() => (suggestions.data?.data ?? []).map((item) => ({
+    value: item,
+    label: field === "key_hash" && item.length > 24 ? `${item.slice(0, 12)}…${item.slice(-8)}` : item,
+  })), [field, suggestions.data]);
+  let emptyMessage = t("logsUX.suggestionsEmpty");
+  if (suggestions.isError || suggestions.isUnavailable) emptyMessage = t("logsUX.suggestionsFailed");
+  else if (suggestions.isLoading || suggestions.isPendingQuery) emptyMessage = t("logsUX.suggestionsLoading");
   return (
-    <DataTableFilterField label={t("Model")}>
-      <Input
-        aria-label={t("Model")}
-        value={value}
-        onChange={(e) => onChange(emptyToUndefined(e.target.value))}
-        placeholder={t("logsUX.modelHint")}
-      />
+    <DataTableFilterField label={label}>
+      <Combobox
+        items={items}
+        value={value ? { label: value, value } : null}
+        inputValue={value}
+        onInputValueChange={(next, details) => { if (SEARCH_INPUT_REASONS.has(details.reason)) onChange(emptyToUndefined(next)); }}
+        onValueChange={(item: SearchSelectOption | null) => { if (item) onChange(item.value); }}
+        onOpenChange={setOpen}
+        isItemEqualToValue={(a: SearchSelectOption, b: SearchSelectOption) => a.value === b.value}
+        itemToStringLabel={(item: SearchSelectOption) => item.label}
+        filter={null}
+      >
+        <ComboboxInput aria-label={label} placeholder={placeholder} showClear={value !== ""} className="w-full" />
+        <ComboboxContent>
+          <ComboboxEmpty>{emptyMessage}</ComboboxEmpty>
+          <ComboboxList>{(item: SearchSelectOption) => <ComboboxItem key={item.value} value={item}>{item.label}</ComboboxItem>}</ComboboxList>
+          {suggestions.data?.has_more && <p role="status" className="px-3 py-2 text-xs text-muted-foreground">{t("logsUX.suggestionsMore")}</p>}
+        </ComboboxContent>
+      </Combobox>
+      {field === "key_hash" && <p className="mt-1 text-xs text-muted-foreground">{t("logsUX.keyFingerprintHelp")}</p>}
     </DataTableFilterField>
   );
 }
@@ -231,7 +259,8 @@ export function RequestLogsFilters({ get, set, teams, logsWindow, errorsOnly = f
   return (
     <>
       <p className="text-sm text-muted-foreground">{t("logsUX.filterHint")}</p>
-      <ModelFilterField value={valueOf(LOG_FILTER_IDS.MODEL_ID)} onChange={setter(LOG_FILTER_IDS.MODEL_ID)} />
+      <p className="text-xs text-muted-foreground">{t("logsUX.suggestionsScope")}</p>
+      <SuggestedFilterField field="model" label={t("Model")} value={valueOf(LOG_FILTER_IDS.MODEL_ID)} onChange={setter(LOG_FILTER_IDS.MODEL_ID)} logsWindow={logsWindow} placeholder={t("logsUX.modelHint")} />
       {canChooseScope && (
         <>
           <UserIdFilterField
@@ -271,7 +300,7 @@ export function RequestLogsFilters({ get, set, teams, logsWindow, errorsOnly = f
             LOG_FILTER_IDS.KEY_HASH,
             LOG_FILTER_IDS.SUPPLIER,
             LOG_FILTER_IDS.ENDPOINT,
-          ].map((id) => (
+          ].map((id) => id === LOG_FILTER_IDS.SESSION_ID ? (
             <DataTableFilterField key={id} label={t(LOG_FILTER_LABELS[id])}>
               <Input
                 aria-label={t(LOG_FILTER_LABELS[id])}
@@ -279,7 +308,7 @@ export function RequestLogsFilters({ get, set, teams, logsWindow, errorsOnly = f
                 onChange={(e) => set(id, emptyToUndefined(e.target.value))}
               />
             </DataTableFilterField>
-          ))}
+          ) : <SuggestedFilterField key={id} field={id as LogSuggestionField} label={t(LOG_FILTER_LABELS[id])} value={valueOf(id)} onChange={setter(id)} logsWindow={logsWindow} />)}
           {!errorsOnly && (
             <DataTableFilterField label={t("logsUX.responseCache")}>
               <Select

@@ -179,6 +179,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/spend/logs/ui/filter-options": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * 日志筛选候选 / Log filter suggestions
+         * @description 只返回当前账号有权查看的日志候选；模型和供应商还需当前模型授权及启用部署，不返回明文密钥或正文 / Return candidates from logs visible to the caller; model and supplier also require current model authorization and an enabled deployment. Never return plaintext keys or bodies.
+         */
+        get: operations["listLogFilterOptions"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -380,6 +400,12 @@ export interface components {
         UsageKeyBucket: {
             metrics: components["schemas"]["UsageMetrics"];
             metadata: components["schemas"]["UsageKeyMetadata"];
+        };
+        LogFilterOptionPage: {
+            data: string[];
+            page: number;
+            page_size: number;
+            has_more: boolean;
         };
     };
     responses: {
@@ -851,6 +877,44 @@ export interface operations {
             403: components["responses"]["Error403"];
             404: components["responses"]["Error404"];
             409: components["responses"]["Error409"];
+            500: components["responses"]["Error500"];
+            503: components["responses"]["Error503"];
+        };
+    };
+    listLogFilterOptions: {
+        parameters: {
+            query: {
+                /** @description 候选字段 / Candidate field */
+                field: "model" | "key_alias" | "key_hash" | "supplier" | "inbound_endpoint";
+                /** @description 授权范围内查询起始时间 / Authorized query start */
+                start_date: string;
+                /** @description 授权范围内查询结束时间，最多366天 / Authorized query end, at most 366 days */
+                end_date: string;
+                /** @description 不区分大小写的字面子串，最多128字符 / Case-insensitive literal substring, up to 128 characters */
+                q?: string;
+                /** @description 页码 1–100，默认 1 / Page 1–100, default 1 */
+                page?: string;
+                /** @description 每页 1–50 条，默认 50 / Page size 1–50, default 50 */
+                page_size?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description 授权范围内筛选候选 / Filter candidates in the authorized scope */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LogFilterOptionPage"];
+                };
+            };
+            400: components["responses"]["Error400"];
+            401: components["responses"]["Error401"];
+            403: components["responses"]["Error403"];
             500: components["responses"]["Error500"];
             503: components["responses"]["Error503"];
         };

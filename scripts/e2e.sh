@@ -9,6 +9,8 @@ export E2E_UP_PORT="${E2E_UP_PORT:-4110}"
 export E2E_MASTER_KEY="${E2E_MASTER_KEY:-sk-e2e-enterprise-test-master-key-32}"
 export E2E_GATEWAY="http://127.0.0.1:$E2E_GW_PORT"
 export E2E_UPSTREAM="http://127.0.0.1:$E2E_UP_PORT"
+# 日志和监控回归验证数据库部署在执行时解析环境变量；该值仅用于隔离测试。
+export E2E_MONITOR_TEST_MODEL="e2e-monitor-upstream"
 # 每轮运行使用专属证据目录，迟到的清理进程不能读取下一轮的 schema 文件。
 export E2E_RUN_DIR="${E2E_RUN_DIR:-$ROOT/.e2e/run-$$-$RANDOM}"
 # 调用方可指定独立构建和数据库；名称先校验，防止清理指向错误目标。

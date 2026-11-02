@@ -28,6 +28,15 @@ const (
 	ListUILogsParamsCacheHitFilterMiss  ListUILogsParamsCacheHitFilter = "miss"
 )
 
+// Defines values for ListLogFilterOptionsParamsField.
+const (
+	InboundEndpoint ListLogFilterOptionsParamsField = "inbound_endpoint"
+	KeyAlias        ListLogFilterOptionsParamsField = "key_alias"
+	KeyHash         ListLogFilterOptionsParamsField = "key_hash"
+	Model           ListLogFilterOptionsParamsField = "model"
+	Supplier        ListLogFilterOptionsParamsField = "supplier"
+)
+
 // Defines values for ListLogsParamsCacheHitFilter.
 const (
 	Empty ListLogsParamsCacheHitFilter = ""
@@ -138,6 +147,14 @@ type ErrorDetail struct {
 	// Param 当前为 null。 / Currently null.
 	Param json.RawMessage `json:"param"`
 	Type  string          `json:"type"`
+}
+
+// LogFilterOptionPage defines model for LogFilterOptionPage.
+type LogFilterOptionPage struct {
+	Data     []string `json:"data"`
+	HasMore  bool     `json:"has_more"`
+	Page     int      `json:"page"`
+	PageSize int      `json:"page_size"`
 }
 
 // LogPage defines model for LogPage.
@@ -387,6 +404,30 @@ type ListUILogsParams struct {
 
 // ListUILogsParamsCacheHitFilter defines parameters for ListUILogs.
 type ListUILogsParamsCacheHitFilter string
+
+// ListLogFilterOptionsParams defines parameters for ListLogFilterOptions.
+type ListLogFilterOptionsParams struct {
+	// Field 候选字段 / Candidate field
+	Field ListLogFilterOptionsParamsField `form:"field" json:"field"`
+
+	// StartDate 授权范围内查询起始时间 / Authorized query start
+	StartDate string `form:"start_date" json:"start_date"`
+
+	// EndDate 授权范围内查询结束时间，最多366天 / Authorized query end, at most 366 days
+	EndDate string `form:"end_date" json:"end_date"`
+
+	// Q 不区分大小写的字面子串，最多128字符 / Case-insensitive literal substring, up to 128 characters
+	Q *string `form:"q,omitempty" json:"q,omitempty"`
+
+	// Page 页码 1–100，默认 1 / Page 1–100, default 1
+	Page *string `form:"page,omitempty" json:"page,omitempty"`
+
+	// PageSize 每页 1–50 条，默认 50 / Page size 1–50, default 50
+	PageSize *string `form:"page_size,omitempty" json:"page_size,omitempty"`
+}
+
+// ListLogFilterOptionsParamsField defines parameters for ListLogFilterOptions.
+type ListLogFilterOptionsParamsField string
 
 // ListLogsParams defines parameters for ListLogs.
 type ListLogsParams struct {

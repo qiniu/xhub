@@ -931,7 +931,8 @@
       "POST /v3/logout"
     ],
     "usage": [
-      "GET /models/monitor"
+      "GET /models/monitor",
+      "GET /spend/logs/ui/filter-options"
     ]
   }
 }
