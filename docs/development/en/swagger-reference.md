@@ -4,7 +4,7 @@ Product guides cover setup and usage; developer docs cover implementation and te
 
 ## Scope and boundaries
 
-Only `contracts/{suppliers,users,keys,models,usage}/openapi.json` is loaded: 5 supplier, 11 user, 14 key, 9 model/endpoint and 9 log/usage operations, totaling 48 operations. The build checks every operation against the migration inventory; missing contracts, unregistered operations and unresolved references fail the build. Original JSON is downloadable. Display localization selects descriptive metadata without changing schemas, defaults or examples.
+Only `contracts/{suppliers,users,keys,models,usage}/openapi.json` is loaded: 5 supplier, 11 user, 14 key, 9 model/endpoint and 10 log/usage operations, totaling 49 operations. The build checks every operation against the migration inventory; missing contracts, unregistered operations and unresolved references fail the build. Original JSON is downloadable. Display localization selects descriptive metadata without changing schemas, defaults or examples.
 
 Bypass, streaming inference, SSO/SCIM, organization/team lifecycles and peripheral compatibility APIs are not covered. Existing protocol guides remain available; they are not presented as verified Swagger operations.
 
