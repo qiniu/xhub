@@ -45,8 +45,18 @@ func ModelMonitor(s Host, w http.ResponseWriter, r *http.Request) {
 		s.WriteIAMError(w, r, err)
 		return
 	}
-	options := modelMonitorOptions(s.ModelList(), allowed)
-	rows, err := db.ModelMonitor(r.Context(), q, tz)
+	list := s.ModelList()
+	options := modelMonitorOptions(list, allowed)
+	visibilityScope := "current_available"
+	var rows []iam.ModelMonitorRow
+	if p.PlatformAdmin() || p.IsMaster() {
+		// 平台管理员保留现有历史监控权限；候选目录仍只显示启用的可用部署。
+		visibilityScope = "historical"
+		rows, err = db.ModelMonitor(r.Context(), q, tz)
+	} else {
+		// 聚合桶未保存公开别名，不能在权限收窄后按供应商＋实际模型猜测历史归属。
+		rows, err = db.ModelMonitorCurrent(r.Context(), q, tz, modelMonitorDeployments(list, allowed))
+	}
 	if err != nil {
 		s.WriteIAMError(w, r, err)
 		return
@@ -64,7 +74,7 @@ func ModelMonitor(s Host, w http.ResponseWriter, r *http.Request) {
 			trend = append(trend, row)
 		}
 	}
-	util.WriteJSON(w, 200, map[string]any{"options": options, "summary": summary, "models": models, "trend": trend, "start_date": q.From.Add(time.Duration(tz) * time.Minute).Format("2006-01-02"), "end_date": q.To.Add(time.Duration(tz)*time.Minute - time.Nanosecond).Format("2006-01-02")})
+	util.WriteJSON(w, 200, map[string]any{"options": options, "summary": summary, "models": models, "trend": trend, "visibility_scope": visibilityScope, "start_date": q.From.Add(time.Duration(tz) * time.Minute).Format("2006-01-02"), "end_date": q.To.Add(time.Duration(tz)*time.Minute - time.Nanosecond).Format("2006-01-02")})
 }
 
 // modelMonitorAccess 复用 IAM 的模型交集查询；监控只读取授权，不创建独立权限规则。
@@ -104,7 +114,7 @@ type modelMonitorOption struct {
 }
 
 // modelMonitorOptions 从配置 list 提取去重排序目录，handler 和单元测试调用。
-// allowed 为许可别名，nil 不限制、空切片拒绝全部；供应商壳仅提供连接，不伪造模型。
+// allowed 为许可别名，nil 不限制、空切片拒绝全部；禁用部署与供应商壳不属于当前可用目录。
 // 返回非 nil 目录，空配置返回空数组；不访问账单、不修改配置。
 func modelMonitorOptions(list []config.ModelEntry, allowed []string) []modelMonitorOption {
 	grants := make(map[string]bool, len(allowed))
@@ -114,12 +124,12 @@ func modelMonitorOptions(list []config.ModelEntry, allowed []string) []modelMoni
 	seen := map[modelMonitorOption]bool{}
 	out := []modelMonitorOption{}
 	for _, entry := range list {
-		if strings.TrimSpace(entry.ModelName) == "" || (allowed != nil && !grants[entry.ModelName]) {
+		if strings.TrimSpace(entry.ModelName) == "" || entry.Disabled() || entry.ModelInfo["role"] == "provider" || (allowed != nil && !grants[entry.ModelName]) {
 			continue
 		}
 		supplier, model := entry.MonitorIdentity()
-		if entry.ModelInfo["role"] == "provider" {
-			model = ""
+		if supplier == "" || model == "" {
+			continue
 		}
 		option := modelMonitorOption{supplier, model}
 		if (supplier != "" || model != "") && !seen[option] {
@@ -133,6 +143,41 @@ func modelMonitorOptions(list []config.ModelEntry, allowed []string) []modelMoni
 		}
 		return out[i].Model < out[j].Model
 	})
+	return out
+}
+
+// modelMonitorDeployments 构造当前账号可使用的部署事实，供精确监控查询使用。
+// list 为配置快照、allowed 为授权公开模型名（nil 为不限）；返回非 nil 三元组，排除禁用、空供应商壳和无模型部署。
+// 启用与停用部署共用同一三元组时，历史记录没有部署 ID 无法确定来源，安全起见不纳入该三元组的统计。
+// 调用：ModelMonitor；不查历史价格或读写账单，多个同名部署可共存，存储层使用 EXISTS 防止重复计数。
+func modelMonitorDeployments(list []config.ModelEntry, allowed []string) []iam.MonitorDeployment {
+	grants := make(map[string]bool, len(allowed))
+	for _, alias := range allowed {
+		grants[alias] = true
+	}
+	ambiguous := map[iam.MonitorDeployment]bool{}
+	for _, entry := range list {
+		if !entry.Disabled() || entry.ModelInfo["role"] == "provider" {
+			continue
+		}
+		supplier, model := entry.MonitorIdentity()
+		ambiguous[iam.MonitorDeployment{Alias: entry.ModelName, Supplier: supplier, Model: model}] = true
+	}
+	out := []iam.MonitorDeployment{}
+	for _, entry := range list {
+		if strings.TrimSpace(entry.ModelName) == "" || entry.Disabled() || entry.ModelInfo["role"] == "provider" || (allowed != nil && !grants[entry.ModelName]) {
+			continue
+		}
+		supplier, model := entry.MonitorIdentity()
+		if supplier == "" || model == "" {
+			continue
+		}
+		id := iam.MonitorDeployment{Alias: entry.ModelName, Supplier: supplier, Model: model}
+		if ambiguous[id] {
+			continue
+		}
+		out = append(out, id)
+	}
 	return out
 }
 

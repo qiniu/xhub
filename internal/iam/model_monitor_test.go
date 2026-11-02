@@ -3,11 +3,92 @@ package iam
 import (
 	"context"
 	"fmt"
+	"reflect"
 	"sync"
 	"testing"
 	"time"
 	"xorm.io/builder"
 )
+
+// TestModelMonitorCurrentMatchesBuckets 在独立数据库对照授权明细与原预聚合的费用和计时口径，覆盖失败、缓存、同步和无效时间；testDB 自动清理。
+func TestModelMonitorCurrentMatchesBuckets(t *testing.T) {
+	db := testDB(t)
+	ctx := context.Background()
+	ttft := 100
+	base := UsageRecord{TS: time.Date(2026, 1, 1, 0, 3, 0, 0, time.UTC), OwnerType: OwnerPersonal, UserID: "owner", Model: "alias", Supplier: "supplier", UpstreamModel: "actual", Status: "success", CallType: "chat", HTTPStatus: 200, PromptTokens: 20, CompletionTokens: 10, Cost: 0.2, DurationMS: 1100, TTFTMs: &ttft, Streamed: true}
+	changes := []func(*UsageRecord){func(*UsageRecord) {}, func(r *UsageRecord) { r.Streamed = false }, func(r *UsageRecord) { r.CacheHit = true }, func(r *UsageRecord) { r.HTTPStatus = 502 }, func(r *UsageRecord) { r.CallType = "image" }, func(r *UsageRecord) { r.DurationMS = 99 }}
+	for i, change := range changes {
+		r := base
+		r.RequestID = fmt.Sprintf("current-scope-%d", i)
+		change(&r)
+		if err := db.RecordUsage(ctx, []UsageRecord{r}); err != nil {
+			t.Fatal(err)
+		}
+	}
+	q := ModelMonitorQuery{UsageQuery: UsageQuery{Cond: builder.Eq{"user_id": "owner"}, From: time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC), To: time.Date(2026, 1, 2, 0, 0, 0, 0, time.UTC)}}
+	deployment := MonitorDeployment{Alias: "alias", Supplier: "supplier", Model: "actual"}
+	want, err := db.ModelMonitor(ctx, q, 0)
+	if err != nil {
+		t.Fatal(err)
+	}
+	got, err := db.ModelMonitorCurrent(ctx, q, 0, []MonitorDeployment{deployment, deployment})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !reflect.DeepEqual(got, want) {
+		t.Fatalf("授权明细统计与原计时口径不一致：got=%+v want=%+v", got, want)
+	}
+	if rows, err := db.ModelMonitorCurrent(ctx, q, 0, nil); err != nil || len(rows) != 0 {
+		t.Fatalf("无授权部署应返回空结果：%+v %v", rows, err)
+	}
+	bad := q
+	bad.Cond = nil
+	if _, err := db.ModelMonitorCurrent(ctx, bad, 0, []MonitorDeployment{deployment}); err == nil {
+		t.Fatal("缺少权限条件必须拒绝")
+	}
+	if _, err := db.ModelMonitorCurrent(ctx, q, 1, []MonitorDeployment{deployment}); err == nil {
+		t.Fatal("非法时区必须拒绝")
+	}
+	cancelled, cancel := context.WithCancel(ctx)
+	cancel()
+	if _, err := db.ModelMonitorCurrent(cancelled, q, 0, []MonitorDeployment{deployment}); err == nil {
+		t.Fatal("数据库查询失败不能返回假成功")
+	}
+}
+
+// TestModelMonitorCurrentSelectivePlan 在独立数据库构造不同用户的历史明细，检查授权窗口查询结果并输出执行计划；私有 schema 自动清理。
+func TestModelMonitorCurrentSelectivePlan(t *testing.T) {
+	db := testDB(t)
+	ctx := context.Background()
+	s := db.session(ctx)
+	defer s.Close()
+	_, err := s.Exec(`INSERT INTO usage_events (request_id, owner_type, user_id, ts, model, supplier, upstream_model, status)
+		SELECT 'plan-' || n, 'personal', 'user-' || (n % 100), '2026-01-01 00:00:00+00'::timestamptz + (n % 60) * interval '1 minute', 'alias', 'supplier', 'actual', 'success' FROM generate_series(1,50000) n`)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err = s.Exec("ANALYZE usage_events"); err != nil {
+		t.Fatal(err)
+	}
+	plan, err := s.QueryString(`EXPLAIN (ANALYZE, BUFFERS) SELECT count(*) FROM usage_events WHERE user_id = ? AND ts >= ? AND ts < ? AND EXISTS (SELECT 1 FROM jsonb_to_recordset(?::jsonb) AS d(alias text, supplier text, model text) WHERE d.alias = usage_events.model AND d.supplier = usage_events.supplier AND d.model = usage_events.upstream_model)`, "user-1", time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC), time.Date(2026, 1, 2, 0, 0, 0, 0, time.UTC), `[{"alias":"alias","supplier":"supplier","model":"actual"}]`)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, row := range plan {
+		t.Log(row["QUERY PLAN"])
+	}
+	q := ModelMonitorQuery{UsageQuery: UsageQuery{Cond: builder.Eq{"user_id": "user-1"}, From: time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC), To: time.Date(2026, 1, 2, 0, 0, 0, 0, time.UTC)}}
+	rows, err := db.ModelMonitorCurrent(ctx, q, 0, []MonitorDeployment{{Alias: "alias", Supplier: "supplier", Model: "actual"}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, row := range rows {
+		if row.Kind == "summary" && row.Requests == 500 {
+			return
+		}
+	}
+	t.Fatalf("授权用户应只统计自己的 500 条请求：%+v", rows)
+}
 
 // TestMonitorContribution 验证正常流、同步、缓存、失败和计时边界的独立 TPS/TTFT 样本及可逆贡献，无外部清理。
 func TestMonitorContribution(t *testing.T) {

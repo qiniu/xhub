@@ -11,6 +11,7 @@ import {
   chartRows,
   monitorOptions,
   parseMonitorData,
+  reconcileMonitorFilters,
   localDate,
   seriesKey,
   validWindow,
@@ -74,10 +75,21 @@ export function ModelMonitorView({ accessToken }: { accessToken: string | null }
     return () => controller.abort();
   }, [accessToken, window]);
   const options = useMemo(() => (data ? monitorOptions(data) : []), [data]);
+  // 仅在候选成功返回后清理撤权或失效的地址参数；加载和报错时保留用户原有筛选。
+  const { supplier: activeSupplier, model: activeModel } = reconcileMonitorFilters(
+    data && !loading && !error ? options : null,
+    supplier,
+    model,
+  );
+  useEffect(() => {
+    if (activeSupplier !== supplier || activeModel !== model) {
+      void setFilters({ supplier: activeSupplier, model: activeModel });
+    }
+  }, [activeSupplier, activeModel, supplier, model, setFilters]);
   const rows = useMemo(
     () =>
-      (data?.models ?? []).filter((row) => (!supplier || row.supplier === supplier) && (!model || row.model === model)),
-    [data, supplier, model],
+      (data?.models ?? []).filter((row) => (!activeSupplier || row.supplier === activeSupplier) && (!activeModel || row.model === activeModel)),
+    [data, activeSupplier, activeModel],
   );
   // 卡片与图表、明细使用同一筛选范围；只累加计数与费用，性能平均值仍由服务端样本加权。
   const totals = rows.reduce(
@@ -173,6 +185,7 @@ export function ModelMonitorView({ accessToken }: { accessToken: string | null }
       )}
       {data && (
         <>
+          {data.visibility_scope === "current_available" && <p className="text-sm text-muted-foreground">{t("monitor.currentScopeNote")}</p>}
           <div className="grid grid-cols-2 gap-3 xl:grid-cols-4">
             {(["requests", "total_tokens", "cost", "failed_requests"] as const).map((key) => (
               <section key={key} aria-label={t("monitor." + key)} className="rounded-lg border bg-card px-4 py-4">
@@ -189,7 +202,7 @@ export function ModelMonitorView({ accessToken }: { accessToken: string | null }
               <select
                 className="h-9 w-full min-w-0 rounded-md border border-input bg-background px-3 text-sm font-normal shadow-xs outline-none focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50"
                 aria-label={t("monitor.supplier")}
-                value={supplier}
+                value={activeSupplier}
                 onChange={(e) => {
                   void setFilters({ supplier: e.target.value, model: "" });
                 }}
@@ -207,11 +220,11 @@ export function ModelMonitorView({ accessToken }: { accessToken: string | null }
               <select
                 className="h-9 w-full min-w-0 rounded-md border border-input bg-background px-3 text-sm font-normal shadow-xs outline-none focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50"
                 aria-label={t("monitor.model")}
-                value={model}
+                value={activeModel}
                 onChange={(e) => void setFilters({ model: e.target.value })}
               >
                 <option value="">{t("monitor.allModels")}</option>
-                {Array.from(new Set(options.filter((r) => !supplier || r.supplier === supplier).map((r) => r.model)))
+                {Array.from(new Set(options.filter((r) => !activeSupplier || r.supplier === activeSupplier).map((r) => r.model)))
                   .filter(Boolean)
                   .map((value) => (
                     <option key={value}>{value}</option>

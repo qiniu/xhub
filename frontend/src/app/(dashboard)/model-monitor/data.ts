@@ -21,6 +21,7 @@ export type MonitorData = {
   trend: MonitorRow[];
   start_date: string;
   end_date: string;
+  visibility_scope?: "current_available" | "historical";
 };
 /** MonitorOption 是配置目录中的公开身份，不包含账单或连接密钥。 */
 export type MonitorOption = Pick<MonitorRow, "supplier" | "model">;
@@ -44,14 +45,24 @@ export function parseMonitorData(value: unknown): MonitorData {
   }
   return data;
 }
-/** monitorOptions 合并配置目录与授权历史，供下拉筛选调用；删除的历史连接仍可查询。
+/** monitorOptions 仅返回后台当前授权且启用的候选，供下拉筛选调用；不以历史结果扩大目录。
  * 参数为接口数据，返回去重排序身份；不修改输入，空目录返回空数组。 */
 export function monitorOptions(data: MonitorData): MonitorOption[] {
   const options = new Map<string, MonitorOption>();
-  for (const row of [...data.options, ...data.models]) {
+  for (const row of data.options) {
     options.set(seriesKey(row), { supplier: row.supplier, model: row.model });
   }
   return [...options.values()].sort((a, b) => a.supplier.localeCompare(b.supplier) || a.model.localeCompare(b.model));
+}
+/** reconcileMonitorFilters 根据已成功加载的授权候选修正地址筛选；候选未知时保留原值。
+ * 供监控页面及单元测试调用；供应商失效时同时清除模型，模型失效时只清除模型，不修改参数。 */
+export function reconcileMonitorFilters(options: MonitorOption[] | null, supplier: string, model: string) {
+  if (!options) return { supplier, model };
+  if (supplier && !options.some((option) => option.supplier === supplier)) return { supplier: "", model: "" };
+  if (model && !options.some((option) => (!supplier || option.supplier === supplier) && option.model === model)) {
+    return { supplier, model: "" };
+  }
+  return { supplier, model };
 }
 export const metrics = ["avg_tps", "avg_ttft_ms", "total_tokens", "cost", "requests", "avg_latency_ms"] as const;
 export type Metric = (typeof metrics)[number];

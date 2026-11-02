@@ -83,6 +83,7 @@ func TestModelMonitorOptions(t *testing.T) {
 		{ModelName: "alias-a", LiteLLMParams: map[string]any{"model": "actual", "litellm_credential_name": "supplier-a"}},
 		{ModelName: "b", LiteLLMParams: map[string]any{"model": "actual", "litellm_credential_name": "supplier-b"}},
 		{ModelName: "shell", LiteLLMParams: map[string]any{"litellm_credential_name": "supplier-c"}, ModelInfo: map[string]any{"role": "provider"}},
+		{ModelName: "disabled", LiteLLMParams: map[string]any{"model": "disabled", "litellm_credential_name": "supplier-disabled"}, ModelInfo: map[string]any{"disabled": true}},
 		{ModelName: " "},
 	}
 	for _, tc := range []struct {
@@ -91,7 +92,7 @@ func TestModelMonitorOptions(t *testing.T) {
 		allowed []string
 		want    []modelMonitorOption
 	}{
-		{"unrestricted", list, nil, []modelMonitorOption{{"supplier-a", "actual"}, {"supplier-b", "actual"}, {"supplier-c", ""}}},
+		{"unrestricted", list, nil, []modelMonitorOption{{"supplier-a", "actual"}, {"supplier-b", "actual"}}},
 		{"restricted alias", list, []string{"b"}, []modelMonitorOption{{"supplier-b", "actual"}}},
 		{"denied", list, []string{}, []modelMonitorOption{}},
 		{"unknown grant", list, []string{"missing"}, []modelMonitorOption{}},
@@ -103,6 +104,26 @@ func TestModelMonitorOptions(t *testing.T) {
 			}
 		})
 	}
+}
+
+// TestModelMonitorDeployments 区分共享实际模型的公开别名、停用部署及拒绝全部，纯内存测试无需清理。
+func TestModelMonitorDeployments(t *testing.T) {
+	list := []config.ModelEntry{
+		{ModelName: "a", LiteLLMParams: map[string]any{"model": "shared", "litellm_credential_name": "supplier"}},
+		{ModelName: "b", LiteLLMParams: map[string]any{"model": "shared", "litellm_credential_name": "supplier"}},
+		{ModelName: "disabled", LiteLLMParams: map[string]any{"model": "shared", "litellm_credential_name": "disabled"}, ModelInfo: map[string]any{"disabled": true}},
+	}
+	got := modelMonitorDeployments(list, []string{"a", "disabled"})
+	want := []iam.MonitorDeployment{{Alias: "a", Supplier: "supplier", Model: "shared"}}
+	if !reflect.DeepEqual(got, want) {
+		t.Fatalf("授权部署三元组错误: got=%+v want=%+v", got, want)
+	}
+	if len(modelMonitorDeployments(list, []string{})) != 0 {
+		t.Fatal("空权限必须拒绝全部")
+	}
+	// 两个部署三元组相同但一个停用时，历史账单无法区分来源，不得猜测属于启用部署。
+	list = append(list, config.ModelEntry{ModelName:"a", LiteLLMParams:map[string]any{"model":"shared", "litellm_credential_name":"supplier"}, ModelInfo:map[string]any{"disabled":true}})
+	if len(modelMonitorDeployments(list, []string{"a"})) != 0 { t.Fatal("同身份启停冲突应保守排除历史统计") }
 }
 
 // TestModelMonitorQuery 验证默认七日、四分之一小时时区、筛选和错误日期；无写入及清理需求。

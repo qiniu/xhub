@@ -93,12 +93,23 @@ export function registerModelMonitorPermissionsScenario(locale: "en" | "zh-CN") 
       await stableGoto(page, "/model-monitor");
       const narrowed = await (await refreshed).json();
       expect(narrowed.options).toEqual([]);
-      expect(narrowed.summary.requests, "组织收窄后仍保留本人历史统计").toBe(1);
-      // 当前可用目录为空，但本人历史仍可筛选；从未授权且没有本人记录的供应商不能混入。
-      await expect(page.getByLabel(tr("monitor.supplier"), { exact: true }).getByRole("option")).toHaveCount(2);
+      expect(narrowed.summary.requests, "监控只统计当前可用部署，授权撤回后不得暴露已撤回的供应商").toBe(0);
+      expect(narrowed.visibility_scope).toBe("current_available");
+      // 监控收窄不删除历史账单，用户仍能在原授权的历史日志中核对。
+      const history = await page.request.get(GATEWAY + "/spend/logs/ui?model=" + encodeURIComponent(aliases[0]), { headers: userHeaders });
+      expect(history.status()).toBe(200);
+      expect((await history.json()).data.length).toBeGreaterThan(0);
+      await expect(page.getByText(tr("monitor.currentScopeNote"))).toBeVisible();
+      await expect(page.getByLabel(tr("monitor.supplier"), { exact: true }).getByRole("option")).toHaveCount(1);
       await expect(page.getByLabel(tr("monitor.supplier"), { exact: true }).getByRole("option", { name: suppliers[1], exact: true })).toHaveCount(0);
-      await expect(page.getByLabel(tr("monitor.model"), { exact: true }).getByRole("option")).toHaveCount(2);
-      await expect(page.getByRole("rowheader", { name: actual, exact: true })).toHaveCount(1);
+      await expect(page.getByLabel(tr("monitor.model"), { exact: true }).getByRole("option")).toHaveCount(1);
+      await expect(page.getByRole("rowheader", { name: actual, exact: true })).toHaveCount(0);
+      // 访问撤权前收藏的旧链接时，失效筛选应从 URL 移除，避免显示“全部”但仍暗中筛选。
+      await stableGoto(page, "/model-monitor?supplier=" + encodeURIComponent(suppliers[0]) + "&model=" + encodeURIComponent(actual));
+      await expect(page.getByLabel(tr("monitor.supplier"), { exact: true })).toHaveValue("");
+      await expect(page.getByLabel(tr("monitor.model"), { exact: true })).toHaveValue("");
+      await expect.poll(() => new URL(page.url()).searchParams.has("supplier")).toBe(false);
+      await expect.poll(() => new URL(page.url()).searchParams.has("model")).toBe(false);
       const before = await (await page.request.get(UPSTREAM + "/e2e/request-count")).json();
       const denied = await page.request.post(GATEWAY + "/v1/chat/completions", {
         headers: { Authorization: "Bearer " + secrets[0] },
