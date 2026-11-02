@@ -328,6 +328,7 @@ export const en = {
     enableName: "Enable {name}", disableName: "Disable {name}", error: "Directory operation failed. Check permissions and configuration, then try again.",
   },
   providerGuideUI: providerGuideUIEn,
+  usageBudget: { title: "Personal budget", amounts: "Recorded spending: {spent}; limit: {limit}; remaining balance: {remaining}.", exceeded: "Over the personal limit by {amount}.", resetUnknown: "Reset schedule unavailable", note: "This balance excludes in-flight charges and does not guarantee availability under key, team, project, or organization limits.", rangeSpend: "Spending in selected period" },
   quotaGuide: {
     personalUnlimited: "No personal cap",
     personalTitle: "Personal budget (USD)",
