@@ -50,6 +50,14 @@ export function registerCacheManagement(locale: Locale) {
         const cost = Number(row.spend);
         if (index === 1) expect(cost).toBe(0); else expect(cost).toBeGreaterThan(0);
       }
+      // 浏览器经真实代理发出 null 请求，必须复用此前缺省参数生成的缓存。
+      const nullCache = await page.evaluate(async ({ key, body }) => {
+        const response = await fetch("/gw/v1/chat/completions", { method: "POST", headers: { Authorization: "Bearer " + key, "Content-Type": "application/json" }, body: JSON.stringify({ ...body, cache: null }) });
+        return { status: response.status, hit: response.headers.get("x-litellm-cache-hit"), id: response.headers.get("x-litellm-call-id"), text: await response.text() };
+      }, { key, body });
+      expect(nullCache.status, nullCache.text).toBe(200);
+      expect(nullCache.hit).toBe("true");
+      expect(Number((await waitForLog(page.request, headers, nullCache.id!)).spend)).toBe(0);
       // 同源浏览器经过真实Next代理；每次强制刷新必须重新出站并产生独立账单，不能只检查请求参数。
       for (let index = 0; index < 2; index++) {
         const fresh = await page.evaluate(async ({ key, body }) => {

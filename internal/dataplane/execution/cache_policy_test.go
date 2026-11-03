@@ -72,4 +72,19 @@ func TestClientCachePolicy(t *testing.T) {
 	if got := body["cache"].(map[string]any); len(got) != 1 || got["extension"] != "keep" {
 		t.Fatal("扩展字段丢失", got)
 	}
+	for _, name := range []string{"missing", "null"} {
+		t.Run(name, func(t *testing.T) {
+			body := map[string]any{"model": "example"}
+			if name == "null" {
+				body["cache"] = nil
+			}
+			policy, err := consumeClientCachePolicy(body)
+			if err != nil || !policy.read || !policy.write {
+				t.Fatalf("缺省或 null 应启用默认读写: %+v %v", policy, err)
+			}
+			if _, exists := body["cache"]; exists {
+				t.Fatal("null 控制未消费，可能被协议解析拒绝或改变缓存键")
+			}
+		})
+	}
 }

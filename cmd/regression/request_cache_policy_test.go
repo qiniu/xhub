@@ -8,6 +8,33 @@ func TestRequestCachePolicy(t *testing.T) {
 	h := newHarness(t, chatDeployment("request-cache"))
 	admin := h.adminSession()
 	owner := h.openScope(t, admin, "request-cache")
+	t.Run("null-equivalent", func(t *testing.T) {
+		for _, path := range []string{"/v1/chat/completions", "/v1beta/models/request-cache:generateContent", "/vertex/v1/models/request-cache:generateContent"} {
+			t.Run(path, func(t *testing.T) {
+				var req map[string]any
+				if path == "/v1/chat/completions" {
+					req = chatRequest("request-cache", "Cache null "+path)
+				} else {
+					req = map[string]any{"contents": []any{map[string]any{"role": "user", "parts": []any{map[string]any{"text": "Cache null " + path}}}}}
+				}
+				before := len(h.upstreamCalls())
+				req["cache"] = nil
+				first := h.ok("POST", path, owner.key, req)
+				if isCacheHit(first) || len(h.upstreamCalls()) != before+1 {
+					t.Fatal("null 首次请求未真实调用上游", first.describe())
+				}
+				delete(req, "cache")
+				second := h.ok("POST", path, owner.key, req)
+				if path == "/v1/chat/completions" && (!isCacheHit(second) || len(h.upstreamCalls()) != before+1) {
+					t.Fatal("Chat 的 null 与缺省请求未共享缓存", second.describe())
+				}
+				// Google 路径现有实现不写响应缓存，核对 null 和缺省均真实出站并成功。
+				if path != "/v1/chat/completions" && (isCacheHit(second) || len(h.upstreamCalls()) != before+2) {
+					t.Fatal("Google 的缺省请求行为改变", second.describe())
+				}
+			})
+		}
+	})
 	for _, tc := range []struct {
 		name   string
 		flags  map[string]any

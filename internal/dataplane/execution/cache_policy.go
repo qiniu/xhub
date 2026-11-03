@@ -14,6 +14,8 @@ type clientCachePolicy struct{ read, write bool }
 func consumeClientCachePolicy(body map[string]any) (clientCachePolicy, error) {
 	p := clientCachePolicy{read: true, write: true}
 	if body["cache"] == nil {
+		// null 与缺省语义相同；清除显式 null 避免协议白名单拒绝或产生不同缓存键。
+		delete(body, "cache")
 		return p, nil
 	}
 	options, ok := body["cache"].(map[string]any)
