@@ -407,6 +407,24 @@ test('bypass body scenarios are registered and failures stay failures', () => {
   assert.equal(evaluateScenarios(catalog, [{...results[1], title:'unknown body test'}]).unregistered.length, 1);
 });
 
+/** 上游流错误双语流程按独立文件登记；前置真实清单，检查通过、失败与未知标题，纯内存无清理。 */
+test('upstream stream error scenarios are registered and failures stay failures', () => {
+  const fs = require('node:fs');
+  const path = require('node:path');
+  const {evaluateScenarios} = require('./scenario-coverage.cjs');
+  const catalog = require('./scenario-catalog.json');
+  const results = ['en', 'zh-CN'].map(locale => {
+    const file = `e2e/scenarios/regression/upstream-stream-errors-${locale}.test.ts`;
+    assert.ok(fs.existsSync(path.join(__dirname, '..', file)));
+    return {file, title: 'upstream stream error details ' + locale, status: 'passed'};
+  });
+  assert.deepEqual(evaluateScenarios(catalog, results).unregistered, []);
+  assert.equal(evaluateScenarios(catalog, results).passed, 2);
+  results[0].status = 'failed';
+  assert.equal(evaluateScenarios(catalog, results).passed, 1);
+  assert.equal(evaluateScenarios(catalog, [{...results[1], title:'unknown stream test'}]).unregistered.length, 1);
+});
+
 /** 目录热更新双语流程须进入全量分母；纯清单验证精确文件/标题及失败不可算通过，无待清理资源。 */
 test('model view scenarios are registered and failures stay failures', () => {
   const fs = require('node:fs');

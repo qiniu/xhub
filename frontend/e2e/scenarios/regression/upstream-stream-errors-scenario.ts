@@ -5,7 +5,8 @@ import {GATEWAY,loginAdmin,sessionBearer,stableGoto} from "../../helpers";
 
 // 双语真实链路：管理员创建隔离模型，HTTP上游返回首帧/中途错误，客户端和日志抽屉保留同一诊断。
 // 前置真实网关/PG/浏览器；验证 Chat 原生及 Responses 转换和错误后的成功请求；finally 删除模型并关闭本地服务，schema 由运行器清理。
-for(const locale of ["en","zh-CN"] as const) test("upstream stream error details "+locale,async({page})=>{
+export function registerUpstreamStreamErrors(locale: "en" | "zh-CN") {
+test("upstream stream error details "+locale,async({page})=>{
  test.setTimeout(120000);
  let partial=false,fail=true,calls=0;
  const marker="Vendor capacity exhausted: 保留原文";
@@ -58,3 +59,4 @@ for(const locale of ["en","zh-CN"] as const) test("upstream stream error details
   upstream.closeAllConnections();await new Promise<void>((resolve,reject)=>upstream.close(err=>err?reject(err):resolve()));
  }
 });
+}

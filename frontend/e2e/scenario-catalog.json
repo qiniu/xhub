@@ -3492,6 +3492,20 @@
     "environment": "default offline"
   },
   {
+    "id": "REG-upstream-stream-errors-en",
+    "file": "e2e/scenarios/regression/upstream-stream-errors-en.test.ts",
+    "title": "upstream stream error details en",
+    "kind": "implemented",
+    "environment": "default offline"
+  },
+  {
+    "id": "REG-upstream-stream-errors-zh-CN",
+    "file": "e2e/scenarios/regression/upstream-stream-errors-zh-CN.test.ts",
+    "title": "upstream stream error details zh-CN",
+    "kind": "implemented",
+    "environment": "default offline"
+  },
+  {
     "id": "REG-bypass-body-en",
     "file": "e2e/scenarios/regression/agent-history-bypass-body-en.test.ts",
     "title": "bypass request body and log lifecycle en",
