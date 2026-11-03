@@ -4,6 +4,12 @@ import { keyEditFormSchema } from "./keyEditFormValues";
 const parse = (values: Record<string, unknown>) => keyEditFormSchema.safeParse(values);
 
 describe("keyEditFormSchema", () => {
+  /** 验证 Zod 升级后省略字段与显式 null、零配额仍保留；纯内存输入无资源需清理。 */
+  it("preserves optional and zero values across schema upgrades", () => {
+    expect(parse({ key_alias: "example", rpm_limit: 0, tpm_limit: null })).toMatchObject({ success: true, data: { key_alias: "example", rpm_limit: 0, tpm_limit: null } });
+    expect(parse({ rpm_limit: -1 }).success).toBe(false);
+    expect(parse({ rpm_limit: "invalid" }).success).toBe(false);
+  });
   it("accepts an empty form", () => {
     expect(parse({}).success).toBe(true);
   });
