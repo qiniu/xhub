@@ -5,9 +5,9 @@ import (
 	"encoding/json"
 	"errors"
 	"net/http"
-	"strings"
 	"time"
 
+	"github.com/sunqirui1987/xhub/internal/gateway/metadataconfig"
 	"github.com/sunqirui1987/xhub/internal/util"
 )
 
@@ -22,37 +22,106 @@ type catalogRecordStore interface {
 }
 
 // writeCatalogStore 处理已鉴权、已解析的通用目录读写；st 为存储，w/r 为 HTTP 输出及路径，body 为请求对象。
-// 由 writeCatalogPersist 调用，结果直接写入 w；保持合法响应及缺失记录更新时的 upsert，仅真实持久化成功才能返回成功。
-// JSON-RPC/OAuth 旧兼容分支保留，不在本次持久化修复内；非事务批量删除失败时不回滚已删除项，但必须返回错误。
+// 已迁移的配置委派独立服务；剩余目录保留CRUD，仅真实持久化成功才返回成功。
+// 插件列表精确筛选；RPC信封拒绝，Skill只删除路径ID；其他批量删除失败必须显式返回。
 func writeCatalogStore(st catalogRecordStore, w http.ResponseWriter, r *http.Request, body map[string]any) {
 	path := r.URL.Path
+	// 此入口是已鉴权的REST资源接口，没有RPC执行器。拒绝信封，而非吞掉操作并伪造空工具列表。
+	// 仅检查顶层标记，资源内部的嵌套元数据仍按正常目录字段持久化。
 	if _, ok := body["jsonrpc"]; ok {
-		util.WriteJSON(w, 200, map[string]any{
-			"jsonrpc": "2.0",
-			"id":      body["id"],
-			"result":  map[string]any{"tools": []any{}},
-		})
+		util.WriteError(w, http.StatusBadRequest, "unsupported_protocol", "JSON-RPC is not supported by this REST management endpoint")
 		return
 	}
-	if (strings.Contains(path, "/oauth/token") || strings.HasSuffix(path, "/token")) && !strings.Contains(path, "count") {
-		util.WriteJSON(w, 200, map[string]any{
-			"access_token": "at-" + util.CallID()[:12],
-			"token_type":   "Bearer",
-			"expires_in":   3600,
-		})
+	// 旧设置没有真实消费者，不能把无效配置写入KV并冒充已生效。
+	if rejectSettingsOperation(w, r) {
+		return
+	}
+	// 旧模型别名不能读写公共KV并冒充真实模型操作。
+	if rejectModelAlias(w, r) {
+		return
+	}
+	// 统计读取和支出重置不属于配置CRUD，未实现时必须先于目录存储明确拒绝。
+	if rejectAnalyticsAlias(w, r) {
+		return
+	}
+	if writeDiscovery(w, r) {
+		return
+	}
+	// 未接执行器的运维操作不能被当成同名配置的CRUD，避免返回假执行成功。
+	if rejectRuntimeOperation(w, r) {
+		return
+	}
+	// 旧身份别名没有签发或邀请执行器，不能落入公共KV后伪装成业务成功。
+	if rejectIdentityAlias(w, r) {
+		return
+	}
+	if rejectLegacyInference(w, r) {
+		return
+	}
+	if rejectProviderFile(w, r) {
+		return
+	}
+	if rejectProviderBatch(w, r) {
+		return
+	}
+	if rejectMedicalAlias(w, r) {
+		return
+	}
+	if rejectServiceAux(w, r) {
 		return
 	}
 	kind, action, id := parseMgmt(r.Method, path, body)
+	// Skill详情路径已明确指定唯一资源；不能再被通用批量操作的正文ID覆盖或扩大删除范围。
+	_, _, skillResource := skillResourceAction(r.Method, path)
 	if st == nil {
 		util.WriteError(w, http.StatusServiceUnavailable, "unavailable", "catalog store unavailable")
 		return
 	}
-	if id == "" || ((action == "update" || action == "delete") && (id == kind || id == singular(kind))) {
+	if writePluginList(st, w, r) {
+		return
+	}
+	if writePluginRegistration(st, w, r, body) {
+		return
+	}
+	if !skillResource && (id == "" || ((action == "update" || action == "delete") && (id == kind || id == singular(kind)))) {
 		if alt := str(body[idField(kind)]); alt != "" {
 			id = alt
 		} else if alt := str(body["id"]); alt != "" && id == "" {
 			id = alt
 		}
+	}
+	if kind == "credentials" || kind == "credential" {
+		writeSupplierStore(st, w, r, kind, action, id, body)
+		return
+	}
+	if kind == "search_tools" || kind == "search_tool" || kind == "search-tools" {
+		writeSearchConfigStore(st, w, r, kind, action, id, body)
+		return
+	}
+	if kind == "prompts" {
+		writePromptConfigStore(st, w, r, kind, action, id, body)
+		return
+	}
+	if kind == "policies" || kind == "policy" {
+		writePolicyConfigStore(st, w, r, kind, action, id, body)
+		return
+	}
+	if kind == "access_group" || kind == "access_groups" {
+		writeAccessGroupConfigStore(st, w, r, kind, action, id, body)
+		return
+	}
+	if kind == "vector_store" {
+		writeVectorConfigStore(st, w, r, kind, action, id, body)
+		return
+	}
+	// 只迁移明确的CRUD入口；block/unblock和统计等执行型旧路径不因此获得新的业务语义。
+	if metadataconfig.Supports(kind) && metadataCRUDPath(path) {
+		writeMetadataConfigStore(st, w, r, kind, action, id, body)
+		return
+	}
+	if kind == "budget" || kind == "budgets" {
+		writeBudgetConfigStore(st, w, r, kind, action, id, body)
+		return
 	}
 	switch action {
 	case "list":
@@ -85,9 +154,13 @@ func writeCatalogStore(st catalogRecordStore, w http.ResponseWriter, r *http.Req
 		Freeze(kind, m)
 		util.WriteJSON(w, 200, redactCatalogObject(kind, m, true))
 	case "delete":
-		ids := idsFrom(body, kind+"s", idField(kind))
-		if id != "" {
-			ids = append(ids, id)
+		ids := []string{id}
+		if !skillResource {
+			// 其他旧入口仍保留原有批量删除语义，收窄只针对Skill详情路由。
+			ids = idsFrom(body, kind+"s", idField(kind))
+			if id != "" {
+				ids = append(ids, id)
+			}
 		}
 		n := 0
 		for _, x := range ids {
@@ -114,15 +187,8 @@ func writeCatalogStore(st catalogRecordStore, w http.ResponseWriter, r *http.Req
 			// 只在确认不存在时沿用更新即创建的契约，故障读取不得覆盖已有记录。
 			m = map[string]any{"id": id, idField(kind): id, "created_at": time.Now().UTC().Format(time.RFC3339)}
 		}
-		if kind == "credentials" || kind == "credential" {
-			mergeCredentialPatch(m, body)
-		} else if kind == "search_tools" || kind == "search_tool" || kind == "search-tools" {
-			mergeSearchToolPatch(m, body)
-		} else {
-			for k, v := range body {
-				if k == "password" {
-					continue
-				}
+		for k, v := range body {
+			if k != "password" {
 				m[k] = v
 			}
 		}

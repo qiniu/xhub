@@ -168,13 +168,17 @@ func (db *DB) AdminBulkUserBudgets(ctx context.Context, by Actor, in BulkUserBud
 }
 
 // validateBulkUserBudgetTree 校验已含全部最终修改和预占的额度树；参数为事务快照和目标ID，返回目标/归属/分配错误。
-// 每条受影响路径检查一次；组织团队的检查递归包括固定下级保留额度，纯函数不修改节点或数据库。
+// 每条受影响路径检查一次；直接修改的用户仍校验消费和预占下限，无关超支兄弟只贡献零预留，纯函数不修改节点。
 func validateBulkUserBudgetTree(nodes map[string]*quotaNode, ids []string) error {
 	checked := map[string]bool{}
 	for _, id := range ids {
 		n := nodes["user:"+id]
 		if n == nil {
 			return ErrNotFound
+		}
+		// 本批目标不能降到已消费及待结算金额以下；不要把该限制扩散至未修改的兄弟用户。
+		if n.Limit != nil && n.Spend > *n.Limit+1e-9 {
+			return ErrQuotaAllocation
 		}
 		for n != nil {
 			key := n.Kind + ":" + n.ID

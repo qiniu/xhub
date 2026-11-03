@@ -129,8 +129,8 @@ export const getTopAPIKeys = (results: ExtendedDailyData[], topKeysLimit: number
       keySpend[key].metrics.api_requests += metrics.metrics.api_requests;
       keySpend[key].metrics.successful_requests += metrics.metrics.successful_requests;
       keySpend[key].metrics.failed_requests += metrics.metrics.failed_requests;
-      keySpend[key].metrics.cache_read_input_tokens += metrics.metrics.cache_read_input_tokens || 0;
-      keySpend[key].metrics.cache_creation_input_tokens += metrics.metrics.cache_creation_input_tokens || 0;
+      keySpend[key].metrics.cache_read_input_tokens! += metrics.metrics.cache_read_input_tokens || 0;
+      keySpend[key].metrics.cache_creation_input_tokens! += metrics.metrics.cache_creation_input_tokens || 0;
     });
   });
 

@@ -37,7 +37,7 @@ test("wrong password shows error", async ({ page }) => {
     await page.getByRole("button", { name: t("login.submit"), exact: true }).click();
     await expect(page.getByText(/Invalid credentials|login failed|UI_USERNAME/i)).toBeVisible();
     await expect(page).toHaveURL(/\/login/);
-    guard.assertOk();
+    await guard.assertOk();
   });
 }
 /** 用途：注册独立场景「admin + master key lands on Virtual Keys」；无参数、无返回值。前置真实浏览器、私有数据库和本地上游；验证页面及原始契约，保留原套件前后置清理，运行器最终回收专属 schema。异常由 Playwright 单独记录。 */

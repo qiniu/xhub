@@ -4,6 +4,12 @@ import { keyEditFormSchema } from "./keyEditFormValues";
 const parse = (values: Record<string, unknown>) => keyEditFormSchema.safeParse(values);
 
 describe("keyEditFormSchema", () => {
+  /** 验证 Zod 升级后省略字段与显式 null、零配额仍保留；纯内存输入无资源需清理。 */
+  it("preserves optional and zero values across schema upgrades", () => {
+    expect(parse({ key_alias: "example", rpm_limit: 0, tpm_limit: null })).toMatchObject({ success: true, data: { key_alias: "example", rpm_limit: 0, tpm_limit: null } });
+    expect(parse({ rpm_limit: -1 }).success).toBe(false);
+    expect(parse({ rpm_limit: "invalid" }).success).toBe(false);
+  });
   it("accepts an empty form", () => {
     expect(parse({}).success).toBe(true);
   });
@@ -41,4 +47,10 @@ describe("key rate allocation boundaries", () => {
     expect(parse({ rpm_limit: value }).success).toBe(false);
     expect(parse({ tpm_limit: value }).success).toBe(false);
   });
+});
+
+/** 真实契约中的null预算与轮换字段进入表单时不能变成零/空串；纯类型和表单解析边界，无后台数据需清理。 */
+it("preserves contract null budget and unsupported rotation in form parsing", () => {
+  const parsed = keyEditFormSchema.parse({ max_budget: null, rpm_limit: null, tpm_limit: null, rotation_interval: null });
+  expect(parsed).toMatchObject({ max_budget: null, rpm_limit: null, tpm_limit: null, rotation_interval: null });
 });

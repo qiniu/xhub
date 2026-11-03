@@ -29,10 +29,13 @@ type UsageQuery struct {
 	KeyID     string
 	Model     string
 	Status    string
-	// ErrorCode 精确匹配最终 HTTP 状态；非法非空值匹配空集。ErrorMessage 为错误正文的字面子串。
+	// ErrorCode 精确匹配最终 HTTP 状态；非法非空值匹配空集。ErrorMessage 为不区分大小写的错误正文字面子串。
 	ErrorCode    string
 	ErrorMessage string
 	SessionID    string
+	// 以下条件匹配调用时记录的事实，不查询当前目录；CacheHit 的 nil 表示不限缓存状态。
+	KeyHash, KeyAlias, Supplier, InboundEndpoint string
+	CacheHit                                     *bool
 	// RequestID 精确定位请求，Search 按请求 ID 子串检索；均在分页之前收窄授权范围。
 	RequestID string
 	Search    string
@@ -104,11 +107,6 @@ func (q UsageQuery) scopedSession(db *DB, ctx context.Context, table string) *xo
 			s = s.And("http_status = ?", code)
 		}
 	}
-	if q.ErrorMessage != "" {
-		// 完整错误独立保存在 request_logs；关联同一请求而非搜索提示词，
-		// EXISTS 不复制事件行，保证列表、计数、会话分页与权限条件保持一致。
-		s = s.And("EXISTS (SELECT 1 FROM request_logs WHERE request_logs.request_id = usage_events.request_id AND position(? in COALESCE(request_logs.error, '')) > 0)", q.ErrorMessage)
-	}
 	if q.SessionID != "" {
 		s = s.And("session_id = ?", q.SessionID)
 	}
@@ -118,6 +116,25 @@ func (q UsageQuery) scopedSession(db *DB, ctx context.Context, table string) *xo
 	if q.Search != "" {
 		// 使用字面子串匹配，避免输入中的百分号或下划线变成 SQL 通配符。
 		s = s.And("position(? in request_id) > 0", q.Search)
+	}
+	if q.KeyHash != "" {
+		s = s.And("key_hash = ?", q.KeyHash)
+	}
+	if q.KeyAlias != "" {
+		s = s.And("key_alias = ?", q.KeyAlias)
+	}
+	if q.CacheHit != nil {
+		s = s.And("cache_hit = ?", *q.CacheHit)
+	}
+	if q.Supplier != "" {
+		s = s.And("supplier = ?", q.Supplier)
+	}
+	if q.InboundEndpoint != "" {
+		s = s.And("inbound_endpoint = ?", q.InboundEndpoint)
+	}
+	if q.ErrorMessage != "" {
+		// EXISTS 不扩增行数，避免正文表关联破坏分页和会话计数；按字面子串匹配，% 和 _ 不是通配符。
+		s = s.And("EXISTS (SELECT 1 FROM request_logs rl WHERE rl.request_id = usage_events.request_id AND position(lower(?) in lower(rl.error)) > 0)", q.ErrorMessage)
 	}
 	return q.applyLists(s)
 }

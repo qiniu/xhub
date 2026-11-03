@@ -66,7 +66,7 @@ func Generate(s Host, w http.ResponseWriter, r *http.Request) {
 // 参数 s（Host）：列出使用的数据面宿主；w（http.ResponseWriter）：调用方的 HTTP 响应，状态和正文写在这里；r（*http.Request）：入站 HTTP 请求。
 // 返回：无。状态码和正文写进调用方的响应。
 // 调用：gateway/keys/mount.go、gateway/models/list.go、gateway/models/mount.go、gateway/prefs/mount.go
-// 测试：personal_test.go、regression/personal_keys_test.go、regression/pagination_test.go。查询先按权限在 SQL 收窄，再应用客户端筛选和分页，不返回明文。
+// 测试：personal_test.go、regression/key_organization_filter_test.go、regression/personal_keys_test.go。组织条件与权限在 SQL 中取交集，再筛选分页，不返回明文。
 func List(s Host, w http.ResponseWriter, r *http.Request) {
 	util.SetCallID(w, util.CallID())
 	p := s.RequireUser(w, r)
@@ -84,6 +84,7 @@ func List(s Host, w http.ResponseWriter, r *http.Request) {
 		// 用户范围取自已认证身份，不能相信 user_id、创建者或团队筛选来决定归属。
 		filter = personalFilter(filter, p)
 	}
+	filter.OrganizationID = r.URL.Query().Get("organization_id")
 	rows, err := s.Identity().ListKeys(r.Context(), filter)
 	if err != nil {
 		s.WriteIAMError(w, r, err)

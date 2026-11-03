@@ -60,11 +60,13 @@ backend_mode = os.environ.get("E2E_BACKEND_MODE", "live")
 scope = os.environ.get("E2E_SCOPE", "完整真实供应商入口" if backend_mode == "live" else "确定性回归")
 cases = []
 def collect(suite, prefix=""):
+    """收集 suite 的浏览器用例与实际尝试；参数 prefix 为标题前缀，追加 cases，不改原始证据。"""
     title = " / ".join(filter(None, [prefix, suite.get("title", "")]))
     for spec in suite.get("specs", []):
         for test in spec.get("tests", []):
             results = test.get("results", [])
             cases.append({"name": title + " / " + spec["title"], "status": test.get("status", "missing"),
+                          "passed": test.get("status") == "expected" and len(results) == 1 and results[0].get("status") == "passed",
                           "duration_ms": sum(r.get("duration", 0) for r in results),
                           "errors": [e.get("message", "") for r in results for e in r.get("errors", [])]})
     for child in suite.get("suites", []): collect(child, title)
@@ -85,6 +87,9 @@ for line in backend.splitlines():
 for case in backend_cases:
     case["errors"] = diagnostics.get(case["name"], [])
 top = [c for c in backend_cases if "/" not in c["name"]]
+backend_parents = {"/".join(c["name"].split("/")[:i]) for c in backend_cases
+                   for i in range(1, len(c["name"].split("/")))}
+backend_passed_leaves = sum(c["status"] == "pass" and c["name"] not in backend_parents for c in backend_cases)
 backend_completed = bool(re.search(r"^(?:ok|FAIL)\s+.*cmd/regression", backend, re.M))
 failed_assertions = [error for case in backend_cases if case["status"] == "fail" for error in case["errors"]]
 build_diagnostics = [line.strip() for line in backend.splitlines() if re.search(
@@ -98,7 +103,7 @@ for weighted_path in sorted((out / "evidence").glob("weighted-*.json")):
         input_errors.append(f"权重证据 {weighted_path.name} 必须是 JSON 对象。")
 coverage = {}
 for name in ("pages", "routes", "chains"):
-    p = out / ".e2e-report" / (name + ".txt")
+    p = result.parent / "coverage" / (name + ".txt")
     coverage[name] = p.read_text().splitlines() if p.exists() else []
 summary = {
     "run_id": out.name, "completed_at": datetime.now(timezone.utc).isoformat(),
@@ -112,6 +117,9 @@ summary = {
     "browser_diagnostics": browser_diagnostics if not browser else [],
     "browser_exit": int(os.environ.get("E2E_BROWSER_STATUS", "1")),
     "backend_exit": int(os.environ.get("E2E_BACKEND_STATUS", "1")),
+    "cleanup_exit": int(os.environ.get("E2E_CLEANUP_STATUS", "1")),
+    "backend_passed_leaves": backend_passed_leaves,
+    "browser_passed_cases": sum(c["passed"] for c in cases),
     "backend_pass": sum(c["status"] == "pass" for c in top),
     "backend_fail": sum(c["status"] == "fail" for c in top),
     "backend_skip": [c["name"] for c in backend_cases if c["status"] == "skip"],
@@ -141,7 +149,8 @@ def valid_weighted_evidence(w):
                     for deployment, count in expected.items())
             and all(c.get("call_id") and c.get("cost_usd", 0) > 0 for c in calls))
 summary["invalid_weighted_evidence"] = [w.get("scenario", "<missing scenario>") for w in weighted if not valid_weighted_evidence(w)]
-failed = (summary["browser_exit"] or summary["backend_exit"] or not browser or not cases
+failed = (summary["cleanup_exit"] or not backend_passed_leaves or not summary["browser_passed_cases"]
+          or summary["browser_exit"] or summary["backend_exit"] or not browser or not cases
           or browser.get("stats", {}).get("unexpected", 0) or summary["browser_errors"]
           or summary["backend_fail"] or not summary["backend_ok"] or not top
           or weighted_missing or summary["invalid_weighted_evidence"] or incomplete_stages or input_errors)
@@ -162,6 +171,7 @@ lines = ["# XHub E2E 回归报告", "", "结果：**" + summary["status"].upper(
 stats = summary["browser"] or {}
 lines += [f"| 浏览器 | {stats.get('expected', 0)} | {stats.get('unexpected', '结果缺失')} | {stats.get('skipped', 0)} | {summary['browser_exit']} |",
           f"| 后端顶层用例 | {summary['backend_pass']} | {summary['backend_fail']} | {sum(c['status']=='skip' for c in top)} | {summary['backend_exit']} |", "",
+          f"资源清理退出码：{summary['cleanup_exit']}（非零为失败或未验证）；后台通过叶例：{backend_passed_leaves}；浏览器实际通过：{summary['browser_passed_cases']}。", "",
           "后端顶层统计不重复计算子测试，子测试逐项列在下方。跳过不计为通过。", "",
           "## 真实供应商", "", "| 供应商 | 模型 | 协议 |", "| --- | --- | --- |"]
 for p in summary["providers"]:
@@ -207,7 +217,7 @@ lines += ["", "具体跳过原因见 backend.log。媒体真实生成与双协�
           "- [完整机器可读结果](summary.json)", "- [JUnit](browser/junit.xml)", ""]
 report = "\n".join(lines)
 (out / "report.md").write_text(report)
-(out / "report.html").write_text('<!doctype html><meta charset="utf-8"><title>XHub E2E report</title><style>body{max-width:1200px;margin:40px auto;padding:20px;font:15px monospace}pre{white-space:pre-wrap;overflow-wrap:anywhere}</style><h1>XHub E2E '+summary["status"].upper()+'</h1><p><a href="playwright-report/index.html">Playwright 交互报告</a> · <a href="summary.json">JSON</a> · <a href="report.md">Markdown</a></p><pre>'+html.escape(report)+'</pre>')
+(out / "report.html").write_text('<!doctype html><meta charset="utf-8"><title>XHub E2E report</title><style>body{max-width:1200px;margin:40px auto;padding:20px;font:15px monospace}pre{white-space:pre-wrap;overflow-wrap:anywhere}</style><h1>XHub E2E '+summary["status"].upper()+'</h1><p><a href="browser/html/index.html">Playwright 交互报告</a> · <a href="summary.json">JSON</a> · <a href="report.md">Markdown</a></p><pre>'+html.escape(report)+'</pre>')
 print(f"E2E {summary['status'].upper()}: browser {stats.get('expected', 0)} passed / {stats.get('unexpected', 'missing')} failed; backend {summary['backend_pass']} passed / {summary['backend_fail']} failed; skipped subtests={len(summary['backend_skip'])}")
 def short_error(error):
     clean = re.sub(r"\x1b\[[0-9;]*m", "", error)
@@ -215,6 +225,10 @@ def short_error(error):
     return "; ".join(parts[:3])[:600]
 if failed:
     print("Failure details:")
+    if summary["cleanup_exit"]:
+        print("  [cleanup] Resource cleanup failed or unverified; inspect cleanup.log")
+    if not backend_passed_leaves or not summary["browser_passed_cases"]:
+        print("  [selection] No passed cases in a required layer; skipped/empty results cannot pass")
     for error in incomplete_stages:
         print("  [incomplete] " + error)
     for case in cases:

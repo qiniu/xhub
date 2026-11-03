@@ -18,6 +18,7 @@ export interface AgentsAndGroups {
   accessGroups: string[];
 }
 
+/** 密钥编辑表单输入；保留缺省、null与用户字符串，供现有解析和提交使用，不代替后台授权或预算校验。 */
 export interface KeyEditFormValues {
   key_alias?: string;
   models?: string[];
@@ -57,7 +58,8 @@ export interface KeyEditFormValues {
   token?: string;
   disabled_callbacks?: string[];
   auto_rotate?: boolean;
-  rotation_interval?: string;
+  // 实际Key响应始终为null；保留旧表单字符串类型供历史页面使用。
+  rotation_interval?: string | null;
   route_template_id?: string;
 }
 
@@ -128,51 +130,52 @@ const rateAllocationSchema = z.custom<number | string | null | undefined>().refi
   { error: () => t("Must be a non-negative whole number") },
 );
 
+// Zod 4 的自定义字段须显式标记可选，才能保留旧表单省略字段、null 和零值的原有语义。
 export const keyEditFormSchema = z.object({
-  key_alias: z.custom<string | undefined>(),
-  models: z.custom<string[] | undefined>(),
-  allowed_routes: z.custom<string | undefined>(),
-  max_budget: z.custom<number | string | null | undefined>(),
-  soft_budget: z.custom<number | string | null | undefined>(),
-  budget_duration: z.custom<string | null | undefined>(),
-  tpm_limit: rateAllocationSchema,
-  tpm_limit_type: z.custom<string | null | undefined>(),
-  rpm_limit: rateAllocationSchema,
-  rpm_limit_type: z.custom<string | null | undefined>(),
-  throttle_on_budget_exceeded: z.custom<boolean | undefined>(),
-  enable_prompt_caching: z.custom<boolean | undefined>(),
-  max_parallel_requests: z.custom<number | string | null | undefined>(),
-  model_tpm_limit: z.custom<string | undefined>(),
-  model_rpm_limit: z.custom<string | undefined>(),
+  key_alias: z.custom<string | undefined>().optional(),
+  models: z.custom<string[] | undefined>().optional(),
+  allowed_routes: z.custom<string | undefined>().optional(),
+  max_budget: z.custom<number | string | null | undefined>().optional(),
+  soft_budget: z.custom<number | string | null | undefined>().optional(),
+  budget_duration: z.custom<string | null | undefined>().optional(),
+  tpm_limit: rateAllocationSchema.optional(),
+  tpm_limit_type: z.custom<string | null | undefined>().optional(),
+  rpm_limit: rateAllocationSchema.optional(),
+  rpm_limit_type: z.custom<string | null | undefined>().optional(),
+  throttle_on_budget_exceeded: z.custom<boolean | undefined>().optional(),
+  enable_prompt_caching: z.custom<boolean | undefined>().optional(),
+  max_parallel_requests: z.custom<number | string | null | undefined>().optional(),
+  model_tpm_limit: z.custom<string | undefined>().optional(),
+  model_rpm_limit: z.custom<string | undefined>().optional(),
   default_estimated_output_tokens: z
-    .custom<number | string | null | undefined>()
+    .custom<number | string | null | undefined>().optional()
     .refine(estimateChecks.positive.isValid, estimateChecks.positive.message),
   default_estimated_output_tokens_per_model: z
-    .custom<string | undefined>()
+    .custom<string | undefined>().optional()
     .refine(estimateChecks.perModel.isValid, estimateChecks.perModel.message),
-  guardrails: z.custom<string[] | undefined>(),
-  disable_global_guardrails: z.custom<boolean | undefined>(),
-  policies: z.custom<string[] | undefined>(),
-  tags: z.custom<string[] | undefined>(),
-  prompts: z.custom<string[] | undefined>(),
-  access_group_ids: z.custom<string[] | undefined>(),
-  allowed_passthrough_routes: z.custom<string[] | undefined>(),
-  vector_stores: z.custom<string[] | undefined>(),
-  mcp_servers_and_groups: z.custom<McpServersAndGroups | undefined>(),
-  mcp_tool_permissions: z.custom<Record<string, string[]> | undefined>(),
-  agents_and_groups: z.custom<AgentsAndGroups | undefined>(),
-  skills: z.custom<string[] | undefined>(),
-  organization_id: z.custom<string | null | undefined>(),
-  team_id: z.custom<string | null | undefined>(),
+  guardrails: z.custom<string[] | undefined>().optional(),
+  disable_global_guardrails: z.custom<boolean | undefined>().optional(),
+  policies: z.custom<string[] | undefined>().optional(),
+  tags: z.custom<string[] | undefined>().optional(),
+  prompts: z.custom<string[] | undefined>().optional(),
+  access_group_ids: z.custom<string[] | undefined>().optional(),
+  allowed_passthrough_routes: z.custom<string[] | undefined>().optional(),
+  vector_stores: z.custom<string[] | undefined>().optional(),
+  mcp_servers_and_groups: z.custom<McpServersAndGroups | undefined>().optional(),
+  mcp_tool_permissions: z.custom<Record<string, string[]> | undefined>().optional(),
+  agents_and_groups: z.custom<AgentsAndGroups | undefined>().optional(),
+  skills: z.custom<string[] | undefined>().optional(),
+  organization_id: z.custom<string | null | undefined>().optional(),
+  team_id: z.custom<string | null | undefined>().optional(),
   project_id: z.string().nullable().optional(),
-  logging_settings: z.custom<unknown[] | undefined>(),
-  metadata: z.custom<string | undefined>(),
-  duration: z.custom<string | null | undefined>(),
-  token: z.custom<string | undefined>(),
-  disabled_callbacks: z.custom<string[] | undefined>(),
-  auto_rotate: z.custom<boolean | undefined>(),
-  rotation_interval: z.custom<string | undefined>(),
-  route_template_id: z.custom<string | undefined>(),
+  logging_settings: z.custom<unknown[] | undefined>().optional(),
+  metadata: z.custom<string | undefined>().optional(),
+  duration: z.custom<string | null | undefined>().optional(),
+  token: z.custom<string | undefined>().optional(),
+  disabled_callbacks: z.custom<string[] | undefined>().optional(),
+  auto_rotate: z.custom<boolean | undefined>().optional(),
+  rotation_interval: z.custom<string | null | undefined>().optional(),
+  route_template_id: z.custom<string | undefined>().optional(),
 });
 
 export interface MountedFieldGates {

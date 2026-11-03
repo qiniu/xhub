@@ -1,3 +1,4 @@
+import { samlRefresh } from "./samlRefresh.en";
 import { budgetReconciliationEn } from "./budgetReconciliation.en";
 import { probesEn } from "./probes.en";
 import { docsEn } from "./docs.en";
@@ -5,8 +6,92 @@ import { enPhrases } from "./phrases.en";
 import { pageDescriptionsEn } from "./pageDescriptions.en";
 import { routeTemplatesEn } from "./routeTemplates.en";
 
+import { cacheAdminEn } from "./cacheAdmin.en";
+
 export const en = {
+  logsUX: {
+    bodyUnavailable: "This log has no request or response body available. The reason was not recorded; other recorded details remain available.",
+    firstResponse: "First upstream response byte (s)",
+    relatedCache: "Related requests (cache key)", relatedPrompt: "Related requests (prompt)",
+    resizeDrawer: "Resize detail panel with drag or arrow keys", expandDrawer: "Expand details", restoreDrawer: "Restore details width", team: "Team", teamUnknown: "Team not recorded",
+    keyFingerprint: "Key fingerprint (SHA-256)",
+    keyFingerprintHelp: "A fingerprint identifies a key; it is not the secret key. Enter the complete SHA-256 hash for an exact match.",
+    suggestionsLoading: "Loading suggestions…",
+    suggestionsEmpty: "No matching suggestions. You can enter a value manually.",
+    suggestionsFailed: "Suggestions could not be loaded. Try a shorter time range or enter a value manually.",
+    suggestionsMore: "More results are available. Type more to narrow the suggestions.",
+    suggestionsScope: "Suggestions come from all logs you can access in the selected time range and ignore other filters. Models and suppliers are limited to currently authorized, enabled deployments.",
+    apply: "Apply Filters",
+    lastMinute: "Last Minute",
+    last15Minutes: "Last 15 Minutes",
+    lastHour: "Last Hour",
+    last4Hours: "Last 4 Hours",
+    last24Hours: "Last 24 Hours",
+    last7Days: "Last 7 Days",
+    code400: "400 - Bad Request",
+    code401: "401 - Invalid Authentication",
+    code403: "403 - Permission Denied",
+    code404: "404 - Not Found",
+    code408: "408 - Request Timeout",
+    code422: "422 - Unprocessable Entity",
+    code429: "429 - Rate Limited",
+    code500: "500 - Internal Server Error",
+    code502: "502 - Bad Gateway",
+    code503: "503 - Service Unavailable",
+    code529: "529 - Overloaded",
+    last14Days: "Last 14 Days",
+    code499: "499 - Connection interrupted",
+    code413: "413 - Request body rejected",
+    lookupFailed: "Could not load options. Please try again.",
+    modelHint: "Exact public model name, including historical models",
+    filterHint: "Conditions are combined with AND and applied before pagination.",
+    keywordHint: "Literal text in the recorded error",
+    advanced: "Advanced filters",
+    responseCache: "Gateway response cache",
+    supplier: "Supplier connection",
+    loadFailed: "Logs could not be loaded. Retry using Refresh.",
+    detailFailed: "This log could not be opened. It may be unavailable or outside your access scope; retry if needed.",
+    autoRefresh: "Refresh every 15 seconds",
+    start: "Start time",
+    end: "End time",
+    empty: "No records in this time range",
+    emptyHint: "Try a wider time range or clear filters. Only logs within your access scope are shown.",
+    diagnosis: "Error summary",
+    interrupted: "Connection interrupted",
+    limited: "Rate limit response",
+    bodyRejected: "Request body rejected",
+    denied: "Authentication or access denied",
+    serviceFailed: "Service error",
+    requestFailed: "Request failed",
+    causeUnknown: "The status alone does not identify the cause. Check the recorded diagnostics below.",
+    rawError: "Expand full error",
+    rawMetadata: "Advanced metadata",
+  },
+  legacyUsage: { title: "Legacy usage", unavailable: "This legacy report is unavailable. No usage or spend has been reset. Open Usage to view real billing records.", openUsage: "Open Usage" },
+  tagSelector: { loadFailed: "Unable to load saved tags. Refresh the page to retry." },
+  cacheAdmin: cacheAdminEn,
+  samlRefresh,
+  skillHub: {
+  usage: "How to Use",
+  "supportTitle": "Publishing and installation are unavailable",
+  "supportHelp": "This gateway currently stores Skill metadata only. An enabled configuration does not confirm public access, installation, or execution. No marketplace installation commands are provided.",
+  "supportAction": "Publishing support status",
+  "loadError": "Unable to load the Skill directory. This does not mean the directory is empty.",
+  "empty": "No Skill metadata found",
+  "configEnabled": "Configuration enabled",
+  "configDisabled": "Configuration disabled",
+  "value": "Value",
+  "all": "All Skill metadata",
+  "count": "Showing {visible} of {total} configurations",
+  "emptyHelp": "Saved metadata does not confirm that a Skill can be installed or used."
+},
   probes: probesEn,
+  mcpOAuthCallback: {
+    title: "MCP authorization callback",
+    pending: "Returning to the console. Receiving a callback does not confirm successful authorization.",
+    returnHelp: "If you are not redirected, return to the original page to check the connection result.",
+    loading: "Loading authorization callback…",
+  },
   consoleDirectory: {
     "userDeleteRefreshFailed": "User deleted, but the list could not be refreshed. Refresh the page to reload the remaining users.",
     "noTeams": "No teams found",
@@ -76,6 +161,7 @@ export const en = {
 },
 
   uiErrors: {"dailyUnavailable": "Daily activity unavailable", "bulkUpdateInvalid": "Unexpected bulk update result", "reservationInvalid": "Invalid reservation response", "resolutionInvalid": "Invalid resolution response", "budgetMissing": "Missing budget snapshot", "samlMetadataInvalid": "Invalid SAML metadata response"},
+  keyActions: { invalidStateResponse: "Could not confirm that the key state was updated. Refresh to check its current state." },
   createdKey: { warning: "Save this secret key in a secure location. You will not be able to view it again in XHub. If you lose it, generate a new key." },
   budgetReconciliation: budgetReconciliationEn,
   hardBudget: {
@@ -136,6 +222,7 @@ export const en = {
  session: { inferred: "Inferred session", logoutFailed: "Unable to sign out. Please try again." },
  requestMetrics: {endpoints: "Endpoints", inbound: "Inbound", outbound: "Outbound", duration: "Total time (s)", ttft: "TTFT (s)", tps: "TPS (tokens/s)", definition: "TTFT measures the first upstream response byte, not necessarily the first visible token. TPS = output tokens / (total time − TTFT), for successful uncached streaming text only; synchronous requests have no TPS sample."},
  monitor: {
+  currentScopeNote: "Only historical requests attributable to currently authorized and enabled deployments are included; older records that cannot be attributed may be excluded. See Usage or Logs for complete historical spending.",
   "title": "Model Monitor",
   "description": "Compare every supplier connection and actual upstream model. Statistics update when billing is persisted.",
   "start": "Start date",
@@ -241,6 +328,7 @@ export const en = {
     enableName: "Enable {name}", disableName: "Disable {name}", error: "Directory operation failed. Check permissions and configuration, then try again.",
   },
   providerGuideUI: providerGuideUIEn,
+  usageBudget: { title: "Personal budget", amounts: "Recorded spending: {spent}; limit: {limit}; remaining balance: {remaining}.", exceeded: "Over the personal limit by {amount}.", resetUnknown: "Reset schedule unavailable", note: "This balance excludes in-flight charges and does not guarantee availability under key, team, project, or organization limits.", rangeSpend: "Spending in selected period" },
   quotaGuide: {
     personalUnlimited: "No personal cap",
     personalTitle: "Personal budget (USD)",

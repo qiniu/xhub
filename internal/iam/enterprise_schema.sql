@@ -29,3 +29,13 @@ ALTER TABLE enterprise_login_transactions ADD COLUMN IF NOT EXISTS saml_subject 
 CREATE UNIQUE INDEX IF NOT EXISTS enterprise_saml_entity_unique ON enterprise_oidc(client_id) WHERE protocol='saml';
 
 ALTER TABLE enterprise_oidc ADD COLUMN IF NOT EXISTS allow_expired_idp_certificate BOOLEAN NOT NULL DEFAULT false;
+
+-- 手工 SAML 元数据刷新默认关闭；单独租约表不改变已发起登录的配置版本。
+CREATE TABLE IF NOT EXISTS enterprise_saml_refresh (
+ connection_id TEXT PRIMARY KEY REFERENCES enterprise_oidc(connection_id) ON DELETE CASCADE,
+ enabled BOOLEAN NOT NULL DEFAULT false, source_url TEXT NOT NULL DEFAULT '',
+ interval_hours INTEGER NOT NULL DEFAULT 6 CHECK(interval_hours BETWEEN 1 AND 24),
+ last_attempt BIGINT NOT NULL DEFAULT 0, last_success BIGINT NOT NULL DEFAULT 0,
+ next_attempt BIGINT NOT NULL DEFAULT 0, error_code TEXT NOT NULL DEFAULT '',
+ lease TEXT NOT NULL DEFAULT '', lease_until BIGINT NOT NULL DEFAULT 0
+);

@@ -41,7 +41,7 @@ export function registerColumnScenario(route: string, verb: string, prerequisite
     await expect(page.getByText("当前权限模型不支持标签管理。请通过组织、团队和项目管理访问范围。")).toBeVisible();
     await expect(page.getByRole("button", {name:"创建",exact:true})).toHaveCount(0);
    } else await writeColumn(page, route, name, prerequisite ? ["创建", verb] : [verb]);
-   guard.assertOk();
+   await guard.assertOk();
   } finally {
    if ((route === "/search-tools" || route === "/prompts") && verb !== "删除") {
     // 页面保存创建结果 ID，清理也从同一页面发出真实删除，避免遗留前置数据。

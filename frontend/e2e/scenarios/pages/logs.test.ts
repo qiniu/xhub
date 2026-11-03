@@ -28,5 +28,5 @@ test("请求日志 Hook 回归：中英文状态与缓存筛选", async ({ page 
   await page.getByTestId("datatable-filters-trigger").click();
   await expect(page.getByText(translate("zh-CN", "Success"), { exact: true }).last()).toBeVisible();
   await expect(page.getByText(translate("zh-CN", "Cache Miss"), { exact: true }).last()).toBeVisible();
-  guard.assertOk();
+  await guard.assertOk();
 });

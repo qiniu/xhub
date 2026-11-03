@@ -61,6 +61,14 @@ export const zhPhrases: Record<string, string> = {
   自定义代码: "自定义代码",
   "Response cache hits": "响应缓存命中",
   "Not reported": "未上报",
+  "logDiagnostics.startTime": "日志开始时间",
+  "logDiagnostics.endTime": "日志结束时间",
+  "logDiagnostics.title": "请求诊断",
+  "logDiagnostics.cancelUnknown": "请求连接已取消，触发来源未知；这不能证明用户手动停止生成。",
+  "logDiagnostics.upstreamError": "已观测到的上游错误",
+  "logDiagnostics.bodyOmitted": "请求正文未读取完整，未保存正文；已保留读取字节数、大小上限和错误原因。",
+  "logDiagnostics.noUpstreamError": "未观测到上游明确错误，不能据此证明上游正常。",
+  "logDiagnostics.noResponse": "尚未收到上游 HTTP 响应",
   "Upstream Response": "上游响应",
   "Copy upstream response": "复制上游响应",
   "Upstream Response Headers": "上游响应头",
@@ -7798,8 +7806,8 @@ export const zhPhrases: Record<string, string> = {
   "Enter a FAL task path as the upstream model, for example byteplus/seedance-2.0/text-to-video.":
     "上游模型需填写 FAL 任务路径，如 byteplus/seedance-2.0/text-to-video。",
   "XHub public endpoints": "XHub 对外接口",
-  "Standard endpoints are enabled automatically and use the same public model name.":
-    "标准接口已自动开放，可使用同一个对外模型名称调用。",
+  "modelEndpoints.automaticDescription":
+    "标准接口和与上游协议匹配的 Chat Completions、Responses 或 Messages 透传接口自动开放。调用时通过请求路径选择标准处理或透传，使用相同的对外模型名称。",
   "This model uses a provider-specific protocol. The passthrough endpoints below are enabled from registered capabilities.":
     "此模型使用供应商专用协议，以下直通接口已按注册能力开放。",
   "Enabled endpoints": "已开放接口",

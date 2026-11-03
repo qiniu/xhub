@@ -1,0 +1,713 @@
+{
+  "openapi": "3.0.3",
+  "info": {
+    "title": "XHub supplier management contract pilot",
+    "version": "0.1.0",
+    "description": "现有 REST 行为的开发期契约；不安装运行时校验器、不覆盖全 API。 / Development contract for existing REST behavior; no runtime validator or whole-API coverage."
+  },
+  "security": [
+    {
+      "bearerAuth": []
+    }
+  ],
+  "paths": {
+    "/credentials": {
+      "get": {
+        "operationId": "listCredentials",
+        "summary": "列出供应商（两个等价列表字段）。 / List suppliers (two equivalent array aliases).",
+        "tags": [
+          "Supplier management"
+        ],
+        "responses": {
+          "200": {
+            "description": "成功。 / Success.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CredentialList"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Error401"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error403"
+          },
+          "500": {
+            "$ref": "#/components/responses/Error500"
+          },
+          "503": {
+            "$ref": "#/components/responses/Error503"
+          },
+          "400": {
+            "$ref": "#/components/responses/Error400"
+          }
+        }
+      },
+      "post": {
+        "operationId": "createCredential",
+        "summary": "保存供应商，同名创建覆盖已有配置。 / Save supplier; duplicate creation replaces existing configuration.",
+        "tags": [
+          "Supplier management"
+        ],
+        "responses": {
+          "200": {
+            "description": "成功。 / Success.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Credential"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Error401"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error403"
+          },
+          "500": {
+            "$ref": "#/components/responses/Error500"
+          },
+          "503": {
+            "$ref": "#/components/responses/Error503"
+          },
+          "400": {
+            "$ref": "#/components/responses/Error400"
+          }
+        },
+        "requestBody": {
+          "required": false,
+          "description": "空正文沿用空对象语义；正文存在时必须是 JSON 对象。 / Empty body acts as an empty object; nonempty body must be a JSON object.",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CredentialInput"
+              },
+              "example": {
+                "credential_name": "example-provider",
+                "credential_info": {
+                  "custom_llm_provider": "openai"
+                },
+                "credential_values": {
+                  "api_base": "https://provider.example/v1",
+                  "api_key": "example-not-a-secret"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/credentials/by_name/{credential_name}": {
+      "get": {
+        "operationId": "getCredential",
+        "summary": "读取供应商，敏感字符串脱敏。 / Read supplier with masked secret strings.",
+        "tags": [
+          "Supplier management"
+        ],
+        "responses": {
+          "200": {
+            "description": "成功。 / Success.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Credential"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Error401"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error403"
+          },
+          "500": {
+            "$ref": "#/components/responses/Error500"
+          },
+          "503": {
+            "$ref": "#/components/responses/Error503"
+          },
+          "404": {
+            "$ref": "#/components/responses/Error404"
+          },
+          "400": {
+            "$ref": "#/components/responses/Error400"
+          }
+        },
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/CredentialName"
+          }
+        ]
+      }
+    },
+    "/credentials/{credential_name}": {
+      "patch": {
+        "operationId": "updateCredential",
+        "summary": "合并补丁；不存在则创建。 / Merge patch; upsert when missing.",
+        "tags": [
+          "Supplier management"
+        ],
+        "responses": {
+          "200": {
+            "description": "成功。 / Success.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Credential"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Error401"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error403"
+          },
+          "500": {
+            "$ref": "#/components/responses/Error500"
+          },
+          "503": {
+            "$ref": "#/components/responses/Error503"
+          },
+          "400": {
+            "$ref": "#/components/responses/Error400"
+          }
+        },
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/CredentialName"
+          }
+        ],
+        "requestBody": {
+          "required": false,
+          "description": "空正文沿用空对象语义；正文存在时必须是 JSON 对象。 / Empty body acts as an empty object; nonempty body must be a JSON object.",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CredentialInput"
+              },
+              "example": {
+                "credential_name": "example-provider",
+                "credential_info": {
+                  "custom_llm_provider": "openai"
+                },
+                "credential_values": {
+                  "api_base": "https://provider.example/v1",
+                  "api_key": "example-not-a-secret"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "operationId": "deleteCredential",
+        "summary": "删除供应商；重复删除返回 deleted=0。 / Delete supplier; repeated deletion returns deleted=0.",
+        "tags": [
+          "Supplier management"
+        ],
+        "responses": {
+          "200": {
+            "description": "成功。 / Success.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Deletion"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Error401"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error403"
+          },
+          "500": {
+            "$ref": "#/components/responses/Error500"
+          },
+          "503": {
+            "$ref": "#/components/responses/Error503"
+          },
+          "400": {
+            "$ref": "#/components/responses/Error400"
+          }
+        },
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/CredentialName"
+          }
+        ],
+        "requestBody": {
+          "required": false,
+          "description": "空正文沿用空对象语义；正文存在时必须是 JSON 对象。 / Empty body acts as an empty object; nonempty body must be a JSON object.",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CredentialInput"
+              },
+              "example": {
+                "credential_name": "example-provider",
+                "credential_info": {
+                  "custom_llm_provider": "openai"
+                },
+                "credential_values": {
+                  "api_base": "https://provider.example/v1",
+                  "api_key": "example-not-a-secret"
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "securitySchemes": {
+      "bearerAuth": {
+        "type": "http",
+        "scheme": "bearer",
+        "description": "XHub 管理员会话或允许管理的凭据。 / XHub administrator credentials."
+      }
+    },
+    "schemas": {
+      "CredentialInput": {
+        "type": "object",
+        "description": "创建/更新 JSON 对象；没有必填业务字段，扩展字段保留，password 顶层字段忽略，jsonrpc 顶层字段拒绝。 / Create/update object; no required business fields, extensions retained, top-level password ignored and jsonrpc rejected.",
+        "properties": {
+          "credential_name": {
+            "nullable": true,
+            "description": "供应商名；创建缺省或非字符串时生成 ID。 / Name; generated when absent or non-string on create."
+          },
+          "credential_info": {
+            "nullable": true,
+            "description": "供应商元数据，历史接口允许任意 JSON。 / Provider metadata; legacy API accepts any JSON."
+          },
+          "credential_values": {
+            "nullable": true,
+            "description": "凭据字段；对象内敏感字符串读取时脱敏，创建响应省略对象。PATCH 忽略空值或含 ** 的敏感字段，非对象补丁忽略。 / Credential object is masked on read and omitted on create. PATCH ignores blank/masked secret fields and non-object values."
+          },
+          "created_at": {
+            "nullable": true,
+            "description": "创建时间；历史接口允许调用者覆盖。 / Creation time; legacy caller overrides are accepted."
+          }
+        },
+        "additionalProperties": true,
+        "x-go-type": "map[string]json.RawMessage"
+      },
+      "Credential": {
+        "type": "object",
+        "required": [
+          "id",
+          "credential_name",
+          "credential_info"
+        ],
+        "properties": {
+          "credential_info": {
+            "nullable": true,
+            "description": "供应商元数据，历史接口允许任意 JSON。 / Provider metadata; legacy API accepts any JSON."
+          },
+          "credential_values": {
+            "nullable": true,
+            "description": "凭据字段；对象内敏感字符串读取时脱敏，创建响应省略对象。PATCH 忽略空值或含 ** 的敏感字段，非对象补丁忽略。 / Credential object is masked on read and omitted on create. PATCH ignores blank/masked secret fields and non-object values."
+          },
+          "created_at": {
+            "nullable": true,
+            "description": "创建时间；历史接口允许调用者覆盖。 / Creation time; legacy caller overrides are accepted."
+          },
+          "id": {
+            "type": "string"
+          },
+          "credential_name": {
+            "type": "string"
+          }
+        },
+        "additionalProperties": true,
+        "x-go-type": "map[string]json.RawMessage",
+        "description": "供应商读取或保存结果；管理接口返回，Go 原始 JSON 类型保留扩展字段及 null。 / Supplier read/save result; raw JSON Go representation preserves extensions and nulls."
+      },
+      "CredentialList": {
+        "type": "object",
+        "required": [
+          "object",
+          "data",
+          "credentials"
+        ],
+        "properties": {
+          "object": {
+            "type": "string",
+            "enum": [
+              "list"
+            ]
+          },
+          "data": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Credential"
+            }
+          },
+          "credentials": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Credential"
+            }
+          }
+        },
+        "description": "供应商列表响应；data 与 credentials 是同一列表的兼容别名。 / Supplier list response; data and credentials are equivalent compatibility aliases."
+      },
+      "Deletion": {
+        "type": "object",
+        "required": [
+          "id",
+          "credential_name",
+          "deleted"
+        ],
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "credential_name": {
+            "type": "string"
+          },
+          "deleted": {
+            "type": "integer",
+            "minimum": 0
+          }
+        },
+        "description": "删除结果；deleted 为实际删除条数，重复删除可为零。 / Deletion result; deleted counts actual removals and may be zero on repeats."
+      },
+      "Error": {
+        "type": "object",
+        "required": [
+          "error"
+        ],
+        "properties": {
+          "error": {
+            "$ref": "#/components/schemas/ErrorDetail"
+          }
+        },
+        "description": "管理接口错误信封；HTTP 状态与 code 一致，不用成功对象代替失败。 / Management error envelope; code matches HTTP status and failures never use a success object."
+      },
+      "Error401": {
+        "type": "object",
+        "required": [
+          "error"
+        ],
+        "properties": {
+          "error": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/ErrorDetail"
+              },
+              {
+                "type": "object",
+                "required": [
+                  "code"
+                ],
+                "properties": {
+                  "code": {
+                    "type": "string",
+                    "pattern": "^401$"
+                  }
+                }
+              }
+            ]
+          }
+        },
+        "description": "完整错误字段在同一对象层合并，避免生成器覆盖嵌套 error。 / Error fields are combined at the same object level to avoid replacing the nested error."
+      },
+      "Error403": {
+        "type": "object",
+        "required": [
+          "error"
+        ],
+        "properties": {
+          "error": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/ErrorDetail"
+              },
+              {
+                "type": "object",
+                "required": [
+                  "code"
+                ],
+                "properties": {
+                  "code": {
+                    "type": "string",
+                    "pattern": "^403$"
+                  }
+                }
+              }
+            ]
+          }
+        },
+        "description": "完整错误字段在同一对象层合并，避免生成器覆盖嵌套 error。 / Error fields are combined at the same object level to avoid replacing the nested error."
+      },
+      "Error500": {
+        "type": "object",
+        "required": [
+          "error"
+        ],
+        "properties": {
+          "error": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/ErrorDetail"
+              },
+              {
+                "type": "object",
+                "required": [
+                  "code"
+                ],
+                "properties": {
+                  "code": {
+                    "type": "string",
+                    "pattern": "^500$"
+                  }
+                }
+              }
+            ]
+          }
+        },
+        "description": "完整错误字段在同一对象层合并，避免生成器覆盖嵌套 error。 / Error fields are combined at the same object level to avoid replacing the nested error."
+      },
+      "Error503": {
+        "type": "object",
+        "required": [
+          "error"
+        ],
+        "properties": {
+          "error": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/ErrorDetail"
+              },
+              {
+                "type": "object",
+                "required": [
+                  "code"
+                ],
+                "properties": {
+                  "code": {
+                    "type": "string",
+                    "pattern": "^503$"
+                  }
+                }
+              }
+            ]
+          }
+        },
+        "description": "完整错误字段在同一对象层合并，避免生成器覆盖嵌套 error。 / Error fields are combined at the same object level to avoid replacing the nested error."
+      },
+      "Error400": {
+        "type": "object",
+        "required": [
+          "error"
+        ],
+        "properties": {
+          "error": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/ErrorDetail"
+              },
+              {
+                "type": "object",
+                "required": [
+                  "code"
+                ],
+                "properties": {
+                  "code": {
+                    "type": "string",
+                    "pattern": "^400$"
+                  }
+                }
+              }
+            ]
+          }
+        },
+        "description": "完整错误字段在同一对象层合并，避免生成器覆盖嵌套 error。 / Error fields are combined at the same object level to avoid replacing the nested error."
+      },
+      "Error404": {
+        "type": "object",
+        "required": [
+          "error"
+        ],
+        "properties": {
+          "error": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/ErrorDetail"
+              },
+              {
+                "type": "object",
+                "required": [
+                  "code"
+                ],
+                "properties": {
+                  "code": {
+                    "type": "string",
+                    "pattern": "^404$"
+                  }
+                }
+              }
+            ]
+          }
+        },
+        "description": "完整错误字段在同一对象层合并，避免生成器覆盖嵌套 error。 / Error fields are combined at the same object level to avoid replacing the nested error."
+      },
+      "ErrorDetail": {
+        "type": "object",
+        "required": [
+          "code",
+          "message",
+          "type",
+          "param"
+        ],
+        "properties": {
+          "code": {
+            "type": "string",
+            "pattern": "^[45][0-9]{2}$"
+          },
+          "message": {
+            "type": "string"
+          },
+          "type": {
+            "type": "string"
+          },
+          "param": {
+            "nullable": true,
+            "x-go-type": "json.RawMessage",
+            "x-go-type-skip-optional-pointer": true,
+            "description": "当前为 null。 / Currently null."
+          }
+        }
+      }
+    },
+    "responses": {
+      "Error401": {
+        "description": "未登录或凭据无效。 / Missing or invalid authentication.",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/Error401"
+            }
+          }
+        }
+      },
+      "Error403": {
+        "description": "非管理员。 / Administrator required.",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/Error403"
+            }
+          }
+        }
+      },
+      "Error500": {
+        "description": "持久化失败，不伪造成功。 / Storage failure, never success.",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/Error500"
+            }
+          }
+        }
+      },
+      "Error503": {
+        "description": "存储不可用。 / Store unavailable.",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/Error503"
+            }
+          }
+        }
+      },
+      "Error400": {
+        "description": "非法 JSON 或 REST 端点收到 JSON-RPC。 / Invalid JSON or JSON-RPC on REST.",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/Error400"
+            }
+          }
+        }
+      },
+      "Error404": {
+        "description": "记录不存在。 / Record not found.",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/Error404"
+            }
+          }
+        }
+      }
+    },
+    "parameters": {
+      "CredentialName": {
+        "name": "credential_name",
+        "in": "path",
+        "required": true,
+        "description": "普通资源名称。保留动作词和集合别名不在本试点范围，参见边界文档。 / Ordinary resource name; reserved action/collection aliases are outside the pilot.",
+        "schema": {
+          "type": "string",
+          "minLength": 1,
+          "pattern": "^[^/]+$"
+        },
+        "x-unverified-name-cases": {
+          "anyOf": [
+            {
+              "enum": [
+                "new",
+                "list",
+                "info",
+                "update",
+                "delete",
+                "register",
+                "runs",
+                "credentials",
+                "credential",
+                "v1",
+                "v2",
+                "v1beta",
+                "api",
+                "ui",
+                "server",
+                "servers",
+                "plugins",
+                "health",
+                "access_groups",
+                "submissions",
+                "available_providers",
+                "toolset",
+                "toolsets",
+                "fields",
+                "discover",
+                "templates",
+                "overview",
+                "logs",
+                "configs",
+                "budgets",
+                "users",
+                "end_users"
+              ]
+            },
+            {
+              "pattern": "settings"
+            }
+          ]
+        }
+      }
+    }
+  }
+}

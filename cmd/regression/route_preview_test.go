@@ -58,11 +58,12 @@ func TestRoutePreviewMatchesInference(t *testing.T) {
 		}
 	}
 	// 无上限的密钥也累计窗口用量。另发新密钥再设 RPM=1，隔离前面真实推理的计数，
-	// 不清 Redis 桶也不依赖跨分钟等待；这样连续预览后的首次推理才验证预览没有消耗额度。
+	// 不清Redis桶；计数序列在安全分钟区间启动，避免CI恰在分钟重置时把正常放行误报为限流失效。
 	c.key, c.keyID = h.issueKey(t, c.session, c.teamID, c.projectID, "preview-fresh-window")
 	c.keySecret = c.key
 	bindTemplate(t, h, admin, "key", c.keyID, key)
 	h.ok(http.MethodPost, "/key/update", admin, map[string]any{"key": c.key, "rpm_limit": 1, "tpm_limit": 100})
+	waitForRateTestMinute(t)
 	preview(c.key, key, "key", "preview-a")
 	h.assertBilled(t, c, admin, model, "key-priority", []string{"preview-a"})
 	preview(c.key, key, "key", "preview-a")

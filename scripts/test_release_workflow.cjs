@@ -45,7 +45,8 @@ test('API client reliability gate runs all flows independently and preserves fai
       });
       assert.equal(result.status, status, '浏览器失败必须阻断发布：' + result.stderr);
       assert.deepEqual(readFileSync(join(directory, 'arguments'), 'utf8').trim().split('\n'), [
-        'client-docs-url-', 'client-cancellation-', 'stream-terminal-sc-',
+        'scenarios/legacy/error-logs/sc-020.test.ts',
+        'proxy-body-limit.test.ts', 'client-docs-url-', 'client-cancellation-', 'stream-terminal-sc-',
         'billing-pending-recovery', 'usage-spool-', 'key-lifecycle-', 'agent-history-', 'hard-budget-', 'budget-reconciliation-', 'messages-signed-history-', 'claude-client-compat-', 'user-bulk-budget-',
         'scenarios/enterprise/saml-', 'scenarios/enterprise/sso-valid.test.ts', 'scenarios/directory/sso-config.test.ts',
       ]);
@@ -347,7 +348,7 @@ test('hard budget tier scenarios are registered and selected by the release gate
   }
 });
 
-/** 前置发布 YAML 与 SAML 场景登记；确认双语 HTTP/HTTPS、拒绝和证书边界进入实际 CI，不把跳过当通过；只读无需清理。 */
+/** 前置发布 YAML 与 SAML 场景登记；确认双语 HTTP/HTTPS、拒绝、证书及刷新边界进入实际 CI，不把跳过当通过；只读无需清理。 */
 test('SAML release gate includes protocol components and every registered browser flow', () => {
   assert.ok(workflow.jobs.verify.steps.some(item => item.run === 'go test ./internal/... ./cmd/regression/testsupport/...'), 'SAML 夹具移出生产目录后仍必须运行真实签名与加密单元测试');
   const steps = workflow.jobs.verify.steps;
@@ -359,7 +360,9 @@ test('SAML release gate includes protocol components and every registered browse
   const scenarios = JSON.parse(readFileSync(join(__dirname, '../frontend/e2e/scenario-catalog.json'), 'utf8'));
   const rows = Array.isArray(scenarios) ? scenarios : scenarios.scenarios;
   const saml = rows.filter(item => item.file.includes('/saml-'));
-  assert.equal(saml.length, 9, 'SAML HTTP/HTTPS、未知用户、篡改、重放和过期证书场景必须完整登记');
+  assert.equal(saml.length, 11, 'SAML 原有九条及新增双语元数据刷新必须完整登记');
+  assert.ok(unit.run.includes('SAMLRefresh.test.tsx'), '刷新组件必须进入发布门禁');
+  for (const locale of ['en', 'zh-CN']) assert.ok(saml.some(item => item.file === `e2e/scenarios/enterprise/saml-refresh-${locale}.test.ts`), '缺少刷新场景：' + locale);
 });
 
 /** 前置真实发布配置及完整场景目录；验证人工对账组件、动态错误与双语真实浏览器闭环都进入CI，避免只跑静态mock；只读无需清理。 */
@@ -375,5 +378,272 @@ test('budget reconciliation release gate covers components and bilingual real fl
     const file = `e2e/scenarios/regression/budget-reconciliation-${locale}.test.ts`;
     assert.ok(catalog.some(row => row.file === file && row.kind === 'implemented'), '人工对账场景未登记：' + locale);
     assert.ok(existsSync(join(__dirname, '../frontend', file)), '人工对账场景不存在：' + locale);
+  }
+});
+
+/** 验证数据库先于 Go 测试启动、门禁自测与原始证据进入发布流程；只读工作流，无需清理。 */
+test('test gates require PostgreSQL, self-tests and structured evidence', () => {
+  const steps = workflow.jobs.verify.steps;
+  const database = steps.findIndex(item => item.run === 'docker compose up -d --wait postgres redis');
+  const unit = steps.findIndex(item => item.run === 'go test ./internal/... ./cmd/regression/testsupport/...');
+  assert.ok(database >= 0 && database < unit, '数据库必须先于全部 DB 夹具测试启动');
+  const commands = steps.map(item => item.run || '').join('\n');
+  for (const name of ['scripts.test_regression_results', 'scripts.test_test_gates', 'scripts.test_e2e_summary', 'scripts.test_e2e_model_endpoints', 'frontend/e2e/checklist-reporter.test.cjs', 'frontend/e2e/guard-resource-cleanup.test.cjs', 'frontend/e2e/guard-resource-fixture.test.cjs', 'frontend/e2e/gateway-response.test.cjs']) {
+    assert.ok(commands.includes(name), `缺少门禁测试 ${name}`);
+  }
+  const paths = steps.filter(item => item.uses === 'actions/upload-artifact@v4').map(item => item.with.path).join('\n');
+  assert.ok(paths.includes('.e2e/runs/regression-*/events.jsonl'));
+  assert.ok(paths.includes('.e2e/runs/regression-*/summary.json'));
+  assert.ok(paths.includes('.e2e/release/cleanup-status.json'));
+  assert.ok(paths.includes('.e2e/release-agent-reliability/cleanup-status.json'));
+});
+
+/** 搜索配置服务发布前必须执行双语真实页面流程；检查登记文件存在且纳入实际 E2E 命令，无外部清理。 */
+test('search configuration release gate includes bilingual real flows', () => {
+  const command = workflow.jobs.verify.steps.find(item => item.run?.startsWith('bash scripts/e2e.sh '))?.run;
+  for (const file of ['scenarios/columns/search-tools-connection.test.ts', 'scenarios/regression/search_tools-probe-en.test.ts']) {
+    assert.ok(command?.split(' ').includes(file), '真实搜索页面门禁缺失：' + file);
+    assert.ok(existsSync(join(__dirname, '../frontend/e2e', file)));
+  }
+});
+
+/** 发布验证需执行中英文提示词编辑到推理与用量的真实流程；只读登记和命令，无外部清理。 */
+test('prompt configuration release gate includes bilingual execution flows', () => {
+  const command = workflow.jobs.verify.steps.find(item => item.run?.startsWith('bash scripts/e2e.sh '))?.run;
+  for (const file of ['scenarios/columns/prompts-test.test.ts', 'scenarios/regression/prompts-probe-en.test.ts']) {
+    assert.ok(command?.split(' ').includes(file), '提示词真实流程缺失：' + file);
+    assert.ok(existsSync(join(__dirname, '../frontend/e2e', file)));
+  }
+});
+
+/** 发布验证需执行中英文护栏编辑到推理与用量的真实流程；只读登记和命令，无外部清理。 */
+test('guard management release gate includes bilingual execution flows', () => {
+  const command = workflow.jobs.verify.steps.find(item => item.run?.startsWith('bash scripts/e2e.sh '))?.run;
+  for (const file of ['scenarios/regression/guard-management-service-zh-CN.test.ts', 'scenarios/regression/guard-management-service-en.test.ts']) {
+    assert.ok(command?.split(' ').includes(file), '护栏真实流程缺失：' + file);
+    assert.ok(existsSync(join(__dirname, '../frontend/e2e', file)));
+  }
+});
+
+/** 发布校验必须运行双语标签读写与真实聊天流程；只检查工作流声明，不代替浏览器结果，无外部副作用。 */
+test('release verifies tag catalog browser flows', () => {
+ const browser=workflow.jobs.verify.steps.find(s=>s.run?.startsWith('bash scripts/e2e.sh scenarios/legacy/login/sc-056.test.ts'));
+ assert.ok(browser);
+ for(const locale of ['en','zh-CN']) assert.ok(browser.run.includes(`scenarios/regression/tag-catalog-${locale}.test.ts`));
+});
+
+/** 发布校验必须运行双语元数据读写与真实聊天流程；只检查工作流声明，不代替浏览器结果，无外部副作用。 */
+test('release verifies metadata configuration browser flows', () => {
+ const browser=workflow.jobs.verify.steps.find(s=>s.run?.startsWith('bash scripts/e2e.sh scenarios/legacy/login/sc-056.test.ts'));
+ assert.ok(browser);
+ for(const locale of ['en','zh-CN']) assert.ok(browser.run.includes(`scenarios/regression/metadata-config-service-${locale}.test.ts`));
+});
+
+/** 发布验证必须包含预算页面与IAM旧入口的双语真实浏览器场景；只检查配置，不启动生产服务。 */
+test('budget IAM boundary browser regressions remain in release gate', () => {
+  const text = require('node:fs').readFileSync(require('node:path').join(__dirname, '../.github/workflows/release.yml'), 'utf8');
+  for (const locale of ['en', 'zh-CN']) assert.ok(text.includes('scenarios/regression/budget-iam-' + locale + '.test.ts'));
+});
+
+/** 运维错误语义必须在两个语言环境走真实浏览器/网关/模型流程；读取配置不产生外部数据。 */
+test('operations boundary browser regressions remain in release gate', () => {
+  const text = require('node:fs').readFileSync(require('node:path').join(__dirname, '../.github/workflows/release.yml'), 'utf8');
+  for (const locale of ['en', 'zh-CN']) assert.ok(text.includes('scenarios/regression/operations-boundary-' + locale + '.test.ts'));
+});
+
+/** 缓存双语清理与真实数据面必须进入发布门禁；只读无清理。 */
+test('cache management release gate includes bilingual execution flows', () => {
+  const command = workflow.jobs.verify.steps.find(item => item.run?.startsWith('bash scripts/e2e.sh '))?.run;
+  for (const file of ['scenarios/columns/caching-save.test.ts', 'scenarios/columns/caching-flush.test.ts']) {
+    assert.ok(command?.split(' ').includes(file), '缓存真实流程缺失：' + file);
+    assert.ok(existsSync(join(__dirname, '../frontend/e2e', file)));
+  }
+});
+
+/** 旧server授权边界必须进入真实发布浏览器门禁；验证双语场景都注册且没有跳过，配置只读无需清理。 */
+test('server OAuth release gate includes bilingual real flows', () => {
+  const browser = workflow.jobs.verify.steps.find(item => (item.run || '').startsWith('bash scripts/e2e.sh '));
+  assert.ok(browser, '发布缺少真实浏览器门禁');
+  const catalog = JSON.parse(readFileSync(join(__dirname, '../frontend/e2e/scenario-catalog.json'), 'utf8'));
+  for (const locale of ['en', 'zh-CN']) {
+    const file = `scenarios/regression/server-oauth-${locale}.test.ts`;
+    assert.ok(browser.run.split(/\s+/).includes(file), '发布遗漏 ' + file);
+    assert.equal(catalog.find(item => item.file === 'e2e/' + file)?.kind, 'implemented');
+  }
+});
+
+/** 旧server运行时边界必须进入真实发布浏览器门禁；验证双语场景都注册且没有跳过，配置只读无需清理。 */
+test('server runtime release gate includes bilingual real flows', () => {
+  const browser = workflow.jobs.verify.steps.find(item => (item.run || '').startsWith('bash scripts/e2e.sh '));
+  assert.ok(browser, '发布缺少真实浏览器门禁');
+  const catalog = JSON.parse(readFileSync(join(__dirname, '../frontend/e2e/scenario-catalog.json'), 'utf8'));
+  for (const locale of ['en', 'zh-CN']) {
+    const file = `scenarios/regression/server-runtime-${locale}.test.ts`;
+    assert.ok(browser.run.split(/\s+/).includes(file), '发布遗漏 ' + file);
+    assert.equal(catalog.find(item => item.file === 'e2e/' + file)?.kind, 'implemented');
+  }
+});
+
+/** 旧server审批边界必须进入真实发布浏览器门禁；验证双语场景都注册且没有跳过，配置只读无需清理。 */
+test('server submission release gate includes bilingual real flows', () => {
+  const browser = workflow.jobs.verify.steps.find(item => (item.run || '').startsWith('bash scripts/e2e.sh '));
+  assert.ok(browser, '发布缺少真实浏览器门禁');
+  const catalog = JSON.parse(readFileSync(join(__dirname, '../frontend/e2e/scenario-catalog.json'), 'utf8'));
+  for (const locale of ['en', 'zh-CN']) {
+    const file = `scenarios/regression/server-submission-${locale}.test.ts`;
+    assert.ok(browser.run.split(/\s+/).includes(file), '发布遗漏 ' + file);
+    assert.equal(catalog.find(item => item.file === 'e2e/' + file)?.kind, 'implemented');
+  }
+});
+
+/** 插件启停边界必须进入真实发布浏览器门禁；验证双语场景都注册且没有跳过，配置只读无需清理。 */
+test('plugin activation release gate includes bilingual real flows', () => {
+  const browser = workflow.jobs.verify.steps.find(item => (item.run || '').startsWith('bash scripts/e2e.sh '));
+  assert.ok(browser, '发布缺少真实浏览器门禁');
+  const catalog = JSON.parse(readFileSync(join(__dirname, '../frontend/e2e/scenario-catalog.json'), 'utf8'));
+  for (const locale of ['en', 'zh-CN']) {
+    const file = `scenarios/regression/plugin-activation-${locale}.test.ts`;
+    assert.ok(browser.run.split(/\s+/).includes(file), '发布遗漏 ' + file);
+    assert.equal(catalog.find(item => item.file === 'e2e/' + file)?.kind, 'implemented');
+  }
+});
+
+/** 插件筛选边界必须进入真实发布浏览器门禁；验证双语场景都注册且没有跳过，配置只读无需清理。 */
+test('plugin filter release gate includes bilingual real flows', () => {
+  const browser = workflow.jobs.verify.steps.find(item => (item.run || '').startsWith('bash scripts/e2e.sh '));
+  assert.ok(browser, '发布缺少真实浏览器门禁');
+  const catalog = JSON.parse(readFileSync(join(__dirname, '../frontend/e2e/scenario-catalog.json'), 'utf8'));
+  for (const locale of ['en', 'zh-CN']) {
+    const file = `scenarios/regression/plugin-filter-${locale}.test.ts`;
+    assert.ok(browser.run.split(/\s+/).includes(file), '发布遗漏 ' + file);
+    assert.equal(catalog.find(item => item.file === 'e2e/' + file)?.kind, 'implemented');
+  }
+});
+
+/** 插件注册边界必须进入真实发布浏览器门禁；验证双语场景都注册且没有跳过，配置只读无需清理。 */
+test('plugin registration release gate includes bilingual real flows', () => {
+  const browser = workflow.jobs.verify.steps.find(item => (item.run || '').startsWith('bash scripts/e2e.sh '));
+  assert.ok(browser, '发布缺少真实浏览器门禁');
+  const catalog = JSON.parse(readFileSync(join(__dirname, '../frontend/e2e/scenario-catalog.json'), 'utf8'));
+  for (const locale of ['en', 'zh-CN']) {
+    const file = `scenarios/regression/plugin-registration-${locale}.test.ts`;
+    assert.ok(browser.run.split(/\s+/).includes(file), '发布遗漏 ' + file);
+    assert.equal(catalog.find(item => item.file === 'e2e/' + file)?.kind, 'implemented');
+  }
+});
+
+/** Skill资源边界必须进入真实发布浏览器门禁；验证双语场景都注册且没有跳过，配置只读无需清理。 */
+test('skill resource release gate includes bilingual real flows', () => {
+  const browser = workflow.jobs.verify.steps.find(item => (item.run || '').startsWith('bash scripts/e2e.sh '));
+  assert.ok(browser, '发布缺少真实浏览器门禁');
+  const catalog = JSON.parse(readFileSync(join(__dirname, '../frontend/e2e/scenario-catalog.json'), 'utf8'));
+  for (const locale of ['en', 'zh-CN']) {
+    const file = `scenarios/regression/skill-resource-${locale}.test.ts`;
+    assert.ok(browser.run.split(/\s+/).includes(file), '发布遗漏 ' + file);
+    assert.equal(catalog.find(item => item.file === 'e2e/' + file)?.kind, 'implemented');
+  }
+});
+
+/** 发布验证需执行中英文Skill目录失败提示到推理的真实流程；只读登记和命令，无外部清理。 */
+test('SkillHub support release gate includes bilingual execution flows', () => {
+  const command = workflow.jobs.verify.steps.find(item => item.run?.startsWith('bash scripts/e2e.sh '))?.run;
+  for (const file of ['scenarios/regression/skill-hub-support-zh-CN.test.ts', 'scenarios/regression/skill-hub-support-en.test.ts']) {
+    assert.ok(command?.split(' ').includes(file), 'SkillHub真实流程缺失：' + file);
+    assert.ok(existsSync(join(__dirname, '../frontend/e2e', file)));
+  }
+});
+
+/** Key旧控件清理必须保留双语真实编辑与数据面验证；只读工作流和用例文件，无外部副作用。 */
+test('key basic editor release gate includes bilingual permission preservation flows', () => {
+  const command = workflow.jobs.verify.steps.find(item => item.run?.startsWith('bash scripts/e2e.sh '))?.run;
+  for (const locale of ['en', 'zh-CN']) {
+    const file = `scenarios/regression/key-basic-edit-${locale}.test.ts`;
+    assert.ok(command?.split(' ').includes(file), '缺少真实Key编辑流程：' + file);
+    assert.ok(existsSync(join(__dirname, '../frontend/e2e', file)));
+  }
+});
+
+/** 发布验证需执行中英文旧入口拒绝后正常对话的真实流程；只读登记和命令，无外部清理。 */
+test('legacy inference release gate includes bilingual execution flows', () => {
+  const command = workflow.jobs.verify.steps.find(item => item.run?.startsWith('bash scripts/e2e.sh '))?.run;
+  for (const file of ['scenarios/regression/legacy-inference-zh-CN.test.ts', 'scenarios/regression/legacy-inference-en.test.ts']) {
+    assert.ok(command?.split(' ').includes(file), '旧入口真实流程缺失：' + file);
+    assert.ok(existsSync(join(__dirname, '../frontend/e2e', file)));
+  }
+});
+
+/** 发布验证需执行中英文旧批处理拒绝后正常对话的真实流程；只读登记和命令，无外部清理。 */
+test('provider batch release gate includes bilingual execution flows', () => {
+  const command = workflow.jobs.verify.steps.find(item => item.run?.startsWith('bash scripts/e2e.sh '))?.run;
+  for (const file of ['scenarios/regression/provider-batch-zh-CN.test.ts', 'scenarios/regression/provider-batch-en.test.ts']) {
+    assert.ok(command?.split(' ').includes(file), '旧批处理真实流程缺失：' + file);
+    assert.ok(existsSync(join(__dirname, '../frontend/e2e', file)));
+  }
+});
+
+/** 发布验证需执行中英文旧分析入口拒绝后正常对话的真实流程；只读登记和命令，无外部清理。 */
+test('medical alias release gate includes bilingual execution flows', () => {
+  const command = workflow.jobs.verify.steps.find(item => item.run?.startsWith('bash scripts/e2e.sh '))?.run;
+  for (const file of ['scenarios/regression/medical-alias-zh-CN.test.ts', 'scenarios/regression/medical-alias-en.test.ts']) {
+    assert.ok(command?.split(' ').includes(file), '旧分析入口真实流程缺失：' + file);
+    assert.ok(existsSync(join(__dirname, '../frontend/e2e', file)));
+  }
+});
+
+/** C1辅助操作失败后仍可创建配置并对话；发布命令必须包含双语真实流程，检查只读且不产生业务数据。 */
+test('service auxiliary release gate includes bilingual real flows', () => {
+  const command = workflow.jobs.verify.steps.find(item => item.run?.startsWith('bash scripts/e2e.sh '))?.run;
+  for (const file of ['scenarios/regression/service-aux-en.test.ts', 'scenarios/regression/service-aux-zh-CN.test.ts']) {
+    assert.ok(command?.split(' ').includes(file), '辅助接口真实回归缺失：' + file);
+    assert.ok(existsSync(join(__dirname, '../frontend/e2e', file)));
+  }
+});
+
+/** 身份旧接口双语真实浏览器场景必须加入发布门禁，不可只在本地运行；仅静态读取工作流，无资源清理。 */
+test('release includes identity alias real browser regressions', () => {
+  const source = require('node:fs').readFileSync(require('node:path').join(__dirname, '../.github/workflows/release.yml'), 'utf8');
+  for (const locale of ['en','zh-CN']) assert.ok(source.includes(`scenarios/regression/identity-alias-${locale}.test.ts`));
+});
+
+/** 发布门禁包含运维边界双语真实流程；只读工作流，禁止只在本地验证后遗漏CI。 */
+test('release includes runtime operation browser regressions', () => {
+  const source = require('node:fs').readFileSync(require('node:path').join(__dirname, '../.github/workflows/release.yml'), 'utf8');
+  for (const locale of ['en','zh-CN']) assert.ok(source.includes(`scenarios/regression/runtime-operation-${locale}.test.ts`));
+});
+
+/** 发布门禁包含设置边界双语真实流程；只读工作流，禁止只在本地验证后遗漏CI。 */
+test('release includes settings operation browser regressions', () => {
+  const source = require('node:fs').readFileSync(require('node:path').join(__dirname, '../.github/workflows/release.yml'), 'utf8');
+  for (const locale of ['en','zh-CN']) assert.ok(source.includes(`scenarios/regression/settings-operation-${locale}.test.ts`));
+});
+
+/** 发布门禁包含模型旧入口边界双语真实流程；只读工作流，禁止只在本地验证后遗漏CI。 */
+test('release includes model alias browser regressions', () => {
+  const source = require('node:fs').readFileSync(require('node:path').join(__dirname, '../.github/workflows/release.yml'), 'utf8');
+  for (const locale of ['en','zh-CN']) assert.ok(source.includes(`scenarios/regression/model-alias-${locale}.test.ts`));
+});
+
+/** 统计边界必须纳入发布浏览器验收，防止有测试文件但发布不执行；只读工作流无需清理。 */
+test('release includes analytics boundary browser scenarios', () => {
+ const source = require('node:fs').readFileSync('.github/workflows/release.yml','utf8');
+ for(const locale of ['en','zh-CN']) assert.ok(source.includes(`scenarios/regression/analytics-boundary-${locale}.test.ts`));
+});
+
+/** 验证日志候选的中英文真实浏览器流程列入发布门禁；只读取工作流，不访问线上，无清理需求。 */
+test('release includes both log filter suggestion browser scenarios', () => {
+  const source = require('node:fs').readFileSync('.github/workflows/release.yml', 'utf8');
+  for (const locale of ['en', 'zh-CN']) {
+    const scenario = `scenarios/permissions/log-options-${locale}.test.ts`;
+    assert.equal(source.split(scenario).length - 1, 1, `日志筛选浏览器流程遗漏或重复: ${locale}`);
+  }
+});
+
+/** 组合验收不能仅靠五个PR各自通过；发布流水线必须运行同一网关中的双语组合流程。
+ * 前置工作流静态文件，验证两种语言均登记且不重复；不连接GitHub或修改文件，无清理副作用。 */
+test('release includes combined phase4 browser acceptance once per locale', () => {
+  const source = require('node:fs').readFileSync(require('node:path').join(__dirname, '../.github/workflows/release.yml'), 'utf8');
+  for (const locale of ['en','zh-CN']) {
+    const scenario = `scenarios/regression/stage4-combined-${locale}.test.ts`;
+    assert.equal(source.split(scenario).length - 1, 1, `组合验收遗漏或重复: ${locale}`);
   }
 });

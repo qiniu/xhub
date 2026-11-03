@@ -38,7 +38,7 @@ interface KeyEditViewProps {
 /** 构建精简编辑器校验；无参数，返回当前语言的 schema，空期限保留现状，非法期限阻止提交。 */
 function editorSchema() {
   const duration = z
-    .custom<string | null | undefined>()
+    .custom<string | null | undefined>().optional()
     .refine((value) => !value?.trim() || /^[1-9][0-9]*[smhd]$/.test(value.trim()), {
       error: () => t("keyEditor.invalidDuration"),
     });
@@ -53,7 +53,7 @@ function editorSchema() {
       route_template_id: true,
       auto_rotate: true,
     })
-    .extend({ duration, rotation_interval: z.custom<string | undefined>() })
+    .extend({ duration, rotation_interval: z.custom<string | undefined>().optional() })
     .superRefine((value, context) => {
       if (value.auto_rotate && !/^[1-9][0-9]*[smhd]$/.test(value.rotation_interval ?? "")) {
         context.addIssue({ code: "custom", path: ["duration"], message: t("keyEditor.invalidDuration") });

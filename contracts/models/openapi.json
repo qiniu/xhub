@@ -1,0 +1,1462 @@
+{
+  "openapi": "3.0.3",
+  "info": {
+    "title": "XHub model and endpoint management",
+    "version": "1.0.0"
+  },
+  "paths": {
+    "/v2/model/info": {
+      "get": {
+        "operationId": "listDeployments",
+        "summary": "读取部署列表 / List deployments",
+        "description": "仅平台管理员；未知ID为空列表；其他旧筛选参数被忽略 / Platform admin only; unknown ID returns empty list; other legacy filters are ignored",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "成功或显式业务结果 / Success or explicit business result",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DeploymentList"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Error401"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error403"
+          }
+        },
+        "parameters": [
+          {
+            "in": "query",
+            "name": "modelId",
+            "schema": {
+              "type": "string"
+            },
+            "description": "保留既有字符串解析 / Existing string parsing retained"
+          },
+          {
+            "in": "query",
+            "name": "search",
+            "schema": {
+              "type": "string"
+            },
+            "description": "保留既有字符串解析 / Existing string parsing retained"
+          },
+          {
+            "in": "query",
+            "name": "page",
+            "schema": {
+              "type": "string"
+            },
+            "description": "保留既有字符串解析 / Existing string parsing retained"
+          },
+          {
+            "in": "query",
+            "name": "size",
+            "schema": {
+              "type": "string"
+            },
+            "description": "保留既有字符串解析 / Existing string parsing retained"
+          }
+        ]
+      }
+    },
+    "/model/groups": {
+      "get": {
+        "operationId": "listModelGroups",
+        "summary": "读取公开模型分组 / List public model groups",
+        "description": "读取公开模型分组 / List public model groups",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "成功或显式业务结果 / Success or explicit business result",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GroupList"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Error401"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error403"
+          },
+          "500": {
+            "$ref": "#/components/responses/Error500"
+          },
+          "503": {
+            "$ref": "#/components/responses/Error503"
+          }
+        },
+        "parameters": [
+          {
+            "in": "query",
+            "name": "search",
+            "schema": {
+              "type": "string"
+            },
+            "description": "保留既有字符串解析 / Existing string parsing retained"
+          },
+          {
+            "in": "query",
+            "name": "page",
+            "schema": {
+              "type": "string"
+            },
+            "description": "保留既有字符串解析 / Existing string parsing retained"
+          },
+          {
+            "in": "query",
+            "name": "size",
+            "schema": {
+              "type": "string"
+            },
+            "description": "保留既有字符串解析 / Existing string parsing retained"
+          }
+        ]
+      }
+    },
+    "/model/new": {
+      "post": {
+        "operationId": "createDeployment",
+        "summary": "创建数据库部署 / Create stored deployment",
+        "description": "声明已支持输入；附加跨字段校验由真实服务执行，未安装运行时严格校验 / Declares supported input; cross-field checks remain in real service, no strict runtime middleware",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "成功或显式业务结果 / Success or explicit business result",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Deployment"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/Error400"
+          },
+          "401": {
+            "$ref": "#/components/responses/Error401"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error403"
+          },
+          "409": {
+            "$ref": "#/components/responses/Error409"
+          },
+          "500": {
+            "$ref": "#/components/responses/Error500"
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateDeployment"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/model/update": {
+      "post": {
+        "operationId": "updateDeployment",
+        "summary": "合并部署补丁 / Merge deployment patch",
+        "description": "省略保持；星号遮罩不覆盖密钥；ID从model_info.id或id读取 / Omitted fields retained; masked secrets preserved; ID from model_info.id or id",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "成功或显式业务结果 / Success or explicit business result",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Deployment"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/Error400"
+          },
+          "401": {
+            "$ref": "#/components/responses/Error401"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error403"
+          },
+          "409": {
+            "$ref": "#/components/responses/Error409"
+          },
+          "500": {
+            "$ref": "#/components/responses/Error500"
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateDeployment"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/model/{model_id}/update": {
+      "patch": {
+        "operationId": "patchDeployment",
+        "summary": "按路径更新部署 / Update deployment by path",
+        "description": "按路径更新部署 / Update deployment by path",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "成功或显式业务结果 / Success or explicit business result",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Deployment"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/Error400"
+          },
+          "401": {
+            "$ref": "#/components/responses/Error401"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error403"
+          },
+          "409": {
+            "$ref": "#/components/responses/Error409"
+          },
+          "500": {
+            "$ref": "#/components/responses/Error500"
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateDeployment"
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "in": "path",
+            "name": "model_id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ]
+      }
+    },
+    "/model/delete": {
+      "post": {
+        "operationId": "deleteDeployment",
+        "summary": "删除部署 / Delete deployment",
+        "description": "删除部署 / Delete deployment",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "成功或显式业务结果 / Success or explicit business result",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DeletedDeployment"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/Error400"
+          },
+          "401": {
+            "$ref": "#/components/responses/Error401"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error403"
+          },
+          "409": {
+            "$ref": "#/components/responses/Error409"
+          },
+          "500": {
+            "$ref": "#/components/responses/Error500"
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DeleteSelector"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/model/disable": {
+      "post": {
+        "operationId": "disableDeployment",
+        "summary": "停用部署 / Disable deployment",
+        "description": "停用部署 / Disable deployment",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "成功或显式业务结果 / Success or explicit business result",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Deployment"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/Error400"
+          },
+          "401": {
+            "$ref": "#/components/responses/Error401"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error403"
+          },
+          "500": {
+            "$ref": "#/components/responses/Error500"
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DeploymentSelector"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/model/enable": {
+      "post": {
+        "operationId": "enableDeployment",
+        "summary": "启用部署 / Enable deployment",
+        "description": "启用部署 / Enable deployment",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "成功或显式业务结果 / Success or explicit business result",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Deployment"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/Error400"
+          },
+          "401": {
+            "$ref": "#/components/responses/Error401"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error403"
+          },
+          "500": {
+            "$ref": "#/components/responses/Error500"
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DeploymentSelector"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/health/test_connection": {
+      "post": {
+        "operationId": "probeDeployment",
+        "summary": "探测保存的部署 / Probe stored deployment",
+        "description": "只使用保存的地址和凭据；失败也可为HTTP200，必须检查healthy；不经过预算和记账 / Uses stored URL and credentials only; HTTP200 may be unhealthy; bypasses budget and billing",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "成功或显式业务结果 / Success or explicit business result",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ConnectionResult"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/Error400"
+          },
+          "401": {
+            "$ref": "#/components/responses/Error401"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error403"
+          },
+          "404": {
+            "$ref": "#/components/responses/Error404"
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ConnectionRequest"
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "securitySchemes": {
+      "bearerAuth": {
+        "type": "http",
+        "scheme": "bearer"
+      }
+    },
+    "schemas": {
+      "Parameters": {
+        "type": "object",
+        "properties": {
+          "model": {
+            "type": "string"
+          },
+          "custom_llm_provider": {
+            "type": "string"
+          },
+          "litellm_credential_name": {
+            "type": "string"
+          },
+          "api_base": {
+            "type": "string"
+          },
+          "api_key": {
+            "type": "string"
+          },
+          "input_cost_per_token": {
+            "anyOf": [
+              {
+                "type": "number",
+                "format": "double",
+                "minimum": 0
+              },
+              {
+                "type": "string",
+                "nullable": true
+              }
+            ],
+            "description": "兼容有限非负数字字符串或null；字符串数值由服务检查 / Finite nonnegative numeric strings or null accepted; service validates string values"
+          },
+          "output_cost_per_token": {
+            "anyOf": [
+              {
+                "type": "number",
+                "format": "double",
+                "minimum": 0
+              },
+              {
+                "type": "string",
+                "nullable": true
+              }
+            ],
+            "description": "兼容有限非负数字字符串或null；字符串数值由服务检查 / Finite nonnegative numeric strings or null accepted; service validates string values"
+          }
+        },
+        "required": [],
+        "additionalProperties": true,
+        "description": "上游参数允许扩展；读取时敏感顶层字符串打码，不能认为所有嵌套字段均脱敏 / Extensible upstream parameters; sensitive top-level strings are masked, not arbitrary nested fields",
+        "x-go-type": "rawjson.RawMessage",
+        "x-go-type-import": {
+          "path": "encoding/json",
+          "name": "rawjson"
+        }
+      },
+      "ModelInfo": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "transport": {
+            "type": "string"
+          },
+          "endpoint_types": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "pricing_source": {
+            "type": "string"
+          },
+          "base_model": {
+            "type": "string"
+          },
+          "disabled": {
+            "type": "boolean"
+          },
+          "db_model": {
+            "type": "boolean"
+          },
+          "unavailable_reason": {
+            "type": "string"
+          }
+        },
+        "required": [],
+        "additionalProperties": true,
+        "x-go-type": "rawjson.RawMessage",
+        "x-go-type-import": {
+          "path": "encoding/json",
+          "name": "rawjson"
+        }
+      },
+      "Deployment": {
+        "type": "object",
+        "properties": {
+          "model_name": {
+            "type": "string"
+          },
+          "litellm_params": {
+            "$ref": "#/components/schemas/Parameters"
+          },
+          "model_info": {
+            "$ref": "#/components/schemas/PublicModelInfo"
+          }
+        },
+        "required": [
+          "model_name",
+          "litellm_params",
+          "model_info"
+        ],
+        "additionalProperties": false
+      },
+      "DeploymentRow": {
+        "type": "object",
+        "properties": {
+          "model_name": {
+            "type": "string"
+          },
+          "litellm_params": {
+            "$ref": "#/components/schemas/Parameters"
+          },
+          "model_info": {
+            "$ref": "#/components/schemas/PublicModelInfo"
+          },
+          "id": {
+            "type": "string"
+          },
+          "db_model": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "model_name",
+          "litellm_params",
+          "model_info",
+          "id",
+          "db_model"
+        ],
+        "additionalProperties": false
+      },
+      "DeletedDeployment": {
+        "type": "object",
+        "properties": {
+          "model_name": {
+            "type": "string"
+          },
+          "litellm_params": {
+            "$ref": "#/components/schemas/Parameters"
+          },
+          "model_info": {
+            "$ref": "#/components/schemas/PublicModelInfo"
+          },
+          "id": {
+            "type": "string"
+          },
+          "deleted": {
+            "type": "boolean",
+            "enum": [
+              true
+            ]
+          }
+        },
+        "required": [
+          "model_name",
+          "litellm_params",
+          "model_info",
+          "id",
+          "deleted"
+        ],
+        "additionalProperties": false
+      },
+      "DeploymentList": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/DeploymentRow"
+            }
+          },
+          "total_count": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "current_page": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "total_pages": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "size": {
+            "type": "integer",
+            "minimum": 1
+          }
+        },
+        "required": [
+          "data",
+          "total_count",
+          "current_page",
+          "total_pages",
+          "size"
+        ],
+        "additionalProperties": false
+      },
+      "DefaultWeights": {
+        "type": "object",
+        "properties": {
+          "allocations": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "deployment_id": {
+                  "type": "string"
+                },
+                "weight": {
+                  "type": "number",
+                  "format": "double"
+                }
+              },
+              "required": [
+                "deployment_id",
+                "weight"
+              ],
+              "additionalProperties": false
+            },
+            "nullable": true
+          }
+        },
+        "required": [
+          "allocations"
+        ],
+        "additionalProperties": false
+      },
+      "FallbackPolicy": {
+        "type": "object",
+        "properties": {
+          "fallbacks": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "nullable": true
+          },
+          "context_window_fallbacks": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "nullable": true
+          },
+          "content_policy_fallbacks": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "nullable": true
+          }
+        },
+        "required": [
+          "fallbacks",
+          "context_window_fallbacks",
+          "content_policy_fallbacks"
+        ],
+        "additionalProperties": false
+      },
+      "ModelGroup": {
+        "type": "object",
+        "properties": {
+          "model_name": {
+            "type": "string"
+          },
+          "deployments": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/DeploymentRow"
+            }
+          },
+          "default_weights": {
+            "$ref": "#/components/schemas/DefaultWeights"
+          },
+          "fallback_policy": {
+            "$ref": "#/components/schemas/FallbackPolicy"
+          }
+        },
+        "required": [
+          "model_name",
+          "deployments",
+          "default_weights",
+          "fallback_policy"
+        ],
+        "additionalProperties": false
+      },
+      "GroupList": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ModelGroup"
+            }
+          },
+          "total_count": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "current_page": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "total_pages": {
+            "type": "integer",
+            "minimum": 1
+          }
+        },
+        "required": [
+          "data",
+          "total_count",
+          "current_page",
+          "total_pages"
+        ],
+        "additionalProperties": false
+      },
+      "CreateDeployment": {
+        "type": "object",
+        "properties": {
+          "model_name": {
+            "type": "string"
+          },
+          "litellm_params": {
+            "$ref": "#/components/schemas/Parameters"
+          },
+          "model_info": {
+            "$ref": "#/components/schemas/ModelInfo"
+          }
+        },
+        "required": [
+          "model_name",
+          "litellm_params",
+          "model_info"
+        ],
+        "additionalProperties": true,
+        "x-go-type": "rawjson.RawMessage",
+        "x-go-type-import": {
+          "path": "encoding/json",
+          "name": "rawjson"
+        }
+      },
+      "UpdateDeployment": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "model_name": {
+            "type": "string"
+          },
+          "litellm_params": {
+            "$ref": "#/components/schemas/Parameters"
+          },
+          "model_info": {
+            "$ref": "#/components/schemas/ModelInfo"
+          },
+          "disabled": {
+            "type": "boolean"
+          }
+        },
+        "required": [],
+        "additionalProperties": true,
+        "x-go-type": "rawjson.RawMessage",
+        "x-go-type-import": {
+          "path": "encoding/json",
+          "name": "rawjson"
+        }
+      },
+      "DeploymentSelector": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "model": {
+            "type": "string"
+          },
+          "model_name": {
+            "type": "string"
+          }
+        },
+        "required": [],
+        "additionalProperties": true,
+        "x-go-type": "rawjson.RawMessage",
+        "x-go-type-import": {
+          "path": "encoding/json",
+          "name": "rawjson"
+        },
+        "anyOf": [
+          {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "id"
+            ]
+          },
+          {
+            "type": "object",
+            "properties": {
+              "model": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "model"
+            ]
+          },
+          {
+            "type": "object",
+            "properties": {
+              "model_name": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "model_name"
+            ]
+          }
+        ]
+      },
+      "ConnectionRequest": {
+        "type": "object",
+        "properties": {
+          "model_info": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "id"
+            ],
+            "additionalProperties": true
+          },
+          "litellm_params": {
+            "$ref": "#/components/schemas/Parameters"
+          },
+          "model": {
+            "type": "string"
+          },
+          "mode": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "model_info"
+        ],
+        "additionalProperties": true,
+        "x-go-type": "rawjson.RawMessage",
+        "x-go-type-import": {
+          "path": "encoding/json",
+          "name": "rawjson"
+        }
+      },
+      "ConnectionSuccess": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "type": "string",
+            "enum": [
+              "success"
+            ]
+          },
+          "healthy": {
+            "type": "boolean",
+            "enum": [
+              true
+            ]
+          },
+          "error": {
+            "type": "string",
+            "nullable": true,
+            "enum": [
+              null
+            ],
+            "x-go-type": "rawjson.RawMessage",
+            "x-go-type-import": {
+              "path": "encoding/json",
+              "name": "rawjson"
+            }
+          },
+          "model": {
+            "type": "string"
+          },
+          "mode": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "status",
+          "healthy",
+          "error",
+          "model",
+          "mode"
+        ],
+        "additionalProperties": false
+      },
+      "ConnectionFailure": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "type": "string",
+            "enum": [
+              "error"
+            ]
+          },
+          "healthy": {
+            "type": "boolean",
+            "enum": [
+              false
+            ]
+          },
+          "error": {
+            "type": "string"
+          },
+          "message": {
+            "type": "string"
+          },
+          "result": {
+            "type": "object",
+            "properties": {
+              "error": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "error"
+            ],
+            "additionalProperties": false
+          },
+          "model": {
+            "type": "string"
+          },
+          "mode": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "status",
+          "healthy",
+          "error",
+          "message",
+          "result",
+          "model",
+          "mode"
+        ],
+        "additionalProperties": false
+      },
+      "ConnectionResult": {
+        "oneOf": [
+          {
+            "$ref": "#/components/schemas/ConnectionSuccess"
+          },
+          {
+            "$ref": "#/components/schemas/ConnectionFailure"
+          }
+        ],
+        "x-go-type": "rawjson.RawMessage",
+        "x-go-type-import": {
+          "path": "encoding/json",
+          "name": "rawjson"
+        }
+      },
+      "Error": {
+        "type": "object",
+        "required": [
+          "error"
+        ],
+        "properties": {
+          "error": {
+            "$ref": "#/components/schemas/ErrorDetail"
+          }
+        },
+        "description": "管理接口错误信封；HTTP 状态与 code 一致，不用成功对象代替失败。 / Management error envelope; code matches HTTP status and failures never use a success object."
+      },
+      "ErrorDetail": {
+        "type": "object",
+        "required": [
+          "code",
+          "message",
+          "type",
+          "param"
+        ],
+        "properties": {
+          "code": {
+            "type": "string",
+            "pattern": "^[45][0-9]{2}$"
+          },
+          "message": {
+            "type": "string"
+          },
+          "type": {
+            "type": "string"
+          },
+          "param": {
+            "nullable": true,
+            "x-go-type": "json.RawMessage",
+            "x-go-type-skip-optional-pointer": true,
+            "description": "当前为 null。 / Currently null."
+          }
+        }
+      },
+      "Error401": {
+        "type": "object",
+        "required": [
+          "error"
+        ],
+        "properties": {
+          "error": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/ErrorDetail"
+              },
+              {
+                "type": "object",
+                "required": [
+                  "code"
+                ],
+                "properties": {
+                  "code": {
+                    "type": "string",
+                    "pattern": "^401$"
+                  }
+                }
+              }
+            ]
+          }
+        },
+        "description": "完整错误字段在同一对象层合并，避免生成器覆盖嵌套 error。 / Error fields are combined at the same object level to avoid replacing the nested error."
+      },
+      "Error403": {
+        "type": "object",
+        "required": [
+          "error"
+        ],
+        "properties": {
+          "error": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/ErrorDetail"
+              },
+              {
+                "type": "object",
+                "required": [
+                  "code"
+                ],
+                "properties": {
+                  "code": {
+                    "type": "string",
+                    "pattern": "^403$"
+                  }
+                }
+              }
+            ]
+          }
+        },
+        "description": "完整错误字段在同一对象层合并，避免生成器覆盖嵌套 error。 / Error fields are combined at the same object level to avoid replacing the nested error."
+      },
+      "Error500": {
+        "type": "object",
+        "required": [
+          "error"
+        ],
+        "properties": {
+          "error": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/ErrorDetail"
+              },
+              {
+                "type": "object",
+                "required": [
+                  "code"
+                ],
+                "properties": {
+                  "code": {
+                    "type": "string",
+                    "pattern": "^500$"
+                  }
+                }
+              }
+            ]
+          }
+        },
+        "description": "完整错误字段在同一对象层合并，避免生成器覆盖嵌套 error。 / Error fields are combined at the same object level to avoid replacing the nested error."
+      },
+      "Error503": {
+        "type": "object",
+        "required": [
+          "error"
+        ],
+        "properties": {
+          "error": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/ErrorDetail"
+              },
+              {
+                "type": "object",
+                "required": [
+                  "code"
+                ],
+                "properties": {
+                  "code": {
+                    "type": "string",
+                    "pattern": "^503$"
+                  }
+                }
+              }
+            ]
+          }
+        },
+        "description": "完整错误字段在同一对象层合并，避免生成器覆盖嵌套 error。 / Error fields are combined at the same object level to avoid replacing the nested error."
+      },
+      "Error400": {
+        "type": "object",
+        "required": [
+          "error"
+        ],
+        "properties": {
+          "error": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/ErrorDetail"
+              },
+              {
+                "type": "object",
+                "required": [
+                  "code"
+                ],
+                "properties": {
+                  "code": {
+                    "type": "string",
+                    "pattern": "^400$"
+                  }
+                }
+              }
+            ]
+          }
+        },
+        "description": "完整错误字段在同一对象层合并，避免生成器覆盖嵌套 error。 / Error fields are combined at the same object level to avoid replacing the nested error."
+      },
+      "Error404": {
+        "type": "object",
+        "required": [
+          "error"
+        ],
+        "properties": {
+          "error": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/ErrorDetail"
+              },
+              {
+                "type": "object",
+                "required": [
+                  "code"
+                ],
+                "properties": {
+                  "code": {
+                    "type": "string",
+                    "pattern": "^404$"
+                  }
+                }
+              }
+            ]
+          }
+        },
+        "description": "完整错误字段在同一对象层合并，避免生成器覆盖嵌套 error。 / Error fields are combined at the same object level to avoid replacing the nested error."
+      },
+      "Error409": {
+        "type": "object",
+        "required": [
+          "error"
+        ],
+        "properties": {
+          "error": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/ErrorDetail"
+              },
+              {
+                "type": "object",
+                "required": [
+                  "code"
+                ],
+                "properties": {
+                  "code": {
+                    "type": "string",
+                    "pattern": "^409$"
+                  }
+                }
+              }
+            ]
+          }
+        },
+        "description": "完整错误字段在同一对象层合并，避免生成器覆盖嵌套 error。 / Error fields are combined at the same object level to avoid replacing the nested error."
+      },
+      "PublicModelInfo": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "transport": {
+            "type": "string"
+          },
+          "endpoint_types": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "pricing_source": {
+            "type": "string"
+          },
+          "base_model": {
+            "type": "string"
+          },
+          "disabled": {
+            "type": "boolean"
+          },
+          "db_model": {
+            "type": "boolean"
+          },
+          "unavailable_reason": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "disabled",
+          "db_model"
+        ],
+        "additionalProperties": true,
+        "description": "读取时保证稳定ID和状态；其他扩展保持原值 / Stable ID and status on read; extensions preserved",
+        "x-go-type": "rawjson.RawMessage",
+        "x-go-type-import": {
+          "path": "encoding/json",
+          "name": "rawjson"
+        }
+      },
+      "DeleteSelector": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "model_name": {
+            "type": "string"
+          }
+        },
+        "required": [],
+        "additionalProperties": true,
+        "x-go-type": "rawjson.RawMessage",
+        "x-go-type-import": {
+          "path": "encoding/json",
+          "name": "rawjson"
+        },
+        "anyOf": [
+          {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "id"
+            ]
+          },
+          {
+            "type": "object",
+            "properties": {
+              "model_name": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "model_name"
+            ]
+          }
+        ]
+      }
+    },
+    "responses": {
+      "Error400": {
+        "description": "失败HTTP 400，不得当成功。 / Failure HTTP 400, never success.",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/Error400"
+            }
+          }
+        }
+      },
+      "Error401": {
+        "description": "失败HTTP 401，不得当成功。 / Failure HTTP 401, never success.",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/Error401"
+            }
+          }
+        }
+      },
+      "Error403": {
+        "description": "失败HTTP 403，不得当成功。 / Failure HTTP 403, never success.",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/Error403"
+            }
+          }
+        }
+      },
+      "Error404": {
+        "description": "失败HTTP 404，不得当成功。 / Failure HTTP 404, never success.",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/Error404"
+            }
+          }
+        }
+      },
+      "Error409": {
+        "description": "失败HTTP 409，不得当成功。 / Failure HTTP 409, never success.",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/Error409"
+            }
+          }
+        }
+      },
+      "Error500": {
+        "description": "失败HTTP 500，不得当成功。 / Failure HTTP 500, never success.",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/Error500"
+            }
+          }
+        }
+      },
+      "Error503": {
+        "description": "失败HTTP 503，不得当成功。 / Failure HTTP 503, never success.",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/Error503"
+            }
+          }
+        }
+      }
+    }
+  }
+}

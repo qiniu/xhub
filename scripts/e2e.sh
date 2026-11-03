@@ -9,6 +9,8 @@ export E2E_UP_PORT="${E2E_UP_PORT:-4110}"
 export E2E_MASTER_KEY="${E2E_MASTER_KEY:-sk-e2e-enterprise-test-master-key-32}"
 export E2E_GATEWAY="http://127.0.0.1:$E2E_GW_PORT"
 export E2E_UPSTREAM="http://127.0.0.1:$E2E_UP_PORT"
+# 日志和监控回归验证数据库部署在执行时解析环境变量；该值仅用于隔离测试。
+export E2E_MONITOR_TEST_MODEL="e2e-monitor-upstream"
 # 每轮运行使用专属证据目录，迟到的清理进程不能读取下一轮的 schema 文件。
 export E2E_RUN_DIR="${E2E_RUN_DIR:-$ROOT/.e2e/run-$$-$RANDOM}"
 # 调用方可指定独立构建和数据库；名称先校验，防止清理指向错误目标。
@@ -33,8 +35,11 @@ LOCK="$ROOT/.e2e/browser.lock"
 mkdir -p "$ROOT/.e2e"
 source "$ROOT/scripts/browser-lock.sh"
 acquire_browser_lock "$LOCK"
+# cleanup 保留测试原始失败码；清理不可验证、删除或证据保存失败都会阻止成功。
+# EXIT 调用，无参数；只操作当前运行目录和已校验的独立 schema，不删除占用端口的其他进程。
 cleanup() {
   local exit_code=$?
+  local cleanup_failed=0
   # Playwright may terminate its whole server process group before the gateway
   # shell runs its EXIT trap. Recover its private schema once ports are free.
   if python3 - "$E2E_GW_PORT" "$E2E_UP_PORT" <<'PYCLEAN'
@@ -45,26 +50,41 @@ for value in sys.argv[1:]:
             raise SystemExit(1)
 PYCLEAN
   then
-    rm -f "$E2E_RUN_DIR/c.yaml"
+    rm -f "$E2E_RUN_DIR/c.yaml" || cleanup_failed=1
     if [[ -f "$E2E_RUN_DIR/schema.txt" ]]; then
       local schema
       schema="$(cat "$E2E_RUN_DIR/schema.txt")"
       if [[ "$schema" =~ ^e2e_[0-9]+_[0-9]+$ ]]; then
-        docker exec xhub-postgres psql -X -U xhub -d "$E2E_DATABASE" -v ON_ERROR_STOP=1 -q -c "DROP SCHEMA IF EXISTS $schema CASCADE" >"$E2E_RUN_DIR/cleanup.log" 2>&1 || exit_code=1
+        docker exec xhub-postgres psql -X -U xhub -d "$E2E_DATABASE" -v ON_ERROR_STOP=1 -q -c "DROP SCHEMA IF EXISTS $schema CASCADE" >"$E2E_RUN_DIR/cleanup.log" 2>&1 || cleanup_failed=1
+      else
+        echo 'Invalid cleanup schema; refusing to delete it.' >&2
+        cleanup_failed=1
       fi
     fi
+  else
+    echo 'E2E services still listening; schema cleanup is unverified.' >&2
+    cleanup_failed=1
   fi
   # 在释放共享锁前保存调用方的专属证据，防止下一个排队运行清空或覆盖本轮结果。
   if [[ -n "${E2E_BROWSER_REPORT_DIR:-}" ]]; then
-    mkdir -p "$E2E_BROWSER_REPORT_DIR"
+    mkdir -p "$E2E_BROWSER_REPORT_DIR" || cleanup_failed=1
     local artifact
     for artifact in results.json junit.xml scenario-coverage.json; do
       if [[ -f "$E2E_RUN_DIR/$artifact" ]]; then
-        cp "$E2E_RUN_DIR/$artifact" "$E2E_BROWSER_REPORT_DIR/$artifact" || exit_code=1
+        cp "$E2E_RUN_DIR/$artifact" "$E2E_BROWSER_REPORT_DIR/$artifact" || cleanup_failed=1
       fi
     done
   fi
-  rmdir "$LOCK"
+  rmdir "$LOCK" || cleanup_failed=1
+  # 浏览器断言报告与资源清理分开记录，不能把 results.json 的通过视为整个入口通过。
+  printf '{"test_exit":%s,"cleanup_exit":%s}\n' "$exit_code" "$cleanup_failed" >"$E2E_RUN_DIR/cleanup-status.json" || cleanup_failed=1
+  if [[ -n "${E2E_BROWSER_REPORT_DIR:-}" ]]; then
+    cp "$E2E_RUN_DIR/cleanup-status.json" "$E2E_BROWSER_REPORT_DIR/cleanup-status.json" || cleanup_failed=1
+  fi
+  if [[ "$cleanup_failed" == 1 ]]; then
+    echo "E2E cleanup failed; inspect $E2E_RUN_DIR before retrying." >&2
+    if [[ "$exit_code" == 0 ]]; then exit_code=1; fi
+  fi
   return "$exit_code"
 }
 trap cleanup EXIT
@@ -92,6 +112,11 @@ config["include"].append(os.environ["E2E_BUILD_DIR"] + "/types/**/*.ts")
 config["exclude"] = [*config.get("exclude", []), ".next"]
 Path("tsconfig.e2e.json").write_text(json.dumps(config, indent=2) + "\n")
 PYCONFIG
+# 公共入口始终从当前源重建 Swagger，避免本地/全量运行依赖缺失或过期的 website/dist。
+# 安装/构建失败由 set -e 阻断；不触碰生产站点，SCARF 禁用依赖安装遥测。
+echo "Building current standalone API reference..."
+SCARF_ANALYTICS=false npm ci --prefix "$ROOT/website"
+npm run build --prefix "$ROOT/website"
 echo "Building production console ($E2E_BUILD_DIR)..."
 npm run build
 echo "Building gateway and catalog sweep before the service readiness timeout..."

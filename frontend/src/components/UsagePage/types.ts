@@ -1,3 +1,4 @@
+/** 账单指标；缓存数可未知，接口缺省不等于已知零；UI汇总桶初始化自己的计数，不修改后台计费。 */
 export interface SpendMetrics {
   spend: number;
   flat_cost?: number;
@@ -7,8 +8,8 @@ export interface SpendMetrics {
   api_requests: number;
   successful_requests: number;
   failed_requests: number;
-  cache_read_input_tokens: number;
-  cache_creation_input_tokens: number;
+  cache_read_input_tokens?: number;
+  cache_creation_input_tokens?: number;
   compression_saved_tokens?: number;
   compression_savings_spend?: number;
   prompt_caching_savings_spend?: number;

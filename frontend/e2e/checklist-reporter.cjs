@@ -28,7 +28,8 @@ class ChecklistReporter {
     const names = {passed: '通过', failed: '失败', timedOut: '超时', skipped: '未执行', interrupted: '中断'};
     this.print(names[result.status] || result.status, test);
   }
-  /** 用途：所有结果结束后核对固定场景分母；完整运行缺失/失败/跳过返回 failed，报告保留每条业务状态，无凭据输出。 */
+  /** 用途：结束时核对执行证据；部分运行也不允许零执行/全跳过，完整运行另核对固定分母。
+   * 参数 result 是 Playwright 结果；返回 failed 阻止假成功，报告保留每条状态，无凭据输出。 */
   onEnd(result) {
     if (!this.config?.rootDir) return;
     const path = require('node:path');
@@ -36,6 +37,7 @@ class ChecklistReporter {
     const {reportCoverage} = require('./scenario-coverage.cjs');
     const report = reportCoverage(catalog, this.tests, path.resolve(process.env.E2E_RUN_DIR || '../.e2e/current', 'scenario-coverage.json'));
     console.log('业务场景覆盖：' + report.passed + '/' + report.total + '，未通过 ' + report.unmet.length);
+    if (!this.tests.some(test => test.results.length === 1 && test.results[0].status === 'passed')) return {status: 'failed'};
     if (process.env.E2E_FULL_COVERAGE === '1' && (report.unmet.length || report.unregistered.length)) return {status: 'failed'};
   }
 }

@@ -26,7 +26,7 @@ test("click every internal sidebar destination", async ({ page }) => {
       recordChain("sidebar pass " + href);
     });
   }
-  guard.assertOk();
+  await guard.assertOk();
 });
 }
 /** 用途：注册独立场景「click each top level tab on /models-and-endpoints」；无参数、无返回值。前置真实浏览器、私有数据库和本地上游；验证页面及原始契约，保留原套件前后置清理，运行器最终回收专属 schema。异常由 Playwright 单独记录。 */
@@ -48,7 +48,7 @@ test("click each top level tab on /models-and-endpoints", async ({ page }) => {
         recordChain("tab pass " + route + " " + name.trim());
       });
     }
-    guard.assertOk();
+    await guard.assertOk();
   });
 }
 /** 用途：注册独立场景「click each top level tab on /guardrails」；无参数、无返回值。前置真实浏览器、私有数据库和本地上游；验证页面及原始契约，保留原套件前后置清理，运行器最终回收专属 schema。异常由 Playwright 单独记录。 */
@@ -70,7 +70,7 @@ test("click each top level tab on /guardrails", async ({ page }) => {
         recordChain("tab pass " + route + " " + name.trim());
       });
     }
-    guard.assertOk();
+    await guard.assertOk();
   });
 }
 /** 用途：注册独立场景「click each top level tab on /usage」；无参数、无返回值。前置真实浏览器、私有数据库和本地上游；验证页面及原始契约，保留原套件前后置清理，运行器最终回收专属 schema。异常由 Playwright 单独记录。 */
@@ -92,7 +92,7 @@ test("click each top level tab on /usage", async ({ page }) => {
         recordChain("tab pass " + route + " " + name.trim());
       });
     }
-    guard.assertOk();
+    await guard.assertOk();
   });
 }
 /** 用途：注册独立场景「click each top level tab on /logs」；无参数、无返回值。前置真实浏览器、私有数据库和本地上游；验证页面及原始契约，保留原套件前后置清理，运行器最终回收专属 schema。异常由 Playwright 单独记录。 */
@@ -114,7 +114,7 @@ test("click each top level tab on /logs", async ({ page }) => {
         recordChain("tab pass " + route + " " + name.trim());
       });
     }
-    guard.assertOk();
+    await guard.assertOk();
   });
 }
 /** 用途：注册独立场景「click each top level tab on /price-data」；无参数、无返回值。前置真实浏览器、私有数据库和本地上游；验证页面及原始契约，保留原套件前后置清理，运行器最终回收专属 schema。异常由 Playwright 单独记录。 */
@@ -136,7 +136,7 @@ test("click each top level tab on /price-data", async ({ page }) => {
         recordChain("tab pass " + route + " " + name.trim());
       });
     }
-    guard.assertOk();
+    await guard.assertOk();
   });
 }
 /** 用途：注册独立场景「click each top level tab on /route-templates」；无参数、无返回值。前置真实浏览器、私有数据库和本地上游；验证页面及原始契约，保留原套件前后置清理，运行器最终回收专属 schema。异常由 Playwright 单独记录。 */
@@ -158,7 +158,7 @@ test("click each top level tab on /route-templates", async ({ page }) => {
         recordChain("tab pass " + route + " " + name.trim());
       });
     }
-    guard.assertOk();
+    await guard.assertOk();
   });
 }
 /** 用途：注册独立场景「click each top level tab on /admin-panel」；无参数、无返回值。前置真实浏览器、私有数据库和本地上游；验证页面及原始契约，保留原套件前后置清理，运行器最终回收专属 schema。异常由 Playwright 单独记录。 */
@@ -180,7 +180,7 @@ test("click each top level tab on /admin-panel", async ({ page }) => {
         recordChain("tab pass " + route + " " + name.trim());
       });
     }
-    guard.assertOk();
+    await guard.assertOk();
   });
 }
 /** 用途：注册独立场景「model search, pagination boundaries and cancelled create」；无参数、无返回值。前置真实浏览器、私有数据库和本地上游；验证页面及原始契约，保留原套件前后置清理，运行器最终回收专属 schema。异常由 Playwright 单独记录。 */
@@ -203,7 +203,7 @@ test("model search, pagination boundaries and cancelled create", async ({ page }
   await expect(form.getByLabel("上游模型 *")).toBeDisabled();
   await form.getByRole("button", { name: "取消", exact: true }).click();
   await expect(page.getByRole("textbox", { name: "搜索模型" })).toBeVisible();
-  guard.assertOk();
+  await guard.assertOk();
 });
 }
 /** 用途：注册独立场景「key create cancellation leaves no saved resource」；无参数、无返回值。前置真实浏览器、私有数据库和本地上游；验证页面及原始契约，保留原套件前后置清理，运行器最终回收专属 schema。异常由 Playwright 单独记录。 */

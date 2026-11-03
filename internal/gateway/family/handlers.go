@@ -17,7 +17,15 @@ import (
 
 	"github.com/sunqirui1987/xhub/internal/catalog"
 	dpusage "github.com/sunqirui1987/xhub/internal/dataplane/usage"
+	"github.com/sunqirui1987/xhub/internal/gateway/accessgroupconfig"
+	"github.com/sunqirui1987/xhub/internal/gateway/budgetconfig"
 	"github.com/sunqirui1987/xhub/internal/gateway/guard"
+	"github.com/sunqirui1987/xhub/internal/gateway/metadataconfig"
+	"github.com/sunqirui1987/xhub/internal/gateway/policyconfig"
+	"github.com/sunqirui1987/xhub/internal/gateway/promptconfig"
+	"github.com/sunqirui1987/xhub/internal/gateway/searchconfig"
+	"github.com/sunqirui1987/xhub/internal/gateway/suppliers"
+	"github.com/sunqirui1987/xhub/internal/gateway/vectorconfig"
 	"github.com/sunqirui1987/xhub/internal/util"
 )
 
@@ -540,11 +548,9 @@ func singular(kind string) string {
 	}
 }
 
-// ServeMixed answers the catalog's "mixed" paths, such as /v1/agents, /v1/skills and /v1/workflows. These were removed from the product and only remain in the catalog. They are refused rather than served: the generic store behind them is one shared key-value namespace keyed by resource kind, with no owner and no team column, so serving them let any signed-in member — and any inference key — create records that every other principal could then list. Refusing is what the classification has always described; this makes the code match. The identity is still required before the refusal, so an anonymous caller learns nothing beyond the fact that the path exists.
-// 参数 s（Host）：处理混合使用的数据面宿主；w（http.ResponseWriter）：调用方的 HTTP 响应，状态和正文写在这里；r（*http.Request）：入站 HTTP 请求。
-// 返回：无。状态码和正文写进调用方的响应。
-// 调用：gateway/catalog.go
-// 测试：无直接单测
+// ServeMixed 拒绝仍列在兼容目录的退役混合身份接口，例如agents、memory和workflows。
+// s提供身份检查，w/r为入站HTTP；先验证身份再返回410，无存储副作用。目录KV没有资源归属隔离，不能恢复给普通成员共享读写。
+// 网关目录分派调用；/v1/skills不属于该分类，其管理配置CRUD与未实现的归档边界另行处理。
 func ServeMixed(s Host, w http.ResponseWriter, r *http.Request) {
 	if s.RequireMixed(w, r) == nil {
 		return
@@ -554,13 +560,26 @@ func ServeMixed(s Host, w http.ResponseWriter, r *http.Request) {
 }
 
 // ServeMgmt 先鉴权再执行管理目录操作；s 为宿主，w/r 为 HTTP 响应和请求，由 gateway/catalog.go 调用。
-// 返回结果直接写入 w；护栏仍使用自己的处理器，通用目录仅接受空正文或一个完整 JSON 对象，解析失败不触碰存储。
-// 测试：catalog_persistence_test.go；不放宽任何权限，不改变空 GET/DELETE 正文语义。
+// 返回结果直接写入 w；未接入IAM的组织/团队旧目录在鉴权后拒绝，不能冒充真实业务操作；护栏仍使用自己的处理器，通用目录仅接受空正文或一个完整 JSON 对象，解析失败不触碰存储。
+// 返回结果直接写入 w；未实现运维目录在原鉴权后明确拒绝；护栏仍使用自己的处理器，通用目录仅接受空正文或一个完整 JSON 对象，解析失败不触碰存储。
+// 未实现的旧server OAuth在解析/存储前明确拒绝；不放宽权限，不改变普通CRUD的空GET/DELETE正文语义。
 func ServeMgmt(s Host, w http.ResponseWriter, r *http.Request) {
 	if s.RequireManage(w, r) == nil {
 		return
 	}
+	if isIAMFallbackPath(r.URL.Path) {
+		util.WriteError(w, http.StatusNotImplemented, "unsupported_iam_operation", "this legacy organization or team operation is not implemented")
+		return
+	}
 	if guard.Manage(s, w, r) {
+		return
+	}
+	// 没有运维执行器的目录必须明确拒绝；保存KV不代表连接测试、排空或GC已经执行。
+	if unsupportedOperationalPath(r.URL.Path) {
+		util.WriteError(w, http.StatusNotImplemented, "unsupported_operation", "this operational endpoint is not implemented")
+		return
+	}
+	if rejectServerOAuth(w, r) {
 		return
 	}
 	body, err := readCatalogBody(r.Body)
@@ -572,8 +591,24 @@ func ServeMgmt(s Host, w http.ResponseWriter, r *http.Request) {
 }
 
 // writeCatalogPersist 将通用目录请求交给窄存储接口；s 提供已授权上下文，w/r 为 HTTP 响应和请求，body 为已解析对象。
-// 由 ServeMgmt 调用，返回值写入 w；不更改 Host、鉴权或资源路径语义，无存储时由处理器返回 503。
+// 由 ServeMgmt 在原鉴权之后调用；server执行、插件启停/市场及Skill归档先明确拒绝。
+// 其他资源委派配置服务或旧目录存储；缺失存储返回503，不改变权限和预算规则。
 func writeCatalogPersist(s Host, w http.ResponseWriter, r *http.Request, body map[string]any) {
+	if rejectServerRuntime(w, r) {
+		return
+	}
+	if rejectServerSubmission(w, r) {
+		return
+	}
+	if rejectPluginActivation(w, r) {
+		return
+	}
+	if rejectPluginMarketplace(w, r) {
+		return
+	}
+	if rejectSkillArchive(w, r) {
+		return
+	}
 	var st catalogRecordStore
 	if recordStore := s.RecordStore(); recordStore != nil {
 		st = recordStore
@@ -581,133 +616,42 @@ func writeCatalogPersist(s Host, w http.ResponseWriter, r *http.Request, body ma
 	writeCatalogStore(st, w, r, body)
 }
 
-// mergeCredentialPatch merges a credential the way LiteLLM update_db_credential does. Incoming credential_values overlay the existing fields. A masked secret that contains a run of * does not overwritethe original, or an edit form that sends the mask back would store the real secret as asterisks.
-// 参数 dst（map[string]any）：合并凭据Patch读到的 JSON 对象。缺键表示没有该字段；body（map[string]any）：已经解析的 JSON 对象。缺字段表示上游或调用方没有给这项。
-// 返回：无。正文里的普通字段已覆盖到凭据上。password 和 credential_values 不在这里整段覆盖。
-// 调用：仅在 handlers.go 内使用
-// 测试：无直接单测
-func mergeCredentialPatch(dst, body map[string]any) {
-	for k, v := range body {
-		if k == "password" || k == "credential_values" {
-			continue
-		}
-		dst[k] = v
-	}
-	incoming, ok := body["credential_values"].(map[string]any)
-	if !ok {
+// Freeze 为旧兼容响应补齐资源必需字段；kind 为资源族，obj 为可修改的 JSON 对象。
+// 无返回值；保留已有非 nil 字段并删除 password，不写数据库；已迁移资源由各自服务规范化。
+// 旧目录适配器调用；新资源业务逻辑不应继续加入此通用分支。
+func Freeze(kind string, obj map[string]any) {
+	if kind == "access_group" || kind == "access_groups" {
+		accessgroupconfig.Normalize(kind, obj)
 		return
 	}
-	cur, _ := dst["credential_values"].(map[string]any)
-	if cur == nil {
-		cur = map[string]any{}
+	if kind == "vector_store" {
+		vectorconfig.Normalize(obj)
+		return
 	}
-	for k, v := range incoming {
-		if isSensitiveCredentialKey(k) {
-			s, _ := v.(string)
-			if strings.TrimSpace(s) == "" || strings.Contains(s, "**") {
-				continue
-			}
-		}
-		cur[k] = v
+	if metadataconfig.Supports(kind) {
+		metadataconfig.Normalize(kind, obj)
+		return
 	}
-	dst["credential_values"] = cur
-}
-
-// redactCredentialObject masks secret fields on a credential object. When showValues is false the original text is not returned.
-// 参数 kind（string）：分类名，用来选择限额主体、日志类型或官方端点；obj（map[string]any）：打码凭据对象读到的 JSON 对象。缺键表示没有该字段；showValues（bool）：为真时走showValues这一支。为假时保持原来的路径。
-// 返回 map[string]any（map[string]any）：打码凭据对象的字段表。缺键表示上游或库里没有这个字段。
-// 调用：仅在 handlers.go 内使用
-// 测试：无直接单测
-func redactCredentialObject(kind string, obj map[string]any, showValues bool) map[string]any {
-	if kind != "credentials" && kind != "credential" {
-		return obj
+	if kind == "budget" || kind == "budgets" {
+		budgetconfig.Normalize(kind, obj)
+		return
 	}
-	vals, ok := obj["credential_values"].(map[string]any)
-	if !ok {
-		return obj
+	if kind == "policies" || kind == "policy" {
+		policyconfig.Normalize(kind, obj)
+		return
 	}
-	out := make(map[string]any, len(obj))
-	for k, v := range obj {
-		if k == "credential_values" {
-			continue
-		}
-		out[k] = v
+	if kind == "credentials" || kind == "credential" {
+		suppliers.Normalize(obj)
+		return
 	}
-	if showValues {
-		out["credential_values"] = maskCredentialValues(vals)
+	if kind == "search_tools" || kind == "search_tool" || kind == "search-tools" {
+		searchconfig.Normalize(kind, obj)
+		return
 	}
-	return out
-}
-
-// redactCredentialList masks each credential in a list.
-// 参数 kind（string）：分类名，用来选择限额主体、日志类型或官方端点；list（[]map[string]any）：打码凭据列表使用的map[string]any；showValues（bool）：为真时走showValues这一支。为假时保持原来的路径。
-// 返回 []map[string]any（[]map[string]any）：一组map[string]any。没有匹配时为空切片，不是 nil 分页。
-// 调用：仅在 handlers.go 内使用
-// 测试：无直接单测
-func redactCredentialList(kind string, list []map[string]any, showValues bool) []map[string]any {
-	if kind != "credentials" && kind != "credential" {
-		return list
+	if kind == "prompts" {
+		promptconfig.Normalize(obj)
+		return
 	}
-	out := make([]map[string]any, len(list))
-	for i, m := range list {
-		out[i] = redactCredentialObject(kind, m, showValues)
-	}
-	return out
-}
-
-// isSensitiveCredentialKey reports whether a field name looks like a key, token, or password. Those fields are masked by default.
-// 参数 k（string）：是否敏感凭据密钥使用的k。空串表示调用方没有提供这项。
-// 返回 bool（bool）：字段名看起来像密钥、令牌或口令时返回真。这类字段默认打码。
-// 调用：仅在 handlers.go 内使用
-// 测试：无直接单测
-func isSensitiveCredentialKey(k string) bool {
-	l := strings.ToLower(k)
-	for _, w := range []string{"authorization", "token", "key", "secret", "password", "passwd", "credential"} {
-		if strings.Contains(l, w) {
-			return true
-		}
-	}
-	return false
-}
-
-// maskCredentialValues 把凭据对象里像密钥、令牌或口令的字段换成掩码，避免明文出现在响应里。
-// 参数 in（map[string]any）：mask凭据Values读到的 JSON 对象。缺键表示没有该字段。
-// 返回 map[string]any（map[string]any）：mask凭据Values的字段表。缺键表示上游或库里没有这个字段。
-// 调用：仅在 handlers.go 内使用
-// 测试：无直接单测
-func maskCredentialValues(in map[string]any) map[string]any {
-	out := make(map[string]any, len(in))
-	for k, v := range in {
-		s, ok := v.(string)
-		if !ok || !isSensitiveCredentialKey(k) {
-			out[k] = v
-			continue
-		}
-		out[k] = maskSecret(s)
-	}
-	return out
-}
-
-// maskSecret keeps a few characters at each end of a secret. An empty string stays empty.
-// 参数 v（string）：mask秘密使用的值。空串表示调用方没有提供这项。
-// 返回 string（string）：固定文本 "*****"。
-// 调用：仅在 handlers.go 内使用
-// 测试：无直接单测
-func maskSecret(v string) string {
-	const unmasked = 4
-	if len(v) <= unmasked {
-		return "*****"
-	}
-	head := unmasked / 2
-	return v[:head] + strings.Repeat("*", len(v)-unmasked) + v[len(v)-head:]
-}
-
-// Freeze fills fields the public contract for this resource family requires. An existing value is not overwritten.
-// 参数 kind（string）：分类名，用来选择限额主体、日志类型或官方端点；obj（map[string]any）：Freeze读到的 JSON 对象。缺键表示没有该字段。
-// 返回：无。这个资源族对外必须有的字段已补上。已经有值的字段不覆盖，password 会被删掉。
-// 调用：gateway/access.go
-// 测试：无直接单测
-func Freeze(kind string, obj map[string]any) {
 	delete(obj, "password")
 	now := time.Now().UTC().Format(time.RFC3339)
 	if obj["id"] == nil {
@@ -737,7 +681,8 @@ func Freeze(kind string, obj map[string]any) {
 			setDefault(obj, "name", "")
 			setDefault(obj, "status", "ready")
 		}
-	case "vector_stores", "vector_store":
+	// 数据面复数资源保留旧分支；本轮只迁移单数管理配置，不改变推理资源支持边界。
+	case "vector_stores":
 		setDefault(obj, "object", "vector_store")
 		setDefault(obj, "name", "")
 		setDefault(obj, "status", "completed")
@@ -783,9 +728,6 @@ func Freeze(kind string, obj map[string]any) {
 		setDefault(obj, "object", "eval")
 		setDefault(obj, "name", "")
 		setDefault(obj, "status", "created")
-	case "prompts":
-		setDefault(obj, "version", 1)
-		setDefault(obj, "prompt_id", id)
 	case "workflows":
 		setDefault(obj, "run_id", id)
 		setDefault(obj, "status", "completed")
@@ -802,62 +744,10 @@ func Freeze(kind string, obj map[string]any) {
 	case "memory":
 		setDefault(obj, "key", id)
 		setDefault(obj, "value", "")
-	case "access_group", "access_groups":
-		setDefault(obj, "access_group_id", id)
-		if str(obj["access_group_name"]) == "" {
-			if n := str(obj["name"]); n != "" {
-				obj["access_group_name"] = n
-			} else {
-				obj["access_group_name"] = id
-			}
-		}
-		setDefault(obj, "description", "")
-		setDefault(obj, "models", []any{})
-		setDefault(obj, "access_model_names", []any{})
-		setDefault(obj, "access_mcp_server_ids", []any{})
-		setDefault(obj, "access_agent_ids", []any{})
-		setDefault(obj, "assigned_key_ids", []any{})
-		setDefault(obj, "assigned_team_ids", []any{})
-		setDefault(obj, "access_mcp_servers", []any{})
-		setDefault(obj, "access_agents", []any{})
-		setDefault(obj, "assigned_keys", []any{})
-		setDefault(obj, "assigned_teams", []any{})
-		setDefault(obj, "updated_at", obj["created_at"])
-		if _, ok := obj["created_by"]; !ok {
-			obj["created_by"] = nil
-		}
-		if _, ok := obj["updated_by"]; !ok {
-			obj["updated_by"] = nil
-		}
-		if _, ok := obj["budget_id"]; !ok {
-			obj["budget_id"] = nil
-		}
-	case "policies", "policy":
-		setDefault(obj, "policy_id", id)
-		setDefault(obj, "policy_name", "")
-		setDefault(obj, "version", 1)
-		setDefault(obj, "status", "active")
-	case "tags", "tag":
-		if n := str(obj["tag_name"]); n != "" {
-			obj["name"] = n
-		}
-		setDefault(obj, "name", id)
-		setDefault(obj, "tag_name", obj["name"])
-		setDefault(obj, "spend", 0)
-	case "credentials", "credential":
-		setDefault(obj, "credential_name", id)
-		setDefault(obj, "credential_info", map[string]any{})
 	case "guardrails", "apply_guardrail":
 		setDefault(obj, "guardrail_id", id)
 		setDefault(obj, "guardrail_name", "")
 		setDefault(obj, "litellm_params", map[string]any{})
-	case "customer", "end_user":
-		setDefault(obj, "user_id", id)
-		setDefault(obj, "spend", 0)
-		setDefault(obj, "blocked", false)
-		if _, ok := obj["max_budget"]; !ok {
-			obj["max_budget"] = nil
-		}
 	case "invitation":
 		setDefault(obj, "user_id", "")
 		setDefault(obj, "is_accepted", false)
@@ -877,9 +767,6 @@ func Freeze(kind string, obj map[string]any) {
 		setDefault(obj, "transport", "sse")
 		setDefault(obj, "status", "ok")
 		setDefault(obj, "tools", []any{})
-	case "search_tools", "search-tools", "search_tool":
-		setDefault(obj, "search_tool_id", id)
-		setDefault(obj, "search_tool_name", "")
 	case "scim", "Users", "Groups":
 		setDefault(obj, "schemas", []any{"urn:ietf:params:scim:schemas:core:2.0:User"})
 		setDefault(obj, "userName", "")
@@ -933,26 +820,6 @@ func Freeze(kind string, obj map[string]any) {
 		setDefault(obj, "name", "")
 		setDefault(obj, "version", "1")
 		setDefault(obj, "enabled", true)
-	case "budget", "budgets":
-		setDefault(obj, "budget_id", id)
-		if _, ok := obj["max_budget"]; !ok {
-			obj["max_budget"] = nil
-		}
-		if _, ok := obj["soft_budget"]; !ok {
-			obj["soft_budget"] = nil
-		}
-		if _, ok := obj["tpm_limit"]; !ok {
-			obj["tpm_limit"] = nil
-		}
-		if _, ok := obj["rpm_limit"]; !ok {
-			obj["rpm_limit"] = nil
-		}
-		if _, ok := obj["budget_duration"]; !ok {
-			obj["budget_duration"] = nil
-		}
-		if _, ok := obj["budget_reset_at"]; !ok {
-			obj["budget_reset_at"] = nil
-		}
 	}
 }
 
@@ -967,12 +834,26 @@ func setDefault(obj map[string]any, key string, val any) {
 	}
 }
 
-// parseMgmt reads the resource kind, action, and id from the method and path.
-// 参数 method（string）：HTTP 方法，例如 GET 或 POST；path（string）：解析Mgmt要定位的路径。可能是 URL，也可能是字段路径；body（map[string]any）：已解析或原始的 JSON。
-// 返回 kind（string）：固定文本 "misc"；action（string）：固定文本 "misc"；id（string）：固定文本 "misc"。
-// 调用：仅在 handlers.go 内使用
-// 测试：无直接单测
+// parseMgmt 根据已注册路径、HTTP方法及JSON正文解析目录种类、动作与资源ID，供通用存储适配器调用。
+// 插件详情按路径名称寻址，避免保留词被当作动作；其他资源沿用旧解析与正文ID回退，无存储或授权副作用。
+// parseMgmt 按已注册路径、HTTP方法及正文解析目录种类、动作、ID，供目录读写调用；无存储副作用。
+// Skill详情优先按资源ID寻址，避免GET误执行保留词动作；其余路径和正文ID回退保持原行为。
 func parseMgmt(method, path string, body map[string]any) (kind, action, id string) {
+	// 注册的插件详情路径以名称为资源身份，list/new/register等名字也不能被通用动作词吞掉。
+	pluginParts := strings.Split(strings.TrimSuffix(path, "/"), "/")
+	if len(pluginParts) == 4 && pluginParts[0] == "" && pluginParts[1] == "claude-code" && pluginParts[2] == "plugins" && pluginParts[3] != "" {
+		switch method {
+		case http.MethodGet:
+			return "claude-code", "info", pluginParts[3]
+		case http.MethodPut:
+			return "claude-code", "update", pluginParts[3]
+		case http.MethodDelete:
+			return "claude-code", "delete", pluginParts[3]
+		}
+	}
+	if action, id, matched := skillResourceAction(method, path); matched {
+		return "skills", action, id
+	}
 	parts := catalog.Split(strings.TrimSuffix(path, "/"))
 	filtered := []string{}
 	for _, p := range parts {
@@ -1059,11 +940,9 @@ func catalogCollectionLast(last string) bool {
 	return false
 }
 
-// catalogListBody wraps a list as the JSON for this resource kind. Some kinds need paging fields and some are a plain array.
-// 参数 kind（string）：分类名，用来选择限额主体、日志类型或官方端点；path（string）：目录列表正文要定位的路径。可能是 URL，也可能是字段路径；list（[]map[string]any）：目录列表正文使用的map[string]any。
-// 返回 any（any）：目录列表正文的结果。具体类型由调用方断言。
-// 调用：仅在 handlers.go 内使用
-// 测试：无直接单测
+// catalogListBody 将已读取的配置列表封装成旧接口响应；kind为资源种类，path为已匹配路径，list为数据副本。
+// 返回对应对象或数组，供目录/专用配置适配器调用，不读写存储；nil列表转为空数组。
+// C7供应商发现由writeDiscovery独立处理，不再在配置列表中硬编码支持能力。
 func catalogListBody(kind, path string, list []map[string]any) any {
 	if list == nil {
 		list = []map[string]any{}
@@ -1115,14 +994,6 @@ func catalogListBody(kind, path string, list []map[string]any) any {
 		return map[string]any{"object": "list", "data": list, "memories": list, "total": len(list)}
 	case kind == "workflows" || strings.Contains(p, "/workflows/runs"):
 		return map[string]any{"object": "list", "data": list, "runs": list, "events": []any{}, "messages": []any{}}
-	case strings.Contains(p, "available_providers"):
-		return map[string]any{
-			"providers": []any{
-				map[string]any{"provider_name": "tavily", "ui_friendly_name": "Tavily"},
-				map[string]any{"provider_name": "perplexity", "ui_friendly_name": "Perplexity"},
-				map[string]any{"provider_name": "serper", "ui_friendly_name": "Serper"},
-			},
-		}
 	case strings.Contains(p, "/guardrails/usage/overview"):
 		return map[string]any{
 			"chart": []any{}, "passRate": 100, "rows": []any{},

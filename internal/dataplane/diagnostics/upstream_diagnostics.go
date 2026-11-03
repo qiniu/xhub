@@ -16,6 +16,13 @@ import (
 // Headers/Trailers 是原始多值头，并未在此结构里脱敏；写日志或向客户端输出时由消费方另行过滤。
 // 正文读取过程中原地更新共享对象，消费方应在读取完成后使用；原始 Usage 与 BillingUsage 分开，避免估算覆盖原厂统计。
 type UpstreamDiagnostics struct {
+	// 准入失败时的只读配置与路由快照，不包含凭据、不影响调度或限流判定。
+	Routing   map[string]any `json:"routing,omitempty"`
+	RateLimit map[string]any `json:"rate_limit,omitempty"`
+	// 请求侧与传输侧失败事实；StatusCode 为 0 时尚未收到上游 HTTP 响应。
+	Failure *Failure `json:"failure,omitempty"`
+	// 上游正文真实读取错误，和供应商 Error 包络分开。
+	ReadError string `json:"read_error,omitempty"`
 	// 供应商明确失败的完整错误及关联信息；与 HTTP 状态分开保存，避免流捕获上限丢失尾部错误。
 	Error map[string]any `json:"error,omitempty"`
 	// 实际出站路径，不含用户信息和查询参数，用于安全关联部署端点。
@@ -137,6 +144,7 @@ func (o *upstreamObserver) Read(p []byte) (int, error) {
 			o.diagnostics.Trailers = o.response.Trailer.Clone()
 		} else {
 			o.diagnostics.ParseError = "upstream body read failed"
+			o.diagnostics.ReadError = ObserveFailure(nil, "upstream_body", err, 0).TransportError
 		}
 	}
 	return n, err

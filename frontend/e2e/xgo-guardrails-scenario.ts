@@ -96,7 +96,7 @@ test("XGo editor executes, persists, reloads, and edits real scripts", async ({ 
   await page.reload();
   await row.getByRole("button").first().click();
   await expect(code).toHaveValue(redactCode);
-  guard.assertOk();
+  await guard.assertOk();
 });
 }
 /** 用途：注册独立场景「XGo JSON input rejects invalid payloads and recovers with a request example」；无参数、无返回值。前置真实浏览器、私有数据库和本地上游；验证页面及原始契约，保留原套件前后置清理，运行器最终回收专属 schema。异常由 Playwright 单独记录。 */
@@ -130,7 +130,7 @@ test("XGo JSON input rejects invalid payloads and recovers with a request exampl
   expect(requests).toHaveLength(1);
   await dialog.getByRole("button", { name: "取消", exact: true }).click();
   await expect(dialog).not.toBeVisible();
-  guard.assertOk();
+  await guard.assertOk();
 });
 }
 /** 用途：注册独立场景「invalid XGo fails compilation and cannot create a saved guardrail」；无参数、无返回值。前置真实浏览器、私有数据库和本地上游；验证页面及原始契约，保留原套件前后置清理，运行器最终回收专属 schema。异常由 Playwright 单独记录。 */
@@ -159,6 +159,6 @@ test("invalid XGo fails compilation and cannot create a saved guardrail", async 
   await expect(dialog).not.toBeVisible();
   await page.reload();
   await expect(page.getByText(name, { exact: true })).toHaveCount(0);
-  guard.assertOk();
+  await guard.assertOk();
 });
 }

@@ -15,6 +15,7 @@ vi.mock("../networking", async (importOriginal) => {
   return {
     ...actual,
     uiSpendLogsCall: vi.fn(),
+    uiSpendLogDetailsCall: vi.fn().mockResolvedValue(null),
     keyInfoV1Call: vi.fn().mockResolvedValue({ info: {} }),
     allEndUsersCall: vi.fn().mockResolvedValue([]),
   };
@@ -63,7 +64,7 @@ vi.mock("@tanstack/react-pacer/debouncer", () => ({
 
 import { useDebouncedValue } from "@tanstack/react-pacer/debouncer";
 import { DEBOUNCE_WAIT_MS } from "@/utils/debounceConstants";
-import { keyInfoV1Call, uiSpendLogsCall } from "../networking";
+import { keyInfoV1Call, uiSpendLogsCall, uiSpendLogDetailsCall } from "../networking";
 
 const logEntry = (overrides: Partial<LogEntry>): LogEntry => ({
   request_id: "req-1",
@@ -139,13 +140,46 @@ const renderPanelWithHistory = () => {
 const urlParams = () => onUrlUpdate.mock.calls.at(-1)?.[0].searchParams ?? new URLSearchParams();
 const historyModes = () => onUrlUpdate.mock.calls.map(([event]) => event.options.history);
 
+/** 前置日志列表已加载；按列选择器恢复低频字段供交互回归，无持久化数据。 */
+async function showColumn(id: string) {
+  const user = userEvent.setup();
+  await user.click(screen.getByRole("button", { name: "Columns" }));
+  await user.click(await screen.findByTestId(`view-option-${id}`));
+  await user.keyboard("{Escape}");
+}
+
 describe("RequestLogsPanel", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     sessionStorage.clear();
     testQueryClient.clear();
     respondWith([]);
+    vi.mocked(uiSpendLogDetailsCall).mockReset().mockResolvedValue(null);
     debounce.settled = null;
+  });
+
+  /** 前置流式与同步日志；TPS 默认隐藏，通过列菜单开启后保留真实数值与无样本状态，finally 清理组件和缓存。 */
+  it("restores the optional TPS column through its accessible menu", async () => {
+    respondWith([
+      logEntry({ request_id: "streamed-speed", streamed: true, tps: 25 }),
+      logEntry({ request_id: "sync-speed", streamed: false, tps: null }),
+    ]);
+    const view = renderPanel();
+    const user = userEvent.setup();
+    try {
+      await screen.findByText("streamed-speed");
+      expect(screen.queryByRole("columnheader", { name: "TPS (tokens/s)", exact: true })).not.toBeInTheDocument();
+      await user.click(screen.getByRole("button", { name: "Columns", exact: true }));
+      const option = await screen.findByRole("menuitemcheckbox", { name: "TPS (tokens/s)", exact: true });
+      expect(option).not.toBeChecked();
+      await user.click(option);
+      expect(option).toBeChecked();
+      await user.keyboard("{Escape}");
+      const index = screen.getAllByRole("columnheader").findIndex(cell => cell.textContent === "TPS (tokens/s)");
+      expect(index).toBeGreaterThanOrEqual(0);
+      expect(within(screen.getByRole("row", { name: /streamed-speed/ })).getAllByRole("cell")[index]).toHaveTextContent("25.00");
+      expect(within(screen.getByRole("row", { name: /sync-speed/ })).getAllByRole("cell")[index]).toHaveTextContent("—");
+    } finally { view.unmount(); testQueryClient.clear(); }
   });
 
   /** 前置正常/错误日志包含历史 Hash 且密钥接口会失败；验证文本不请求密钥、行点击仍打开日志详情。
@@ -156,6 +190,7 @@ describe("RequestLogsPanel", () => {
     respondWith([logEntry({ request_id: "req-historical-key", metadata: { user_api_key: "deleted-key-hash" } })]);
     renderWithProviders(<RequestLogsPanel {...defaultProps} errorsOnly={errorsOnly} />, { onUrlUpdate });
 
+    await showColumn("key_hash");
     const hash = await screen.findByText("deleted-key-hash");
     expect(screen.queryByRole("button", { name: "deleted-key-hash" })).not.toBeInTheDocument();
     expect(screen.queryByRole("link", { name: "deleted-key-hash" })).not.toBeInTheDocument();
@@ -274,6 +309,7 @@ describe("RequestLogsPanel", () => {
       renderPanel();
 
       await waitFor(() => expect(row("req-llm")).not.toBeNull());
+      await showColumn("type");
       expect(within(row("req-llm") as HTMLElement).getByText("3")).toBeInTheDocument();
     });
 
@@ -601,11 +637,7 @@ describe("RequestLogsPanel", () => {
     });
 
     it("fetches the log by request_id and opens the drawer when it is not in the loaded page", async () => {
-      vi.mocked(uiSpendLogsCall).mockImplementation(async ({ params }) =>
-        params?.request_id === "req-old"
-          ? { data: [logEntry({ request_id: "req-old" })], total: 1, page: 1, page_size: 1, total_pages: 1 }
-          : { data: [], total: 0, page: 1, page_size: 50, total_pages: 0 },
-      );
+      vi.mocked(uiSpendLogDetailsCall).mockResolvedValue(logEntry({ request_id: "req-old", startTime: "2020-01-01T00:00:00Z" }));
       renderPanel("?log_id=req-old");
 
       await waitFor(() => {
@@ -613,13 +645,8 @@ describe("RequestLogsPanel", () => {
       });
       expect(drawer()).toHaveAttribute("data-log-id", "req-old");
 
-      const byIdCall = vi
-        .mocked(uiSpendLogsCall)
-        .mock.calls.find(([options]) => options.params?.request_id === "req-old")?.[0];
-      if (!byIdCall) throw new Error("expected a by-id uiSpendLogsCall");
-      expect(byIdCall.page).toBe(1);
-      expect(byIdCall.page_size).toBe(1);
-      expect(byIdCall.params?.group_by_session).toBeUndefined();
+      expect(uiSpendLogDetailsCall).toHaveBeenCalledWith("test-token", "req-old", "");
+      expect(vi.mocked(uiSpendLogsCall).mock.calls.every(([options]) => !options.params?.request_id)).toBe(true);
     });
 
     it("opens the drawer when ?log_id= is the log's litellm_call_id rather than its request_id", async () => {
@@ -633,17 +660,7 @@ describe("RequestLogsPanel", () => {
     });
 
     it("fetches by litellm_call_id and opens the drawer when that log is not in the loaded page", async () => {
-      vi.mocked(uiSpendLogsCall).mockImplementation(async ({ params }) =>
-        params?.request_id === "call-old"
-          ? {
-              data: [logEntry({ request_id: "chatcmpl-old", litellm_call_id: "call-old" })],
-              total: 1,
-              page: 1,
-              page_size: 1,
-              total_pages: 1,
-            }
-          : { data: [], total: 0, page: 1, page_size: 50, total_pages: 0 },
-      );
+      vi.mocked(uiSpendLogDetailsCall).mockResolvedValue(logEntry({ request_id: "chatcmpl-old", litellm_call_id: "call-old" }));
       renderPanel("?log_id=call-old");
 
       await waitFor(() => {
@@ -705,6 +722,7 @@ describe("RequestLogsPanel", () => {
       renderPanel();
 
       await waitFor(() => expect(row("req-solo")).not.toBeNull());
+      await showColumn("session_id");
       await user.click(within(row("req-solo") as HTMLElement).getByText("sess-solo"));
 
       await waitFor(() => expect(urlParams().get("session_id")).toBe("sess-solo"));
@@ -725,6 +743,7 @@ describe("RequestLogsPanel", () => {
       renderPanel();
 
       await waitFor(() => expect(row("req-a")).not.toBeNull());
+      await showColumn("session_id");
       await user.click(within(row("req-a") as HTMLElement).getByText("sess-a"));
       await waitFor(() => expect(urlParams().get("session_id")).toBe("sess-a"));
 
@@ -744,6 +763,7 @@ describe("RequestLogsPanel", () => {
       renderPanel();
 
       await waitFor(() => expect(row("req-solo")).not.toBeNull());
+      await showColumn("session_id");
       await user.click(within(row("req-solo") as HTMLElement).getByText("sess-solo"));
       await waitFor(() => expect(drawer()).toHaveTextContent("open"));
 
@@ -799,54 +819,43 @@ describe("RequestLogsPanel", () => {
     });
   });
 
-  describe("hide health checks", () => {
-    const toggle = () => screen.getByRole("switch", { name: "Hide Health Checks" });
-
-    it("defaults to showing health checks and refetches without them from page 1 when toggled on", async () => {
-      const user = userEvent.setup();
-      renderPanel();
-
-      await waitFor(() => expect(uiSpendLogsCall).toHaveBeenCalled());
-      expect(lastCall()?.params?.exclude_internal_health_checks).toBe(false);
-      expect(toggle()).not.toBeChecked();
-
-      await user.click(toggle());
-
-      await waitFor(() => expect(lastCall()?.params?.exclude_internal_health_checks).toBe(true));
-      expect(lastCall()?.page).toBe(1);
-      expect(toggle()).toBeChecked();
-      expect(sessionStorage.getItem("excludeInternalHealthChecks")).toBe("true");
-    });
-
-    it("restores the persisted toggle from sessionStorage", async () => {
-      sessionStorage.setItem("excludeInternalHealthChecks", "true");
-      renderPanel();
-
-      await waitFor(() => expect(uiSpendLogsCall).toHaveBeenCalled());
-      expect(lastCall()?.params?.exclude_internal_health_checks).toBe(true);
-      expect(toggle()).toBeChecked();
-    });
-
-    it("falls back to showing health checks when the persisted value is malformed", async () => {
-      sessionStorage.setItem("excludeInternalHealthChecks", "{not json");
-      renderPanel();
-
-      await waitFor(() => expect(uiSpendLogsCall).toHaveBeenCalled());
-      expect(lastCall()?.params?.exclude_internal_health_checks).toBe(false);
-      expect(toggle()).not.toBeChecked();
-    });
+  /** 前置旧会话保存了无效开关；不显示或发送未支持筛选；beforeEach 清理会话和组件。 */
+  it("does not offer or send the unsupported health check filter", async () => {
+    sessionStorage.setItem("excludeInternalHealthChecks", "true");
+    renderPanel();
+    await waitFor(() => expect(uiSpendLogsCall).toHaveBeenCalled());
+    expect(lastCall()?.params?.exclude_internal_health_checks).toBeUndefined();
+    expect(screen.queryByRole("switch", { name: "Hide Health Checks" })).not.toBeInTheDocument();
   });
 
-  describe("live tail", () => {
-    it("shows the auto-refresh banner on the first page and hides it once stopped", async () => {
-      const user = userEvent.setup();
-      renderPanel();
+  /** 前置默认刷新状态；验证唯一开关可停止刷新，异常持久化内容不会使页面崩溃；会话与组件由框架清理。 */
+  it("uses one refresh switch and tolerates malformed stored settings", async () => {
+    sessionStorage.setItem("isLiveTail", "{broken");
+    renderPanel();
+    const toggle = screen.getByRole("switch", { name: "Refresh every 15 seconds" });
+    expect(toggle).toBeChecked();
+    await userEvent.click(toggle);
+    expect(toggle).not.toBeChecked();
+    expect(sessionStorage.getItem("isLiveTail")).toBe("false");
+  });
 
-      expect(await screen.findByText("Auto-refreshing every 15 seconds")).toBeInTheDocument();
+  /** 前置列表接口失败；验证显示加载失败而非无日志，重试成功可恢复；mock 与缓存自动清理。 */
+  it("distinguishes a failed query from an empty result and can retry", async () => {
+    vi.mocked(uiSpendLogsCall).mockRejectedValueOnce(new Error("database unavailable"));
+    renderPanel();
+    expect(await screen.findByRole("alert")).toHaveTextContent("Logs could not be loaded");
+    expect(screen.queryByText("No records in this time range")).not.toBeInTheDocument();
+    respondWith([logEntry({ request_id: "recovered" })]);
+    await userEvent.click(screen.getByRole("button", { name: "Refresh", exact: true }));
+    expect(await screen.findByText("recovered")).toBeInTheDocument();
+    expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+  });
 
-      await user.click(screen.getByRole("button", { name: "Stop" }));
-
-      expect(screen.queryByText("Auto-refreshing every 15 seconds")).not.toBeInTheDocument();
-    });
+  /** 前置详情接口返回不可访问；验证不将失败吞掉，且不会打开其他记录；mock 与缓存自动清理。 */
+  it("shows an explicit error when the linked detail is unavailable", async () => {
+    vi.mocked(uiSpendLogDetailsCall).mockRejectedValue(new Error("not found"));
+    renderPanel("?log_id=private-log");
+    expect(await screen.findByRole("alert")).toHaveTextContent("This log could not be opened");
+    expect(screen.getByTestId("log-details-drawer")).toHaveTextContent("closed");
   });
 });

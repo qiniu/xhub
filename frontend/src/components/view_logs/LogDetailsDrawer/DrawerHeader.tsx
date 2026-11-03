@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Check, ChevronDown, ChevronUp, Copy, X } from "lucide-react";
+import { Check, ChevronDown, ChevronUp, Copy, Maximize2, Minimize2, X } from "lucide-react";
 import moment from "moment";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -30,12 +30,12 @@ interface DrawerHeaderProps {
   environment: string;
   isSidebarCollapsed: boolean;
   onToggleSidebar: () => void;
+  isExpanded?: boolean;
+  onToggleExpanded?: () => void;
 }
 
-/**
- * Header component for the log details drawer.
- * Displays model/provider, request ID, navigation controls, status, environment, and timestamp.
- */
+/** 显示日志抽屉标题与导航；参数为当前日志、团队状态和布局回调，返回可交互标题。
+ * 抽屉调用；展开仅改变本地视图宽度，不修改日志和请求。 */
 export function DrawerHeader({
   log,
   onClose,
@@ -46,6 +46,8 @@ export function DrawerHeader({
   environment,
   isSidebarCollapsed,
   onToggleSidebar,
+  isExpanded = false,
+  onToggleExpanded,
 }: DrawerHeaderProps) {
   const t = useT();
   const provider = log.custom_llm_provider || "";
@@ -64,7 +66,7 @@ export function DrawerHeader({
         top: 0,
       }}
     >
-      {/* Row 0: Model + Provider with Logo */}
+      {/* 模型和供应商可换行，长名称保留原文。 */}
       <div className="flex items-center gap-2" style={{ marginBottom: SPACING_MEDIUM }}>
         {showToggleWithProvider && <SidebarToggle isCollapsed onToggle={onToggleSidebar} />}
         <ModelProviderSection
@@ -76,7 +78,7 @@ export function DrawerHeader({
         />
       </div>
 
-      {/* Row 1: Request ID + Actions */}
+      {/* 请求 ID 缩略显示，导航和复制操作始终保持可访问。 */}
       <div
         style={{
           display: "flex",
@@ -88,18 +90,17 @@ export function DrawerHeader({
       >
         {showToggleWithRequestId && <SidebarToggle isCollapsed onToggle={onToggleSidebar} />}
         <RequestIdSection requestId={log.request_id} />
-        <NavigationSection onPrevious={onPrevious} onNext={onNext} onClose={onClose} />
+        <NavigationSection onPrevious={onPrevious} onNext={onNext} onClose={onClose} isExpanded={isExpanded} onToggleExpanded={onToggleExpanded} />
       </div>
 
-      {/* Row 2: Status + Env + Timestamp */}
+      {/* 状态、团队和时间按可用宽度换行。 */}
       <StatusBar log={log} statusLabel={statusLabel} statusColor={statusColor} environment={environment} />
     </div>
   );
 }
 
-/**
- * Model and Provider display with logo
- */
+/** 展示模型、供应商及分类；参数为原始名称和标记，返回可换行的标题内容。
+ * 抽屉标题调用；保留输入原文，供应商图标加载失败时隐藏图标。 */
 function ModelProviderSection({
   model,
   modelGroup,
@@ -127,8 +128,8 @@ function ModelProviderSection({
           }}
         />
       )}
-      <div className="flex items-center gap-2">
-        <span className="font-semibold" style={{ fontSize: 14 }}>
+      <div className="flex min-w-0 flex-wrap items-center gap-2">
+        <span className="font-semibold break-all" style={{ fontSize: 14 }}>
           {model}
         </span>
         {providerName && (
@@ -143,9 +144,8 @@ function ModelProviderSection({
   );
 }
 
-/**
- * Request ID display with copy functionality
- */
+/** 展示并复制请求 ID；参数 requestId 为原始标识，返回可访问控件。
+ * 抽屉标题调用；复制失败不改变原日志，长 ID 仅在视觉上省略。 */
 function RequestIdSection({ requestId }: { requestId: string }) {
   const t = useT();
   const [copied, setCopied] = useState(false);
@@ -161,7 +161,7 @@ function RequestIdSection({ requestId }: { requestId: string }) {
   };
 
   return (
-    <div style={{ flex: 1, minWidth: 0 }}>
+    <div className="flex min-w-0 flex-1 items-center gap-1">
       <TooltipProvider>
         <Tooltip>
           <TooltipTrigger
@@ -180,34 +180,36 @@ function RequestIdSection({ requestId }: { requestId: string }) {
             }
           >
             {requestId}
-            <button
-              type="button"
-              aria-label={copied ? t("Copied!") : t("Copy Request ID")}
-              onClick={handleCopy}
-              className="ml-1 align-middle text-muted-foreground hover:text-foreground"
-            >
-              {copied ? <Check className="size-3.5" /> : <Copy className="size-3.5" />}
-            </button>
           </TooltipTrigger>
           <TooltipContent>{requestId}</TooltipContent>
         </Tooltip>
       </TooltipProvider>
+      <button
+        type="button"
+        aria-label={copied ? t("Copied!") : t("Copy Request ID")}
+        onClick={handleCopy}
+        className="shrink-0 text-muted-foreground hover:text-foreground"
+      >
+        {copied ? <Check className="size-3.5" /> : <Copy className="size-3.5" />}
+      </button>
     </div>
   );
 }
 
-/**
- * Navigation controls (previous, next, close)
- * Shows keyboard shortcuts with bounding boxes for visibility
- */
+/** 显示展开、前后切换及关闭按钮；参数为对应回调及展开状态，返回导航控件。
+ * 抽屉标题调用；按钮只触发调用方回调，不改变日志。 */
 function NavigationSection({
   onPrevious,
   onNext,
   onClose,
+  isExpanded,
+  onToggleExpanded,
 }: {
   onPrevious: () => void;
   onNext: () => void;
   onClose: () => void;
+  isExpanded: boolean;
+  onToggleExpanded?: () => void;
 }) {
   const t = useT();
   const keyboardShortcutStyle = {
@@ -222,7 +224,10 @@ function NavigationSection({
   const splitStyle = { width: 1, height: 20, background: COLOR_BORDER };
 
   return (
-    <div className="flex items-center gap-1">
+    <div className="flex shrink-0 items-center gap-1">
+      {onToggleExpanded && <Button variant="ghost" size="icon-sm" onClick={onToggleExpanded} aria-label={t(isExpanded ? "logsUX.restoreDrawer" : "logsUX.expandDrawer")}>
+        {isExpanded ? <Minimize2 className="size-4" /> : <Maximize2 className="size-4" />}
+      </Button>}
       <Button variant="ghost" size="sm" onClick={onPrevious}>
         <ChevronUp className="size-4" />
         <span style={keyboardShortcutStyle}>K</span>
@@ -245,9 +250,8 @@ function NavigationSection({
   );
 }
 
-/**
- * Status bar with tags and timestamp
- */
+/** 展示状态、团队和请求时间；参数为当前日志与格式化状态，返回可换行状态栏。
+ * 抽屉标题调用；团队名称由数据决定，缺失时由调用方提供明确占位。 */
 function StatusBar({
   log,
   statusLabel,
@@ -261,10 +265,10 @@ function StatusBar({
 }) {
   const t = useT();
   return (
-    <div className="flex items-center gap-3">
+    <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
       <Badge variant={statusColor === "error" ? "destructive" : "secondary"}>{statusLabel}</Badge>
-      <Badge variant="outline">Env: {environment}</Badge>
-      <div className="flex items-center gap-2">
+      <Badge variant="outline" className="max-w-full whitespace-normal break-all">{t("logsUX.team")}: {environment}</Badge>
+      <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
         <span className="text-muted-foreground" style={{ fontSize: FONT_SIZE_MEDIUM }}>
           {moment(log.startTime).format(t("MMM D, YYYY h:mm:ss A"))}
         </span>

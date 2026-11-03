@@ -40,10 +40,6 @@ vi.mock("@/components/activity_metrics", () => ({
   processActivityData: (_data: unknown, key: string) => ({ __source: key }),
 }));
 
-vi.mock("@/components/view_user_spend", () => ({
-  default: ({userMaxBudget}: {userMaxBudget: number | null}) => <div>View User Spend <span data-testid="personal-budget">{String(userMaxBudget)}</span></div>,
-}));
-
 vi.mock("@/components/UsagePage/components/EntityUsage/TopKeyView", () => ({
   default: () => <div>Top Keys</div>,
 }));
@@ -406,11 +402,58 @@ describe("UsagePage", () => {
     } as any);
   });
 
-  // 真实用量组件必须传递 0 上限，不能显示为无限制；前置公共 mock，测试框架清理 DOM。
+  // 零上限必须显示为零而不是无限制；普通用户及已记账零消费，测试框架清理 DOM。
   it("preserves zero personal budget", async () => {
-    mockUseCurrentUser.mockReturnValue({data:{user_id:"user-123",max_budget:0},isLoading:false,isError:false} as any);
+    mockUseAuthorized.mockReturnValue(nonAdminSession as any);
+    mockUseCurrentUser.mockReturnValue({data:{user_id:"user-123",max_budget:0,spend:0,budget_reset_day:0},isLoading:false,isError:false} as any);
     renderWithProviders(<UsagePage {...defaultProps} />);
-    await waitFor(() => expect(screen.getByTestId("personal-budget").textContent).toBe("0"));
+    expect(await screen.findByText(/limit: \$0\.0000/)).toBeVisible();
+    expect(screen.getByText("No automatic reset")).toBeVisible();
+  });
+
+  // 区间切换不能改变真实预算；前置已有消费与无刷新日，测试框架清理 DOM。
+  it("keeps recorded budget independent of the selected usage range", async () => {
+    mockUseAuthorized.mockReturnValue(nonAdminSession as any);
+    mockUseCurrentUser.mockReturnValue({data:{user_id:"user-123",max_budget:500,spend:500.551638,budget_reset_day:0},isLoading:false,isError:false} as any);
+    renderWithProviders(<UsagePage {...defaultProps} />);
+    expect(await screen.findByText(/Over the personal limit by \$0\.5516/)).toBeVisible();
+    expect(screen.getByText(/Spending in selected period/)).toBeVisible();
+    await userEvent.click(screen.getByTestId("pick-a-different-range"));
+    expect(screen.getByText(/Over the personal limit by \$0\.5516/)).toBeVisible();
+  });
+
+  // 全局视图不能把管理员预算误配给其他用户；前置管理员会话，测试框架清理 DOM。
+  it("does not show the administrator budget in global usage", async () => {
+    mockUseCurrentUser.mockReturnValue({data:{user_id:"user-123",max_budget:500,spend:10,budget_reset_day:0},isLoading:false,isError:false} as any);
+    renderWithProviders(<UsagePage {...defaultProps} />);
+    await screen.findByText(/Spending in selected period/);
+    expect(screen.queryByRole("region", {name:"Personal budget"})).not.toBeInTheDocument();
+  });
+
+  // 指定刷新日与下次刷新时间来自用户接口，以北京时间展示；测试框架清理 DOM。
+  it("shows the real monthly schedule in Beijing time", async () => {
+    mockUseAuthorized.mockReturnValue(nonAdminSession as any);
+    mockUseCurrentUser.mockReturnValue({data:{user_id:"user-123",max_budget:500,spend:10,budget_reset_day:15,budget_reset_at:"2026-11-14T16:00:00Z"},isLoading:false,isError:false} as any);
+    renderWithProviders(<UsagePage {...defaultProps} />);
+    expect(await screen.findByText("Day 15 of each month")).toBeVisible();
+    expect(screen.getByText(/2026-11-15 00:00/)).toBeVisible();
+  });
+
+  // 预算接口失败不能显示无限额或用区间消费代替；测试框架清理 DOM。
+  it("does not turn a budget read failure into a balance", async () => {
+    mockUseAuthorized.mockReturnValue(nonAdminSession as any);
+    mockUseCurrentUser.mockReturnValue({data:undefined,isLoading:false,isError:true} as any);
+    renderWithProviders(<UsagePage {...defaultProps} />);
+    expect(await screen.findByText(/Could not load personal budget/)).toBeVisible();
+    expect(screen.queryByText(/remaining balance:/)).not.toBeInTheDocument();
+  });
+
+  // 空额度表示无限额且不能与零混淆；测试框架清理 DOM。
+  it("distinguishes an unlimited budget from zero", async () => {
+    mockUseAuthorized.mockReturnValue(nonAdminSession as any);
+    mockUseCurrentUser.mockReturnValue({data:{user_id:"user-123",max_budget:null,spend:10,budget_reset_day:0},isLoading:false,isError:false} as any);
+    renderWithProviders(<UsagePage {...defaultProps} />);
+    expect(await screen.findByText(/limit: No personal cap/)).toBeVisible();
   });
 
   it("keeps the daily spend loader up until the activity request resolves", async () => {

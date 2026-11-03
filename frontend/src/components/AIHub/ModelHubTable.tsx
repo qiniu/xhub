@@ -94,6 +94,7 @@ const ModelHubTable: React.FC<ModelHubTableProps> = ({ accessToken, publicPage, 
   // Skill Hub state
   const [skillHubData, setSkillHubData] = useState<Plugin[]>([]);
   const [skillLoading, setSkillLoading] = useState<boolean>(false);
+  const [skillLoadError, setSkillLoadError] = useState(false);
   const [isMakeSkillPublicModalVisible, setIsMakeSkillPublicModalVisible] = useState(false);
   const { data: uiSettings, isLoading: isUISettingsLoading } = useUISettings();
 
@@ -201,14 +202,18 @@ const ModelHubTable: React.FC<ModelHubTableProps> = ({ accessToken, publicPage, 
 
   // Fetch Skill Hub data — all skills for admins, enabled-only for public page
   useEffect(() => {
+    /** 读取Skill目录；失败独立展示，不冒充空列表，原有认证和请求入口保持不变。 */
     const fetchSkillData = async () => {
       if (!accessToken) return;
       try {
         setSkillLoading(true);
+        setSkillLoadError(false);
         const enabledOnly = publicPage === true;
         const response = await getClaudeCodePluginsList(accessToken, enabledOnly);
         setSkillHubData(response.plugins);
       } catch (error) {
+        setSkillLoadError(true);
+        setSkillHubData([]);
         console.error("Error fetching skill hub data", error);
       } finally {
         setSkillLoading(false);
@@ -540,12 +545,13 @@ const ModelHubTable: React.FC<ModelHubTableProps> = ({ accessToken, publicPage, 
               <TabsContent value="skills" keepMounted>
                 {publicPage == false && canModify && (
                   <div className="flex justify-end mb-4">
-                    <Button onClick={() => setIsMakeSkillPublicModalVisible(true)}>{t("Select Skills to Make Public")}</Button>
+                    <Button onClick={() => setIsMakeSkillPublicModalVisible(true)}>{t("skillHub.supportAction")}</Button>
                   </div>
                 )}
                 <SkillHubDashboard
                   skills={skillHubData}
                   isLoading={skillLoading}
+                  loadError={skillLoadError}
                   isAdmin={canModify}
                   accessToken={accessToken}
                   publicPage={publicPage}

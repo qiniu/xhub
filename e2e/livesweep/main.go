@@ -248,17 +248,28 @@ func call(client *http.Client, base, method, path, token string, body any) (int,
 
 // typedUnsupported 只接受目录明确声明的未实现契约；参数为方法、路径和响应正文，返回是否可作为预期 501。
 // 调用：live catalog sweep；customer/tag 维度只接受专用错误类型，其他路径仍只接受通用 not_implemented。
+// typedUnsupported 供目录扫描器校验501响应；method/path为真实请求，raw为响应JSON。
+// 返回是否匹配已声明的拒绝契约；精确运维及归因接口不能接受其他错误类型，非法或空消息返回false。
+// 仅解析响应，不发送请求或改变状态；未知路径保留原not_implemented契约，不泛化放行unsupported_operation。
 func typedUnsupported(method, path, raw string) bool {
 	var body map[string]any
 	if json.Unmarshal([]byte(raw), &body) != nil {
 		return false
 	}
 	err, _ := body["error"].(map[string]any)
-	if err["message"] == "" {
+	if message, ok := err["message"].(string); !ok || strings.TrimSpace(message) == "" {
 		return false
 	}
 	if method == http.MethodGet && (path == "/customer/daily/activity" || path == "/tag/daily/activity") {
 		return err["type"] == "unsupported_usage_dimension"
+	}
+	// 运维接口没有执行器时仅接受明确声明的方法和路径，避免将真实服务端失败整体豁免。
+	switch method + " " + strings.TrimSuffix(path, "/") {
+	case "GET /coordination_redis/settings", "POST /coordination_redis/settings", "POST /coordination_redis/settings/test",
+		"GET /debug/asyncio-tasks", "GET /debug/memory/details", "GET /debug/memory/summary", "POST /debug/memory/gc/configure",
+		"GET /memory-usage", "GET /memory-usage-in-mem-cache", "GET /memory-usage-in-mem-cache-items",
+		"GET /health/backlog", "GET /health/drain", "GET /health/history", "GET /health/license", "GET /health/shared-status", "GET /health/services":
+		return err["type"] == "unsupported_operation"
 	}
 	return err["type"] == "not_implemented"
 }

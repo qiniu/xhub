@@ -1,8 +1,8 @@
 #!/usr/bin/env node
 /**
  * 检查控制台 API 类型的真实生成来源。
- * XHub 后端已经迁移到 Go；当前仓库只有 method/path 路由目录，没有包含请求体、
- * 响应体和状态码的 OpenAPI 文档或 Go 生成命令，因此不能安全生成 schema.d.ts。
+ * XHub 后端已经迁移到 Go；供应商契约试点仅覆盖五个操作，仍没有全 API 契约，
+ * 因此不能用局部来源覆盖现有 schema.d.ts。局部类型用 gen:api:suppliers 独立生成。
  */
 import { existsSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
@@ -35,7 +35,7 @@ export function inspectContractSources(paths, exists = existsSync) {
 
 /**
  * 执行 API 类型来源检查。
- * 参数 scriptUrl 定位仓库，exists 供测试隔离文件系统；当前没有真实 Go OpenAPI
+ * 参数 scriptUrl 定位仓库，exists 供测试隔离文件系统；当前没有完整 OpenAPI
  * 来源时抛出可操作错误。不会启动服务、调用网络或改写生成文件。
  */
 export function runGeneratorCheck(scriptUrl = import.meta.url, exists = existsSync) {
@@ -45,10 +45,10 @@ export function runGeneratorCheck(scriptUrl = import.meta.url, exists = existsSy
     ? `检测到 ${paths.routeCatalogPath}，但它只包含 method/path，不能生成请求和响应类型。`
     : `未检测到路由目录 ${paths.routeCatalogPath}。`;
   throw new Error([
-    "无法生成 src/lib/http/schema.d.ts：仓库中没有由 Go 后端产出的 OpenAPI 合同。",
+    "无法生成 src/lib/http/schema.d.ts：仓库中尚无覆盖全 API 的 OpenAPI 合同。",
     catalog,
     "已停止使用退役的 litellm.proxy.proxy_server；现有 schema.d.ts 保持不变。",
-    "请先在 Go 源码中建立包含请求体、响应体和错误状态的 OpenAPI 生成链，再接入 openapi-typescript。",
+    "供应商试点请运行 npm run gen:api:suppliers；全量生成需先完成其余领域的请求、响应和错误契约。",
   ].join("\n"));
 }
 

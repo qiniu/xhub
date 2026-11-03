@@ -1,0 +1,80 @@
+import { test } from "node:test";
+import assert from "node:assert/strict";
+import { mkdtempSync, mkdirSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import { generate, renderReference, syncArtifacts } from "./gen-usage-contract.mjs";
+import { generate as generateDomain } from "./gen-management-contract.mjs";
+
+/** 使用真实固定生成器验证九个日志/用量操作、双语说明和四份产物；缺失或漂移必须失败，临时文件 finally 清理。 */
+test("usage contract generators cover real routes and reject all artifact drift", async () => {
+  const artifacts = await generate();
+  assert.equal(Object.keys(artifacts).length, 4);
+  assert.match(artifacts["contracts/usage/types.gen.go"], /type LogRecord struct/);
+  const ts = artifacts["frontend/src/lib/http/contracts/usage.d.ts"];
+  for (const op of [
+    "listLogs",
+    "listUILogs",
+    "listSessionLogs",
+    "getLog",
+    "userDailyUsage",
+    "userTotalUsage",
+    "teamDailyUsage",
+    "teamTotalUsage",
+    "organizationDailyUsage",
+  ])
+    assert.ok(ts.includes(op), op);
+  // 新筛选须同时进入生成客户端和双语接口参考，防止 UI 支持但 Swagger 未声明。
+  for (const field of ["key_hash", "key_alias", "supplier", "inbound_endpoint", "cache_hit_filter"]) {
+    assert.ok(ts.includes(`${field}?:`), field);
+    assert.ok(artifacts["docs/development/en/usage-api.generated.md"].includes(field), field);
+    assert.ok(artifacts["docs/development/zh-CN/usage-api.generated.md"].includes(field), field);
+  }
+  assert.match(artifacts["docs/development/en/usage-api.generated.md"], /not every failure has a usage record/);
+  assert.match(artifacts["docs/development/zh-CN/usage-api.generated.md"], /并非所有错误均有账单/);
+  // 三个日志操作的单语描述必须同时保留旧分页/时间规则和新组合筛选规则，防止只保留分隔符一侧的末句。
+  for (const route of ["/spend/logs/v2", "/spend/logs/ui", "/spend/logs/session/ui"]) {
+    const heading = `### GET ${route}\n\n`;
+    const en = artifacts["docs/development/en/usage-api.generated.md"].split(heading)[1].split("\n\n")[0];
+    const zh = artifacts["docs/development/zh-CN/usage-api.generated.md"].split(heading)[1].split("\n\n")[0];
+    assert.match(en, /Scoped logs.*invalid page.*exact timestamps.*AND-combined.*return 400/);
+    assert.doesNotMatch(en, /[\u4e00-\u9fff]/);
+    assert.match(zh, /权限范围内日志.*page无效.*完整时间.*按且组合.*返回400/);
+    assert.doesNotMatch(zh, /Scoped logs|AND-combined/);
+  }
+  const root = mkdtempSync(join(tmpdir(), "xhub-usage-"));
+  try {
+    assert.throws(() => syncArtifacts(root, artifacts, true), /ENOENT/);
+    syncArtifacts(root, artifacts, false);
+    syncArtifacts(root, artifacts, true);
+    for (const name of Object.keys(artifacts)) {
+      writeFileSync(join(root, name), artifacts[name] + "drift");
+      assert.throws(() => syncArtifacts(root, artifacts, true), /drift/);
+      writeFileSync(join(root, name), artifacts[name]);
+    }
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+/** 生成失败必须暴露而非产生空契约；覆盖未知领域/语言、缺源、坏JSON及不存在路由，临时目录最终删除。 */
+test("usage generation rejects invalid source and domain", async () => {
+  assert.throws(() => renderReference({}, "fr"), /Unsupported locale/);
+  await assert.rejects(generateDomain(undefined, "typo"), /Unsupported contract/);
+  const root = mkdtempSync(join(tmpdir(), "xhub-usage-invalid-"));
+  try {
+    await assert.rejects(generate(root), /ENOENT/);
+    mkdirSync(join(root, "contracts/usage"), { recursive: true });
+    const source = join(root, "contracts/usage/openapi.json");
+    writeFileSync(source, "{");
+    await assert.rejects(generate(root), SyntaxError);
+    mkdirSync(join(root, "internal/catalog"), { recursive: true });
+    writeFileSync(join(root, "internal/catalog/routes.json"), "[]");
+    mkdirSync(join(root, "internal/gateway/usage"), { recursive: true });
+    writeFileSync(join(root, "internal/gateway/usage/mount.go"), "");
+    writeFileSync(source, JSON.stringify({ paths: { "/missing": { get: {} } } }));
+    await assert.rejects(generate(root), /Undeclared gateway route/);
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});

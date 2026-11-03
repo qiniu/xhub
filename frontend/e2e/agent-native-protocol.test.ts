@@ -28,7 +28,7 @@ test("native agent protocols preserve reasoning and tool continuation through th
     await page.getByPlaceholder(t("Select a Model"), { exact: true }).click();
     await page.getByRole("option", { name, exact: true }).click();
     await page.getByPlaceholder(t("Select an endpoint"), { exact: true }).click();
-    await page.getByRole("option").filter({ hasText: /\/v1\/responses$/ }).click();
+    await page.getByRole("option").filter({ hasText: /(?:^|\s)\/v1\/responses$/ }).click();
     await page.getByPlaceholder(t("Type your message... (Shift+Enter for new line)")).filter({ visible: true }).fill("Native agent protocol acceptance");
     const pending = page.waitForResponse(r => /\/responses$/.test(new URL(r.url()).pathname) && r.request().method() === "POST");
     await page.getByRole("button", { name: t("Send message") }).click();

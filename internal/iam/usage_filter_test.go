@@ -120,3 +120,34 @@ func TestUsageErrorFilters(t *testing.T) {
 		t.Fatalf("第二页遗漏匹配记录: %v %v", rows, err)
 	}
 }
+
+// TestUsageEvidenceFilters 验证持久化字段的组合筛选、字面错误搜索和授权交集；前置私有数据库，测试结束自动删除 schema。
+func TestUsageEvidenceFilters(t *testing.T) {
+	db := testDB(t)
+	ctx := t.Context()
+	first := usageRecord("evidence-a", "", 0)
+	first.UserID, first.KeyHash, first.KeyAlias, first.Supplier = "owner", "historical-hash", "old-key", "supplier-a"
+	first.HTTPStatus, first.Error, first.InboundEndpoint = 499, "UPSTREAM 100%_literal", "/v1/responses"
+	second := usageRecord("evidence-b", "", 0)
+	second.UserID, second.KeyHash, second.CacheHit = "other", "historical-hash", true
+	if err := db.RecordUsage(ctx, []UsageRecord{first, second}); err != nil {
+		t.Fatal(err)
+	}
+	hit, miss := true, false
+	for _, tc := range []struct {
+		q     UsageQuery
+		count int
+	}{
+		{UsageQuery{KeyHash: "historical-hash"}, 2},
+		{UsageQuery{UserID: "owner", KeyHash: "historical-hash", KeyAlias: "old-key", ErrorCode: "499", Supplier: "supplier-a", InboundEndpoint: "/v1/responses", CacheHit: &miss}, 1},
+		{UsageQuery{CacheHit: &hit}, 1},
+		{UsageQuery{ErrorMessage: "upstream 100%_literal"}, 1},
+		{UsageQuery{ErrorMessage: "' OR true --"}, 0},
+		{UsageQuery{UserID: "other", ErrorMessage: "100%_literal"}, 0},
+	} {
+		rows, err := db.ListUsage(ctx, tc.q)
+		if err != nil || len(rows) != tc.count {
+			t.Fatalf("证据筛选 %+v 得到 %d 条，期望 %d，错误 %v", tc.q, len(rows), tc.count, err)
+		}
+	}
+}

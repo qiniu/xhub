@@ -57,13 +57,16 @@ func (s *handler) healthReady(w http.ResponseWriter, r *http.Request) {
 	util.WriteJSON(w, 200, map[string]any{"status": "ready"})
 }
 
-// healthDetails returns readiness details, including litellm_version, so the dashboard can tell which gateway build is running.
-// 参数 w（http.ResponseWriter）：调用方的 HTTP 响应，状态码和正文写在这里；r（*http.Request）：入站 HTTP 请求，用来读路径、头和正文。
-// 调用：仅在 health.go 内使用
-// 测试：无直接单测
-// 返回：无。状态码和正文写进调用方的响应。
+// healthDetails 提供包含构建版本的真实就绪详情；w/r为响应与请求，由公开就绪详情入口调用。
+// 成功保持旧响应形状；数据库探测失败返回503和脱敏错误，不把底层连接信息发给客户端。
+// 每次调用实际执行ping，不缓存健康状态，不改变独立的存活检查和账务。
 func (s *handler) healthDetails(w http.ResponseWriter, r *http.Request) {
 	util.SetCallID(w, util.CallID())
+	if err := s.ping(); err != nil {
+		util.Error("readiness details failed error_type=%T", err)
+		util.WriteError(w, http.StatusServiceUnavailable, "not_ready", "database is not ready")
+		return
+	}
 	util.WriteJSON(w, 200, map[string]any{
 		"status":          "ready",
 		"litellm_version": s.version,

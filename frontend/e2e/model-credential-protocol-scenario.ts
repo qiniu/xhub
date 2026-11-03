@@ -131,6 +131,6 @@ test("official Ark credential saves edits and calls its native task model", asyn
   await stableGoto(page, "/models-and-endpoints");
   await page.getByRole("tab", { name: t("pages.models.all") }).click();
   await expect(page.getByRole("region", { name: "公开模型 " + name + "-edited", exact: true })).toHaveCount(0);
-  guard.assertOk();
+  await guard.assertOk();
 });
 }

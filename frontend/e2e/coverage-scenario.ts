@@ -107,7 +107,7 @@ test("model hubs require login then allow searching the public price catalog", a
     await page.evaluate(() => sessionStorage.clear());
     recordPage(route, "pass");
   }
-  guard.assertOk();
+  await guard.assertOk();
 });
 }
 /** 用途：注册独立场景「a created user can sign in with the initial password」；无参数、无返回值。前置真实浏览器、私有数据库和本地上游；验证页面及原始契约，保留原套件前后置清理，运行器最终回收专属 schema。异常由 Playwright 单独记录。 */
@@ -129,10 +129,10 @@ test("a created user can sign in with the initial password", async ({ page }) =>
   await expect(page.getByText("e2e-claim@example.com").first()).toBeVisible({ timeout: 15_000 });
   await login(page, "e2e-claim@example.com", "claimed-pass");
   await expect(page.getByText(t("nav.apiKeys")).first()).toBeVisible({ timeout: 20_000 });
-  guard.assertOk();
+  await guard.assertOk();
   console.log("created resource name=e2e-claim@example.com");
   recordChain("created resource name=e2e-claim@example.com");
-  guard.assertOk();
+  await guard.assertOk();
 });
 }
 /** 用途：注册独立场景「an administrator resets a password and the account signs in with it」；无参数、无返回值。前置真实浏览器、私有数据库和本地上游；验证页面及原始契约，保留原套件前后置清理，运行器最终回收专属 schema。异常由 Playwright 单独记录。 */
@@ -180,7 +180,7 @@ test("an administrator resets a password and the account signs in with it", asyn
   // nothing.
   await login(page, email, "replaced-pass");
   await expect(page.getByText(t("nav.apiKeys")).first()).toBeVisible({ timeout: 20_000 });
-  guard.assertOk();
+  await guard.assertOk();
 });
 }
 /** 用途：注册独立场景「chat shows the fake upstream assistant text」；无参数、无返回值。前置真实浏览器、私有数据库和本地上游；验证页面及原始契约，保留原套件前后置清理，运行器最终回收专属 schema。异常由 Playwright 单独记录。 */
@@ -202,7 +202,7 @@ test("chat shows the fake upstream assistant text", async ({ page }) => {
   console.log("chat content=e2e-ok");
   recordChain("chat content=e2e-ok");
   recordPage("/chat", "pass");
-  guard.assertOk();
+  await guard.assertOk();
 });
 }
 /** 用途：注册独立场景「ui create is visible from the live gateway and chat returns e2e-ok」；无参数、无返回值。前置真实浏览器、私有数据库和本地上游；验证页面及原始契约，保留原套件前后置清理，运行器最终回收专属 schema。异常由 Playwright 单独记录。 */
@@ -259,7 +259,7 @@ test("ui create is visible from the live gateway and chat returns e2e-ok", async
   console.log("chat content=e2e-ok");
   recordChain(`created resource name=${name}`);
   recordChain("chat content=e2e-ok");
-  guard.assertOk();
+  await guard.assertOk();
 });
 }
 /** 用途：注册独立场景「live gateway catalog sweep」；无参数、无返回值。前置真实浏览器、私有数据库和本地上游；验证页面及原始契约，保留原套件前后置清理，运行器最终回收专属 schema。异常由 Playwright 单独记录。 */

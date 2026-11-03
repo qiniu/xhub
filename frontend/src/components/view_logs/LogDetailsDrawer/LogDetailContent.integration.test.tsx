@@ -83,12 +83,20 @@ describe("LogDetailContent", () => {
   ])("shows plain text diagnostics with %j", (overrides) => {
     render(<LogDetailContent logEntry={createLogEntry({ status: "error", metadata: {}, messages: [], ...overrides })} />);
     expect(screen.getByRole("region", { name: "Full Error Details" })).toHaveTextContent("last diagnostic");
-    expect(screen.queryByText("Request/Response Data Not Available")).not.toBeInTheDocument();
+    expect(screen.queryByText("This log has no request or response body available. The reason was not recorded; other recorded details remain available.")).not.toBeInTheDocument();
   });
   it("should render the component successfully", () => {
     render(<LogDetailContent logEntry={createLogEntry()} />);
 
     expect(screen.getByText("Request Details")).toBeInTheDocument();
+  });
+
+  /** 前置后端可能返回带二进制浮点尾数的费用；验证日志详情保留有效小额并隐藏浮点尾数，组件卸载自动清理。 */
+  it("formats spend without exposing a floating point tail", () => {
+    render(<LogDetailContent logEntry={createLogEntry({ spend: 0.008289600000000001 })} />);
+
+    expect(screen.getAllByText("$0.0082896").length).toBeGreaterThan(0);
+    expect(screen.queryByText("$0.008289600000000001")).not.toBeInTheDocument();
   });
 
   it("should display Request Details with model, provider, and call type", () => {
@@ -125,7 +133,7 @@ describe("LogDetailContent", () => {
       />,
     );
 
-    expect(screen.getByText("Request Failed")).toBeInTheDocument();
+    expect(screen.getByText("Request failed")).toBeInTheDocument();
     expect(screen.getByText("rate_limit")).toBeInTheDocument();
     expect(screen.getByText("Too many requests")).toBeInTheDocument();
   });
@@ -286,7 +294,7 @@ describe("LogDetailContent", () => {
       />,
     );
 
-    expect(screen.getByText("Request/Response Data Not Available")).toBeInTheDocument();
+    expect(screen.getByText("This log has no request or response body available. The reason was not recorded; other recorded details remain available.")).toBeInTheDocument();
   });
 
   it("should not display ConfigInfoMessage when isLoadingDetails is true even without data", () => {
@@ -301,7 +309,13 @@ describe("LogDetailContent", () => {
       />,
     );
 
-    expect(screen.queryByText("Request/Response Data Not Available")).not.toBeInTheDocument();
+    expect(screen.queryByText("This log has no request or response body available. The reason was not recorded; other recorded details remain available.")).not.toBeInTheDocument();
+  });
+
+  // 详情读取失败时不得把错误误报成历史正文缺失；组件自动卸载，无后端数据。
+  it("does not report missing bodies when detail loading failed", () => {
+    render(<LogDetailContent logEntry={createLogEntry({ messages: [], response: {}, metadata: {} })} isDetailsError />);
+    expect(screen.queryByText(/The reason was not recorded/)).not.toBeInTheDocument();
   });
 
   it("should display loading state when isLoadingDetails is true", () => {

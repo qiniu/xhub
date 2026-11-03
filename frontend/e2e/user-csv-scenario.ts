@@ -45,7 +45,13 @@ export function registerUserCsvScenario(locale: "en" | "zh-CN") {
       await dialog.getByRole("button", { name: tr("create", { count: 1 }) }).click();
       const created = await createdPromise;
       expect(created.status()).toBe(200);
-      id = (await created.json()).user_id;
+      const snapshot = await created.json();
+      id = snapshot.user_id;
+      expect(id).toBeTruthy();
+      // 邮箱沿用服务端转小写规范化；用户显示名字应保持原始语言。
+      expect(snapshot).toMatchObject({ user_email: email.toLowerCase(), user_role: "internal_user", max_budget: 10, spend: 0, teams: [] });
+      expect(snapshot).not.toHaveProperty("password");
+      expect(snapshot).not.toHaveProperty("key");
       await expect(dialog.getByRole("status")).toHaveText(tr("summary", { success: 1, failed: 0 }));
       const read = await page.request.get(GATEWAY + "/user/info?user_id=" + id, { headers });
       expect(read.status()).toBe(200);
@@ -54,6 +60,16 @@ export function registerUserCsvScenario(locale: "en" | "zh-CN") {
       expect(user.budget_reset_day).toBe(1);
       expect(user.budget_reset_at).toBeTruthy();
       expect(user.user_alias).toBe("测试名字");
+      const detailV2 = await page.request.get(GATEWAY + "/v2/user/info?user_id=" + id, { headers });
+      expect(detailV2.status()).toBe(200);
+      expect((await detailV2.json()).user_info).toEqual(user);
+      const listing = await page.request.get(GATEWAY + "/user/list?user_email=" + encodeURIComponent(email), { headers });
+      expect(listing.status()).toBe(200);
+      const listed = await listing.json();
+      expect(listed.total).toBe(1);
+      expect(listed.total_count).toBe(listed.total);
+      expect(listed.current_page).toBe(listed.page);
+      expect(listed.users[0].user_id).toBe(id);
       const signedIn = await page.request.post(GATEWAY + "/v2/login", {
         data: { username: email, password: "Replace-before-import-123!" },
       });
@@ -77,6 +93,8 @@ export function registerUserCsvScenario(locale: "en" | "zh-CN") {
       if (id) {
         const deleted = await page.request.post(GATEWAY + "/user/delete", { headers, data: { user_id: id } });
         expect(deleted.status(), await deleted.text()).toBe(200);
+        expect(await deleted.json()).toEqual({ deleted: true });
+        expect((await page.request.get(GATEWAY + "/user/info?user_id=" + id, { headers })).status()).toBe(404);
       }
     }
   });

@@ -4,6 +4,7 @@ import { Inbox, Search, X } from "lucide-react";
 import { Plugin } from "@/components/claude_code_plugins/types";
 import { DataTable } from "@/components/shared/DataTable";
 import { getSkillHubTableColumns } from "@/components/AIHub/SkillHubTableColumns";
+import SkillSupportNotice from "@/components/claude_code_plugins/SkillSupportNotice";
 import SkillDetail from "@/components/claude_code_plugins/skill_detail";
 import { InputGroup, InputGroupAddon, InputGroupButton, InputGroupInput } from "@/components/ui/input-group";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -14,12 +15,14 @@ const ALL_DOMAINS = "__all_domains__";
 interface SkillHubDashboardProps {
   skills: Plugin[];
   isLoading: boolean;
+  loadError?: boolean;
   isAdmin?: boolean;
   accessToken?: string | null;
   publicPage?: boolean;
   onPublishSuccess?: () => void;
 }
 
+/** 区分真实空目录和筛选无结果；filtered为是否有筛选，无请求或写入副作用。 */
 function SkillsEmptyState({ filtered }: { filtered: boolean }) {
   const t = useT();
   return (
@@ -27,22 +30,25 @@ function SkillsEmptyState({ filtered }: { filtered: boolean }) {
       <div className="mb-1 flex size-10 items-center justify-center rounded-lg bg-muted">
         <Inbox className="size-5 text-muted-foreground" />
       </div>
-      <div className="text-sm font-medium text-foreground">{filtered ? t("No matching skills") : t("No skills yet")}</div>
+      <div className="text-sm font-medium text-foreground">{filtered ? t("No matching skills") : t("skillHub.empty")}</div>
       <div className="text-sm text-muted-foreground">
         {filtered
           ? t("Adjust the search or domain filter to see more skills.")
-          : t("Skills added here will appear for developers.")}
+          : t("skillHub.emptyHelp")}
       </div>
     </div>
   );
 }
 
+/** 展示Skill元数据、筛选与详情；skills为已读取数据，loadError优先展示失败，不能用空列表掩盖失败。
+ * 其他属性保留调用兼容；无发布或安装请求，用户名称说明保持原文。
+ */
 const SkillHubDashboard: React.FC<SkillHubDashboardProps> = ({
   skills,
   isLoading,
+  loadError = false,
   isAdmin,
   accessToken,
-  publicPage = false,
   onPublishSuccess,
 }) => {
   const t = useT();
@@ -79,7 +85,7 @@ const SkillHubDashboard: React.FC<SkillHubDashboardProps> = ({
     return result;
   }, [skills, search, domainFilter]);
 
-  const columns = useMemo(() => getSkillHubTableColumns({ onSkillClick: setSelectedSkill }), []);
+  const columns = getSkillHubTableColumns({ onSkillClick: setSelectedSkill });
 
   const domainItems = useMemo(
     () => [{ value: ALL_DOMAINS, label: t("All Domains") }, ...domains.map((d) => ({ value: d, label: d }))],
@@ -87,6 +93,10 @@ const SkillHubDashboard: React.FC<SkillHubDashboardProps> = ({
   );
 
   const hasActiveFilter = search.trim().length > 0 || domainFilter != null;
+
+  if (loadError) {
+    return <div className="space-y-4"><SkillSupportNotice /><p role="alert">{t("skillHub.loadError")}</p></div>;
+  }
 
   if (selectedSkill) {
     return (
@@ -102,6 +112,7 @@ const SkillHubDashboard: React.FC<SkillHubDashboardProps> = ({
 
   return (
     <div className="space-y-6">
+      <SkillSupportNotice />
       {/* Stats row */}
       <div className="grid grid-cols-3 gap-4">
         <div className="border border-border rounded-lg p-4">
@@ -121,7 +132,7 @@ const SkillHubDashboard: React.FC<SkillHubDashboardProps> = ({
       {/* Search + filters + table */}
       <div>
         <div className="flex items-center justify-between mb-3">
-          <h3 className="text-sm font-semibold text-foreground">{t("All {value0} Skills", { value0: (publicPage ? "Public " : "") })}</h3>
+          <h3 className="text-sm font-semibold text-foreground">{t("skillHub.all")}</h3>
           <div className="flex items-center gap-2">
             <Select
               items={domainItems}
@@ -178,7 +189,7 @@ const SkillHubDashboard: React.FC<SkillHubDashboardProps> = ({
         />
         <div className="mt-3 text-center">
           <p className="text-sm text-muted-foreground">
-            Showing {filteredSkills.length} of {totalSkills} skill{totalSkills !== 1 ? "s" : ""}
+            {t("skillHub.count", { visible: filteredSkills.length, total: totalSkills })}
           </p>
         </div>
       </div>

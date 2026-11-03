@@ -24,7 +24,7 @@ fi
 REDIS_NAME="xhub-e2e-redis-$$"
 export E2E_ACCEPTANCE_DIR="${E2E_ACCEPTANCE_DIR:-$ROOT/.e2e/runs/$(date -u +%Y%m%dT%H%M%SZ)-$$}"
 export E2E_EVIDENCE_DIR="$E2E_ACCEPTANCE_DIR/evidence"
-export E2E_RUN_DIR="$ROOT/.e2e/current"
+export E2E_RUN_DIR="$E2E_ACCEPTANCE_DIR/browser"
 export E2E_REVISION="$(git -C "$ROOT" rev-parse HEAD)"
 export E2E_BROWSER_STATUS=1 E2E_BACKEND_STATUS=1
 export E2E_FULL_COVERAGE=0
@@ -32,14 +32,17 @@ if [[ $# == 0 ]]; then export E2E_FULL_COVERAGE=1; fi
 mkdir -p "$E2E_ACCEPTANCE_DIR/browser" "$E2E_EVIDENCE_DIR" "$E2E_RUN_DIR"
 ln -sfn "$E2E_ACCEPTANCE_DIR" "$ROOT/.e2e/latest"
 rm -f "$E2E_RUN_DIR/results.json" "$E2E_RUN_DIR/junit.xml"
+# cleanup 由 EXIT 调用，无参数；先清理专属 Redis/锁，再生成最终报告。
+# 清理失败不得被阶段成功掩盖；已有测试/启动失败保留原退出码，日志留供定位。
 cleanup() {
-  local exit_code=$?
-  if [[ "${REPORT_WRITTEN:-0}" != 1 ]]; then
-    python3 "$ROOT/scripts/e2e-summary.py" || true
-  fi
-  docker rm -f "$REDIS_NAME" >/dev/null 2>&1 || true
-  rmdir "$LOCK"
-  return "$exit_code"
+  local code=$? cleanup_status=0
+  docker rm -f "$REDIS_NAME" >"$E2E_ACCEPTANCE_DIR/cleanup.log" 2>&1 || cleanup_status=1
+  rmdir "$LOCK" || cleanup_status=1
+  export E2E_CLEANUP_STATUS="$cleanup_status"
+  if [[ "$cleanup_status" != 0 && "$code" == 0 ]]; then code=1; fi
+  E2E_RUN_DIR="$E2E_ACCEPTANCE_DIR/browser" python3 "$ROOT/scripts/e2e-summary.py" || { if [[ "$code" == 0 ]]; then code=1; fi; }
+  echo "Regression finished: exit=$code; report: $E2E_ACCEPTANCE_DIR/report.html"
+  return "$code"
 }
 trap cleanup EXIT
 echo "Run directory: $E2E_ACCEPTANCE_DIR"
@@ -53,14 +56,21 @@ for attempt in {1..30}; do
   sleep 0.2
 done
 status=0
-# A heartbeat also covers compilation and long external requests with no output.
+# run_stage 接收阶段名、日志路径及命令，返回命令/tee 状态；心跳覆盖编译和长请求。
+# 阶段结束同时回收心跳与 sleep 子进程，避免日志管道保持打开；不改写产品数据。
 run_stage() {
   local label=$1 logfile=$2
   shift 2
   (set -o pipefail; "$@" 2>&1 | tee "$logfile") &
   local stage_pid=$!
-  (while kill -0 "$stage_pid" 2>/dev/null; do
-    sleep 30
+  (timer_pid=''
+  # TERM 必须同时停止定时子进程，否则 sleep 仍持有日志管道，入口结束后迟迟没有 EOF。
+  trap 'if [[ -n "$timer_pid" ]]; then kill "$timer_pid" 2>/dev/null || true; wait "$timer_pid" 2>/dev/null || true; fi; exit 0' TERM INT
+  while kill -0 "$stage_pid" 2>/dev/null; do
+    sleep 30 &
+    timer_pid=$!
+    wait "$timer_pid" || true
+    timer_pid=''
     kill -0 "$stage_pid" 2>/dev/null && echo "[$(date +%H:%M:%S)] $label still running; log: $logfile"
   done) &
   local heartbeat_pid=$! stage_status=0
@@ -76,12 +86,6 @@ else
   browser_status=1
   status=1
 fi
-for artifact in results.json junit.xml; do
-  if [[ -f "$E2E_RUN_DIR/$artifact" ]]; then cp "$E2E_RUN_DIR/$artifact" "$E2E_ACCEPTANCE_DIR/browser/"; fi
-done
-for artifact in playwright-report test-results .e2e-report; do
-  if [[ -d "$ROOT/frontend/$artifact" ]]; then cp -R "$ROOT/frontend/$artifact" "$E2E_ACCEPTANCE_DIR/"; fi
-done
 export E2E_RUN_DIR="$E2E_ACCEPTANCE_DIR/browser"
 echo "[3/4] Running backend business regression and real suppliers"
 if run_stage Backend "$E2E_ACCEPTANCE_DIR/backend.log" bash "$ROOT/scripts/regression.sh" --live -v; then
@@ -92,7 +96,4 @@ else
 fi
 echo "[4/4] Summarizing results: browser=$browser_status backend=$backend_status"
 export E2E_BROWSER_STATUS="$browser_status" E2E_BACKEND_STATUS="$backend_status"
-python3 "$ROOT/scripts/e2e-summary.py" || status=1
-REPORT_WRITTEN=1
-echo "Regression finished: exit=$status; report: $E2E_ACCEPTANCE_DIR/report.html"
 exit "$status"

@@ -1,96 +1,34 @@
-// onboarding.go finishes a local connect flow.
-// These handlers do not call an external identity provider. It is not part
-// of inference.
-//
-// The invitation flow is gone. It minted a session from a key-value invite
-// record and a hard-coded "internal_user" default, which is a third account role
-// the model no longer has: an account is created with a password by a platform
-// administrator, and that is the only way one comes into being.
-
 package gateway
 
 import (
-	"encoding/json"
-	"io"
 	"net/http"
-	"net/url"
-	"strings"
-	"sync"
 
 	"github.com/sunqirui1987/xhub/internal/util"
 )
 
-var logTraceOnceOnboarding sync.Once
-
-// authorizeFlow describes one connect attempt from a local fixture and does not call an external identity provider.
-// 参数 w（http.ResponseWriter）：调用方的 HTTP 响应，状态码和正文写在这里；r（*http.Request）：入站 HTTP 请求，用来读路径、头和正文。
-// 调用：仅在 onboarding.go 内使用
-// 测试：无直接单测
-// 返回：无。状态码和正文写进调用方的响应。
+// authorizeFlow 保留旧本地连接查询URL，但不把测试fixture当作真实授权会话。
+// w/r为HTTP响应与请求，由GET /authorize/flow调用；始终明确501，不读取或创建会话，也不调用外部IdP。
 func (s *Server) authorizeFlow(w http.ResponseWriter, r *http.Request) {
-	logTraceOnceOnboarding.Do(func() { util.Trace("enter gateway.authorizeFlow") })
-
-	flow := r.URL.Query().Get("flow")
-	body := map[string]any{
-		"state":         "unscoped",
-		"client_origin": "http://127.0.0.1:3000",
-		"server_id":     nil,
-		"server_name":   nil,
-		"connected":     false,
-	}
-	if flow == "" {
-		body["state"] = "stale"
-	}
-	if flow == "e2e-fixture" {
-		body["state"] = "interactive"
-		body["server_id"] = "e2e-server"
-		body["server_name"] = "e2e-server"
-		body["connected"] = true
-	}
-	util.WriteJSON(w, 200, body)
+	writeUnsupportedAuthorization(w)
 }
 
-// authorizeComplete accepts the connect form and returns a fixed local result.
-// 参数 w（http.ResponseWriter）：调用方的 HTTP 响应，状态码和正文写在这里；r（*http.Request）：入站 HTTP 请求，用来读路径、头和正文。
-// 调用：仅在 onboarding.go 内使用
-// 测试：无直接单测
-// 返回：无。状态码和正文写进调用方的响应。
+// authorizeComplete 拒绝没有执行器的本地授权提交，不能把任意正文标为已完成。
+// w/r为HTTP响应与请求，由POST /authorize/complete调用；返回501，无授权、重定向、存储或网络副作用。
 func (s *Server) authorizeComplete(w http.ResponseWriter, r *http.Request) {
-	raw, _ := io.ReadAll(r.Body)
-	flow, decision := "", ""
-	trimmed := strings.TrimSpace(string(raw))
-	if strings.HasPrefix(trimmed, "{") {
-		var body map[string]any
-		_ = json.Unmarshal(raw, &body)
-		flow, _ = body["flow"].(string)
-		decision, _ = body["decision"].(string)
-	} else if trimmed != "" {
-		vals, _ := url.ParseQuery(trimmed)
-		flow = vals.Get("flow")
-		decision = vals.Get("decision")
-	}
-	if decision == "" {
-		decision = "complete"
-	}
-	if flow == "" {
-		flow = "local"
-	}
-	util.WriteJSON(w, 200, map[string]any{
-		"status":   "ok",
-		"decision": decision,
-		"flow":     flow,
-	})
+	writeUnsupportedAuthorization(w)
 }
 
-// mcpOAuthToken answers the console's follow-up after the OAuth callback stores a code.
-// 参数 w（http.ResponseWriter）：调用方的 HTTP 响应，状态码和正文写在这里；r（*http.Request）：入站 HTTP 请求，用来读路径、头和正文。
-// 调用：仅在 onboarding.go 内使用
-// 测试：无直接单测
-// 返回：无。状态码和正文写进调用方的响应。
+// mcpOAuthToken 保留MCP令牌交换URL，明确当前未实现授权码交换，而非签发无效随机token。
+// w/r为HTTP响应与请求，由专用路由调用；任何身份和正文均返回501，不解析或回显授权码、PKCE及客户端秘密。
+// 企业SSO使用独立/auth/enterprise/*处理器，不经过本函数；这不是一个可用的OAuth授权服务器。
 func (s *Server) mcpOAuthToken(w http.ResponseWriter, r *http.Request) {
-	util.WriteJSON(w, 200, map[string]any{
-		"access_token": "at-" + util.CallID()[:12],
-		"token_type":   "Bearer",
-		"expires_in":   3600,
-	})
+	writeUnsupportedAuthorization(w)
+}
+
+// writeUnsupportedAuthorization 向旧授权入口写统一的不支持响应；w是HTTP输出，无返回值。
+// 仅供本文件三个占位入口调用；禁止缓存，不签发token或cookie，不把未执行能力包装成OAuth成功包络。
+func writeUnsupportedAuthorization(w http.ResponseWriter) {
+	w.Header().Set("Cache-Control", "no-store")
+	w.Header().Set("Pragma", "no-cache")
+	util.WriteError(w, http.StatusNotImplemented, "not_implemented", "local authorization and MCP OAuth token exchange are not implemented")
 }

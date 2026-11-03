@@ -366,24 +366,24 @@ func (db *DB) KeyByHash(ctx context.Context, hash string) (*Key, error) {
 	return &k, nil
 }
 
-// KeyFilter scopes a key listing. Empty fields are not filtered, and a nil
-// TeamIDs or KeyIDs means "no filter on that column" while an empty, non-nil
-// slice means "nothing matches". The two answers stay distinct so a member with
-// no teams is never shown the whole table.
+// KeyFilter 供管理接口向 ListKeys 传递授权范围与资源筛选；各字段取交集，无写入副作用。
+// 字符串为空表示不附加该条件；TeamIDs/KeyIDs 为 nil 表示不限制，非 nil 空切片表示无权限匹配任何记录。
+// 两种空值不能混淆，否则没有授权团队的成员可能看到整个表。
 type KeyFilter struct {
-	TeamID    string
-	ProjectID string
-	UserID    string
-	OwnerType string
-	TeamIDs   []string
-	KeyIDs    []string
+	OrganizationID string // 密钥所属用户当前团队的组织；空串不附加组织条件，不替代权限范围。
+	TeamID         string
+	ProjectID      string
+	UserID         string
+	OwnerType      string
+	TeamIDs        []string
+	KeyIDs         []string
 }
 
-// ListKeys returns keys inside the filter, newest first.
+// ListKeys 查询权限范围与资源条件的交集，按创建时间倒序返回；组织取所属用户当前团队，组织管理员身份不代表 Key 归属。
 // 参数 ctx（context.Context）：上下文，取消时停止；f（KeyFilter）：列出密钥使用的KeyFilter。
 // 返回 []Key（[]Key）：过滤条件内的密钥，最新的在前。条件对不上任何行时为空切片；error（error）：查询失败。nil 表示成功。
 // 调用：gateway/keys/admin.go、gateway/keys/generate.go
-// 测试：无直接单测
+// 测试：key_organization_filter_test.go；查询失败返回错误，不能伪装成空列表。
 func (db *DB) ListKeys(ctx context.Context, f KeyFilter) ([]Key, error) {
 	s := db.session(ctx)
 	defer s.Close()
@@ -402,6 +402,10 @@ func (db *DB) ListKeys(ctx context.Context, f KeyFilter) ([]Key, error) {
 	}
 	if f.TeamID != "" {
 		s = s.Where("user_id IN (SELECT user_id FROM team_members WHERE team_id = ?)", f.TeamID)
+	}
+	if f.OrganizationID != "" {
+		// 附加 AND 条件，保留原有授权范围；使用当前团队，避免转团队后仍匹配旧组织。
+		s = s.Where("user_id IN (SELECT m.user_id FROM team_members m JOIN teams t ON t.id = m.team_id WHERE t.organization_id = ?)", f.OrganizationID)
 	}
 	if f.ProjectID != "" {
 		s = s.Where("project_id = ?", f.ProjectID)

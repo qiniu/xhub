@@ -97,7 +97,7 @@ test("testdata 仅构造资源，控制台可见且不执行 Codex 或媒体模�
       expect(evidence.status()).toBe(200);
       expect((await evidence.json()).data.length).toBeGreaterThan(0);
     }
-    guard.assertOk();
+    await guard.assertOk();
   } finally {
     fs.rmSync(directory, { recursive: true, force: true });
   }

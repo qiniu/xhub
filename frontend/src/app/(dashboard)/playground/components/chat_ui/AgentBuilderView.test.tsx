@@ -5,7 +5,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import AgentBuilderView from "./AgentBuilderView";
 import type { AgentModel } from "../../llm_calls/fetch_agents";
 
-const modelCreateCall = vi.fn().mockResolvedValue({ model_id: "id-new" });
+const modelCreateCall = vi.fn().mockResolvedValue({ model_info: { id: "id-new" } });
 const modelPatchUpdateCall = vi.fn().mockResolvedValue({});
 const modelDeleteCall = vi.fn().mockResolvedValue({});
 const keyCreateCall = vi.fn().mockResolvedValue({ key: "sk-agent-key" });
@@ -78,7 +78,7 @@ beforeEach(() => {
   fetchAvailableAgentModels.mockResolvedValue(AGENTS);
   fetchAvailableModels.mockResolvedValue([{ model_group: "gpt-4o" }, { model_group: "claude-sonnet-4" }]);
   fetchMCPServers.mockResolvedValue([]);
-  modelCreateCall.mockResolvedValue({ model_id: "id-new" });
+  modelCreateCall.mockResolvedValue({ model_info: { id: "id-new" } });
   Object.defineProperty(window, "matchMedia", {
     writable: true,
     value: (query: string) => ({

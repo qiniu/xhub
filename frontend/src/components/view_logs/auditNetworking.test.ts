@@ -49,7 +49,7 @@ describe("gateway audit logs", () => {
       params: { changed_by: "admin-1", search: "key-1", object_id: undefined },
     });
     const url = new URL(fetchMock.mock.calls[0][0], "http://localhost");
-    expect(url.pathname).toBe("/audit/logs");
+    expect(url.pathname).toBe("/gw/audit/logs");
     expect(Object.fromEntries(url.searchParams)).toEqual({
       page: "2",
       page_size: "2",

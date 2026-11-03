@@ -125,8 +125,40 @@ E2E 运行时设置 `E2E_RUN_DIR="$PWD/.e2e/interface-integrity-final"`。流程
 后续按独立、可回退变更推进：
 
 1. 提示词 [#137](https://github.com/qiniu/xhub/issues/137) / 搜索 [#138](https://github.com/qiniu/xhub/issues/138) 测试契约与真实执行，先明确当前页面和保留组件的差异。
-2. OAuth token 与通用 JSON-RPC 假成功，明确保留功能的真实授权与协议语义。
+2. OAuth token 与通用 JSON-RPC 假成功：本批修正范围与验证见文末边界说明。
 3. 测试基础设施严格模式、清理失败和历史排除清单逐项收口。
 4. 以已验证的用户或 Key 域试点权威契约和离线文档，再逐域收拢兼容层。
 
 本轮不改线上、不进行员工账号测试、不恢复已移除入口、不缩减现有产品功能。真实供应商、真实七牛 SSO、TLS/反向代理和正式 Docker 部署仍属于独立验收边界。
+
+
+## OAuth 与 JSON-RPC 边界修正（#144、#145）
+
+在 `30e60c7` 基础上继续复核并先运行失败测试，确认了 [#144](https://github.com/qiniu/xhub/issues/144) 与 [#145](https://github.com/qiniu/xhub/issues/145)。上文表格保留初始审计事实；本节说明本批修复后的契约，不代表补齐了 OAuth 或 MCP 服务。
+
+| 入口 | 修正后的可观察契约 |
+| --- | --- |
+| `GET /authorize/flow`、`POST /authorize/complete`、`POST /v1/mcp/server/oauth/{server_id}/token` | 保留 URL，匿名与已登录请求均返回 HTTP 501、XHub `error.type=not_implemented`，禁止缓存。不生成随机令牌、不把 `e2e-fixture` 标为已连接、不回显授权码或 PKCE。它们不是可用的 OAuth 授权服务器 |
+| 通用 REST 管理接口的顶层 `jsonrpc` 字段 | 原有管理权限检查后，返回 HTTP 400、`error.type=unsupported_protocol`；不返回 JSON-RPC `result`，不读写目录。资源嵌套 `metadata.jsonrpc` 仍可正常存储。这是 REST 拒绝错误协议，并非 JSON-RPC 方法调度器 |
+| `/credentials/token`、`/search_tools/token` 等普通资源路径 | 移除生成令牌的路径后缀判断，`token` 作为合法资源名走真实持久化、回读、修改和删除；供应商详情仍通过 `/credentials/by_name/token` 读取 |
+| `/ui/mcp/oauth/callback` | 中英文均只说明正在返回、收到回调不代表授权成功；转交原始授权码或错误，不宣称令牌已交换或数据已保存 |
+
+企业 SSO 的 `/auth/enterprise/*` 使用独立处理器。本次未修改其实现；已有本地 SAML/OIDC 测试验证隔离边界。已移除的 `/v1/mcp` 与 `/v1/mcp/oauth/token` 继续返回 404，不借此恢复 MCP 功能。
+
+验证分层：
+
+- [`catalog_protocol_test.go`](../../../internal/gateway/family/catalog_protocol_test.go) 和 [`onboarding_test.go`](../../../internal/gateway/onboarding_test.go)：确定性覆盖 RPC 请求/通知/坏版本、正常 token 资源、无存储失败与 OAuth 正常形状/空/坏正文。
+- [`protocol_false_success_test.go`](../../../cmd/regression/protocol_false_success_test.go)：真实 HTTP、独立 PostgreSQL schema、匿名/普通用户/管理员、无副作用、普通资源生命周期、会话有效性与已移除 URL。旧实现的两个顶层回归均失败，修复后通过。
+- [`page.test.tsx`](../../../frontend/src/app/mcp/oauth/callback/page.test.tsx)：双语回调在授权码、上游错误及存储失败时都不能显示已授权或已保存。
+- [`catalog-persistence-scenario.ts`](../../../frontend/e2e/catalog-persistence-scenario.ts)：双语真实浏览器创建名为 `token` 的供应商、编辑/刷新/回读、拒绝 RPC 且配置不变、引用凭据完成一次本地上游推理与计费、删除后 404；同时验证 OAuth 失败契约、回调提示、真实跳转和正常登录会话。无脚本临时浏览器仅观察自动跳转前的服务端文案，常规浏览器验证回调行为；不伪造管理接口响应。
+
+可复现命令（均在隔离测试环境运行）：
+
+~~~bash
+XHUB_REGRESSION_STRICT=1 go test ./internal/gateway/family ./internal/gateway -count=1
+bash scripts/regression.sh 'TestProtocolFalseSuccess|TestCatalogIntegrity|TestProvider|TestSupplierCatalogLifecycle|TestOfficialCredentialSupportsNativeModel|TestEnterpriseSAMLHTTPFlow|TestEnterpriseProvisioningAndArchive'
+(cd frontend && npx vitest run src/app/mcp/oauth/callback/page.test.tsx src/components/networking.test.ts src/hooks/useToolsOAuthFlow.test.tsx)
+E2E_RUN_DIR="$PWD/.e2e/protocol-false-success-final" bash scripts/e2e.sh scenarios/regression/catalog-persistence-en.test.ts scenarios/regression/catalog-persistence-zh-CN.test.ts
+~~~
+
+外部边界：没有商业 MCP OAuth 服务、真实企业 IdP 或生产网络验证；本批证明的是未实现功能明确失败、现有资源实际执行、会话隔离和本地供应商调用，不宣称完整 OAuth/JSON-RPC 支持。无需数据迁移，未部署线上。

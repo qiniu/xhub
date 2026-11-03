@@ -247,6 +247,7 @@ func Serve(h dpcontract.Adapted, w http.ResponseWriter, r *http.Request, op stri
 	}
 	pool, routeCfg = fallbacks.SelectAffinity(&plan, pool, alias, models, state, routeCfg)
 	if plan.Required && len(pool) == 0 {
+		dpdiagnostics.RecordEarlyFailure(w, &dpdiagnostics.UpstreamDiagnostics{Routing: diagnosis.Snapshot(routeCfg, plan.Target.DeploymentID)})
 		util.WriteTypedError(w, r.URL.Path, 409, "continuation_unavailable", "original deployment is unavailable")
 		return
 	}
@@ -256,6 +257,7 @@ func Serve(h dpcontract.Adapted, w http.ResponseWriter, r *http.Request, op stri
 	}
 	util.Debug("process path=%s step=route model=%s deployments=%d stream=%t call_id=%q endpoint=%q resolved_model=%q fallback_visited=%d", r.URL.Path, alias, len(pool), stream, callID, providercapability.EndpointForOp(op), fallbacks.PoolAlias, len(fallbacks.Seen)-1)
 	if len(pool) == 0 {
+		dpdiagnostics.RecordEarlyFailure(w, &dpdiagnostics.UpstreamDiagnostics{Routing: diagnosis.Snapshot(routeCfg, "")})
 		status, kind, message := diagnosis.Failure(alias)
 		util.Error("process path=%s step=route call_id=%q model=%q reason=%q message=%q fallback_visited=%d", r.URL.Path, callID, alias, kind, message, len(fallbacks.Seen)-1)
 		util.WriteTypedError(w, r.URL.Path, status, kind, message)
@@ -268,6 +270,8 @@ func Serve(h dpcontract.Adapted, w http.ResponseWriter, r *http.Request, op stri
 	var lastStatus int
 	var lastResponse []byte
 	var lastProvider string
+	var lastDiagnostic *dpdiagnostics.UpstreamDiagnostics
+	cancelPhase := "before_upstream"
 	triedHTTP := false
 	missingCredential := false
 	// stopCanceled 在调用方上下文结束时记录一次零费用取消并终止执行。
@@ -279,8 +283,14 @@ func Serve(h dpcontract.Adapted, w http.ResponseWriter, r *http.Request, op stri
 			return false
 		}
 		if len(response) == 0 {
-			response = []byte("client request canceled")
+			response = []byte("request connection canceled; initiator unknown")
 		}
+		if lastDiagnostic == nil {
+			lastDiagnostic = &dpdiagnostics.UpstreamDiagnostics{}
+		}
+		lastDiagnostic.Failure = dpdiagnostics.ObserveFailure(r.Context(), cancelPhase, lastErr, time.Since(start))
+		lastDiagnostic.Failure.Kind = "request_canceled"
+		h.AnnotateCall(callID, dpcontract.CallNote{Upstream: lastDiagnostic})
 		h.RememberExchange(callID, r, raw, response)
 		h.AnnotateCall(callID, dpcontract.CallNote{Streamed: stream, TTFTMs: dpusage.TtftMillis(ttft), Provider: lastProvider, CacheKey: ck, SessionID: plan.SessionID})
 		h.RecordSpend(w, p, callID, alias, op, usage, start, false, 499, deployment)
@@ -293,6 +303,7 @@ func Serve(h dpcontract.Adapted, w http.ResponseWriter, r *http.Request, op stri
 	for len(pool) > 0 {
 		kind := "general"
 		for _, rawDep := range pool {
+			cancelPhase = "before_upstream"
 			if stopCanceled(nil, nil, "", 0) {
 				return
 			}
@@ -329,6 +340,7 @@ func Serve(h dpcontract.Adapted, w http.ResponseWriter, r *http.Request, op stri
 			}
 			// 固定历史必须比对首次外发时的实际连接，不能只靠可编辑的稳定部署 ID。
 			if !dprouting.BindConnection(&plan, dep) {
+				dpdiagnostics.RecordEarlyFailure(w, &dpdiagnostics.UpstreamDiagnostics{Routing: map[string]any{"required_deployment_id": plan.Target.DeploymentID, "required_deployment_reason": "connection_identity_changed_or_missing"}})
 				util.WriteTypedError(w, r.URL.Path, 409, "unavailable", "response deployment unavailable")
 				return
 			}
@@ -441,10 +453,12 @@ func Serve(h dpcontract.Adapted, w http.ResponseWriter, r *http.Request, op stri
 					h.DecBusy(did)
 					return
 				}
+				cancelPhase = "upstream_request"
 				resp, err := client.Do(req)
 				if err != nil {
 					// 即使未收到响应，也保存本次尝试的实际出站路径，便于失败日志定位。
-					h.AnnotateCall(callID, dpcontract.CallNote{Upstream: &dpdiagnostics.UpstreamDiagnostics{Endpoint: req.URL.EscapedPath(), DroppedCapabilities: built.DroppedCapabilities}})
+					lastDiagnostic = &dpdiagnostics.UpstreamDiagnostics{Endpoint: req.URL.EscapedPath(), DroppedCapabilities: built.DroppedCapabilities, Failure: dpdiagnostics.ObserveFailure(r.Context(), "upstream_request", err, time.Since(start))}
+					h.AnnotateCall(callID, dpcontract.CallNote{Upstream: lastDiagnostic})
 					cancelAttempt()
 					h.DecBusy(did)
 					lastErr = err
@@ -465,6 +479,8 @@ func Serve(h dpcontract.Adapted, w http.ResponseWriter, r *http.Request, op stri
 				// 先观察原始响应，再执行错误重试和协议转换。
 				resp.Request = req
 				diagnostic := dpdiagnostics.ObserveUpstream(resp)
+				lastDiagnostic = diagnostic
+				cancelPhase = "response_transfer"
 				diagnostic.DroppedCapabilities = built.DroppedCapabilities
 				if !firstByte.IsZero() {
 					diagnostic.FirstByteAt = *firstByte
@@ -544,6 +560,7 @@ func Serve(h dpcontract.Adapted, w http.ResponseWriter, r *http.Request, op stri
 					cancelAttempt()
 					if streamErr != nil {
 						lastErr = streamErr
+						diagnostic.Failure = dpdiagnostics.ObserveFailure(r.Context(), "response_transfer", streamErr, time.Since(start))
 						if stopCanceled(streamed, usage, did, ttft) {
 							return
 						}

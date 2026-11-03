@@ -95,6 +95,7 @@ const PublicModelHub: React.FC<PublicModelHubProps> = ({ accessToken, isEmbedded
   const [activeTab, setActiveTab] = useState<string>("models");
   const [skillHubData, setSkillHubData] = useState<Plugin[]>([]);
   const [skillLoading, setSkillLoading] = useState<boolean>(false);
+  const [skillLoadError, setSkillLoadError] = useState(false);
 
   useEffect(() => {
     const initializeAndFetch = async () => {
@@ -130,12 +131,16 @@ const PublicModelHub: React.FC<PublicModelHubProps> = ({ accessToken, isEmbedded
         setUsefulLinks(publicModelHubInfo.useful_links || {});
       };
 
+      /** 读取Skill目录；失败独立展示，不冒充空列表，原有认证和请求入口保持不变。 */
       const fetchSkillData = async () => {
         try {
           setSkillLoading(true);
+          setSkillLoadError(false);
           const response = await skillHubPublicCall();
           setSkillHubData(response.plugins ?? []);
         } catch (error) {
+          setSkillLoadError(true);
+          setSkillHubData([]);
           console.error("There was an error fetching the public skill data", error);
         } finally {
           setSkillLoading(false);
@@ -568,7 +573,7 @@ const PublicModelHub: React.FC<PublicModelHubProps> = ({ accessToken, isEmbedded
 
                 {/* Skill Hub Tab */}
                 <TabsContent value="skills">
-                  <SkillHubDashboard skills={skillHubData} isLoading={skillLoading} publicPage={true} />
+                  <SkillHubDashboard skills={skillHubData} isLoading={skillLoading} loadError={skillLoadError} publicPage={true} />
                 </TabsContent>
               </Tabs>
             </Card>

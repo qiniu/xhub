@@ -81,7 +81,7 @@ for (const stream of [false, true]) {
       await page.getByPlaceholder(t("Select an endpoint"), { exact: true }).click();
       await page
         .getByRole("option")
-        .filter({ hasText: /\/v1\/responses$/ })
+        .filter({ hasText: /(?:^|\s)\/v1\/responses$/ })
         .click();
       const sessionSwitch = page.getByRole("switch", { name: t("Use API session management") });
       if (await sessionSwitch.isChecked()) await sessionSwitch.click();

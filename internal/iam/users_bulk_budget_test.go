@@ -186,3 +186,23 @@ func TestAdminBulkUserBudgetsAllLimit(t *testing.T) {
 		t.Fatalf("精确边界未逐人保存: %d %v", count, err)
 	}
 }
+
+// TestBulkUserBudgetOverspentSibling 验证批量修改不受无关超支用户阻塞，但直接对超支目标降额仍拒绝。
+// 前置纯内存组织树；覆盖合法分配、真实父级超配和目标消费下限，函数无外部副作用，无需清理。
+func TestBulkUserBudgetOverspentSibling(t *testing.T) {
+	old := &quotaNode{Kind: "user", ID: "old", Parent: "org:o", Limit: quotaLimit(500), Spend: 501}
+	target := &quotaNode{Kind: "user", ID: "new", Parent: "org:o", Limit: quotaLimit(499)}
+	org := &quotaNode{Kind: "org", ID: "o", Limit: quotaLimit(1000), Spend: 501, Children: []*quotaNode{old, target}}
+	nodes := map[string]*quotaNode{"org:o": org, "user:old": old, "user:new": target}
+	if err := validateBulkUserBudgetTree(nodes, []string{"new"}); err != nil {
+		t.Fatalf("无关超支阻塞合法分配: %v", err)
+	}
+	target.Limit = quotaLimit(500)
+	if err := validateBulkUserBudgetTree(nodes, []string{"new"}); !errors.Is(err, ErrQuotaAllocation) {
+		t.Fatalf("父级超配未拒绝: %v", err)
+	}
+	target.Limit = quotaLimit(499)
+	if err := validateBulkUserBudgetTree(nodes, []string{"old"}); !errors.Is(err, ErrQuotaAllocation) {
+		t.Fatalf("修改目标不得低于消费: %v", err)
+	}
+}

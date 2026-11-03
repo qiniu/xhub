@@ -4,6 +4,26 @@ import (
 	"testing"
 )
 
+// TestCacheReady 检查nil、零值、正常实例与清理后的状态；只读内存对象，无外部前置及清理。
+func TestCacheReady(t *testing.T) {
+	var absent *DualCache
+	if absent.Ready() || (&DualCache{}).Ready() {
+		t.Fatal("未初始化缓存不能就绪")
+	}
+	c := NewCache()
+	c.Set("entry", []byte("value"))
+	if !c.Ready() {
+		t.Fatal("正常缓存未就绪")
+	}
+	if _, ok := c.Get("entry"); !ok {
+		t.Fatal("就绪检查改动缓存")
+	}
+	c.Flush()
+	if !c.Ready() {
+		t.Fatal("空缓存仍应就绪")
+	}
+}
+
 // TestFlush 验证空缓存、重复清理及多条响应全部失效，清理后可重新写入。
 // 前置独立内存缓存；无非法键限制，空键也必须清理；不访问外部资源，无需清理。
 func TestFlush(t *testing.T) {

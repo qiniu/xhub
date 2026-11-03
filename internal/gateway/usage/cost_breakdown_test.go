@@ -230,6 +230,30 @@ func TestEventRowCarriesTheBill(t *testing.T) {
 	}
 }
 
+// TestCostBreakdownRoundsStoredFloatTail 验证日志详情读取旧的浮点金额时也会清掉展示尾数。
+// 前置条件是价格快照包含输入、缓存读取和输出三项；验证结果是总额、分项和费率行都使用稳定小数；测试只读内存数据并自动结束。
+func TestCostBreakdownRoundsStoredFloatTail(t *testing.T) {
+	row := iam.UsageEvent{
+		Model: "gpt-6.1-sol", PromptTokens: 28123, CompletionTokens: 117,
+		Cost: 0.008289600000000001, TS: offpeakTestInstant(),
+		PriceSnapshot: `{"window":"all","applied":[` +
+			`{"measure":"token","side":"input","unit_size":1000000,"usd":0.000002,"quantity":2267},` +
+			`{"measure":"token","side":"cache_read","unit_size":1000000,"usd":0.0000001,"quantity":25856},` +
+			`{"measure":"token","side":"output","unit_size":1000000,"usd":0.00001,"quantity":117}]}`,
+	}
+	got := costBreakdown(row)
+	if got["total_cost"] != 0.0082896 {
+		t.Fatalf("total cost = %#v, want 0.0082896", got["total_cost"])
+	}
+	if got["cache_read_cost"] != 0.0025856 || got["output_cost"] != 0.00117 {
+		t.Fatalf("breakdown kept a float tail: %#v", got)
+	}
+	applied, _ := got["applied"].([]map[string]any)
+	if len(applied) != 3 || applied[1]["cost"] != 0.0025856 {
+		t.Fatalf("applied costs = %#v", got["applied"])
+	}
+}
+
 // TestEventRowExposesTheConsoleColumns 验证日志接口保留调用时凭证、基础地址和计费字段；纯内存夹具，无需清理。
 func TestEventRowExposesTheConsoleColumns(t *testing.T) {
 	ttft := 420

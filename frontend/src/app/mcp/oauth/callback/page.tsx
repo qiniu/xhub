@@ -28,6 +28,11 @@ const resolveDefaultRedirect = () => {
   return "/";
 };
 
+/**
+ * 将 URL 中未验证的授权结果交给原页面处理；无参数，返回双语跳转提示。
+ * 回调页不会验证授权或交换令牌，即使收到 code 或写入存储成功，也不能宣称连接成功。
+ * 副作用为写入会话存储并跳回同源页面；存储失败时仍跳转，提示不承诺已保存。
+ */
 const McpOAuthCallbackContent = () => {
   const t = useT();
   const searchParams = useSearchParams();
@@ -81,22 +86,23 @@ const McpOAuthCallbackContent = () => {
   return (
     <div className="min-h-screen flex items-center justify-center bg-muted p-6">
       <div className="max-w-lg w-full rounded-lg bg-card shadow-md p-8 text-center space-y-4">
-        <h1 className="text-xl font-semibold text-foreground">{t("LiteLLM MCP OAuth")}</h1>
+        <h1 className="text-xl font-semibold text-foreground">{t("mcpOAuthCallback.title")}</h1>
         <p className="text-sm text-foreground">
-          {t("Authorization complete. You may close this window and return to the LiteLLM dashboard.")}
+          {t("mcpOAuthCallback.pending")}
         </p>
         <p className="text-xs text-muted-foreground">
-          {t("If the window does not close automatically, everything is still saved—you can close it manually.")}
+          {t("mcpOAuthCallback.returnHelp")}
         </p>
       </div>
     </div>
   );
 };
 
+/** OAuth 回调页面入口；无参数，返回加载边界与结果转交提示，由 Next.js 挂载，授权副作用由子组件处理。 */
 const McpOAuthCallbackPage = () => {
   const t = useT();
   return (
-    <Suspense fallback={<div className="min-h-screen flex items-center justify-center">{t("Loading...")}</div>}>
+    <Suspense fallback={<div className="min-h-screen flex items-center justify-center">{t("mcpOAuthCallback.loading")}</div>}>
       <McpOAuthCallbackContent />
     </Suspense>
   );

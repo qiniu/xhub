@@ -339,7 +339,7 @@ export function registerVisibilityScenario(role: "platform" | "organization" | "
 
 
   }
-  guard.assertOk();
+  await guard.assertOk();
   } finally {
     test.setTimeout(test.info().timeout + 30_000);
     await admin.ok("POST", "/project/delete", {project_id: tenant.projectA1});

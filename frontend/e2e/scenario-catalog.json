@@ -919,14 +919,14 @@
   {
     "id": "SC-132",
     "file": "e2e/scenarios/columns/caching-flush.test.ts",
-    "title": "通用页面 /caching 清空",
+    "title": "cache management reflects runtime en",
     "kind": "implemented",
     "environment": "default offline"
   },
   {
     "id": "SC-133",
     "file": "e2e/scenarios/columns/caching-save.test.ts",
-    "title": "通用页面 /caching 保存",
+    "title": "cache management reflects runtime zh-CN",
     "kind": "implemented",
     "environment": "default offline"
   },
@@ -2977,6 +2977,503 @@
     "id": "REG-search_tools-probe-en",
     "file": "e2e/scenarios/regression/search_tools-probe-en.test.ts",
     "title": "real search_tools probe and upstream failure en",
+    "kind": "implemented",
+    "environment": "default offline"
+  },
+  {
+    "id": "REG-key-state-confirmation-en",
+    "file": "e2e/scenarios/regression/key-state-confirmation-en.test.ts",
+    "title": "key state requires explicit confirmation en",
+    "kind": "implemented",
+    "environment": "default offline"
+  },
+  {
+    "id": "REG-key-state-confirmation-zh-CN",
+    "file": "e2e/scenarios/regression/key-state-confirmation-zh-CN.test.ts",
+    "title": "key state requires explicit confirmation zh-CN",
+    "kind": "implemented",
+    "environment": "default offline"
+  },
+  {
+    "id": "REG-key-organization-filter-en",
+    "file": "e2e/scenarios/regression/key-organization-filter-en.test.ts",
+    "title": "key organization filter and permission intersection en",
+    "kind": "implemented",
+    "environment": "default offline"
+  },
+  {
+    "id": "REG-key-organization-filter-zh-CN",
+    "file": "e2e/scenarios/regression/key-organization-filter-zh-CN.test.ts",
+    "title": "key organization filter and permission intersection zh-CN",
+    "kind": "implemented",
+    "environment": "default offline"
+  },
+  {
+    "id": "SC-443",
+    "file": "e2e/scenarios/regression/swagger-reference-en.test.ts",
+    "title": "Swagger reference real user lifecycle en",
+    "kind": "implemented",
+    "environment": "default offline"
+  },
+  {
+    "id": "SC-444",
+    "file": "e2e/scenarios/regression/swagger-reference-zh-CN.test.ts",
+    "title": "Swagger reference real user lifecycle zh",
+    "kind": "implemented",
+    "environment": "default offline"
+  },
+  {
+    "id": "REG-catalog-short-key-en",
+    "file": "e2e/scenarios/regression/catalog-short-key-en.test.ts",
+    "title": "catalog persistence survives reload and rejects invalid updates en short key",
+    "kind": "implemented",
+    "environment": "default offline"
+  },
+  {
+    "id": "REG-catalog-short-key-zh-CN",
+    "file": "e2e/scenarios/regression/catalog-short-key-zh-CN.test.ts",
+    "title": "catalog persistence survives reload and rejects invalid updates zh-CN short key",
+    "kind": "implemented",
+    "environment": "default offline"
+  },
+  {
+    "id": "REG-guard-management-service-en",
+    "file": "e2e/scenarios/regression/guard-management-service-en.test.ts",
+    "title": "guard management service lifecycle en",
+    "kind": "implemented",
+    "environment": "default offline"
+  },
+  {
+    "id": "REG-guard-management-service-zh-CN",
+    "file": "e2e/scenarios/regression/guard-management-service-zh-CN.test.ts",
+    "title": "guard management service lifecycle zh-CN",
+    "kind": "implemented",
+    "environment": "default offline"
+  },
+  {
+    "id": "REG-policy-config-service-en",
+    "file": "e2e/scenarios/regression/policy-config-service-en.test.ts",
+    "title": "policy configuration persistence and isolation en",
+    "kind": "implemented",
+    "environment": "default offline"
+  },
+  {
+    "id": "REG-policy-config-service-zh-CN",
+    "file": "e2e/scenarios/regression/policy-config-service-zh-CN.test.ts",
+    "title": "policy configuration persistence and isolation zh-CN",
+    "kind": "implemented",
+    "environment": "default offline"
+  },
+  {
+    "id": "REG-access-group-config-service-en",
+    "file": "e2e/scenarios/regression/access-group-config-service-en.test.ts",
+    "title": "access group configuration persistence and isolation en",
+    "kind": "implemented",
+    "environment": "default offline"
+  },
+  {
+    "id": "REG-access-group-config-service-zh-CN",
+    "file": "e2e/scenarios/regression/access-group-config-service-zh-CN.test.ts",
+    "title": "access group configuration persistence and isolation zh-CN",
+    "kind": "implemented",
+    "environment": "default offline"
+  },
+  {
+    "id": "REG-vector-config-service-en",
+    "file": "e2e/scenarios/regression/vector-config-service-en.test.ts",
+    "title": "vector configuration persistence and isolation en",
+    "kind": "implemented",
+    "environment": "default offline"
+  },
+  {
+    "id": "REG-vector-config-service-zh-CN",
+    "file": "e2e/scenarios/regression/vector-config-service-zh-CN.test.ts",
+    "title": "vector configuration persistence and isolation zh-CN",
+    "kind": "implemented",
+    "environment": "default offline"
+  },
+  {
+    "id": "REG-tag-catalog-en",
+    "file": "e2e/scenarios/regression/tag-catalog-en.test.ts",
+    "title": "tag catalog read after write en",
+    "kind": "implemented",
+    "environment": "default offline"
+  },
+  {
+    "id": "REG-tag-catalog-zh-CN",
+    "file": "e2e/scenarios/regression/tag-catalog-zh-CN.test.ts",
+    "title": "tag catalog read after write zh-CN",
+    "kind": "implemented",
+    "environment": "default offline"
+  },
+  {
+    "id": "REG-metadata-config-service-en",
+    "file": "e2e/scenarios/regression/metadata-config-service-en.test.ts",
+    "title": "metadata configuration lifecycle en",
+    "kind": "implemented",
+    "environment": "default offline"
+  },
+  {
+    "id": "REG-metadata-config-service-zh-CN",
+    "file": "e2e/scenarios/regression/metadata-config-service-zh-CN.test.ts",
+    "title": "metadata configuration lifecycle zh-CN",
+    "kind": "implemented",
+    "environment": "default offline"
+  },
+  {
+    "id": "REG-budget-iam-en",
+    "file": "e2e/scenarios/regression/budget-iam-en.test.ts",
+    "title": "budget configuration and IAM boundary en",
+    "kind": "implemented",
+    "environment": "default offline"
+  },
+  {
+    "id": "REG-budget-iam-zh-CN",
+    "file": "e2e/scenarios/regression/budget-iam-zh-CN.test.ts",
+    "title": "budget configuration and IAM boundary zh-CN",
+    "kind": "implemented",
+    "environment": "default offline"
+  },
+  {
+    "id": "REG-operations-boundary-en",
+    "file": "e2e/scenarios/regression/operations-boundary-en.test.ts",
+    "title": "unsupported operations preserve real health and chat en",
+    "kind": "implemented",
+    "environment": "default offline"
+  },
+  {
+    "id": "REG-operations-boundary-zh-CN",
+    "file": "e2e/scenarios/regression/operations-boundary-zh-CN.test.ts",
+    "title": "unsupported operations preserve real health and chat zh-CN",
+    "kind": "implemented",
+    "environment": "default offline"
+  },
+  {
+    "id": "REG-server-oauth-en",
+    "file": "e2e/scenarios/regression/server-oauth-en.test.ts",
+    "title": "legacy server OAuth rejects false success and preserves chat en",
+    "kind": "implemented",
+    "environment": "default offline"
+  },
+  {
+    "id": "REG-server-oauth-zh-CN",
+    "file": "e2e/scenarios/regression/server-oauth-zh-CN.test.ts",
+    "title": "legacy server OAuth rejects false success and preserves chat zh-CN",
+    "kind": "implemented",
+    "environment": "default offline"
+  },
+  {
+    "id": "REG-server-runtime-en",
+    "file": "e2e/scenarios/regression/server-runtime-en.test.ts",
+    "title": "legacy server runtime helpers preserve configuration and chat en",
+    "kind": "implemented",
+    "environment": "default offline"
+  },
+  {
+    "id": "REG-server-runtime-zh-CN",
+    "file": "e2e/scenarios/regression/server-runtime-zh-CN.test.ts",
+    "title": "legacy server runtime helpers preserve configuration and chat zh-CN",
+    "kind": "implemented",
+    "environment": "default offline"
+  },
+  {
+    "id": "SC-445",
+    "file": "e2e/scenarios/enterprise/saml-refresh-en.test.ts",
+    "title": "SAML refresh HTTP valid en",
+    "kind": "implemented",
+    "environment": "local TLS IdP and PostgreSQL"
+  },
+  {
+    "id": "SC-446",
+    "file": "e2e/scenarios/enterprise/saml-refresh-zh-CN.test.ts",
+    "title": "SAML refresh HTTP expired zh-CN",
+    "kind": "implemented",
+    "environment": "local TLS IdP and PostgreSQL"
+  },
+  {
+    "id": "REG-server-submission-en",
+    "file": "e2e/scenarios/regression/server-submission-en.test.ts",
+    "title": "legacy server submission helpers preserve configuration and chat en",
+    "kind": "implemented",
+    "environment": "default offline"
+  },
+  {
+    "id": "REG-server-submission-zh-CN",
+    "file": "e2e/scenarios/regression/server-submission-zh-CN.test.ts",
+    "title": "legacy server submission helpers preserve configuration and chat zh-CN",
+    "kind": "implemented",
+    "environment": "default offline"
+  },
+  {
+    "id": "REG-plugin-activation-en",
+    "file": "e2e/scenarios/regression/plugin-activation-en.test.ts",
+    "title": "legacy plugin activation helpers preserve configuration and chat en",
+    "kind": "implemented",
+    "environment": "default offline"
+  },
+  {
+    "id": "REG-plugin-activation-zh-CN",
+    "file": "e2e/scenarios/regression/plugin-activation-zh-CN.test.ts",
+    "title": "legacy plugin activation helpers preserve configuration and chat zh-CN",
+    "kind": "implemented",
+    "environment": "default offline"
+  },
+  {
+    "id": "REG-plugin-filter-en",
+    "file": "e2e/scenarios/regression/plugin-filter-en.test.ts",
+    "title": "plugin list filters configuration and preserves chat en",
+    "kind": "implemented",
+    "environment": "default offline"
+  },
+  {
+    "id": "REG-plugin-filter-zh-CN",
+    "file": "e2e/scenarios/regression/plugin-filter-zh-CN.test.ts",
+    "title": "plugin list filters configuration and preserves chat zh-CN",
+    "kind": "implemented",
+    "environment": "default offline"
+  },
+  {
+    "id": "REG-plugin-registration-en",
+    "file": "e2e/scenarios/regression/plugin-registration-en.test.ts",
+    "title": "plugin registration preserves identities and chat en",
+    "kind": "implemented",
+    "environment": "default offline"
+  },
+  {
+    "id": "REG-plugin-registration-zh-CN",
+    "file": "e2e/scenarios/regression/plugin-registration-zh-CN.test.ts",
+    "title": "plugin registration preserves identities and chat zh-CN",
+    "kind": "implemented",
+    "environment": "default offline"
+  },
+  {
+    "id": "REG-skill-resource-en",
+    "file": "e2e/scenarios/regression/skill-resource-en.test.ts",
+    "title": "skill resource boundaries preserve configuration and chat en",
+    "kind": "implemented",
+    "environment": "default offline"
+  },
+  {
+    "id": "REG-skill-resource-zh-CN",
+    "file": "e2e/scenarios/regression/skill-resource-zh-CN.test.ts",
+    "title": "skill resource boundaries preserve configuration and chat zh-CN",
+    "kind": "implemented",
+    "environment": "default offline"
+  },
+  {
+    "id": "REG-skill-hub-support-en",
+    "file": "e2e/scenarios/regression/skill-hub-support-en.test.ts",
+    "title": "skill hub reports unsupported discovery and preserves chat en",
+    "kind": "implemented",
+    "environment": "default offline"
+  },
+  {
+    "id": "REG-skill-hub-support-zh-CN",
+    "file": "e2e/scenarios/regression/skill-hub-support-zh-CN.test.ts",
+    "title": "skill hub reports unsupported discovery and preserves chat zh-CN",
+    "kind": "implemented",
+    "environment": "default offline"
+  },
+  {
+    "id": "REG-key-basic-edit-en",
+    "file": "e2e/scenarios/regression/key-basic-edit-en.test.ts",
+    "title": "basic key editor preserves permissions and budget en",
+    "kind": "implemented",
+    "environment": "default offline"
+  },
+  {
+    "id": "REG-key-basic-edit-zh-CN",
+    "file": "e2e/scenarios/regression/key-basic-edit-zh-CN.test.ts",
+    "title": "basic key editor preserves permissions and budget zh-CN",
+    "kind": "implemented",
+    "environment": "default offline"
+  },
+  {
+    "id": "REG-legacy-inference-en",
+    "file": "e2e/scenarios/regression/legacy-inference-en.test.ts",
+    "title": "legacy inference aliases reject false success en",
+    "kind": "implemented",
+    "environment": "default offline"
+  },
+  {
+    "id": "REG-legacy-inference-zh-CN",
+    "file": "e2e/scenarios/regression/legacy-inference-zh-CN.test.ts",
+    "title": "legacy inference aliases reject false success zh-CN",
+    "kind": "implemented",
+    "environment": "default offline"
+  },
+  {
+    "id": "REG-provider-batch-en",
+    "file": "e2e/scenarios/regression/provider-batch-en.test.ts",
+    "title": "provider batch aliases reject false success en",
+    "kind": "implemented",
+    "environment": "default offline"
+  },
+  {
+    "id": "REG-provider-batch-zh-CN",
+    "file": "e2e/scenarios/regression/provider-batch-zh-CN.test.ts",
+    "title": "provider batch aliases reject false success zh-CN",
+    "kind": "implemented",
+    "environment": "default offline"
+  },
+  {
+    "id": "REG-medical-alias-en",
+    "file": "e2e/scenarios/regression/medical-alias-en.test.ts",
+    "title": "medical aliases reject false success en",
+    "kind": "implemented",
+    "environment": "default offline"
+  },
+  {
+    "id": "REG-medical-alias-zh-CN",
+    "file": "e2e/scenarios/regression/medical-alias-zh-CN.test.ts",
+    "title": "medical aliases reject false success zh-CN",
+    "kind": "implemented",
+    "environment": "default offline"
+  },
+  {
+    "id": "REG-service-aux-en",
+    "file": "e2e/scenarios/regression/service-aux-en.test.ts",
+    "title": "service auxiliary boundaries preserve configuration and chat en",
+    "kind": "implemented",
+    "environment": "default offline"
+  },
+  {
+    "id": "REG-service-aux-zh-CN",
+    "file": "e2e/scenarios/regression/service-aux-zh-CN.test.ts",
+    "title": "service auxiliary boundaries preserve configuration and chat zh-CN",
+    "kind": "implemented",
+    "environment": "default offline"
+  },
+  {
+    "id": "REG-identity-alias-en",
+    "file": "e2e/scenarios/regression/identity-alias-en.test.ts",
+    "title": "identity aliases reject false success without breaking login and chat en",
+    "kind": "implemented",
+    "environment": "default offline"
+  },
+  {
+    "id": "REG-identity-alias-zh-CN",
+    "file": "e2e/scenarios/regression/identity-alias-zh-CN.test.ts",
+    "title": "identity aliases reject false success without breaking login and chat zh-CN",
+    "kind": "implemented",
+    "environment": "default offline"
+  },
+  {
+    "id": "REG-runtime-operation-en",
+    "file": "e2e/scenarios/regression/runtime-operation-en.test.ts",
+    "title": "runtime operations reject false success without changing configuration and chat en",
+    "kind": "implemented",
+    "environment": "default offline"
+  },
+  {
+    "id": "REG-runtime-operation-zh-CN",
+    "file": "e2e/scenarios/regression/runtime-operation-zh-CN.test.ts",
+    "title": "runtime operations reject false success without changing configuration and chat zh-CN",
+    "kind": "implemented",
+    "environment": "default offline"
+  },
+  {
+    "id": "REG-settings-operation-en",
+    "file": "e2e/scenarios/regression/settings-operation-en.test.ts",
+    "title": "unsupported settings preserve configuration and chat en",
+    "kind": "implemented",
+    "environment": "default offline"
+  },
+  {
+    "id": "REG-settings-operation-zh-CN",
+    "file": "e2e/scenarios/regression/settings-operation-zh-CN.test.ts",
+    "title": "unsupported settings preserve configuration and chat zh-CN",
+    "kind": "implemented",
+    "environment": "default offline"
+  },
+  {
+    "id": "REG-model-alias-en",
+    "file": "e2e/scenarios/regression/model-alias-en.test.ts",
+    "title": "legacy model aliases preserve real deployment and chat en",
+    "kind": "implemented",
+    "environment": "default offline"
+  },
+  {
+    "id": "REG-model-alias-zh-CN",
+    "file": "e2e/scenarios/regression/model-alias-zh-CN.test.ts",
+    "title": "legacy model aliases preserve real deployment and chat zh-CN",
+    "kind": "implemented",
+    "environment": "default offline"
+  },
+  {
+    "id": "REG-analytics-boundary-en",
+    "file": "e2e/scenarios/regression/analytics-boundary-en.test.ts",
+    "title": "analytics aliases preserve billed chat and logs en",
+    "kind": "implemented",
+    "environment": "default offline"
+  },
+  {
+    "id": "REG-analytics-boundary-zh-CN",
+    "file": "e2e/scenarios/regression/analytics-boundary-zh-CN.test.ts",
+    "title": "analytics aliases preserve billed chat and logs zh-CN",
+    "kind": "implemented",
+    "environment": "default offline"
+  },
+  {
+    "id": "REG-protocol-boundary-en",
+    "file": "e2e/scenarios/regression/protocol-boundary-en.test.ts",
+    "title": "legacy protocol aliases reject false success en",
+    "kind": "implemented",
+    "environment": "default offline"
+  },
+  {
+    "id": "REG-protocol-boundary-zh-CN",
+    "file": "e2e/scenarios/regression/protocol-boundary-zh-CN.test.ts",
+    "title": "legacy protocol aliases reject false success zh-CN",
+    "kind": "implemented",
+    "environment": "default offline"
+  },
+  {
+    "id": "REG-discovery-boundary-en",
+    "file": "e2e/scenarios/regression/discovery-boundary-en.test.ts",
+    "title": "discovery aliases reject false success en",
+    "kind": "implemented",
+    "environment": "default offline"
+  },
+  {
+    "id": "REG-discovery-boundary-zh-CN",
+    "file": "e2e/scenarios/regression/discovery-boundary-zh-CN.test.ts",
+    "title": "discovery aliases reject false success zh-CN",
+    "kind": "implemented",
+    "environment": "default offline"
+  },
+  {
+    "id": "REG-stage4-combined-en",
+    "file": "e2e/scenarios/regression/stage4-combined-en.test.ts",
+    "title": "stage4 combined boundaries preserve chat and logs en",
+    "kind": "implemented",
+    "environment": "default offline"
+  },
+  {
+    "id": "REG-stage4-combined-zh-CN",
+    "file": "e2e/scenarios/regression/stage4-combined-zh-CN.test.ts",
+    "title": "stage4 combined boundaries preserve chat and logs zh-CN",
+    "kind": "implemented",
+    "environment": "default offline"
+  },
+  {
+    "id": "REG-proxy-body-limit",
+    "file": "e2e/proxy-body-limit.test.ts",
+    "title": "console proxy preserves large bodies and rejects oversize without truncation",
+    "kind": "implemented",
+    "environment": "default offline"
+  },
+  {
+    "id": "REG-request-diagnostics-en",
+    "file": "e2e/scenarios/regression/request-diagnostics-en.test.ts",
+    "title": "request failure diagnostics and exact time filtering en",
+    "kind": "implemented",
+    "environment": "default offline"
+  },
+  {
+    "id": "REG-request-diagnostics-zh-CN",
+    "file": "e2e/scenarios/regression/request-diagnostics-zh-CN.test.ts",
+    "title": "request failure diagnostics and exact time filtering zh-CN",
     "kind": "implemented",
     "environment": "default offline"
   }

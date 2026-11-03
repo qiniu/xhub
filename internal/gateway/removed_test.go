@@ -91,10 +91,7 @@ func TestRetiredPathsAreRefused(t *testing.T) {
 		}
 	}
 
-	// A live path must not be caught by the retired prefixes. /v1/skills is
-	// here because it was retired once and is served again by a dedicated
-	// handler; leaving it in the retired list would refuse it before that
-	// handler ran, and the skills page would be empty with a plausible error.
+	// 仍注册的管理路径不应被退役前缀捕获；/v1/skills仅表示通用配置CRUD可达，不证明下载、组织隔离或执行可用。
 	live := []string{"/v1/models", "/key/list", "/spend/logs/v2", "/team/member_list",
 		"/token_counter", "/v1/skills", "/server"}
 	for _, path := range live {

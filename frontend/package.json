@@ -25,7 +25,17 @@
     "knip:ci": "knip --exclude exports,nsExports,types,nsTypes,enumMembers,classMembers,duplicates",
     "knip:fix": "knip --fix",
     "gen:api": "node scripts/gen-api-types.mjs",
-    "test:e2e:report": "playwright show-report"
+    "test:e2e:report": "playwright show-report",
+    "gen:api:suppliers": "node scripts/gen-supplier-contract.mjs",
+    "check:api:suppliers": "node scripts/gen-supplier-contract.mjs --check && tsc --noEmit --strict --skipLibCheck tests/contracts/suppliers.typecheck.ts",
+    "gen:api:users": "node scripts/gen-user-contract.mjs",
+    "check:api:users": "node scripts/gen-user-contract.mjs --check && tsc --noEmit --strict --skipLibCheck tests/contracts/users.typecheck.ts",
+    "gen:api:keys": "node scripts/gen-key-contract.mjs",
+    "check:api:keys": "node scripts/gen-key-contract.mjs --check && tsc --noEmit --strict --skipLibCheck tests/contracts/keys.typecheck.ts",
+    "gen:api:models": "node scripts/gen-model-contract.mjs",
+    "check:api:models": "node scripts/gen-model-contract.mjs --check && tsc --noEmit --strict --skipLibCheck tests/contracts/models.typecheck.ts",
+    "gen:api:usage": "node scripts/gen-usage-contract.mjs",
+    "check:api:usage": "node scripts/gen-usage-contract.mjs --check && tsc --noEmit --strict --skipLibCheck tests/contracts/usage.typecheck.ts && tsc --noEmit --project tests/contracts/tsconfig.usage-client.json"
   },
   "dependencies": {
     "@base-ui/react": "^1.6.0",

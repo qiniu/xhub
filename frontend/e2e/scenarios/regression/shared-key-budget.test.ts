@@ -23,10 +23,9 @@ for (const locale of ["en", "zh-CN"] as const)
       await expect(page.getByTestId("create-key-button")).toBeVisible();
       const session = { Authorization: "Bearer " + (await sessionBearer(page)) };
       await stableGoto(page, "/usage");
-      await expect(
-        page.getByText(translate(locale, "{value0} limit", { value0: "$500.0000" }), { exact: true }),
-      ).toBeVisible();
+      await expect(page.getByRole("region", { name: tr("usageBudget.title") })).toContainText("$500.0000");
       const tokens: string[] = [];
+      const ids: string[] = [];
       for (const [name, budget] of [
         ["fixed", 500],
         ["blank-one", null],
@@ -46,8 +45,20 @@ for (const locale of ["en", "zh-CN"] as const)
         expect(r.status(), await r.text()).toBe(200);
         const key = await r.json();
         tokens.push(key.key);
+        ids.push(key.token_id);
         expect(key.max_budget).toBe(budget);
         await page.keyboard.press("Escape");
+      }
+      // 真实列表只暴露记录ID；两个空额度Key独立存在且共享个人额度，不能回显创建时明文。
+      const listed = await page.request.get(GATEWAY + "/key/list?scope=personal", { headers: session });
+      expect(listed.status()).toBe(200);
+      const list = await listed.json();
+      expect(list.total_count).toBe(3);
+      for (const row of list.keys) {
+        expect(ids).toContain(row.token_id);
+        expect(row.token).toBe(row.token_id);
+        expect(row.key).toBeUndefined();
+        expect(tokens).not.toContain(row.token);
       }
       const before = await page.request.get(GATEWAY + "/v2/user/info", { headers: session });
       expect((await before.json()).user_info).toMatchObject({ max_budget: 500, spend: 0 });

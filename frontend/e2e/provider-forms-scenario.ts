@@ -57,7 +57,7 @@ test("provider editor uses current API protocol without repairing display-name i
     await expect(edit.getByText(t("Select a provider to see its configuration fields."))).toBeVisible();
     await expect(edit.getByLabel("OpenAI API Key")).toHaveCount(0);
     await expect(edit.getByRole("button",{name:t("Save model provider")})).toBeDisabled();
-    await edit.getByRole("button",{name:t("Cancel"),exact:true}).click();guard.assertOk();
+    await edit.getByRole("button",{name:t("Cancel"),exact:true}).click();await guard.assertOk();
   } finally {
     for (const name of names) {
       const deleted=await page.request.delete(GATEWAY+"/credentials/"+name,{headers});
@@ -118,7 +118,7 @@ test("provider forms switch and persist DeepSeek credentials", async({page})=>{
   await edit.getByLabel("API Base",{exact:true}).fill(UPSTREAM+"/v1");
   const updating=page.waitForResponse(r=>new URL(r.url()).pathname==="/credentials/e2e-form-deepseek"&&r.request().method()==="PATCH");
   await edit.getByRole("button",{name:t("Save model provider")}).click();expect((await updating).status()).toBe(200);
-  await deleteProvider(page,"e2e-form-deepseek");guard.assertOk();
+  await deleteProvider(page,"e2e-form-deepseek");await guard.assertOk();
 });
 }
 /** 用途：注册独立场景「OpenAI compatible form saves a provider and invokes its model」；无参数、无返回值。前置真实浏览器、私有数据库和本地上游；验证页面及原始契约，保留原套件前后置清理，运行器最终回收专属 schema。异常由 Playwright 单独记录。 */
@@ -155,7 +155,7 @@ test("OpenAI compatible form saves a provider and invokes its model", async({pag
   expect(response.status(),await response.text()).toBe(200);expect((await response.json()).choices[0].message.content).toBe("e2e-ok");
   await page.getByRole("button",{name:"删除",exact:true}).click();await page.getByRole("dialog").getByPlaceholder(name).fill(name);
   await page.getByRole("dialog").getByRole("button",{name:"删除",exact:true}).click();
-  await expect(page.getByRole("button",{name,exact:true})).toHaveCount(0);await deleteProvider(page,name);guard.assertOk();
+  await expect(page.getByRole("button",{name,exact:true})).toHaveCount(0);await deleteProvider(page,name);await guard.assertOk();
 });
 }
 /** 用途：注册独立场景「Custom provider explicitly selects and invokes a Qiniu compatible transport」；无参数、无返回值。前置真实浏览器、私有数据库和本地上游；验证页面及原始契约，保留原套件前后置清理，运行器最终回收专属 schema。异常由 Playwright 单独记录。 */
@@ -189,6 +189,6 @@ test("Custom provider explicitly selects and invokes a Qiniu compatible transpor
   await form.getByRole("button",{name:"取消",exact:true}).click();await page.getByRole("button",{name:"删除",exact:true}).click();
   await page.getByRole("dialog",{name:"删除模型"}).getByPlaceholder(name,{exact:true}).fill(name);
   await page.getByRole("dialog",{name:"删除模型"}).getByRole("button",{name:/删除|确认/}).click();
-  await deleteProvider(page,credential);guard.assertOk();
+  await deleteProvider(page,credential);await guard.assertOk();
 });
 }

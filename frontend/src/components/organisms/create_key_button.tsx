@@ -125,6 +125,7 @@ export const fetchUserModels = async (
  * 参数包含团队上下文、已有密钥、新增回调及预填配置；返回创建表单和一次性密钥展示。
  * 读取个人预算快照，空金额共享；显式团队上下文保留模型/额度校验，失败保留后台错误分类。
  * 成功刷新列表，关闭重置表单；明文不持久化到浏览器。 */
+/** 创建Key弹窗；参数提供团队、已有数据与成功回调，沿既有权限/预算流程提交并一次性显示明文；失败展示错误，关闭清理表单状态。 */
 const CreateKey: React.FC<CreateKeyProps> = ({ team, teams, data, addKey, autoOpenCreate, prefillData }) => {
   const t = useT();
   const { accessToken, userId: userID, userRole } = useAuthorized();
@@ -142,7 +143,8 @@ const CreateKey: React.FC<CreateKeyProps> = ({ team, teams, data, addKey, autoOp
   const registry = useMountRegistry();
   const mountedForm = useMemo(() => ({ control: form.control, registry }), [form.control, registry]);
   const [isModalVisible, setIsModalVisible] = useState(false);
-  const [apiKey, setApiKey] = useState(null);
+  // 创建回复明文为字符串，关闭前尚未创建时为null；仅收紧类型，不改显示或保存行为。
+  const [apiKey, setApiKey] = useState<string | null>(null);
   const [modelsToPick, setModelsToPick] = useState<string[]>([]);
   const keyOwner = "you";
   const [hasPrefilled, setHasPrefilled] = useState(false);

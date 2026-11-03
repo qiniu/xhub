@@ -86,7 +86,7 @@ test("deployment deletion clears default and template weights for inherited rout
     await expect(modelGroup.getByRole("button", { name: "编辑权重" })).toHaveCount(0);
     await expect(modelGroup.getByRole("columnheader", { name: "默认权重" })).toHaveCount(0);
     await call(upstreams[0], 0.000028);
-    guard.assertOk();
+    await guard.assertOk();
   } finally {
     if (key) {
       await page.request.post(GATEWAY + "/key/update", { headers, data: { key, route_template_id: "" } });
