@@ -154,6 +154,20 @@ class ArkUpstreamTest(unittest.TestCase):
         with self.assertRaises(ValueError):
             vision_answer(messages, "/v1/messages")
 
+    def test_generic_messages_stream_lifecycle(self):
+        """前置真实本地HTTP服务；验证通用Messages同步结果及SSE身份、完整块生命周期和用量，tearDown关闭服务。"""
+        body = {"model": "e2e-native-real-claude", "messages": [{"role": "user", "content": "Say hello."}], "max_tokens": 32}
+        result = self.request("/v1/messages", body)
+        with urlopen(Request(self.base + "/v1/messages", data=json.dumps({**body, "stream": True}).encode()), timeout=2) as response:
+            frames = [json.loads(line[6:]) for line in response.read().decode().splitlines() if line.startswith("data: {")]
+        self.assertEqual([frame["type"] for frame in frames], ["message_start", "content_block_start", "content_block_delta", "content_block_stop", "message_delta", "message_stop"])
+        self.assertEqual(frames[0]["message"], {**result, "content": [], "stop_reason": None, "usage": {"input_tokens": 8, "output_tokens": 0}})
+        self.assertEqual(frames[1]["content_block"], {"type": "text", "text": ""})
+        self.assertEqual(frames[2]["delta"], {"type": "text_delta", "text": result["content"][0]["text"]})
+        self.assertEqual([frame["index"] for frame in frames[1:4]], [0, 0, 0])
+        self.assertEqual(frames[4]["delta"]["stop_reason"], result["stop_reason"])
+        self.assertEqual(frames[4]["usage"]["output_tokens"], result["usage"]["output_tokens"])
+
     def test_budgeted_vision_messages_and_tool_result(self):
         """前置本地HTTP原生Messages；核对用户/工具图片的JSON与完整SSE、cap上下界及错误关联/MIME拒绝，tearDown清理服务。"""
         image = {"type": "image", "source": {"type": "base64", "media_type": "image/png", "data": VISION_PNG}}

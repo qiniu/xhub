@@ -11,6 +11,24 @@ import unittest
 class GatewayConfigTests(unittest.TestCase):
     """验证浏览器夹具配置的可选异步落库路径。"""
 
+    def test_continuation_cache_price(self):
+        """目的：显式开启续接夹具时配置完整缓存价格；未开启时不注入模型，临时目录自动清理。"""
+        for enabled in ("0", "1"):
+            with self.subTest(enabled=enabled), tempfile.TemporaryDirectory() as directory:
+                env = {"PATH": os.environ.get("PATH", ""), "E2E_UP_PORT": "4137",
+                       "E2E_MASTER_KEY": "test-only-key", "E2E_SCHEMA": "test_config",
+                       "E2E_RUN_DIR": directory, "E2E_RESPONSES_CONTINUATION": enabled}
+                subprocess.run([sys.executable, str(Path(__file__).with_name("config.py"))],
+                               env=env, check=True, capture_output=True)
+                models = json.loads((Path(directory) / "c.yaml").read_text())["model_list"]
+                selected = [row for row in models if row["model_name"] in ("e2e-responses-history", "e2e-codex-agent")]
+                self.assertEqual(len(selected), 2 if enabled == "1" else 0)
+                for model in selected:
+                    prices = model["litellm_params"]
+                    self.assertEqual(prices["input_cost_per_token"], 0.000001)
+                    self.assertEqual(prices["output_cost_per_token"], 0.000002)
+                    self.assertEqual(prices["cache_read_input_token_cost"], 0.000001)
+
     def test_database_target(self):
         """验证默认库、专属库及非法名称；配置不访问数据库，临时文件自动清理。"""
         for database in (None, "xhub_e2e_audit", "../postgres", "xhub;drop", ""):

@@ -22,7 +22,7 @@ func Execution(m config.ModelEntry) (providercontract.Transport, bool) {
 	return providercontract.Transport{}, false
 }
 
-// AllowsEndpoint 校验入口目录、部署声明与上游协议兼容性，返回明确的排除原因。
+// AllowsEndpoint 校验入口目录、默认开放规则、部署声明与上游协议兼容性，返回明确的排除原因。
 // 参数为部署及用户入口 ID；调用：实际选路与只读预览，无副作用。
 func AllowsEndpoint(m config.ModelEntry, endpoint string) error {
 	if m.Disabled() {
@@ -32,13 +32,14 @@ func AllowsEndpoint(m config.ModelEntry, endpoint string) error {
 		return err
 	}
 	declared := stringList(m.ModelInfo["endpoint_types"])
-	standard := false
+	automatic := false
 	for _, e := range providercapability.EndpointTypes() {
-		if e.ID == endpoint && e.Category != "bypass" {
-			standard = true
+		if e.ID == endpoint {
+			// 默认入口仍须经过下方协议兼容检查；缺失历史声明不再关闭三种原生对话入口。
+			automatic = e.Category != "bypass" || endpoint == "bypass:openai-chat" || endpoint == "bypass:openai-responses" || endpoint == "bypass:anthropic-messages"
 		}
 	}
-	if !standard && !slices.Contains(declared, endpoint) {
+	if !automatic && !slices.Contains(declared, endpoint) {
 		return fmt.Errorf("endpoint %s is not enabled", endpoint)
 	}
 	for _, e := range providercapability.EndpointTypes() {

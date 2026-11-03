@@ -1,4 +1,11 @@
 export const enPhrases: Record<string, string> = {
+  "cachePrice.warningTitle": "Incomplete cache pricing",
+  "cachePrice.missing": "Missing prices: {fields}. If the upstream reports these tokens, the request cannot be fully priced. Enter the supplier rate; use 0 only when explicitly free.",
+  "cachePrice.blankHelp": "Blank means unset, not the input price. Reported cache usage without a matching rate remains unpriced.",
+  "cachePrice.readMissing": "The upstream reported cache read tokens, but the model has no cache read price. Configure the price; this request has no complete bill.",
+  "cachePrice.writeMissing": "The upstream reported cache write tokens, but the model has no cache write price. Configure the price; this request has no complete bill.",
+  "cachePrice.unavailable": "The reported usage could not be priced completely. Check the model prices and upstream usage; this does not mean the request was free.",
+
   "To:": "To:",
   "Identity request failed ({value0})": "Identity request failed ({value0})",
   "Missing endpoint catalog": "Missing endpoint catalog",
@@ -8031,8 +8038,8 @@ export const enPhrases: Record<string, string> = {
   "Enter a FAL task path as the upstream model, for example byteplus/seedance-2.0/text-to-video.":
     "Enter a FAL task path as the upstream model, for example byteplus/seedance-2.0/text-to-video.",
   "XHub public endpoints": "XHub public endpoints",
-  "Standard endpoints are enabled automatically and use the same public model name.":
-    "Standard endpoints are enabled automatically and use the same public model name.",
+  "modelEndpoints.automaticDescription":
+    "Standard endpoints and matching Chat Completions, Responses or Messages passthrough endpoints are enabled automatically. Choose the request path to use standard processing or passthrough; both use the same public model name.",
   "This model uses a provider-specific protocol. The passthrough endpoints below are enabled from registered capabilities.":
     "This model uses a provider-specific protocol. The passthrough endpoints below are enabled from registered capabilities.",
   "Enabled endpoints": "Enabled endpoints",

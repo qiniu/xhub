@@ -45,7 +45,7 @@ go test ./internal/provider/... -count=1
 5. `../dataplane/transport/bypass_url.go`、`../dataplane/execution/official.go`：路径拼接、原生请求、任务钉与结算。
 6. `all/all.go`：编译时加载；新增后重建并重启网关，不支持上传 Go 插件热加载。
 
-凭据类型、连接名称、`catalog_id`、上游模型 ID、对外模型名、`transport` 是不同字段。`custom_llm_provider: suno` 不会自动选择音乐协议；`model_info.transport` 必须已登记。标准客户接口由执行能力生成，Bypass 入口需在 `endpoint_types` 显式启用。
+凭据类型、连接名称、`catalog_id`、上游模型 ID、对外模型名、`transport` 是不同字段。`custom_llm_provider: suno` 不会自动选择音乐协议；`model_info.transport` 必须已登记。标准客户接口和匹配上游协议的 Chat、Responses、Messages 对话透传入口由执行能力自动开放；其他 Bypass 入口仍需在 `endpoint_types` 显式启用。
 
 | Directory | Responsibility |
 |---|---|

@@ -1,4 +1,11 @@
 export const zhPhrases: Record<string, string> = {
+  "cachePrice.warningTitle": "缓存价格不完整",
+  "cachePrice.missing": "缺少价格：{fields}。若上游返回这些 Token，本次请求将无法完整计费。请填写供应商费率，仅在明确免费时填 0。",
+  "cachePrice.blankHelp": "留空表示未设置，不会默认使用输入价格。上游报告缓存用量但缺少对应费率时，账单将标为未定价。",
+  "cachePrice.readMissing": "上游返回了缓存读取 Token，但模型未配置缓存读取价格。请补齐价格；本次请求尚无完整账单。",
+  "cachePrice.writeMissing": "上游返回了缓存写入 Token，但模型未配置缓存写入价格。请补齐价格；本次请求尚无完整账单。",
+  "cachePrice.unavailable": "实际用量无法完整定价。请核对模型价格和上游用量；这不表示请求免费。",
+
   "To:": "至：",
   "Identity request failed ({value0})": "身份信息请求失败（{value0}）",
   "Missing endpoint catalog": "端点目录缺失",
@@ -7806,8 +7813,8 @@ export const zhPhrases: Record<string, string> = {
   "Enter a FAL task path as the upstream model, for example byteplus/seedance-2.0/text-to-video.":
     "上游模型需填写 FAL 任务路径，如 byteplus/seedance-2.0/text-to-video。",
   "XHub public endpoints": "XHub 对外接口",
-  "Standard endpoints are enabled automatically and use the same public model name.":
-    "标准接口已自动开放，可使用同一个对外模型名称调用。",
+  "modelEndpoints.automaticDescription":
+    "标准接口和与上游协议匹配的 Chat Completions、Responses 或 Messages 透传接口自动开放。调用时通过请求路径选择标准处理或透传，使用相同的对外模型名称。",
   "This model uses a provider-specific protocol. The passthrough endpoints below are enabled from registered capabilities.":
     "此模型使用供应商专用协议，以下直通接口已按注册能力开放。",
   "Enabled endpoints": "已开放接口",

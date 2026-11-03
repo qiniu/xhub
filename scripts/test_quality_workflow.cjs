@@ -239,7 +239,7 @@ test('model contract requires generated types and real deployment regression', (
 
 /** 日志契约作业必须实际执行HTTP/PG验证及清单漂移检查；只读YAML，不接触线上。 */
 test('usage contract includes real traffic and inventory gates', () => {
- assert.equal(step('usage-contract', 'Run real usage contract regression').run, "bash scripts/regression.sh '^Test(UsageContractRealTraffic|BodyReadDiagnostics|LogExactTimeWindow|ClientCancellationDoesNotCoolDeployment|AnthropicTokenCountContract|ErrorLogFilterContract|UpstreamDiagnosticsContract|RouteDiagnosticContract|NativeRouteDiagnosticContract|ResponsesNativeToolContinuation|StreamReadFailureDiagnostics|ResponsesFailedStreamCannotContinue|ResponseConnectionChanges|LogFilterOptionsScope|MonitorRoutingAndFallback|MonitorEnvironmentIdentity|ModelMonitorCurrentAliasScope|ModelMonitorCatalogPermissions|ModelMonitorHTTP)$'");
+ assert.equal(step('usage-contract', 'Run real usage contract regression').run, "bash scripts/regression.sh '^Test(CachePriceDiagnostics|CachePriceDiagnosticBoundaries|UsageContractRealTraffic|BodyReadDiagnostics|LogExactTimeWindow|ClientCancellationDoesNotCoolDeployment|AnthropicTokenCountContract|ErrorLogFilterContract|UpstreamDiagnosticsContract|RouteDiagnosticContract|NativeRouteDiagnosticContract|ResponsesNativeToolContinuation|StreamReadFailureDiagnostics|ResponsesFailedStreamCannotContinue|ResponseConnectionChanges|LogFilterOptionsScope|MonitorRoutingAndFallback|MonitorEnvironmentIdentity|ModelMonitorCurrentAliasScope|ModelMonitorCatalogPermissions|ModelMonitorHTTP)$'");
  assert.match(step('usage-contract', 'Check core migration inventory').run, /contract-inventory.mjs --check/);
 });
 
@@ -508,7 +508,7 @@ test('operations boundary has real regression coverage and cleanup', () => {
 test('cache management has real regression coverage and cleanup', () => {
   const job = workflow.jobs['supplier-contract'];
   const run = step('supplier-contract', 'Run real cache management regression');
-  assert.equal(run.run, "bash scripts/regression.sh '^Test(CacheManagementTruth|CacheUnavailableManagement|CacheHitIsFreeAndLoggedAsOne)$'");
+  assert.equal(run.run, "bash scripts/regression.sh '^Test(RequestCachePolicy|CacheManagementTruth|CacheUnavailableManagement|CacheHitIsFreeAndLoggedAsOne)$'");
   assert.equal(run.env.XHUB_REGRESSION_COVERPROFILE, 'coverage/cache-config.out');
   const check = step('supplier-contract', 'Validate cache regression coverage');
   assert.match(check.run, /set -euo pipefail/);

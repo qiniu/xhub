@@ -1,4 +1,5 @@
 import path from "path";
+import { translate } from "../src/i18n/translate";
 
 import { expect, test } from "@playwright/test";
 
@@ -38,11 +39,12 @@ test("model editor presents endpoints clearly and saves a path model with a safe
     await expect(form.getByText(/上游模型需填写 FAL 任务路径/)).toHaveCount(0);
     await toggle.click();
     await expect(toggle).toHaveAttribute("aria-expanded", "true");
-    await expect(published.getByRole("listitem")).toHaveCount(5);
+    await expect(published.getByRole("listitem")).toHaveCount(6);
     const gemini = published.getByRole("listitem", { name: "Gemini · Generate Content" });
     await expect(gemini.getByText("/v1beta/models/{model}:generateContent", { exact: true })).toBeVisible();
     await expect(gemini.getByText("/v1beta/models/{model}:streamGenerateContent", { exact: true })).toBeVisible();
-    await published.getByRole("checkbox", { name: "Bypass · OpenAI Responses" }).check();
+    await expect(published.getByRole("checkbox")).toHaveCount(0);
+    await expect(published.getByRole("listitem", { name: "Bypass · OpenAI Responses" })).toBeVisible();
     // 可见卡片和路径均不能超出容器；以实际浏览器几何验证长 Google 路径的折行。
     await page.setViewportSize({ width: 900, height: 1000 });
     expect(await published.evaluate(element => element.scrollWidth <= element.clientWidth)).toBe(true);
@@ -50,9 +52,9 @@ test("model editor presents endpoints clearly and saves a path model with a safe
     await page.setViewportSize({ width: 1440, height: 1100 });
     await published.screenshot({ path: path.resolve(__dirname, "../../.e2e/model-discovery-fix/endpoints.png") });
     await toggle.click();
-    await expect(published.getByRole("checkbox", { name: "Bypass · OpenAI Responses" })).toBeHidden();
+    await expect(published.getByRole("listitem", { name: "Bypass · OpenAI Responses" })).toBeHidden();
     await toggle.click();
-    await expect(published.getByRole("checkbox", { name: "Bypass · OpenAI Responses" })).toBeChecked();
+    await expect(published.getByRole("listitem", { name: "Bypass · OpenAI Responses" })).toBeVisible();
     await toggle.click();
     await published.screenshot({ path: path.resolve(__dirname, "../../.e2e/model-discovery-fix/endpoints-collapsed.png") });
     await form.getByLabel("价格来源").selectOption("manual");
@@ -80,7 +82,7 @@ test("model editor presents endpoints clearly and saves a path model with a safe
     await expect(upstream).toHaveValue(upstreamModel);
     await expect(toggle).toHaveAttribute("aria-expanded", "false");
     await toggle.click();
-    await expect(published.getByRole("checkbox", { name: "Bypass · OpenAI Responses" })).toBeChecked();
+    await expect(published.getByRole("listitem", { name: "Bypass · OpenAI Responses" })).toBeVisible();
     for (const target of [
       { path: "/v1/chat/completions", body: { model: name, messages: [{ role: "user", content: "hello" }] } },
       { path: "/v1beta/models/" + encodeURIComponent(name) + ":generateContent", body: { contents: [{ role: "user", parts: [{ text: "hello" }] }] } },
@@ -90,6 +92,24 @@ test("model editor presents endpoints clearly and saves a path model with a safe
       expect(response.status(), await response.text()).toBe(200);
       expect(await response.text()).toContain("e2e-ok");
     }
+    // 旧部署不补写 Bypass 声明，英文页面仍必须展示自动可用入口，并用页面所示路径完成真实调用。
+    const patched = await page.request.patch(GATEWAY + "/model/" + id + "/update", { headers, data: { model_info: { endpoint_types: ["chat"] } } });
+    expect(patched.status(), await patched.text()).toBe(200);
+    await page.reload();
+    await page.getByRole("button", { name: "English", exact: true }).click();
+    await page.getByRole("button", { name: translate("en", "providerGuideUI.editModel"), exact: true }).click();
+    const english = page.getByRole("region", { name: "XHub public endpoints" });
+    await english.getByRole("button", { name: "XHub public endpoints", exact: true }).click();
+    await expect(english).toContainText(translate("en", "modelEndpoints.automaticDescription"));
+    const native = english.getByRole("listitem", { name: "Bypass · OpenAI Responses" });
+    await expect(native.getByText("Enabled", { exact: true })).toBeVisible();
+    await expect(english.getByRole("checkbox")).toHaveCount(0);
+    await expect(page.getByLabel(translate("en", "providerGuideUI.publicName"), { exact: true })).toHaveValue(name);
+    const nativePath = await native.locator("code").innerText();
+    const result = await page.request.post(GATEWAY + nativePath, { headers, data: { model: name, input: "Reply with a greeting." } });
+    expect(result.status(), await result.text()).toBe(200);
+    expect(await result.text()).toContain("e2e-ok");
+
   } finally {
     if (id) expect((await page.request.post(GATEWAY + "/model/delete", { headers, data: { id } })).status()).toBe(200);
     expect((await page.request.delete(GATEWAY + "/credentials/" + credential, { headers })).status()).toBe(200);

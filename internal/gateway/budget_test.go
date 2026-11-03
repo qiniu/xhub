@@ -108,3 +108,19 @@ func TestSearchTokenOnlyLifecycle(t *testing.T) {
 	}
 	s.finishBudgetCall("retry")
 }
+
+// TestPricingFailureCode 验证正常、缺价和未知内部错误仅输出有限安全原因码；纯内存，无需清理。
+func TestPricingFailureCode(t *testing.T) {
+	for _, tc := range []struct {
+		err  error
+		want string
+	}{
+		{nil, ""}, {fmt.Errorf("measured cache reads have no reserved price"), "cache_read_price_missing"},
+		{fmt.Errorf("measured cache writes have no reserved price"), "cache_write_price_missing"},
+		{fmt.Errorf("private configuration value"), "pricing_unavailable"},
+	} {
+		if got := pricingFailureCode(tc.err); got != tc.want {
+			t.Fatalf("原因码错误 %q want %q", got, tc.want)
+		}
+	}
+}

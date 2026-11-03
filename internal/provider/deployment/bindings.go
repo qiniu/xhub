@@ -30,7 +30,7 @@ type EndpointBinding struct {
 }
 
 // DeploymentEndpoints 将有效部署投影成可公开的端点列表。
-// 参数 m（config.ModelEntry）：模型部署，必须显式声明传输，标准接口自动生成，Bypass 按声明开放。
+// 参数 m（config.ModelEntry）：模型部署，必须显式声明传输，标准接口及匹配的 Chat/Responses/Messages 透传自动生成，其他 Bypass 按声明开放。
 // 返回 []EndpointBinding：只含该模型可调用的创建路径和配套任务操作；无效或禁用部署返回空列表。
 // 调用：模型可用列表、管理页面模型分组。测试：bindings_test.go。
 func DeploymentEndpoints(m config.ModelEntry) []EndpointBinding {

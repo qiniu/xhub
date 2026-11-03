@@ -4,15 +4,15 @@ import Link from "next/link";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { apiClient, getProxyBaseUrl, modelInfoCall } from "@/components/networking";
-import type { EndpointDescriptor } from "@/components/add_model/endpointCatalog";
+import type { EndpointDescriptor, EndpointTransport } from "@/components/add_model/endpointCatalog";
 import type { PriceCatalogRow } from "./priceCatalogRows";
 import { marketMoney, marketPrices, marketModalities, MODALITY_NAMES, marketStrings } from "./marketCatalog";
-import { modelDeployments, modelCurl, marketDocUrl, type MarketDeployment } from "./modelAccess";
+import { modelDeployments, modelCurl, marketDocUrl, effectiveMarketEndpoints, type MarketDeployment } from "./modelAccess";
 
 /** 读取当前用户可见的完整部署与端点；参数为会话，返回部署和公开端点。
  * 供内部详情使用，分页读取避免漏掉部署；读取失败交由查询错误状态展示，不误报为未部署。 */
 export async function loadMarketAccess(token: string, userId: string, role: string) {
-  const endpoints = await apiClient.get<{ endpoint_types?: EndpointDescriptor[] }>("/public/endpoints");
+  const endpoints = await apiClient.get<{ endpoint_types?: EndpointDescriptor[]; transports?: EndpointTransport[] }>("/public/endpoints");
   const deployments: MarketDeployment[] = [];
   for (let page = 1; ; page++) {
     const result = await modelInfoCall(token, userId, role, page, 1000);
@@ -20,7 +20,9 @@ export async function loadMarketAccess(token: string, userId: string, role: stri
     deployments.push(...result.data);
     if (page >= (result.total_pages ?? 1) || !result.data.length) break;
   }
-  return { deployments, endpoints: endpoints?.endpoint_types ?? [] };
+  const catalog = endpoints?.endpoint_types ?? [];
+  const transports = endpoints?.transports ?? [];
+  return { deployments: deployments.map((item) => ({ ...item, model_info: { ...item.model_info, endpoint_types: effectiveMarketEndpoints(item, catalog, transports) } })), endpoints: catalog };
 }
 
 /** 内部模型详情；参数为价格行、会话和关闭回调，返回全部价格档位与实际接入信息。

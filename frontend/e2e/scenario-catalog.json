@@ -3478,6 +3478,20 @@
     "environment": "default offline"
   },
   {
+    "id": "REG-CACHE-PRICE-en",
+    "file": "e2e/cache-price-diagnostics-en.test.ts",
+    "title": "cache pricing warning and actual bill en",
+    "kind": "implemented",
+    "environment": "default offline"
+  },
+  {
+    "id": "REG-CACHE-PRICE-zh-CN",
+    "file": "e2e/cache-price-diagnostics-zh-CN.test.ts",
+    "title": "cache pricing warning and actual bill zh-CN",
+    "kind": "implemented",
+    "environment": "default offline"
+  },
+  {
     "id": "REG-bypass-body-en",
     "file": "e2e/scenarios/regression/agent-history-bypass-body-en.test.ts",
     "title": "bypass request body and log lifecycle en",

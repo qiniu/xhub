@@ -18,7 +18,9 @@ live = env.get("E2E_LIVE") == "1"
 if env.get("E2E_RESPONSES_CONTINUATION") == "1":
     models.append({"model_name": "e2e-responses-history", "litellm_params": {
         "model": "e2e-responses-history", "api_key": "sk-fake",
+        # 本地上游从第二轮报告缓存读取；必须显式定价，才能验证完整账单而非缺价降级。
         "input_cost_per_token": 0.000001, "output_cost_per_token": 0.000002,
+        "cache_read_input_token_cost": 0.000001,
         "api_base": "http://127.0.0.1:" + env["E2E_UP_PORT"]},
         "model_info": {"transport": "bypass_openai_chat", "endpoint_types": ["chat", "responses"]}})
     # Codex 模拟器使用独立模型，供应商必须验证其真实收到的三轮项目上下文。
