@@ -21,7 +21,7 @@ export function registerUsageErrorScenario(locale:"en"|"zh-CN"){
   const fault=async(mode:string)=>expect((await page.request.post(control+"/usage/failure",{data:{mode}})).status()).toBe(200);
   try{
    modelID=(await create("/model/new",{model_name:name,litellm_params:{model:name,custom_llm_provider:"openai",api_base:UPSTREAM,api_key:"sk-fake",input_cost_per_token:0.01,output_cost_per_token:0.01},model_info:{transport:"bypass_openai_chat",pricing_source:"manual"}})).model_info.id;
-   userID=(await create("/user/new",{user_email:email,password:"usage-state-test-password"})).user_id;
+   userID=(await create("/user/new",{user_email:email,password:"usage-state-test-password",max_budget:500,budget_reset_day:0})).user_id;
    const key=await create("/key/generate",{user_id:userID,key_alias:name});keyID=key.token_id;
    const call=await page.request.post(GATEWAY+"/v1/chat/completions",{headers:{Authorization:"Bearer "+key.key},data:{model:name,messages:[{role:"user",content:"Verify usage loading and recovery."}]}});
    expect(call.status(),await call.text()).toBe(200);
@@ -30,6 +30,10 @@ export function registerUsageErrorScenario(locale:"en"|"zh-CN"){
    await page.getByRole("button",{name:locale==="en"?"English":translate("en","language.zhCN"),exact:true}).click();
    const tr=(key:string)=>translate(locale,key);
    await stableGoto(page,"/usage");await expect(page.getByTestId("daily-spend-settled")).toBeVisible();
+   // 真正推理后的预算消费不因统计范围改变；后续使用空历史范围核对同一用户与实际额度。
+   const budget=page.getByRole("region",{name:tr("usageBudget.title")});
+   await expect(budget).toContainText("500.0000");
+   const budgetBefore=await budget.textContent();
    expect((await page.request.post(control+"/usage/legacy")).status()).toBe(200);legacy=true;
    const failed=page.waitForResponse(r=>r.url().includes("/user/daily/activity")&&!r.url().includes("aggregated")&&r.status()===500);
    await page.reload();await failed;
@@ -40,6 +44,14 @@ export function registerUsageErrorScenario(locale:"en"|"zh-CN"){
    await page.getByRole("button",{name:tr("usageLoad.retry"),exact:true}).click();
    await expect(page.getByTestId("daily-spend-settled")).toBeVisible();
    await expect(page.getByText(tr("usageLoad.failed"),{exact:true})).toHaveCount(0);
+   expect(await budget.textContent()).toBe(budgetBefore);
+   await expect(page.getByText(tr("usageBudget.rangeSpend"),{exact:false})).toBeVisible();
+   // 更改刷新日不会立即重置已用金额；重新加载后应显示真实月度设置及下次刷新。
+   await create("/user/update",{user_id:userID,budget_reset_day:15});
+   await page.reload();
+   await expect(budget).toContainText(translate(locale,"userBudgetReset.day",{day:15}));
+   await expect(budget).toContainText("500.0000");
+   await expect(budget).toContainText("499.9000");
    await fault("aggregated");await page.reload();await expect(page.getByTestId("daily-spend-settled")).toBeVisible();
    await expect(page.getByText(tr("usageLoad.failed"),{exact:true})).toHaveCount(0);
    expect((await page.request.post(control+"/usage/seed-pages",{data:{user_id:userID}})).status()).toBe(200);
@@ -58,12 +70,33 @@ export function registerUsageErrorScenario(locale:"en"|"zh-CN"){
    await expect(page.getByRole("tab",{name:tr("pages.usage.keyActivity"),exact:true})).toHaveAttribute("aria-selected","true");
    await page.getByRole("tab",{name:tr("pages.usage.cost"),exact:true}).click();
    await expect(page.getByTestId("daily-spend-settled")).toBeVisible();
-   // 成功空范围才允许展示空统计，不沿用刚才的 52 日数据。
+   // 测试夹具直接写入历史用量，重新加载让预算卡读取这次外部写入后的最新计数。
+   await page.reload();
+   await expect(page.getByTestId("daily-spend-settled")).toBeVisible();
+   // 将预算卡与当前用户接口核对后再切换至空窗口，确保不是拿时间范围内支出充当预算。
+   const account=await page.request.get(GATEWAY+"/v2/user/info",{headers:{Authorization:"Bearer "+await sessionBearer(page)}});
+   expect(account.status(),await account.text()).toBe(200);
+   const userInfo=(await account.json()).user_info;
+   expect(userInfo.spend).toBeGreaterThan(0);
+   expect(userInfo.max_budget).toBe(500);
+   const expectedAmounts=translate(locale,"usageBudget.amounts",{spent:`$${userInfo.spend.toFixed(4)}`,limit:`$${userInfo.max_budget.toFixed(4)}`,remaining:`$${Math.max(0,userInfo.max_budget-userInfo.spend).toFixed(4)}`});
+   await expect(budget).toContainText(expectedAmounts);
+   const budgetBeforeEmpty=await budget.textContent();
+   const rangeSpend=page.getByText(tr("usageBudget.rangeSpend"),{exact:false}).filter({visible:true}).locator("..").locator("p").last();
+   await expect(rangeSpend).not.toHaveText("$0.0000");
+   // 成功空范围才允许展示空统计，不沿用刚才的 52 日数据；预算余额不随查询窗口变化。
    await page.getByRole("button",{name:tr("Select Time Range"),exact:true}).click();
    await page.getByLabel(tr("Start date"),{exact:true}).fill("2020-01-01");await page.getByLabel(tr("End date"),{exact:true}).fill("2020-01-02");
-   await page.getByRole("button",{name:tr("Apply"),exact:true}).click();
+   const [emptyRange]=await Promise.all([
+    page.waitForResponse(r=>isSuccessfulGatewayGet({url:r.url(),method:r.request().method(),status:r.status()},"/user/daily/activity/aggregated") && new URL(r.url()).searchParams.get("start_date")==="2020-01-01" && new URL(r.url()).searchParams.get("end_date")==="2020-01-02",{timeout:15000}),
+    page.getByRole("button",{name:tr("Apply"),exact:true}).click(),
+   ]);
+   expect((await emptyRange.json()).metadata.total_spend).toBe(0);
    await expect(page.getByTestId("daily-spend-settled")).toBeVisible();
    await expect(page.getByText(tr("usageLoad.failed"),{exact:true})).toHaveCount(0);
+   await expect(rangeSpend).toHaveText("$0.0000");
+   expect(await budget.textContent()).toBe(budgetBeforeEmpty);
+   await expect(budget).toContainText(expectedAmounts);
    // 管理员实体视图同样不能将失败显示为零，筛选入口应保持可用以便修复范围。
    await login(page,"admin",MASTER,locale);
    await expect(page.getByText(tr("nav.apiKeys"),{exact:true}).first()).toBeVisible();

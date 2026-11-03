@@ -244,6 +244,7 @@ x-litellm-call-id 关联调用与日志，x-litellm-response-cost 表示这次�
 | `GET /guardrails/usage/logs` | `GuardrailLogs` | [mount.go](../../../internal/gateway/usage/mount.go) |
 | `GET /spend/logs/v2` | `LogsV2` | [mount.go](../../../internal/gateway/usage/mount.go) |
 | `GET /spend/logs/ui` | `LogsV2` | [mount.go](../../../internal/gateway/usage/mount.go) |
+| `GET /spend/logs/ui/filter-options` | `LogFilterOptions` | [mount.go](../../../internal/gateway/usage/mount.go) |
 | `GET /spend/logs/ui/{request_id}` | `LogByID` | [mount.go](../../../internal/gateway/usage/mount.go) |
 | `GET /spend/logs/session/ui` | `SessionLogs` | [mount.go](../../../internal/gateway/usage/mount.go) |
 | `GET /global/spend/logs` | `SpendLogs` | [mount.go](../../../internal/gateway/usage/mount.go) |

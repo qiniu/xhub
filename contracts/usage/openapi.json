@@ -13,8 +13,8 @@
     "/spend/logs/v2": {
       "get": {
         "operationId": "listLogs",
-        "summary": "权限范围内日志，page无效回退1，page_size超出1..200回退50；日期按UTC含结束日；会话聚合先分组后分页；未声明筛选不保证有效 / Scoped logs; invalid page defaults to 1, page_size outside 1..200 defaults to 50; UTC inclusive dates; session grouping before pagination; undeclared filters not guaranteed",
-        "description": "权限范围内日志，page无效回退1，page_size超出1..200回退50；日期按UTC含结束日；会话聚合先分组后分页；未声明筛选不保证有效 / Scoped logs; invalid page defaults to 1, page_size outside 1..200 defaults to 50; UTC inclusive dates; session grouping before pagination; undeclared filters not guaranteed",
+        "summary": "权限范围内日志，page无效回退1，page_size超出1..200回退50；日期按UTC含结束日；完整时间精确过滤，非法或倒置窗口返回400；会话聚合先分组后分页；未声明筛选不保证有效 / Scoped logs; invalid page defaults to 1, page_size outside 1..200 defaults to 50; UTC inclusive dates; exact timestamps; invalid or reversed windows return 400; session grouping before pagination; undeclared filters not guaranteed",
+        "description": "权限范围内日志，page无效回退1，page_size超出1..200回退50；日期按UTC含结束日；完整时间精确过滤，非法或倒置窗口返回400；会话聚合先分组后分页；未声明筛选不保证有效；筛选条件在权限范围内按且组合，先筛选再分页；非法错误码或缓存条件返回400 / Scoped logs; invalid page defaults to 1, page_size outside 1..200 defaults to 50; UTC inclusive dates; exact timestamps; invalid or reversed windows return 400; session grouping before pagination; undeclared filters not guaranteed; Filters are AND-combined within the authorized scope before pagination; invalid error codes or cache conditions return 400.",
         "responses": {
           "200": {
             "description": "实际结果 / Actual result",
@@ -54,14 +54,16 @@
             "name": "start_date",
             "schema": {
               "type": "string"
-            }
+            },
+            "description": "支持 YYYY-MM-DD（UTC整天）、YYYY-MM-DD HH:mm:ss（UTC）或 RFC3339；完整结束时间不延长一天 / Accepts UTC dates, UTC date-times, or RFC3339. Timestamp end bounds are not extended by one day."
           },
           {
             "in": "query",
             "name": "end_date",
             "schema": {
               "type": "string"
-            }
+            },
+            "description": "支持 YYYY-MM-DD（UTC整天）、YYYY-MM-DD HH:mm:ss（UTC）或 RFC3339；完整结束时间不延长一天 / Accepts UTC dates, UTC date-times, or RFC3339. Timestamp end bounds are not extended by one day."
           },
           {
             "in": "query",
@@ -131,14 +133,16 @@
             "name": "error_code",
             "schema": {
               "type": "string"
-            }
+            },
+            "description": "最终 HTTP 状态精确匹配，100至599；非法非空值返回400 / Exact final HTTP status from 100 to 599; invalid non-empty values return 400"
           },
           {
             "in": "query",
             "name": "error_message",
             "schema": {
               "type": "string"
-            }
+            },
+            "description": "完整错误正文中不区分大小写的字面子串；%和_不是通配符 / Case-insensitive literal substring of the full error; % and _ are not wildcards"
           },
           {
             "in": "query",
@@ -167,6 +171,52 @@
             "schema": {
               "type": "string"
             }
+          },
+          {
+            "in": "query",
+            "name": "key_hash",
+            "schema": {
+              "type": "string"
+            },
+            "description": "密钥 Hash 精确匹配；api_key 仍指密钥 ID / Exact recorded key hash; api_key still means key ID"
+          },
+          {
+            "in": "query",
+            "name": "key_alias",
+            "schema": {
+              "type": "string"
+            },
+            "description": "调用时的密钥别名精确匹配，包含历史别名 / Exact recorded key alias, including historical aliases"
+          },
+          {
+            "in": "query",
+            "name": "supplier",
+            "schema": {
+              "type": "string"
+            },
+            "description": "调用时的供应商连接名精确匹配 / Exact recorded supplier connection name"
+          },
+          {
+            "in": "query",
+            "name": "inbound_endpoint",
+            "schema": {
+              "type": "string"
+            },
+            "description": "入站路径精确匹配 / Exact inbound path"
+          },
+          {
+            "in": "query",
+            "name": "cache_hit_filter",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "",
+                "hit",
+                "miss"
+              ]
+            },
+            "description": "网关响应缓存命中或未命中，不是上游提示词缓存；非法值返回400 / Gateway response cache hit or miss, not provider prompt cache; invalid values return 400",
+            "allowEmptyValue": true
           }
         ]
       }
@@ -174,8 +224,8 @@
     "/spend/logs/ui": {
       "get": {
         "operationId": "listUILogs",
-        "summary": "权限范围内日志，page无效回退1，page_size超出1..200回退50；日期按UTC含结束日；会话聚合先分组后分页；未声明筛选不保证有效 / Scoped logs; invalid page defaults to 1, page_size outside 1..200 defaults to 50; UTC inclusive dates; session grouping before pagination; undeclared filters not guaranteed",
-        "description": "权限范围内日志，page无效回退1，page_size超出1..200回退50；日期按UTC含结束日；会话聚合先分组后分页；未声明筛选不保证有效 / Scoped logs; invalid page defaults to 1, page_size outside 1..200 defaults to 50; UTC inclusive dates; session grouping before pagination; undeclared filters not guaranteed",
+        "summary": "权限范围内日志，page无效回退1，page_size超出1..200回退50；日期按UTC含结束日；完整时间精确过滤，非法或倒置窗口返回400；会话聚合先分组后分页；未声明筛选不保证有效 / Scoped logs; invalid page defaults to 1, page_size outside 1..200 defaults to 50; UTC inclusive dates; exact timestamps; invalid or reversed windows return 400; session grouping before pagination; undeclared filters not guaranteed",
+        "description": "权限范围内日志，page无效回退1，page_size超出1..200回退50；日期按UTC含结束日；完整时间精确过滤，非法或倒置窗口返回400；会话聚合先分组后分页；未声明筛选不保证有效；筛选条件在权限范围内按且组合，先筛选再分页；非法错误码或缓存条件返回400 / Scoped logs; invalid page defaults to 1, page_size outside 1..200 defaults to 50; UTC inclusive dates; exact timestamps; invalid or reversed windows return 400; session grouping before pagination; undeclared filters not guaranteed; Filters are AND-combined within the authorized scope before pagination; invalid error codes or cache conditions return 400.",
         "responses": {
           "200": {
             "description": "实际结果 / Actual result",
@@ -215,14 +265,16 @@
             "name": "start_date",
             "schema": {
               "type": "string"
-            }
+            },
+            "description": "支持 YYYY-MM-DD（UTC整天）、YYYY-MM-DD HH:mm:ss（UTC）或 RFC3339；完整结束时间不延长一天 / Accepts UTC dates, UTC date-times, or RFC3339. Timestamp end bounds are not extended by one day."
           },
           {
             "in": "query",
             "name": "end_date",
             "schema": {
               "type": "string"
-            }
+            },
+            "description": "支持 YYYY-MM-DD（UTC整天）、YYYY-MM-DD HH:mm:ss（UTC）或 RFC3339；完整结束时间不延长一天 / Accepts UTC dates, UTC date-times, or RFC3339. Timestamp end bounds are not extended by one day."
           },
           {
             "in": "query",
@@ -292,14 +344,16 @@
             "name": "error_code",
             "schema": {
               "type": "string"
-            }
+            },
+            "description": "最终 HTTP 状态精确匹配，100至599；非法非空值返回400 / Exact final HTTP status from 100 to 599; invalid non-empty values return 400"
           },
           {
             "in": "query",
             "name": "error_message",
             "schema": {
               "type": "string"
-            }
+            },
+            "description": "完整错误正文中不区分大小写的字面子串；%和_不是通配符 / Case-insensitive literal substring of the full error; % and _ are not wildcards"
           },
           {
             "in": "query",
@@ -328,6 +382,52 @@
             "schema": {
               "type": "string"
             }
+          },
+          {
+            "in": "query",
+            "name": "key_hash",
+            "schema": {
+              "type": "string"
+            },
+            "description": "密钥 Hash 精确匹配；api_key 仍指密钥 ID / Exact recorded key hash; api_key still means key ID"
+          },
+          {
+            "in": "query",
+            "name": "key_alias",
+            "schema": {
+              "type": "string"
+            },
+            "description": "调用时的密钥别名精确匹配，包含历史别名 / Exact recorded key alias, including historical aliases"
+          },
+          {
+            "in": "query",
+            "name": "supplier",
+            "schema": {
+              "type": "string"
+            },
+            "description": "调用时的供应商连接名精确匹配 / Exact recorded supplier connection name"
+          },
+          {
+            "in": "query",
+            "name": "inbound_endpoint",
+            "schema": {
+              "type": "string"
+            },
+            "description": "入站路径精确匹配 / Exact inbound path"
+          },
+          {
+            "in": "query",
+            "name": "cache_hit_filter",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "",
+                "hit",
+                "miss"
+              ]
+            },
+            "description": "网关响应缓存命中或未命中，不是上游提示词缓存；非法值返回400 / Gateway response cache hit or miss, not provider prompt cache; invalid values return 400",
+            "allowEmptyValue": true
           }
         ]
       }
@@ -335,8 +435,8 @@
     "/spend/logs/session/ui": {
       "get": {
         "operationId": "listSessionLogs",
-        "summary": "权限范围内日志，page无效回退1，page_size超出1..200回退50；日期按UTC含结束日；会话聚合先分组后分页；未声明筛选不保证有效 / Scoped logs; invalid page defaults to 1, page_size outside 1..200 defaults to 50; UTC inclusive dates; session grouping before pagination; undeclared filters not guaranteed；session_id空时既有接口在鉴权前返回空页 / Empty session_id returns empty page before authentication under existing behavior",
-        "description": "权限范围内日志，page无效回退1，page_size超出1..200回退50；日期按UTC含结束日；会话聚合先分组后分页；未声明筛选不保证有效 / Scoped logs; invalid page defaults to 1, page_size outside 1..200 defaults to 50; UTC inclusive dates; session grouping before pagination; undeclared filters not guaranteed；session_id空时既有接口在鉴权前返回空页 / Empty session_id returns empty page before authentication under existing behavior",
+        "summary": "权限范围内日志，page无效回退1，page_size超出1..200回退50；日期按UTC含结束日；完整时间精确过滤，非法或倒置窗口返回400；会话聚合先分组后分页；未声明筛选不保证有效 / Scoped logs; invalid page defaults to 1, page_size outside 1..200 defaults to 50; UTC inclusive dates; exact timestamps; invalid or reversed windows return 400; session grouping before pagination; undeclared filters not guaranteed；session_id空时既有接口在鉴权前返回空页 / Empty session_id returns empty page before authentication under existing behavior",
+        "description": "权限范围内日志，page无效回退1，page_size超出1..200回退50；日期按UTC含结束日；完整时间精确过滤，非法或倒置窗口返回400；会话聚合先分组后分页；未声明筛选不保证有效；session_id空时既有接口在鉴权前返回空页；筛选条件在权限范围内按且组合，先筛选再分页；非法错误码或缓存条件返回400 / Scoped logs; invalid page defaults to 1, page_size outside 1..200 defaults to 50; UTC inclusive dates; exact timestamps; invalid or reversed windows return 400; session grouping before pagination; undeclared filters not guaranteed; Empty session_id returns empty page before authentication under existing behavior; Filters are AND-combined within the authorized scope before pagination; invalid error codes or cache conditions return 400.",
         "responses": {
           "200": {
             "description": "实际结果 / Actual result",
@@ -376,14 +476,16 @@
             "name": "start_date",
             "schema": {
               "type": "string"
-            }
+            },
+            "description": "支持 YYYY-MM-DD（UTC整天）、YYYY-MM-DD HH:mm:ss（UTC）或 RFC3339；完整结束时间不延长一天 / Accepts UTC dates, UTC date-times, or RFC3339. Timestamp end bounds are not extended by one day."
           },
           {
             "in": "query",
             "name": "end_date",
             "schema": {
               "type": "string"
-            }
+            },
+            "description": "支持 YYYY-MM-DD（UTC整天）、YYYY-MM-DD HH:mm:ss（UTC）或 RFC3339；完整结束时间不延长一天 / Accepts UTC dates, UTC date-times, or RFC3339. Timestamp end bounds are not extended by one day."
           },
           {
             "in": "query",
@@ -453,14 +555,16 @@
             "name": "error_code",
             "schema": {
               "type": "string"
-            }
+            },
+            "description": "最终 HTTP 状态精确匹配，100至599；非法非空值返回400 / Exact final HTTP status from 100 to 599; invalid non-empty values return 400"
           },
           {
             "in": "query",
             "name": "error_message",
             "schema": {
               "type": "string"
-            }
+            },
+            "description": "完整错误正文中不区分大小写的字面子串；%和_不是通配符 / Case-insensitive literal substring of the full error; % and _ are not wildcards"
           },
           {
             "in": "query",
@@ -489,6 +593,52 @@
             "schema": {
               "type": "string"
             }
+          },
+          {
+            "in": "query",
+            "name": "key_hash",
+            "schema": {
+              "type": "string"
+            },
+            "description": "密钥 Hash 精确匹配；api_key 仍指密钥 ID / Exact recorded key hash; api_key still means key ID"
+          },
+          {
+            "in": "query",
+            "name": "key_alias",
+            "schema": {
+              "type": "string"
+            },
+            "description": "调用时的密钥别名精确匹配，包含历史别名 / Exact recorded key alias, including historical aliases"
+          },
+          {
+            "in": "query",
+            "name": "supplier",
+            "schema": {
+              "type": "string"
+            },
+            "description": "调用时的供应商连接名精确匹配 / Exact recorded supplier connection name"
+          },
+          {
+            "in": "query",
+            "name": "inbound_endpoint",
+            "schema": {
+              "type": "string"
+            },
+            "description": "入站路径精确匹配 / Exact inbound path"
+          },
+          {
+            "in": "query",
+            "name": "cache_hit_filter",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "",
+                "hit",
+                "miss"
+              ]
+            },
+            "description": "网关响应缓存命中或未命中，不是上游提示词缓存；非法值返回400 / Gateway response cache hit or miss, not provider prompt cache; invalid values return 400",
+            "allowEmptyValue": true
           }
         ]
       }
@@ -1136,6 +1286,103 @@
             }
           }
         ]
+      }
+    },
+    "/spend/logs/ui/filter-options": {
+      "get": {
+        "operationId": "listLogFilterOptions",
+        "summary": "日志筛选候选 / Log filter suggestions",
+        "description": "只返回当前账号有权查看的日志候选；模型和供应商还需当前模型授权及启用部署，不返回明文密钥或正文 / Return candidates from logs visible to the caller; model and supplier also require current model authorization and an enabled deployment. Never return plaintext keys or bodies.",
+        "parameters": [
+          {
+            "name": "field",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "model",
+                "key_alias",
+                "key_hash",
+                "supplier",
+                "inbound_endpoint"
+              ]
+            },
+            "description": "候选字段 / Candidate field"
+          },
+          {
+            "name": "start_date",
+            "in": "query",
+            "required": true,
+            "description": "授权范围内查询起始时间 / Authorized query start",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "end_date",
+            "in": "query",
+            "required": true,
+            "description": "授权范围内查询结束时间，最多366天 / Authorized query end, at most 366 days",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "q",
+            "in": "query",
+            "required": false,
+            "description": "不区分大小写的字面子串，最多128字符 / Case-insensitive literal substring, up to 128 characters",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "page",
+            "in": "query",
+            "required": false,
+            "description": "页码 1–100，默认 1 / Page 1–100, default 1",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "page_size",
+            "in": "query",
+            "required": false,
+            "description": "每页 1–50 条，默认 50 / Page size 1–50, default 50",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "授权范围内筛选候选 / Filter candidates in the authorized scope",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LogFilterOptionPage"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/Error400"
+          },
+          "401": {
+            "$ref": "#/components/responses/Error401"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error403"
+          },
+          "500": {
+            "$ref": "#/components/responses/Error500"
+          },
+          "503": {
+            "$ref": "#/components/responses/Error503"
+          }
+        }
       }
     }
   },
@@ -1916,6 +2163,32 @@
           "metrics",
           "metadata"
         ]
+      },
+      "LogFilterOptionPage": {
+        "type": "object",
+        "required": [
+          "data",
+          "page",
+          "page_size",
+          "has_more"
+        ],
+        "properties": {
+          "data": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "page": {
+            "type": "integer"
+          },
+          "page_size": {
+            "type": "integer"
+          },
+          "has_more": {
+            "type": "boolean"
+          }
+        }
       }
     },
     "securitySchemes": {

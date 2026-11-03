@@ -23,9 +23,7 @@ for (const locale of ["en", "zh-CN"] as const)
       await expect(page.getByTestId("create-key-button")).toBeVisible();
       const session = { Authorization: "Bearer " + (await sessionBearer(page)) };
       await stableGoto(page, "/usage");
-      await expect(
-        page.getByText(translate(locale, "{value0} limit", { value0: "$500.0000" }), { exact: true }),
-      ).toBeVisible();
+      await expect(page.getByRole("region", { name: tr("usageBudget.title") })).toContainText("$500.0000");
       const tokens: string[] = [];
       const ids: string[] = [];
       for (const [name, budget] of [

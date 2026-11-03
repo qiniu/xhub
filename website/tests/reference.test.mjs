@@ -10,9 +10,9 @@ const root = new URL("../../", import.meta.url).pathname;
 const entries = await loadReferences(root);
 const inventory = JSON.parse(await readFile(root + "contracts/migration-inventory.json", "utf8"));
 
-/** 验证公开集合来自真实五域契约且只包含48操作；前置仓库文件，不调用网络或修改资源。 */
+/** 验证公开集合来自真实五域契约且只包含49操作；前置仓库文件，不调用网络或修改资源。 */
 test("Swagger only publishes the five contracted domains", () => {
-  assert.deepEqual(entries.map(e => [e.domain, e.count]), [["suppliers",5],["users",11],["keys",14],["models",9],["usage",9]]);
+  assert.deepEqual(entries.map(e => [e.domain, e.count]), [["suppliers",5],["users",11],["keys",14],["models",9],["usage",10]]);
   for (const { raw } of entries) assert.ok(!Object.keys(JSON.parse(raw).paths).some(p => p.startsWith("/bypass/")));
 });
 
@@ -73,7 +73,7 @@ test("Swagger defaults to read only and does not persist auth", () => {
 test("reference pages expose scope and local assets in both languages", () => {
   for (const lang of ["zh", "en"]) {
     const html = referencePage(lang, entries);
-    assert.match(html, /48/); assert.match(html, /Bypass/); assert.match(html, /SSO\/SCIM/);
+    assert.match(html, /49/); assert.match(html, /Bypass/); assert.match(html, /SSO\/SCIM/);
     assert.match(html, /\.\.\/assets\/swagger-ui-bundle.js/);
     assert.doesNotMatch(html, /https:\/\/xapi|cdn\./);
     assert.equal((html.match(/<option /g) || []).length, 5);
@@ -131,4 +131,21 @@ test("legacy operation bookmarks map to Swagger deep links safely", () => {
   assert.match(html, /location.replace/);
   assert.match(html, /post-usernew/);
   assert.throws(() => referenceRedirect("bad", "", {}, []));
+});
+
+/** 前置真实日志契约；新增筛选说明与参数在中英文 Swagger 中完整保留且不混语，源对象不变，无外部写入。 */
+test("log filter descriptions retain all conditions in both languages", () => {
+  const spec = JSON.parse(entries.find(e => e.domain === "usage").raw);
+  for (const route of ["/spend/logs/v2", "/spend/logs/ui", "/spend/logs/session/ui"]) {
+    const en = localizedSpec(spec, "en").paths[route].get;
+    const zh = localizedSpec(spec, "zh").paths[route].get;
+    assert.doesNotMatch(en.description, /[\u4e00-\u9fff]/);
+    assert.match(en.description, /AND-combined.*before pagination/);
+    assert.match(zh.description, /按且组合，先筛选再分页/);
+    assert.doesNotMatch(zh.description, /AND-combined/);
+    for (const name of ["key_hash", "key_alias", "supplier", "inbound_endpoint", "cache_hit_filter", "error_message"]) {
+      assert.doesNotMatch(en.parameters.find(p => p.name === name).description, /[\u4e00-\u9fff]/);
+      assert.match(zh.parameters.find(p => p.name === name).description, /[\u4e00-\u9fff]/);
+    }
+  }
 });

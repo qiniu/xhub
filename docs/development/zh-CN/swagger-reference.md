@@ -4,7 +4,7 @@
 
 ## 覆盖与边界
 
-只读取 `contracts/{suppliers,users,keys,models,usage}/openapi.json`：供应商5、用户11、Key14、模型/端点9、日志/用量9，共48个操作。构建逐项核对迁移清单，缺失契约、未登记操作或无法解析的引用阻止构建。原始 JSON 可下载；展示语言只选择说明元数据，不改变结构、默认值或示例。
+只读取 `contracts/{suppliers,users,keys,models,usage}/openapi.json`：供应商5、用户11、Key14、模型/端点9、日志/用量10，共49个操作。构建逐项核对迁移清单，缺失契约、未登记操作或无法解析的引用阻止构建。原始 JSON 可下载；展示语言只选择说明元数据，不改变结构、默认值或示例。
 
 Bypass、流式推理、SSO/SCIM、组织团队生命周期及外围兼容目录不在本批契约范围内。已有协议指南保留，不将其当作已验收的 Swagger 操作。
 

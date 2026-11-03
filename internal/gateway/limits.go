@@ -16,6 +16,7 @@ import (
 	"github.com/sunqirui1987/xhub/internal/auth"
 	"github.com/sunqirui1987/xhub/internal/authz"
 	"github.com/sunqirui1987/xhub/internal/config"
+	dpdiagnostics "github.com/sunqirui1987/xhub/internal/dataplane/diagnostics"
 	dpexecution "github.com/sunqirui1987/xhub/internal/dataplane/execution"
 	modelaccess "github.com/sunqirui1987/xhub/internal/gateway/models"
 	"github.com/sunqirui1987/xhub/internal/iam"
@@ -421,6 +422,13 @@ func (s *Server) admitRateLimits(w http.ResponseWriter, path string, plan live.R
 		return false
 	}
 	if rejected != "" {
+		// 保存本次已用于判定的配置，不再次查询或消耗窗口；没有计数快照时不伪造使用量。
+		scopes := make([]map[string]any, 0, len(plan.Path))
+		for _, index := range plan.Path {
+			n := plan.Nodes[index]
+			scopes = append(scopes, map[string]any{"scope": n.Kind, "scope_id": n.ID, "rpm_limit": n.RPM, "tpm_limit": n.TPM})
+		}
+		dpdiagnostics.RecordEarlyFailure(w, &dpdiagnostics.UpstreamDiagnostics{RateLimit: map[string]any{"rejected": rejected, "effective_path": scopes, "window": "UTC calendar minute", "counter_snapshot": "not captured"}})
 		util.WriteTypedError(w, path, 429, "rate_limit", rejected+" exceeded")
 		return false
 	}

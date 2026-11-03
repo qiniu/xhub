@@ -1,8 +1,10 @@
 package diagnostics
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
+	"net"
 )
 
 // UpstreamError 保存供应商明确返回的错误对象及关联 ID，不把 HTTP 200 的流内错误误当作成功。
@@ -57,7 +59,8 @@ func ExtractUpstreamError(doc map[string]any) *UpstreamError {
 }
 
 // ErrorEnvelope 为客户端失败事件提供结构化错误，保留供应商字段；参数 err 为失败原因。
-// 原生和跨协议流调用；普通网络/解析错误使用安全文字，nil 返回 nil；返回独立顶层映射。
+// 原生和跨协议流调用；本地取消/超时/传输错误标记gateway来源，不冒充供应商返回。
+// nil 返回 nil；返回独立顶层映射。取消发起方无法从context判断，必须保留unknown。
 func ErrorEnvelope(err error) map[string]any {
 	if err == nil {
 		return nil
@@ -70,5 +73,20 @@ func ErrorEnvelope(err error) map[string]any {
 		}
 		return out
 	}
-	return map[string]any{"error": map[string]any{"type": "upstream_error", "code": "upstream_error", "message": SafeErr(err)}}
+	kind := "stream_transport_error"
+	var timeout net.Error
+	switch {
+	case errors.Is(err, context.Canceled):
+		kind = "request_canceled"
+	case errors.Is(err, context.DeadlineExceeded), errors.As(err, &timeout) && timeout.Timeout():
+		kind = "request_timeout"
+	}
+	out := map[string]any{
+		"error":        map[string]any{"type": kind, "code": kind, "message": SafeErr(err)},
+		"error_origin": "gateway",
+	}
+	if kind == "request_canceled" {
+		out["cancellation_source"] = "unknown"
+	}
+	return out
 }

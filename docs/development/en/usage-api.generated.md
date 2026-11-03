@@ -6,8 +6,8 @@ Generated from OpenAPI; existing authorization and billing remain unchanged. See
 
 | Operation | Behavior | HTTP statuses |
 | --- | --- | --- |
-| `GET /spend/logs/v2` | Scoped logs; invalid page defaults to 1, page_size outside 1..200 defaults to 50; UTC inclusive dates; session grouping before pagination; undeclared filters not guaranteed | 200, 400, 401, 403, 404, 409, 500, 503 |
-| `GET /spend/logs/ui` | Scoped logs; invalid page defaults to 1, page_size outside 1..200 defaults to 50; UTC inclusive dates; session grouping before pagination; undeclared filters not guaranteed | 200, 400, 401, 403, 404, 409, 500, 503 |
+| `GET /spend/logs/v2` | Scoped logs; invalid page defaults to 1, page_size outside 1..200 defaults to 50; UTC inclusive dates; exact timestamps; invalid or reversed windows return 400; session grouping before pagination; undeclared filters not guaranteed | 200, 400, 401, 403, 404, 409, 500, 503 |
+| `GET /spend/logs/ui` | Scoped logs; invalid page defaults to 1, page_size outside 1..200 defaults to 50; UTC inclusive dates; exact timestamps; invalid or reversed windows return 400; session grouping before pagination; undeclared filters not guaranteed | 200, 400, 401, 403, 404, 409, 500, 503 |
 | `GET /spend/logs/session/ui` | Empty session_id returns empty page before authentication under existing behavior | 200, 400, 401, 403, 404, 409, 500, 503 |
 | `GET /spend/logs/ui/{request_id}` | Out-of-scope and missing records are 404; admin cross-user reads audited; missing bodies may be empty and non-JSON upstream bodies strings; not every failure has a usage record | 200, 400, 401, 403, 404, 409, 500, 503 |
 | `GET /user/daily/activity` | Scoped daily aggregates; paged totals cover current page, aggregated totals entire range; invalid dates leave bounds open; unknown cache tokens omitted | 200, 400, 401, 403, 404, 409, 500, 503 |
@@ -15,10 +15,11 @@ Generated from OpenAPI; existing authorization and billing remain unchanged. See
 | `GET /team/daily/activity` | Scoped daily aggregates; paged totals cover current page, aggregated totals entire range; invalid dates leave bounds open; unknown cache tokens omitted | 200, 400, 401, 403, 404, 409, 500, 503 |
 | `GET /team/daily/activity/aggregated` | Scoped daily aggregates; paged totals cover current page, aggregated totals entire range; invalid dates leave bounds open; unknown cache tokens omitted | 200, 400, 401, 403, 404, 409, 500, 503 |
 | `GET /organization/daily/activity` | Scoped daily aggregates; paged totals cover current page, aggregated totals entire range; invalid dates leave bounds open; unknown cache tokens omitted | 200, 400, 401, 403, 404, 409, 500, 503 |
+| `GET /spend/logs/ui/filter-options` | Log filter suggestions | 200, 400, 401, 403, 500, 503 |
 
 ### GET /spend/logs/v2
 
-Scoped logs; invalid page defaults to 1, page_size outside 1..200 defaults to 50; UTC inclusive dates; session grouping before pagination; undeclared filters not guaranteed
+Scoped logs; invalid page defaults to 1, page_size outside 1..200 defaults to 50; UTC inclusive dates; exact timestamps; invalid or reversed windows return 400; session grouping before pagination; undeclared filters not guaranteed; Filters are AND-combined within the authorized scope before pagination; invalid error codes or cache conditions return 400.
 
 ```json
 [
@@ -27,14 +28,16 @@ Scoped logs; invalid page defaults to 1, page_size outside 1..200 defaults to 50
     "name": "start_date",
     "schema": {
       "type": "string"
-    }
+    },
+    "description": "Accepts UTC dates, UTC date-times, or RFC3339. Timestamp end bounds are not extended by one day."
   },
   {
     "in": "query",
     "name": "end_date",
     "schema": {
       "type": "string"
-    }
+    },
+    "description": "Accepts UTC dates, UTC date-times, or RFC3339. Timestamp end bounds are not extended by one day."
   },
   {
     "in": "query",
@@ -104,14 +107,16 @@ Scoped logs; invalid page defaults to 1, page_size outside 1..200 defaults to 50
     "name": "error_code",
     "schema": {
       "type": "string"
-    }
+    },
+    "description": "Exact final HTTP status from 100 to 599; invalid non-empty values return 400"
   },
   {
     "in": "query",
     "name": "error_message",
     "schema": {
       "type": "string"
-    }
+    },
+    "description": "Case-insensitive literal substring of the full error; % and _ are not wildcards"
   },
   {
     "in": "query",
@@ -140,6 +145,52 @@ Scoped logs; invalid page defaults to 1, page_size outside 1..200 defaults to 50
     "schema": {
       "type": "string"
     }
+  },
+  {
+    "in": "query",
+    "name": "key_hash",
+    "schema": {
+      "type": "string"
+    },
+    "description": "Exact recorded key hash; api_key still means key ID"
+  },
+  {
+    "in": "query",
+    "name": "key_alias",
+    "schema": {
+      "type": "string"
+    },
+    "description": "Exact recorded key alias, including historical aliases"
+  },
+  {
+    "in": "query",
+    "name": "supplier",
+    "schema": {
+      "type": "string"
+    },
+    "description": "Exact recorded supplier connection name"
+  },
+  {
+    "in": "query",
+    "name": "inbound_endpoint",
+    "schema": {
+      "type": "string"
+    },
+    "description": "Exact inbound path"
+  },
+  {
+    "in": "query",
+    "name": "cache_hit_filter",
+    "schema": {
+      "type": "string",
+      "enum": [
+        "",
+        "hit",
+        "miss"
+      ]
+    },
+    "description": "Gateway response cache hit or miss, not provider prompt cache; invalid values return 400",
+    "allowEmptyValue": true
   }
 ]
 ```
@@ -147,7 +198,7 @@ Scoped logs; invalid page defaults to 1, page_size outside 1..200 defaults to 50
 
 ### GET /spend/logs/ui
 
-Scoped logs; invalid page defaults to 1, page_size outside 1..200 defaults to 50; UTC inclusive dates; session grouping before pagination; undeclared filters not guaranteed
+Scoped logs; invalid page defaults to 1, page_size outside 1..200 defaults to 50; UTC inclusive dates; exact timestamps; invalid or reversed windows return 400; session grouping before pagination; undeclared filters not guaranteed; Filters are AND-combined within the authorized scope before pagination; invalid error codes or cache conditions return 400.
 
 ```json
 [
@@ -156,14 +207,16 @@ Scoped logs; invalid page defaults to 1, page_size outside 1..200 defaults to 50
     "name": "start_date",
     "schema": {
       "type": "string"
-    }
+    },
+    "description": "Accepts UTC dates, UTC date-times, or RFC3339. Timestamp end bounds are not extended by one day."
   },
   {
     "in": "query",
     "name": "end_date",
     "schema": {
       "type": "string"
-    }
+    },
+    "description": "Accepts UTC dates, UTC date-times, or RFC3339. Timestamp end bounds are not extended by one day."
   },
   {
     "in": "query",
@@ -233,14 +286,16 @@ Scoped logs; invalid page defaults to 1, page_size outside 1..200 defaults to 50
     "name": "error_code",
     "schema": {
       "type": "string"
-    }
+    },
+    "description": "Exact final HTTP status from 100 to 599; invalid non-empty values return 400"
   },
   {
     "in": "query",
     "name": "error_message",
     "schema": {
       "type": "string"
-    }
+    },
+    "description": "Case-insensitive literal substring of the full error; % and _ are not wildcards"
   },
   {
     "in": "query",
@@ -269,6 +324,52 @@ Scoped logs; invalid page defaults to 1, page_size outside 1..200 defaults to 50
     "schema": {
       "type": "string"
     }
+  },
+  {
+    "in": "query",
+    "name": "key_hash",
+    "schema": {
+      "type": "string"
+    },
+    "description": "Exact recorded key hash; api_key still means key ID"
+  },
+  {
+    "in": "query",
+    "name": "key_alias",
+    "schema": {
+      "type": "string"
+    },
+    "description": "Exact recorded key alias, including historical aliases"
+  },
+  {
+    "in": "query",
+    "name": "supplier",
+    "schema": {
+      "type": "string"
+    },
+    "description": "Exact recorded supplier connection name"
+  },
+  {
+    "in": "query",
+    "name": "inbound_endpoint",
+    "schema": {
+      "type": "string"
+    },
+    "description": "Exact inbound path"
+  },
+  {
+    "in": "query",
+    "name": "cache_hit_filter",
+    "schema": {
+      "type": "string",
+      "enum": [
+        "",
+        "hit",
+        "miss"
+      ]
+    },
+    "description": "Gateway response cache hit or miss, not provider prompt cache; invalid values return 400",
+    "allowEmptyValue": true
   }
 ]
 ```
@@ -276,7 +377,7 @@ Scoped logs; invalid page defaults to 1, page_size outside 1..200 defaults to 50
 
 ### GET /spend/logs/session/ui
 
-Empty session_id returns empty page before authentication under existing behavior
+Scoped logs; invalid page defaults to 1, page_size outside 1..200 defaults to 50; UTC inclusive dates; exact timestamps; invalid or reversed windows return 400; session grouping before pagination; undeclared filters not guaranteed; Empty session_id returns empty page before authentication under existing behavior; Filters are AND-combined within the authorized scope before pagination; invalid error codes or cache conditions return 400.
 
 ```json
 [
@@ -285,14 +386,16 @@ Empty session_id returns empty page before authentication under existing behavio
     "name": "start_date",
     "schema": {
       "type": "string"
-    }
+    },
+    "description": "Accepts UTC dates, UTC date-times, or RFC3339. Timestamp end bounds are not extended by one day."
   },
   {
     "in": "query",
     "name": "end_date",
     "schema": {
       "type": "string"
-    }
+    },
+    "description": "Accepts UTC dates, UTC date-times, or RFC3339. Timestamp end bounds are not extended by one day."
   },
   {
     "in": "query",
@@ -362,14 +465,16 @@ Empty session_id returns empty page before authentication under existing behavio
     "name": "error_code",
     "schema": {
       "type": "string"
-    }
+    },
+    "description": "Exact final HTTP status from 100 to 599; invalid non-empty values return 400"
   },
   {
     "in": "query",
     "name": "error_message",
     "schema": {
       "type": "string"
-    }
+    },
+    "description": "Case-insensitive literal substring of the full error; % and _ are not wildcards"
   },
   {
     "in": "query",
@@ -398,6 +503,52 @@ Empty session_id returns empty page before authentication under existing behavio
     "schema": {
       "type": "string"
     }
+  },
+  {
+    "in": "query",
+    "name": "key_hash",
+    "schema": {
+      "type": "string"
+    },
+    "description": "Exact recorded key hash; api_key still means key ID"
+  },
+  {
+    "in": "query",
+    "name": "key_alias",
+    "schema": {
+      "type": "string"
+    },
+    "description": "Exact recorded key alias, including historical aliases"
+  },
+  {
+    "in": "query",
+    "name": "supplier",
+    "schema": {
+      "type": "string"
+    },
+    "description": "Exact recorded supplier connection name"
+  },
+  {
+    "in": "query",
+    "name": "inbound_endpoint",
+    "schema": {
+      "type": "string"
+    },
+    "description": "Exact inbound path"
+  },
+  {
+    "in": "query",
+    "name": "cache_hit_filter",
+    "schema": {
+      "type": "string",
+      "enum": [
+        "",
+        "hit",
+        "miss"
+      ]
+    },
+    "description": "Gateway response cache hit or miss, not provider prompt cache; invalid values return 400",
+    "allowEmptyValue": true
   }
 ]
 ```
@@ -848,6 +999,77 @@ Scoped daily aggregates; paged totals cover current page, aggregated totals enti
   {
     "in": "query",
     "name": "model",
+    "schema": {
+      "type": "string"
+    }
+  }
+]
+```
+
+
+### GET /spend/logs/ui/filter-options
+
+Return candidates from logs visible to the caller; model and supplier also require current model authorization and an enabled deployment. Never return plaintext keys or bodies.
+
+```json
+[
+  {
+    "name": "field",
+    "in": "query",
+    "required": true,
+    "schema": {
+      "type": "string",
+      "enum": [
+        "model",
+        "key_alias",
+        "key_hash",
+        "supplier",
+        "inbound_endpoint"
+      ]
+    },
+    "description": "Candidate field"
+  },
+  {
+    "name": "start_date",
+    "in": "query",
+    "required": true,
+    "description": "Authorized query start",
+    "schema": {
+      "type": "string"
+    }
+  },
+  {
+    "name": "end_date",
+    "in": "query",
+    "required": true,
+    "description": "Authorized query end, at most 366 days",
+    "schema": {
+      "type": "string"
+    }
+  },
+  {
+    "name": "q",
+    "in": "query",
+    "required": false,
+    "description": "Case-insensitive literal substring, up to 128 characters",
+    "schema": {
+      "type": "string"
+    }
+  },
+  {
+    "name": "page",
+    "in": "query",
+    "required": false,
+    "description": "Page 1–100, default 1",
+    "schema": {
+      "type": "string"
+    }
+  },
+  {
+    "name": "page_size",
+    "in": "query",
+    "required": false,
+    "description": "Page size 1–50, default 50",
     "schema": {
       "type": "string"
     }
@@ -1726,5 +1948,36 @@ Scoped daily aggregates; paged totals cover current page, aggregated totals enti
     "metrics",
     "metadata"
   ]
+}
+```
+
+### LogFilterOptionPage
+
+```json
+{
+  "type": "object",
+  "required": [
+    "data",
+    "page",
+    "page_size",
+    "has_more"
+  ],
+  "properties": {
+    "data": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "page": {
+      "type": "integer"
+    },
+    "page_size": {
+      "type": "integer"
+    },
+    "has_more": {
+      "type": "boolean"
+    }
+  }
 }
 ```

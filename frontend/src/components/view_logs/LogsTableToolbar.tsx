@@ -24,12 +24,11 @@ interface LogsTableToolbarProps {
   onSelectedTimeIntervalChange: (value: { value: number; unit: string }) => void;
   isLiveTail: boolean;
   onIsLiveTailChange: (value: boolean) => void;
-  excludeInternalHealthChecks: boolean;
-  onExcludeInternalHealthChecksChange: (value: boolean) => void;
   onResetToFirstPage: () => void;
   onResetFilters: () => void;
 }
 
+/** 展示日志筛选工具条；参数为时间、实时刷新及过滤状态和回调，返回可访问且国际化的控件。仅通知调用方更新查询，不读取或修改日志数据。 */
 export function LogsTableToolbar({
   startTime,
   onStartTimeChange,
@@ -41,8 +40,6 @@ export function LogsTableToolbar({
   onSelectedTimeIntervalChange,
   isLiveTail,
   onIsLiveTailChange,
-  excludeInternalHealthChecks,
-  onExcludeInternalHealthChecksChange,
   onResetToFirstPage,
   onResetFilters,
 }: LogsTableToolbarProps) {
@@ -65,7 +62,7 @@ export function LogsTableToolbar({
   const selectedOption = QUICK_SELECT_OPTIONS.find(
     (option) => option.value === selectedTimeInterval.value && option.unit === selectedTimeInterval.unit,
   );
-  const displayLabel = isCustomDate ? getTimeRangeDisplay(isCustomDate, startTime, endTime) : selectedOption?.label;
+  const displayLabel = isCustomDate ? getTimeRangeDisplay(isCustomDate, startTime, endTime) : t(selectedOption?.label ?? "Last 24 Hours");
 
   return (
     <div className="flex flex-wrap items-center gap-2">
@@ -82,12 +79,12 @@ export function LogsTableToolbar({
           <div className="space-y-1">
             {QUICK_SELECT_OPTIONS.map((option) => (
               <Button
-                key={option.label}
+                key={t(option.label)}
                 variant="ghost"
                 className="w-full justify-start font-normal"
                 onClick={() => applyQuickSelect(option)}
               >
-                {option.label}
+                {t(option.label)}
               </Button>
             ))}
             <div className="my-2 border-t" />
@@ -108,6 +105,7 @@ export function LogsTableToolbar({
       {isCustomDate && (
         <div className="flex items-center gap-2">
           <Input
+            aria-label={t("logsUX.start")}
             type="datetime-local"
             className="w-auto"
             value={startTime}
@@ -118,6 +116,7 @@ export function LogsTableToolbar({
           />
           <span className="text-sm text-muted-foreground">{t("to")}</span>
           <Input
+            aria-label={t("logsUX.end")}
             type="datetime-local"
             className="w-auto"
             value={endTime}
@@ -130,34 +129,13 @@ export function LogsTableToolbar({
       )}
 
       <div className="flex items-center gap-2">
-        <span className="text-sm font-medium">{t("Live Tail")}</span>
-        <Switch checked={isLiveTail} onCheckedChange={onIsLiveTailChange} aria-label={t("Live Tail")} />
-      </div>
-
-      <div className="flex items-center gap-2">
-        <span className="text-sm font-medium">{t("Hide Health Checks")}</span>
-        <Switch
-          checked={excludeInternalHealthChecks}
-          onCheckedChange={onExcludeInternalHealthChecksChange}
-          aria-label={t("Hide Health Checks")}
-        />
+        <span className="text-sm font-medium">{t("logsUX.autoRefresh")}</span>
+        <Switch checked={isLiveTail} onCheckedChange={onIsLiveTailChange} aria-label={t("logsUX.autoRefresh")} />
       </div>
 
       <Button variant="outline" size="sm" onClick={onResetFilters}>
         {t("Reset Filters")}
       </Button>
-    </div>
-  );
-}
-
-export function LiveTailBanner({ onStop }: { onStop: () => void }) {
-  const t = useT();
-  return (
-    <div className="mb-4 flex items-center justify-between rounded-md border border-success/20 bg-success/10 px-4 py-2">
-      <span className="text-sm text-success">{t("Auto-refreshing every 15 seconds")}</span>
-      <button type="button" onClick={onStop} className="text-sm text-success hover:text-success/80">
-        {t("Stop")}
-      </button>
     </div>
   );
 }

@@ -44,7 +44,7 @@ describe("model monitor view", () => {
       vi.fn().mockResolvedValue({
         ok: true,
         json: async () => ({
-          options: [],
+          options: [row],
           summary: row,
           models: [row],
           trend: [],
@@ -78,7 +78,7 @@ describe("model monitor view", () => {
       vi.fn().mockResolvedValue({
         ok: true,
         json: async () => ({
-          options: [],
+          options: [row, { ...row, supplier: "supplier-b" }],
           summary: row,
           models: [row, { ...row, supplier: "supplier-b" }],
           trend: [],
@@ -151,5 +151,40 @@ describe("model monitor view", () => {
     expect(await screen.findByRole("alert")).toHaveTextContent("Unable to load");
     fireEvent.click(screen.getByRole("button", { name: "Refresh" }));
     await waitFor(() => expect(request).toHaveBeenCalledTimes(2));
+  });
+  /** 前置地址保存已撤权供应商及模型，验证成功加载后清除筛选并显示可见数据；清理由 afterEach 完成。 */
+  it("clears revoked filters after loading current options", async () => {
+    const onUrlUpdate = vi.fn();
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue({ ok: true, json: async () => ({ options: [row], summary: row, models: [row], trend: [], start_date: "2026-01-01", end_date: "2026-01-02" }) }));
+    render(<NuqsTestingAdapter hasMemory searchParams="?supplier=revoked&model=old" onUrlUpdate={onUrlUpdate}><I18nProvider initialLocale="en"><ModelMonitorView accessToken="session" /></I18nProvider></NuqsTestingAdapter>);
+    expect(await screen.findByRole("rowheader", { name: "original-model" })).toBeVisible();
+    expect(screen.getByLabelText("Supplier connection")).toHaveValue("");
+    expect(screen.getByLabelText("Actual model")).toHaveValue("");
+    await waitFor(() => expect(onUrlUpdate).toHaveBeenCalled());
+    const update = onUrlUpdate.mock.lastCall?.[0];
+    expect(update.searchParams.has("supplier")).toBe(false);
+    expect(update.searchParams.has("model")).toBe(false);
+  });
+  /** 前置有效地址和当前授权目录，验证加载后继续使用原筛选且不改写地址；清理由 afterEach 完成。 */
+  it("keeps valid filters after loading current options", async () => {
+    const onUrlUpdate = vi.fn();
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue({ ok: true, json: async () => ({ options: [row], summary: row, models: [row], trend: [], start_date: "2026-01-01", end_date: "2026-01-02" }) }));
+    render(<NuqsTestingAdapter hasMemory searchParams="?supplier=supplier-a&model=original-model" onUrlUpdate={onUrlUpdate}><I18nProvider initialLocale="en"><ModelMonitorView accessToken="session" /></I18nProvider></NuqsTestingAdapter>);
+    expect(await screen.findByRole("rowheader", { name: "original-model" })).toBeVisible();
+    expect(screen.getByLabelText("Supplier connection")).toHaveValue("supplier-a");
+    expect(screen.getByLabelText("Actual model")).toHaveValue("original-model");
+    expect(onUrlUpdate).not.toHaveBeenCalled();
+  });
+  /** 前置尚未完成的请求及随后发生的错误，验证未知候选时不会清除地址筛选；清理由 afterEach 完成。 */
+  it("preserves filters while loading and after a request error", async () => {
+    const onUrlUpdate = vi.fn();
+    let reject!: (reason: Error) => void;
+    vi.stubGlobal("fetch", vi.fn().mockReturnValue(new Promise((_resolve, rejectPromise) => { reject = rejectPromise; })));
+    render(<NuqsTestingAdapter hasMemory searchParams="?supplier=old&model=old-model" onUrlUpdate={onUrlUpdate}><I18nProvider initialLocale="en"><ModelMonitorView accessToken="session" /></I18nProvider></NuqsTestingAdapter>);
+    expect(screen.getByRole("status")).toBeVisible();
+    expect(onUrlUpdate).not.toHaveBeenCalled();
+    reject(new Error("network failure"));
+    expect(await screen.findByRole("alert")).toHaveTextContent("Unable to load");
+    expect(onUrlUpdate).not.toHaveBeenCalled();
   });
 });

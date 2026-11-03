@@ -70,7 +70,7 @@ func TestUpstreamDiagnosticsInterrupted(t *testing.T) {
 	resp.Body = diagnosticBrokenBody{cause: cause}
 	diagnostic = ObserveUpstream(resp)
 	_, err := io.ReadAll(resp.Body)
-	if err != cause || resp.Body.Close() != cause || diagnostic.ParseError != "upstream body read failed" || diagnostic.UsageReported {
+	if err != cause || resp.Body.Close() != cause || diagnostic.ParseError != "upstream body read failed" || diagnostic.ReadError != cause.Error() || diagnostic.UsageReported {
 		t.Fatalf("断流错误被改变或统计伪造: %+v %v", diagnostic, err)
 	}
 }

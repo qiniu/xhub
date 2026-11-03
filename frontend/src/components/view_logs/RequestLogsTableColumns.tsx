@@ -2,6 +2,7 @@
 
 import { formatLogCost } from "./formatLogCost";
 
+import { logOutcomeKey } from "./logPresentation";
 import { requestLogStatus } from "./taskStatus";
 
 import type { ColumnDef } from "@tanstack/react-table";
@@ -54,6 +55,7 @@ export const getRequestLogsTableColumns = ({
     header: ({ column }) => <DataTableSortHeader column={column} title={t("Time")} variant="dropdown-tristate" />,
     size: 200,
     enableSorting: true,
+    meta: { title: t("Time") },
     cell: ({ row }) => <DateCell value={row.original.startTime} />,
   },
   {
@@ -140,6 +142,10 @@ export const getRequestLogsTableColumns = ({
     },
   },
   {
+    id: "diagnosis", header: t("logsUX.diagnosis"), enableSorting: false,
+    cell: ({ row }) => isRequestFailure(row.original) ? <div className="max-w-64 text-sm"><span className="font-mono">{row.original.metadata?.http_status || "—"}</span> · {t(logOutcomeKey(row.original))}</div> : "—",
+  },
+  {
     id: "session_id",
     accessorKey: "session_id",
     header: t("Session ID"),
@@ -180,7 +186,7 @@ export const getRequestLogsTableColumns = ({
     header: ({ column }) => <DataTableSortHeader column={column} title={t("Cost")} variant="dropdown-tristate" />,
     size: 110,
     enableSorting: true,
-    meta: { numeric: true, skeleton: "twoLine" },
+    meta: { title: t("Cost"), numeric: true, skeleton: "twoLine" },
     cell: ({ row }) => {
       const log = row.original;
       const mcpCount = log.mcp_tool_call_count || 0;
@@ -195,7 +201,7 @@ export const getRequestLogsTableColumns = ({
 
       return (
         <div className="flex flex-col items-end">
-          {spend ? <CellTooltip content={`$${String(spend)}`} trigger={money} /> : money}
+          {spend ? <CellTooltip content={formatLogCost(spend, log)} trigger={money} /> : money}
           {isMultiCallSession && <span className="text-[10px] text-muted-foreground">{t("session total")}</span>}
           {mcpCount > 0 && mcpSpend > 0 && (
             <span className="text-[10px] text-warning">
@@ -210,7 +216,7 @@ export const getRequestLogsTableColumns = ({
     accessorKey: "request_duration_ms",
     header: ({ column }) => <DataTableSortHeader column={column} title={t("requestMetrics.duration")} variant="dropdown-tristate" />,
     enableSorting: true,
-    meta: { numeric: true },
+    meta: { title: t("requestMetrics.duration"), numeric: true },
     cell: ({ row }) => {
       const ms = row.original.request_duration_ms;
       if (ms == null) return <span>-</span>;
@@ -227,7 +233,7 @@ export const getRequestLogsTableColumns = ({
     accessorKey: "completionStartTime",
     header: ({ column }) => <DataTableSortHeader column={column} title={t("requestMetrics.ttft")} variant="dropdown-tristate" />,
     enableSorting: true,
-    meta: { numeric: true },
+    meta: { title: t("requestMetrics.ttft"), numeric: true },
     cell: ({ row }) => {
       const ms = row.original.ttft_ms;
       return <span title={t("requestMetrics.definition")}>{ms != null && ms >= 0 ? (ms / 1000).toFixed(2) + "s" : "—"}</span>;
@@ -266,6 +272,7 @@ export const getRequestLogsTableColumns = ({
     header: ({ column }) => <DataTableSortHeader column={column} title={t("Model")} variant="dropdown-tristate" />,
     size: 200,
     enableSorting: true,
+    meta: { title: t("Model") },
     cell: ({ row }) => {
       const log = row.original;
       const provider = log.custom_llm_provider;
@@ -303,7 +310,7 @@ export const getRequestLogsTableColumns = ({
     header: ({ column }) => <DataTableSortHeader column={column} title={t("Tokens")} variant="dropdown-tristate" />,
     size: 140,
     enableSorting: true,
-    meta: { numeric: true },
+    meta: { title: t("Tokens"), numeric: true },
     cell: ({ row }) => {
       const log = row.original;
       const showSessionTotal = (log.session_total_count || 1) > 1 && log.session_total_tokens != null;

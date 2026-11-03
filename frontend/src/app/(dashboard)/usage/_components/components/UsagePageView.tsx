@@ -33,7 +33,6 @@ import {
 } from "@/components/networking";
 import AdvancedDatePicker from "@/components/shared/advanced_date_picker";
 import { ChartLoader } from "@/components/shared/chart_loader";
-import ViewUserSpend from "@/components/view_user_spend";
 import { usePaginatedDailyActivity } from "../hooks/usePaginatedDailyActivity";
 import { keyActivityLabel } from "@/components/UsagePage/keyActivityLabel";
 import { KeyMetricWithMetadata, MetricWithMetadata } from "@/components/UsagePage/types";
@@ -113,6 +112,7 @@ const UsagePage: React.FC<UsagePageProps> = ({ teams, organizations }) => {
 
   // For non-admins or "my-usage" view, always pass their own user_id
   const effectiveUserId = usageView === "my-usage" || !isAdmin ? userID || null : selectedUserId;
+  const showPersonalBudget = !!userID && effectiveUserId === userID;
 
   const startTime = useMemo(() => (dateValue.from ? new Date(dateValue.from) : null), [dateValue.from]);
   const endTime = useMemo(() => (dateValue.to ? new Date(dateValue.to) : null), [dateValue.to]);
@@ -410,6 +410,18 @@ const UsagePage: React.FC<UsagePageProps> = ({ teams, organizations }) => {
               </div>
             </div>
           )}
+          {showPersonalBudget && <section aria-label={t("usageBudget.title")} className="rounded-lg border bg-card px-4 py-4 space-y-2">
+            <h2 className="font-semibold">{t("usageBudget.title")}</h2>
+            {userBudgetLoading || userBudgetError || !currentUser || currentUser.user_id !== userID || !Number.isFinite(currentUser.spend) || (currentUser.max_budget !== null && !Number.isFinite(currentUser.max_budget)) ? (
+              <p role="status">{t(userBudgetLoading ? "quotaGuide.personalLoading" : "quotaGuide.personalUnavailable")}</p>
+            ) : <>
+              <p>{t("usageBudget.amounts", { spent: `$${formatNumberWithCommas(currentUser.spend, 4)}`, limit: currentUser.max_budget === null ? t("quotaGuide.personalUnlimited") : `$${formatNumberWithCommas(currentUser.max_budget, 4)}`, remaining: currentUser.max_budget === null ? t("quotaGuide.personalUnlimited") : `$${formatNumberWithCommas(Math.max(0, currentUser.max_budget - currentUser.spend), 4)}` })}</p>
+              {currentUser.max_budget !== null && currentUser.spend > currentUser.max_budget && <p>{t("usageBudget.exceeded", { amount: `$${formatNumberWithCommas(currentUser.spend - currentUser.max_budget, 4)}` })}</p>}
+              <p>{currentUser.budget_reset_day === 0 ? t("userBudgetReset.none") : currentUser.budget_reset_day ? t("userBudgetReset.day", { day: currentUser.budget_reset_day }) : t("usageBudget.resetUnknown")}</p>
+              {currentUser.budget_reset_day && currentUser.budget_reset_at && !Number.isNaN(Date.parse(currentUser.budget_reset_at)) ? <p>{t("userBudgetReset.next", { date: new Intl.DateTimeFormat("sv-SE", { timeZone: "Asia/Shanghai", dateStyle: "short", timeStyle: "short", hour12: false }).format(new Date(currentUser.budget_reset_at)) })}</p> : null}
+              <p className="text-sm text-muted-foreground">{t("usageBudget.note")}</p>
+            </>}
+          </section>}
           {!paginatedResult.hasData && (paginatedResult.error ? (
             <div role="alert" className="rounded-lg border border-destructive p-4 space-y-3">
               <p>{t("usageLoad.failed")}</p><Button variant="outline" onClick={retryUsage}>{t("usageLoad.retry")}</Button>
@@ -451,16 +463,10 @@ const UsagePage: React.FC<UsagePageProps> = ({ teams, organizations }) => {
                   <div className="mt-4 grid grid-cols-1 gap-4 lg:grid-cols-2">
                     <div className="lg:col-span-2 rounded-lg border bg-card px-4 py-4">
                       <p className="mb-3 text-sm text-muted-foreground">
-                        {t("Project Spend")}
+                        {t("usageBudget.rangeSpend")}
                         {dateValue.from && dateValue.to ? ` · ${formatClosedRangeLabel(dateValue.from, dateValue.to)}` : ""}
                       </p>
-                      {userBudgetLoading || userBudgetError || !currentUser ? (
-                        <p role="status">{t(userBudgetLoading ? "quotaGuide.personalLoading" : "quotaGuide.personalUnavailable")}</p>
-                      ) : <ViewUserSpend
-                        userSpend={totalSpend}
-                        selectedTeam={null}
-                        userMaxBudget={currentUser.max_budget ?? null}
-                      />}
+                      <p className="text-2xl font-semibold tabular-nums">${formatNumberWithCommas(totalSpend, 4)}</p>
                     </div>
 
                     <div className="lg:col-span-2">

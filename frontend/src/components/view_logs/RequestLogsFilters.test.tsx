@@ -1,426 +1,250 @@
 import { fireEvent, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { useState } from "react";
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import { chooseSelectOption, renderWithProviders, testQueryClient } from "../../../tests/test-utils";
-import { ERROR_CODE_OPTIONS } from "./constants";
 import { LOG_FILTER_IDS } from "./log_filter_logic";
 import { RequestLogsFilters } from "./RequestLogsFilters";
-import { I18nProvider, translate, setActiveLocale, type Locale } from "@/i18n";
+import { setActiveLocale } from "@/i18n";
 
-const { authorizedMock } = vi.hoisted(() => ({ authorizedMock: vi.fn() }));
-
-vi.mock("@/app/(dashboard)/hooks/sessionIdentity/useSessionIdentity", async (importOriginal) => {
-  const actual = await importOriginal<typeof import("@/app/(dashboard)/hooks/sessionIdentity/useSessionIdentity")>();
-  return { ...actual, useIsPlatformAdmin: () => true, useIsTeamAdminForAnyTeam: () => false };
-});
+const scope = vi.hoisted(() => ({ admin: true }));
+vi.mock("@/app/(dashboard)/hooks/sessionIdentity/useSessionIdentity", () => ({
+  useIsPlatformAdmin: () => scope.admin,
+  useIsTeamAdminForAnyTeam: () => false,
+}));
 vi.mock("@/app/(dashboard)/hooks/useIsOrgAdmin", () => ({ default: () => false }));
-
-vi.mock("@/app/(dashboard)/hooks/keys/useKeyAliases", () => ({
-  useInfiniteKeyAliases: vi.fn(),
-}));
-
-vi.mock("@/app/(dashboard)/hooks/useAuthorized", () => ({
-  default: authorizedMock,
-}));
-
-vi.mock("@/components/networking", () => ({
-  userAvailableModelsCall: vi.fn().mockResolvedValue({ data: [] }),
-}));
-
-vi.mock("@/app/(dashboard)/hooks/spendLogs/useSpendLogUsers", () => ({
-  useInfiniteSpendLogUsers: vi.fn(),
-}));
-
-vi.mock("@/app/(dashboard)/hooks/spendLogs/useSpendLogEndUsers", () => ({
-  useInfiniteSpendLogEndUsers: vi.fn(),
-}));
-
-import { useInfiniteSpendLogEndUsers } from "@/app/(dashboard)/hooks/spendLogs/useSpendLogEndUsers";
+vi.mock("@/app/(dashboard)/hooks/spendLogs/useSpendLogUsers", () => ({ useInfiniteSpendLogUsers: vi.fn() }));
+vi.mock("./useLogFilterSuggestions", () => ({ useLogFilterSuggestions: vi.fn() }));
 import { useInfiniteSpendLogUsers } from "@/app/(dashboard)/hooks/spendLogs/useSpendLogUsers";
-import { useInfiniteKeyAliases } from "@/app/(dashboard)/hooks/keys/useKeyAliases";
-import { userAvailableModelsCall } from "@/components/networking";
-
-const emptyInfiniteQuery = {
+import { useLogFilterSuggestions } from "./useLogFilterSuggestions";
+const emptyQuery = {
   data: { pages: [], pageParams: [] },
   fetchNextPage: vi.fn(),
   hasNextPage: false,
   isFetchingNextPage: false,
   isLoading: false,
+  isError: false,
 };
+const logsWindow = { start_date: "2026-11-01 00:00:00", end_date: "2026-11-02 00:00:00" };
 
-const LOGS_WINDOW = { start_date: "2026-07-23 00:00:00", end_date: "2026-07-24 00:00:00" };
-
-/** 渲染日志筛选器并返回查询写入回调；参数是初始筛选值，不写后台，组件由测试框架卸载。 */
-function renderFilters(filters: Record<string, string> = {}) {
-  const set = vi.fn();
-  renderWithProviders(
-    <RequestLogsFilters get={(id: string) => filters[id]} set={set} teams={[]} logsWindow={LOGS_WINDOW} />,
-  );
-  return { set };
-}
-
-/** 在测试中保存筛选状态；无参数，返回可交互筛选器，状态仅存在于测试组件且随卸载清理。 */
-function StatefulFilters() {
-  const [filters, setFilters] = useState<Record<string, string | undefined>>({});
+/** 渲染可变筛选草稿；参数指定错误视图，返回表单。状态由测试框架卸载，无后台写入。 */
+function StatefulFilters({ errorsOnly = false }: { errorsOnly?: boolean }) {
+  const [values, setValues] = useState<Record<string, unknown>>({});
   return (
     <RequestLogsFilters
-      get={(id: string) => filters[id]}
-      set={(id: string, value: unknown) =>
-        setFilters((previous) => ({ ...previous, [id]: typeof value === "string" ? value : undefined }))
-      }
+      get={(id) => values[id]}
+      set={(id, value) => setValues((old) => ({ ...old, [id]: value }))}
       teams={[]}
-      logsWindow={LOGS_WINDOW}
+      logsWindow={logsWindow}
+      errorsOnly={errorsOnly}
     />
   );
 }
 
+/** 渲染固定筛选草稿并返回变更观察器；测试框架卸载组件且清理查询缓存。 */
+function renderFilters(errorsOnly = false) {
+  const set = vi.fn();
+  renderWithProviders(
+    <RequestLogsFilters get={() => undefined} set={set} teams={[]} logsWindow={logsWindow} errorsOnly={errorsOnly} />,
+  );
+  return set;
+}
+
 describe("RequestLogsFilters", () => {
-  // Provider 会更新全局翻译状态，恢复默认测试语言，避免同一文件的后续英文断言受到影响。
-  afterEach(() => setActiveLocale("en"));
-  /** 目的：验证状态及缓存选项在两种语言下使用组件顶层翻译函数；前置真实 Provider 和空查询夹具；选择结果保持协议值，组件和查询缓存由框架清理，无后台写入。 */
-  it.each(["en", "zh-CN"] as Locale[])("translates status and cache options in %s", async (locale) => {
-    const user = userEvent.setup();
-    const set = vi.fn();
-    renderWithProviders(
-      <I18nProvider initialLocale={locale}>
-        <RequestLogsFilters get={() => undefined} set={set} teams={[]} logsWindow={LOGS_WINDOW} />
-      </I18nProvider>,
-    );
-    await user.click(await screen.findByText(translate(locale, "All Statuses")));
-    await user.click(await screen.findByRole("option", { name: translate(locale, "Success"), exact: true }));
-    expect(set).toHaveBeenCalledWith(LOG_FILTER_IDS.STATUS, "success");
-    await user.click(await screen.findByText(translate(locale, "All Requests")));
-    await user.click(await screen.findByRole("option", { name: translate(locale, "Cache Miss"), exact: true }));
-    expect(set).toHaveBeenCalledWith(LOG_FILTER_IDS.CACHE_STATUS, "miss");
-  });
   beforeEach(() => {
     vi.clearAllMocks();
-    authorizedMock.mockReturnValue({ accessToken: "sk-test", userId: "user-1", userRole: "Internal User" });
     testQueryClient.clear();
-    vi.mocked(useInfiniteKeyAliases).mockReturnValue(
-      emptyInfiniteQuery as unknown as ReturnType<typeof useInfiniteKeyAliases>,
-    );
-    vi.mocked(userAvailableModelsCall).mockResolvedValue({ data: [] });
+    scope.admin = true;
+    setActiveLocale("en");
     vi.mocked(useInfiniteSpendLogUsers).mockReturnValue(
-      emptyInfiniteQuery as unknown as ReturnType<typeof useInfiniteSpendLogUsers>,
+      emptyQuery as unknown as ReturnType<typeof useInfiniteSpendLogUsers>,
     );
-    vi.mocked(useInfiniteSpendLogEndUsers).mockReturnValue(
-      emptyInfiniteQuery as unknown as ReturnType<typeof useInfiniteSpendLogEndUsers>,
-    );
+    vi.mocked(useLogFilterSuggestions).mockReturnValue({ data: { data: [], page: 1, page_size: 50, has_more: false }, isError: false, isLoading: false, isPendingQuery: false } as unknown as ReturnType<typeof useLogFilterSuggestions>);
   });
 
-  /** 前置错误日志视图；验证状态选择隐藏且缓存筛选仍可使用，自动卸载和查询缓存清理。 */
-  it("hides conflicting status choices in error logs", () => {
-    renderWithProviders(
-      <RequestLogsFilters get={() => undefined} set={vi.fn()} teams={[]} logsWindow={LOGS_WINDOW} errorsOnly />,
-    );
+  /** 前置普通日志；常用模型和账号直接可见，高级筛选折叠且不出现未实现字段；自动卸载。 */
+  it("prioritizes common filters and removes unsupported or duplicated inputs", () => {
+    renderFilters();
+    expect(screen.getByLabelText("Model")).toBeVisible();
+    expect(screen.getByText(/Suggestions come from all logs you can access/)).toBeVisible();
+    expect(screen.getByPlaceholderText("Search an internal user")).toBeVisible();
+    expect(screen.getByLabelText("Key fingerprint (SHA-256)")).not.toBeVisible();
+    expect(screen.queryByText("End User")).not.toBeInTheDocument();
+    expect(screen.queryByText("Public model / search tool")).not.toBeInTheDocument();
+    expect(screen.queryByText("Error Message")).not.toBeInTheDocument();
+  });
+
+  /** 前置错误日志；状态码/关键词直接可用，不提供与错误视图冲突的状态或缓存筛选；自动卸载。 */
+  it("prioritizes error code and message only in the error view", () => {
+    renderFilters(true);
+    expect(screen.getByPlaceholderText("Select or type an error code")).toBeVisible();
+    expect(screen.getByLabelText("Error Message")).toBeVisible();
+    expect(screen.queryByText("Gateway response cache")).not.toBeInTheDocument();
     expect(screen.queryByText("Status", { exact: true })).not.toBeInTheDocument();
-    expect(screen.getByText("Cache", { exact: true })).toBeInTheDocument();
   });
 
-  /** 前置普通日志筛选表单；展开状态选项后应只有成功和全部状态，不能混入错误页专用筛选，卸载与查询缓存由测试框架清理。 */
-  it("does not offer failure status in ordinary logs", async () => {
+  /** 前置普通成员；不呈现管理账号选择器，范围继续由后台决定；mock 在下一例重置。 */
+  it("does not expose admin scope controls to ordinary members", () => {
+    scope.admin = false;
+    renderFilters();
+    expect(screen.queryByPlaceholderText("Search an internal user")).not.toBeInTheDocument();
+    expect(useInfiniteSpendLogUsers).not.toHaveBeenCalled();
+  });
+
+  /** 前置历史型号和已删除密钥；可直接输入精确名称，不依赖当前目录；只改本地草稿。 */
+  it("accepts historical models and key aliases and preserves original text", async () => {
     const user = userEvent.setup();
-    renderFilters();
-    await user.click(screen.getByText("All Statuses"));
-    expect(await screen.findByRole("option", { name: "Success" })).toBeInTheDocument();
-    expect(screen.queryByRole("option", { name: "Failure" })).not.toBeInTheDocument();
+    renderWithProviders(<StatefulFilters />);
+    await user.type(screen.getByLabelText("Model"), "retired-模型");
+    await user.click(screen.getByText("Advanced filters"));
+    await user.type(screen.getByLabelText("Key Alias"), "deleted-key");
+    expect(screen.getByLabelText("Model")).toHaveValue("retired-模型");
+    expect(screen.getByLabelText("Key Alias")).toHaveValue("deleted-key");
   });
 
-  it("renders every backend-supported filter field", async () => {
-    renderFilters();
-
-    for (const label of [
-      "Team ID",
-      "Status",
-      "Cache",
-      "Key Alias",
-      "User ID",
-      "End User",
-      "Error Code",
-      "Error Message",
-      "Key Hash",
-      "Session ID",
-      "Model",
-      "Public model / search tool",
-    ]) {
-      expect(await screen.findByText(label)).toBeInTheDocument();
-    }
-  });
-
-  it("places User ID between Key Alias and End User", async () => {
-    renderFilters();
-
-    const labels = ["Key Alias", "User ID", "End User"].map((label) => screen.getByText(label));
-    expect(labels[0].compareDocumentPosition(labels[1]) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
-    expect(labels[1].compareDocumentPosition(labels[2]) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
-  });
-
-  it("selects an internal user value from the caller's visible spend logs", async () => {
-    vi.mocked(useInfiniteSpendLogUsers).mockReturnValue({
-      ...emptyInfiniteQuery,
-      data: {
-        pages: [
-          {
-            data: ["alice@example.com"],
-            meta: { page: 1, page_size: 50, has_more: false },
-            links: { self: "", next: null },
-          },
-        ],
-        pageParams: [1],
-      },
-    } as unknown as ReturnType<typeof useInfiniteSpendLogUsers>);
+  /** 前置本账号可见候选；键盘选择应写入完整值，指纹只缩略显示且非密钥明文；测试框架清理 DOM。 */
+  it("selects a complete fingerprint without submitting the abbreviated label", async () => {
+    const hash = "sha256-" + "0123456789abcdef".repeat(4);
+    vi.mocked(useLogFilterSuggestions).mockImplementation((field) => ({ data: { data: field === "key_hash" ? [hash] : [], page: 1, page_size: 50, has_more: false }, isError: false, isLoading: false, isPendingQuery: false }) as unknown as ReturnType<typeof useLogFilterSuggestions>);
     const user = userEvent.setup();
-    const { set } = renderFilters();
-
-    await chooseSelectOption(user, await screen.findByPlaceholderText("Search an internal user"), "alice@example.com");
-
-    expect(set).toHaveBeenCalledWith(LOG_FILTER_IDS.USER_ID, "alice@example.com");
-  });
-
-  it("pushes the User ID picker query to the paginated user lookup", async () => {
-    const user = userEvent.setup();
-    renderFilters();
-
-    const input = await screen.findByPlaceholderText("Search an internal user");
+    renderWithProviders(<StatefulFilters />);
+    await user.click(screen.getByText("Advanced filters"));
+    const input = screen.getByLabelText("Key fingerprint (SHA-256)");
     await user.click(input);
-    fireEvent.change(input, { target: { value: "alice@example.com" } });
-
-    await waitFor(() => expect(useInfiniteSpendLogUsers).toHaveBeenCalledWith(LOGS_WINDOW, 50, "alice@example.com"));
+    const option = await screen.findByRole("option", { name: "sha256-01234…89abcdef" });
+    expect(option).not.toHaveTextContent(hash);
+    await user.click(option);
+    expect(input).toHaveValue(hash);
+    expect(screen.getByText(/not the secret key/i)).toBeVisible();
   });
 
-  it("loads the next page when the User ID list is scrolled near the end", async () => {
+  /** 各字段选择已授权提示后保留完整原文，允许继续手动编辑；组件和查询由框架清理。 */
+  it.each([
+    ["model", "Model", "public-model"],
+    ["key_alias", "Key Alias", "my-key"],
+    ["supplier", "Supplier connection", "supplier-one"],
+    ["inbound_endpoint", "Inbound", "/v1/responses"],
+  ] as const)("selects a %s suggestion", async (field, label, value) => {
+    vi.mocked(useLogFilterSuggestions).mockImplementation((f) => ({ data: { data: f === field ? [value] : [], page: 1, page_size: 50, has_more: false }, isError: false, isLoading: false, isPendingQuery: false }) as unknown as ReturnType<typeof useLogFilterSuggestions>);
+    const user = userEvent.setup();
+    renderWithProviders(<StatefulFilters />);
+    if (field !== "model") await user.click(screen.getByText("Advanced filters"));
+    const input = screen.getByLabelText(label);
+    await user.click(input);
+    await user.click(await screen.findByRole("option", { name: value, exact: true }));
+    expect(input).toHaveValue(value);
+  });
+
+  /** 限量结果必须提示缩小搜索范围，不误称已返回全部；组件卸载清理。 */
+  it("reports additional suggestion pages", async () => {
+    vi.mocked(useLogFilterSuggestions).mockReturnValue({ data: { data: ["one"], page: 1, page_size: 50, has_more: true }, isError: false, isLoading: false, isPendingQuery: false } as unknown as ReturnType<typeof useLogFilterSuggestions>);
+    renderFilters();
+    await userEvent.click(screen.getByLabelText("Model"));
+    expect(await screen.findByText(/More results are available/)).toBeVisible();
+  });
+
+  /** 查询失败和部分候选不得妨碍手工输入；候选失败仅影响提示，测试框架清理 DOM。 */
+  it("keeps manual historical input on a suggestion failure", async () => {
+    vi.mocked(useLogFilterSuggestions).mockReturnValue({ data: undefined, isError: true, isLoading: false, isPendingQuery: false } as unknown as ReturnType<typeof useLogFilterSuggestions>);
+    const user = userEvent.setup();
+    renderWithProviders(<StatefulFilters />);
+    const model = screen.getByLabelText("Model");
+    await user.click(model);
+    expect(await screen.findByText(/Suggestions could not be loaded/)).toBeVisible();
+    await user.type(model, "retired-模型");
+    await user.click(screen.getByText("Advanced filters"));
+    expect(model).toHaveValue("retired-模型");
+  });
+
+  /** 中文过滤器显示明确指纹说明，查询草稿保留用户内容；测试框架清理 DOM 与语言。 */
+  it("translates the fingerprint label and guidance", async () => {
+    setActiveLocale("zh-CN");
+    renderFilters();
+    expect(screen.getByText(/提示选项来自所选时间内有权查看的全部日志/)).toBeVisible();
+    await userEvent.click(screen.getByText("高级筛选"));
+    expect(screen.getByLabelText("密钥指纹（SHA-256）")).toBeVisible();
+    expect(screen.getByText(/并非密钥明文/)).toBeVisible();
+  });
+
+  /** 前置分页用户选项；选择后发送准确 user_id，文字搜索发送时间范围与查询，不跨权限拉取全目录；mock 清理。 */
+  it("uses the scoped user lookup and passes its chosen value", async () => {
+    vi.mocked(useInfiniteSpendLogUsers).mockReturnValue({
+      ...emptyQuery,
+      data: { pages: [{ data: ["alice"] }] },
+    } as unknown as ReturnType<typeof useInfiniteSpendLogUsers>);
+    const set = renderFilters();
+    const user = userEvent.setup();
+    await chooseSelectOption(user, screen.getByPlaceholderText("Search an internal user"), "alice");
+    expect(set).toHaveBeenCalledWith(LOG_FILTER_IDS.USER_ID, "alice");
+    expect(useInfiniteSpendLogUsers).toHaveBeenCalledWith(logsWindow, 50, undefined);
+  });
+
+  /** 前置用户目录失败；显示加载失败而非不存在用户；mock 清理。 */
+  it("distinguishes failed option lookup from an empty directory", async () => {
+    vi.mocked(useInfiniteSpendLogUsers).mockReturnValue({ ...emptyQuery, isError: true } as unknown as ReturnType<
+      typeof useInfiniteSpendLogUsers
+    >);
+    renderFilters();
+    await userEvent.click(screen.getByPlaceholderText("Search an internal user"));
+    expect(await screen.findByText("Could not load options. Please try again.")).toBeVisible();
+  });
+
+  /** 前置用户列表仍有下一页；滚动后继续分页且不一次取全量，mock 清理。 */
+  it("loads another bounded page of visible users", async () => {
     const fetchNextPage = vi.fn();
     vi.mocked(useInfiniteSpendLogUsers).mockReturnValue({
-      ...emptyInfiniteQuery,
+      ...emptyQuery,
       fetchNextPage,
       hasNextPage: true,
-      data: {
-        pages: [
-          {
-            data: ["alice@example.com"],
-            meta: { page: 1, page_size: 50, has_more: true },
-            links: { self: "", next: "?page=2" },
-          },
-        ],
-        pageParams: [1],
-      },
+      data: { pages: [{ data: ["alice"] }] },
     } as unknown as ReturnType<typeof useInfiniteSpendLogUsers>);
-    const user = userEvent.setup();
     renderFilters();
-
-    await user.click(await screen.findByPlaceholderText("Search an internal user"));
+    await userEvent.click(screen.getByPlaceholderText("Search an internal user"));
     const list = await screen.findByTestId("paginated-search-select-list");
-    Object.defineProperty(list, "scrollTop", { value: 90, configurable: true });
-    Object.defineProperty(list, "clientHeight", { value: 10, configurable: true });
-    Object.defineProperty(list, "scrollHeight", { value: 100, configurable: true });
-    list.dispatchEvent(new Event("scroll", { bubbles: true }));
-
+    for (const [key, value] of Object.entries({ scrollTop: 90, clientHeight: 10, scrollHeight: 100 }))
+      Object.defineProperty(list, key, { value, configurable: true });
+    fireEvent.scroll(list);
     await waitFor(() => expect(fetchNextPage).toHaveBeenCalled());
   });
 
-  it("scopes the Key Alias lookup to the selected team", async () => {
-    renderFilters({ [LOG_FILTER_IDS.TEAM_ID]: "team-42" });
-
-    await waitFor(() => expect(useInfiniteKeyAliases).toHaveBeenCalled());
-    expect(useInfiniteKeyAliases).toHaveBeenCalledWith(50, undefined, "team-42");
-  });
-
-  it("leaves the Key Alias lookup unscoped when no team is selected", async () => {
-    renderFilters();
-
-    await waitFor(() => expect(useInfiniteKeyAliases).toHaveBeenCalled());
-    expect(useInfiniteKeyAliases).toHaveBeenCalledWith(50, undefined, undefined);
-  });
-
-  it("loads the model list from the caller's own models, not the deployment catalog", async () => {
-    renderFilters({ [LOG_FILTER_IDS.TEAM_ID]: "team-42" });
-
-    await waitFor(() => expect(userAvailableModelsCall).toHaveBeenCalledWith("sk-test"));
-    expect(userAvailableModelsCall).not.toHaveBeenCalledWith("sk-test", expect.anything());
-  });
-
-  /** 前置正常模型列表含重复与空 ID；验证只显示有效唯一项，模拟接口和组件由每次测试清理。 */
-  it("deduplicates available models and ignores empty ids", async () => {
-    vi.mocked(userAvailableModelsCall).mockResolvedValue({
-      data: [{ id: "visible-model" }, { id: "visible-model" }, { id: "" }, {}],
-    });
-    renderFilters();
-    await waitFor(() => expect(userAvailableModelsCall).toHaveBeenCalled());
-    await userEvent.setup().click(screen.getByPlaceholderText("Search a model"));
-    expect(await screen.findAllByRole("option", { name: "visible-model" })).toHaveLength(1);
-  });
-
-  /** 前置没有登录凭据；验证不调用模型接口且显示空选项，测试不生成持久化数据。 */
-  it("does not load models without an access token", async () => {
-    authorizedMock.mockReturnValue({ accessToken: null, userId: "user-1", userRole: "Internal User" });
-    renderFilters();
-    await userEvent.setup().click(screen.getByPlaceholderText("Search a model"));
-    expect(await screen.findByText("No models found")).toBeInTheDocument();
-    expect(userAvailableModelsCall).not.toHaveBeenCalled();
-  });
-
-  /** 前置模型接口拒绝请求；验证页面降级为空列表且无未处理异常，模拟接口下一例重置。 */
-  it("shows empty model options when the lookup fails", async () => {
-    vi.mocked(userAvailableModelsCall).mockRejectedValue(new Error("model lookup unavailable"));
-    renderFilters();
-    await waitFor(() => expect(userAvailableModelsCall).toHaveBeenCalled());
-    await userEvent.setup().click(screen.getByPlaceholderText("Search a model"));
-    expect(await screen.findByText("No models found")).toBeInTheDocument();
-  });
-
-  it("asks the server for a bounded page of end users scoped to the visible time window", async () => {
-    renderFilters();
-
-    await waitFor(() => expect(useInfiniteSpendLogEndUsers).toHaveBeenCalled());
-    expect(useInfiniteSpendLogEndUsers).toHaveBeenCalledWith(LOGS_WINDOW, 50, undefined);
-  });
-
-  it("pushes the End User query to the server rather than filtering a preloaded list", async () => {
-    const user = userEvent.setup();
-    renderFilters();
-
-    const input = await screen.findByPlaceholderText("Search an end user");
-    await user.click(input);
-    fireEvent.change(input, { target: { value: "acme" } });
-
-    await waitFor(() => expect(useInfiniteSpendLogEndUsers).toHaveBeenCalledWith(LOGS_WINDOW, 50, "acme"));
-  });
-
-  it("renders only the end users the current page returned", async () => {
-    vi.mocked(useInfiniteSpendLogEndUsers).mockReturnValue({
-      ...emptyInfiniteQuery,
-      data: {
-        pages: [
-          {
-            data: ["cust-a", "cust-b"],
-            meta: { page: 1, page_size: 50, has_more: true },
-            links: { self: "", next: "?page=2" },
-          },
-        ],
-        pageParams: [1],
-      },
-    } as unknown as ReturnType<typeof useInfiniteSpendLogEndUsers>);
-    const user = userEvent.setup();
-    renderFilters();
-
-    await user.click(await screen.findByPlaceholderText("Search an end user"));
-
-    expect(await screen.findByText("cust-a")).toBeInTheDocument();
-    expect(screen.getByText("cust-b")).toBeInTheDocument();
-  });
-
-  it("loads the next page when the End User list is scrolled near the end", async () => {
-    const fetchNextPage = vi.fn();
-    vi.mocked(useInfiniteSpendLogEndUsers).mockReturnValue({
-      ...emptyInfiniteQuery,
-      fetchNextPage,
-      hasNextPage: true,
-      data: {
-        pages: [
-          { data: ["cust-a"], meta: { page: 1, page_size: 50, has_more: true }, links: { self: "", next: "?page=2" } },
-        ],
-        pageParams: [1],
-      },
-    } as unknown as ReturnType<typeof useInfiniteSpendLogEndUsers>);
-    const user = userEvent.setup();
-    renderFilters();
-
-    await user.click(await screen.findByPlaceholderText("Search an end user"));
-    const list = await screen.findByTestId("paginated-search-select-list");
-    Object.defineProperty(list, "scrollTop", { value: 90, configurable: true });
-    Object.defineProperty(list, "clientHeight", { value: 10, configurable: true });
-    Object.defineProperty(list, "scrollHeight", { value: 100, configurable: true });
-    list.dispatchEvent(new Event("scroll", { bubbles: true }));
-
-    await waitFor(() => expect(fetchNextPage).toHaveBeenCalled());
-  });
-
-  it("scopes the End User lookup to the window the logs table is showing", async () => {
-    const otherWindow = { start_date: "2026-01-01 00:00:00", end_date: "2026-01-02 00:00:00" };
-    renderWithProviders(<RequestLogsFilters get={() => undefined} set={vi.fn()} teams={[]} logsWindow={otherWindow} />);
-
-    await waitFor(() => expect(useInfiniteSpendLogEndUsers).toHaveBeenCalledWith(otherWindow, 50, undefined));
-  });
-
-  it.each([
-    ["", "All Statuses"],
-    ["success", "Success"],
-    ["failure", "All Statuses"],
-  ])("shows the human label on the Status trigger for %s", async (status, label) => {
-    renderFilters(status === "" ? {} : { [LOG_FILTER_IDS.STATUS]: status });
-
-    expect(await screen.findByText(label)).toBeInTheDocument();
-  });
-
-  it.each([
-    ["", "All Requests"],
-    ["hit", "Cache Hit"],
-    ["miss", "Cache Miss"],
-  ])("shows the human label on the Cache trigger for %s", async (cacheState, label) => {
-    renderFilters(cacheState === "" ? {} : { [LOG_FILTER_IDS.CACHE_STATUS]: cacheState });
-
-    expect(await screen.findByText(label)).toBeInTheDocument();
-  });
-
+  /** 前置高级缓存条件；命中/未命中映射真实后台参数；组件和查询缓存由框架清理。 */
   it.each([
     ["Cache Hit", "hit"],
     ["Cache Miss", "miss"],
-  ])("selecting %s sets the cache filter to %s", async (label, expected) => {
+  ])("maps %s to %s", async (label, value) => {
     const user = userEvent.setup();
-    const { set } = renderFilters();
-
-    await user.click(await screen.findByText("All Requests"));
+    const set = renderFilters();
+    await user.click(screen.getByText("Advanced filters"));
+    await user.click(screen.getByText("All Requests"));
     await user.click(await screen.findByRole("option", { name: label }));
-
-    expect(set).toHaveBeenCalledWith(LOG_FILTER_IDS.CACHE_STATUS, expected);
+    expect(set).toHaveBeenCalledWith(LOG_FILTER_IDS.CACHE_STATUS, value);
   });
 
-  it("stores the raw status code when a labeled error code is picked", async () => {
+  /** 前置错误视图；常见 499 和自定义有效状态均发送数字，非法值不能成为选项；自动清理。 */
+  it("supports cancellation and valid custom codes without accepting arbitrary text", async () => {
     const user = userEvent.setup();
-    const { set } = renderFilters();
-
-    await user.click(await screen.findByPlaceholderText("Select or type an error code"));
-    await user.click(await screen.findByRole("option", { name: "429 - Rate Limited" }));
-
-    expect(set).toHaveBeenCalledWith(LOG_FILTER_IDS.ERROR_CODE, "429");
-  });
-
-  it("offers every error code again after one was picked", async () => {
-    const user = userEvent.setup();
-    renderWithProviders(<StatefulFilters />);
-
-    const input = await screen.findByPlaceholderText("Select or type an error code");
+    const set = renderFilters(true);
+    const input = screen.getByPlaceholderText("Select or type an error code");
     await user.click(input);
-    await user.click(await screen.findByRole("option", { name: "429 - Rate Limited" }));
-    await user.click(input);
-
-    const list = await screen.findByTestId("error-code-filter-list");
-    expect(within(list).getAllByRole("option")).toHaveLength(ERROR_CODE_OPTIONS.length);
-    expect(within(list).queryByText(/^Use custom code:/)).not.toBeInTheDocument();
-  });
-
-  it("filters by an error code the list does not offer", async () => {
-    const user = userEvent.setup();
-    const { set } = renderFilters();
-
-    const input = await screen.findByPlaceholderText("Select or type an error code");
+    await user.click(screen.getByRole("option", { name: "499 - Connection interrupted" }));
+    expect(set).toHaveBeenCalledWith(LOG_FILTER_IDS.ERROR_CODE, "499");
     await user.click(input);
     await user.type(input, "418");
-    await user.click(await screen.findByRole("option", { name: "Use custom code: 418" }));
-
+    await user.click(screen.getByRole("option", { name: "Use custom code: 418" }));
     expect(set).toHaveBeenCalledWith(LOG_FILTER_IDS.ERROR_CODE, "418");
+    await user.click(input);
+    await user.clear(input);
+    await user.type(input, "oops");
+    expect(within(screen.getByTestId("error-code-filter-list")).queryByRole("option")).not.toBeInTheDocument();
   });
 
-  it("selecting All Requests clears the cache filter", async () => {
-    const user = userEvent.setup();
-    const { set } = renderFilters({ [LOG_FILTER_IDS.CACHE_STATUS]: "hit" });
-
-    await user.click(await screen.findByText("Cache Hit"));
-    await user.click(await screen.findByRole("option", { name: "All Requests" }));
-
-    expect(set).toHaveBeenCalledWith(LOG_FILTER_IDS.CACHE_STATUS, undefined);
+  /** 前置中文界面；语义翻译覆盖高级字段与 499，不修改输入内容；locale 由测试 setup 重置。 */
+  it("translates common and advanced filters into Chinese", async () => {
+    setActiveLocale("zh-CN");
+    renderFilters(true);
+    expect(screen.getByLabelText("模型")).toBeVisible();
+    await userEvent.click(screen.getByText("高级筛选"));
+    expect(screen.getByLabelText("供应商连接")).toBeVisible();
+    expect(screen.queryByText("Advanced filters")).not.toBeInTheDocument();
   });
 });

@@ -41,6 +41,7 @@ test("直接注册的 HTTP 入口与处理器索引完整一致", () => {
   const actual = [...source("docs/development/zh-CN/handler-index.md").matchAll(/\| `([A-Z]+ \/[^`]+)` \| `(\w+)` \| \[[^\]]+\]\(\.\.\/\.\.\/\.\.\/([^\)]+)\) \|/g)].map((match) => match.slice(1).join("|"));
   assert.ok(expected.length > 150, "应覆盖全部直接注册源码");
   assert.deepEqual(actual.sort(), expected.sort(), "索引缺少、增加或错误描述了真实注册入口");
+  assert.ok(source("docs/development/en/handler-index.md").includes("`GET /spend/logs/ui/filter-options` | `LogFilterOptions`"), "英文索引缺少日志筛选候选入口");
 });
 
 /** 目的：模型列表和价格源常量变化时提醒同步双语文档；前置当前源码及翻译，验证数值、匿名参数边界与默认源，无副作用无需清理。 */

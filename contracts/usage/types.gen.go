@@ -14,6 +14,36 @@ const (
 	BearerAuthScopes = "bearerAuth.Scopes"
 )
 
+// Defines values for ListSessionLogsParamsCacheHitFilter.
+const (
+	ListSessionLogsParamsCacheHitFilterEmpty ListSessionLogsParamsCacheHitFilter = ""
+	ListSessionLogsParamsCacheHitFilterHit   ListSessionLogsParamsCacheHitFilter = "hit"
+	ListSessionLogsParamsCacheHitFilterMiss  ListSessionLogsParamsCacheHitFilter = "miss"
+)
+
+// Defines values for ListUILogsParamsCacheHitFilter.
+const (
+	ListUILogsParamsCacheHitFilterEmpty ListUILogsParamsCacheHitFilter = ""
+	ListUILogsParamsCacheHitFilterHit   ListUILogsParamsCacheHitFilter = "hit"
+	ListUILogsParamsCacheHitFilterMiss  ListUILogsParamsCacheHitFilter = "miss"
+)
+
+// Defines values for ListLogFilterOptionsParamsField.
+const (
+	InboundEndpoint ListLogFilterOptionsParamsField = "inbound_endpoint"
+	KeyAlias        ListLogFilterOptionsParamsField = "key_alias"
+	KeyHash         ListLogFilterOptionsParamsField = "key_hash"
+	Model           ListLogFilterOptionsParamsField = "model"
+	Supplier        ListLogFilterOptionsParamsField = "supplier"
+)
+
+// Defines values for ListLogsParamsCacheHitFilter.
+const (
+	Empty ListLogsParamsCacheHitFilter = ""
+	Hit   ListLogsParamsCacheHitFilter = "hit"
+	Miss  ListLogsParamsCacheHitFilter = "miss"
+)
+
 // DailyUsage defines model for DailyUsage.
 type DailyUsage struct {
 	Metadata UsageMetadata `json:"metadata"`
@@ -117,6 +147,14 @@ type ErrorDetail struct {
 	// Param 当前为 null。 / Currently null.
 	Param json.RawMessage `json:"param"`
 	Type  string          `json:"type"`
+}
+
+// LogFilterOptionPage defines model for LogFilterOptionPage.
+type LogFilterOptionPage struct {
+	Data     []string `json:"data"`
+	HasMore  bool     `json:"has_more"`
+	Page     int      `json:"page"`
+	PageSize int      `json:"page_size"`
 }
 
 // LogPage defines model for LogPage.
@@ -277,66 +315,165 @@ type OrganizationDailyUsageParams struct {
 
 // ListSessionLogsParams defines parameters for ListSessionLogs.
 type ListSessionLogsParams struct {
-	StartDate      *string `form:"start_date,omitempty" json:"start_date,omitempty"`
-	EndDate        *string `form:"end_date,omitempty" json:"end_date,omitempty"`
-	Page           *string `form:"page,omitempty" json:"page,omitempty"`
-	PageSize       *string `form:"page_size,omitempty" json:"page_size,omitempty"`
-	UserId         *string `form:"user_id,omitempty" json:"user_id,omitempty"`
-	TeamId         *string `form:"team_id,omitempty" json:"team_id,omitempty"`
-	ApiKey         *string `form:"api_key,omitempty" json:"api_key,omitempty"`
-	Model          *string `form:"model,omitempty" json:"model,omitempty"`
-	SessionId      *string `form:"session_id,omitempty" json:"session_id,omitempty"`
-	RequestId      *string `form:"request_id,omitempty" json:"request_id,omitempty"`
-	Search         *string `form:"search,omitempty" json:"search,omitempty"`
-	ErrorCode      *string `form:"error_code,omitempty" json:"error_code,omitempty"`
+	// StartDate 支持 YYYY-MM-DD（UTC整天）、YYYY-MM-DD HH:mm:ss（UTC）或 RFC3339；完整结束时间不延长一天 / Accepts UTC dates, UTC date-times, or RFC3339. Timestamp end bounds are not extended by one day.
+	StartDate *string `form:"start_date,omitempty" json:"start_date,omitempty"`
+
+	// EndDate 支持 YYYY-MM-DD（UTC整天）、YYYY-MM-DD HH:mm:ss（UTC）或 RFC3339；完整结束时间不延长一天 / Accepts UTC dates, UTC date-times, or RFC3339. Timestamp end bounds are not extended by one day.
+	EndDate   *string `form:"end_date,omitempty" json:"end_date,omitempty"`
+	Page      *string `form:"page,omitempty" json:"page,omitempty"`
+	PageSize  *string `form:"page_size,omitempty" json:"page_size,omitempty"`
+	UserId    *string `form:"user_id,omitempty" json:"user_id,omitempty"`
+	TeamId    *string `form:"team_id,omitempty" json:"team_id,omitempty"`
+	ApiKey    *string `form:"api_key,omitempty" json:"api_key,omitempty"`
+	Model     *string `form:"model,omitempty" json:"model,omitempty"`
+	SessionId *string `form:"session_id,omitempty" json:"session_id,omitempty"`
+	RequestId *string `form:"request_id,omitempty" json:"request_id,omitempty"`
+	Search    *string `form:"search,omitempty" json:"search,omitempty"`
+
+	// ErrorCode 最终 HTTP 状态精确匹配，100至599；非法非空值返回400 / Exact final HTTP status from 100 to 599; invalid non-empty values return 400
+	ErrorCode *string `form:"error_code,omitempty" json:"error_code,omitempty"`
+
+	// ErrorMessage 完整错误正文中不区分大小写的字面子串；%和_不是通配符 / Case-insensitive literal substring of the full error; % and _ are not wildcards
 	ErrorMessage   *string `form:"error_message,omitempty" json:"error_message,omitempty"`
 	SortBy         *string `form:"sort_by,omitempty" json:"sort_by,omitempty"`
 	SortOrder      *string `form:"sort_order,omitempty" json:"sort_order,omitempty"`
 	StatusFilter   *string `form:"status_filter,omitempty" json:"status_filter,omitempty"`
 	GroupBySession *string `form:"group_by_session,omitempty" json:"group_by_session,omitempty"`
+
+	// KeyHash 密钥 Hash 精确匹配；api_key 仍指密钥 ID / Exact recorded key hash; api_key still means key ID
+	KeyHash *string `form:"key_hash,omitempty" json:"key_hash,omitempty"`
+
+	// KeyAlias 调用时的密钥别名精确匹配，包含历史别名 / Exact recorded key alias, including historical aliases
+	KeyAlias *string `form:"key_alias,omitempty" json:"key_alias,omitempty"`
+
+	// Supplier 调用时的供应商连接名精确匹配 / Exact recorded supplier connection name
+	Supplier *string `form:"supplier,omitempty" json:"supplier,omitempty"`
+
+	// InboundEndpoint 入站路径精确匹配 / Exact inbound path
+	InboundEndpoint *string `form:"inbound_endpoint,omitempty" json:"inbound_endpoint,omitempty"`
+
+	// CacheHitFilter 网关响应缓存命中或未命中，不是上游提示词缓存；非法值返回400 / Gateway response cache hit or miss, not provider prompt cache; invalid values return 400
+	CacheHitFilter *ListSessionLogsParamsCacheHitFilter `form:"cache_hit_filter,omitempty" json:"cache_hit_filter,omitempty"`
 }
+
+// ListSessionLogsParamsCacheHitFilter defines parameters for ListSessionLogs.
+type ListSessionLogsParamsCacheHitFilter string
 
 // ListUILogsParams defines parameters for ListUILogs.
 type ListUILogsParams struct {
-	StartDate      *string `form:"start_date,omitempty" json:"start_date,omitempty"`
-	EndDate        *string `form:"end_date,omitempty" json:"end_date,omitempty"`
-	Page           *string `form:"page,omitempty" json:"page,omitempty"`
-	PageSize       *string `form:"page_size,omitempty" json:"page_size,omitempty"`
-	UserId         *string `form:"user_id,omitempty" json:"user_id,omitempty"`
-	TeamId         *string `form:"team_id,omitempty" json:"team_id,omitempty"`
-	ApiKey         *string `form:"api_key,omitempty" json:"api_key,omitempty"`
-	Model          *string `form:"model,omitempty" json:"model,omitempty"`
-	SessionId      *string `form:"session_id,omitempty" json:"session_id,omitempty"`
-	RequestId      *string `form:"request_id,omitempty" json:"request_id,omitempty"`
-	Search         *string `form:"search,omitempty" json:"search,omitempty"`
-	ErrorCode      *string `form:"error_code,omitempty" json:"error_code,omitempty"`
+	// StartDate 支持 YYYY-MM-DD（UTC整天）、YYYY-MM-DD HH:mm:ss（UTC）或 RFC3339；完整结束时间不延长一天 / Accepts UTC dates, UTC date-times, or RFC3339. Timestamp end bounds are not extended by one day.
+	StartDate *string `form:"start_date,omitempty" json:"start_date,omitempty"`
+
+	// EndDate 支持 YYYY-MM-DD（UTC整天）、YYYY-MM-DD HH:mm:ss（UTC）或 RFC3339；完整结束时间不延长一天 / Accepts UTC dates, UTC date-times, or RFC3339. Timestamp end bounds are not extended by one day.
+	EndDate   *string `form:"end_date,omitempty" json:"end_date,omitempty"`
+	Page      *string `form:"page,omitempty" json:"page,omitempty"`
+	PageSize  *string `form:"page_size,omitempty" json:"page_size,omitempty"`
+	UserId    *string `form:"user_id,omitempty" json:"user_id,omitempty"`
+	TeamId    *string `form:"team_id,omitempty" json:"team_id,omitempty"`
+	ApiKey    *string `form:"api_key,omitempty" json:"api_key,omitempty"`
+	Model     *string `form:"model,omitempty" json:"model,omitempty"`
+	SessionId *string `form:"session_id,omitempty" json:"session_id,omitempty"`
+	RequestId *string `form:"request_id,omitempty" json:"request_id,omitempty"`
+	Search    *string `form:"search,omitempty" json:"search,omitempty"`
+
+	// ErrorCode 最终 HTTP 状态精确匹配，100至599；非法非空值返回400 / Exact final HTTP status from 100 to 599; invalid non-empty values return 400
+	ErrorCode *string `form:"error_code,omitempty" json:"error_code,omitempty"`
+
+	// ErrorMessage 完整错误正文中不区分大小写的字面子串；%和_不是通配符 / Case-insensitive literal substring of the full error; % and _ are not wildcards
 	ErrorMessage   *string `form:"error_message,omitempty" json:"error_message,omitempty"`
 	SortBy         *string `form:"sort_by,omitempty" json:"sort_by,omitempty"`
 	SortOrder      *string `form:"sort_order,omitempty" json:"sort_order,omitempty"`
 	StatusFilter   *string `form:"status_filter,omitempty" json:"status_filter,omitempty"`
 	GroupBySession *string `form:"group_by_session,omitempty" json:"group_by_session,omitempty"`
+
+	// KeyHash 密钥 Hash 精确匹配；api_key 仍指密钥 ID / Exact recorded key hash; api_key still means key ID
+	KeyHash *string `form:"key_hash,omitempty" json:"key_hash,omitempty"`
+
+	// KeyAlias 调用时的密钥别名精确匹配，包含历史别名 / Exact recorded key alias, including historical aliases
+	KeyAlias *string `form:"key_alias,omitempty" json:"key_alias,omitempty"`
+
+	// Supplier 调用时的供应商连接名精确匹配 / Exact recorded supplier connection name
+	Supplier *string `form:"supplier,omitempty" json:"supplier,omitempty"`
+
+	// InboundEndpoint 入站路径精确匹配 / Exact inbound path
+	InboundEndpoint *string `form:"inbound_endpoint,omitempty" json:"inbound_endpoint,omitempty"`
+
+	// CacheHitFilter 网关响应缓存命中或未命中，不是上游提示词缓存；非法值返回400 / Gateway response cache hit or miss, not provider prompt cache; invalid values return 400
+	CacheHitFilter *ListUILogsParamsCacheHitFilter `form:"cache_hit_filter,omitempty" json:"cache_hit_filter,omitempty"`
 }
+
+// ListUILogsParamsCacheHitFilter defines parameters for ListUILogs.
+type ListUILogsParamsCacheHitFilter string
+
+// ListLogFilterOptionsParams defines parameters for ListLogFilterOptions.
+type ListLogFilterOptionsParams struct {
+	// Field 候选字段 / Candidate field
+	Field ListLogFilterOptionsParamsField `form:"field" json:"field"`
+
+	// StartDate 授权范围内查询起始时间 / Authorized query start
+	StartDate string `form:"start_date" json:"start_date"`
+
+	// EndDate 授权范围内查询结束时间，最多366天 / Authorized query end, at most 366 days
+	EndDate string `form:"end_date" json:"end_date"`
+
+	// Q 不区分大小写的字面子串，最多128字符 / Case-insensitive literal substring, up to 128 characters
+	Q *string `form:"q,omitempty" json:"q,omitempty"`
+
+	// Page 页码 1–100，默认 1 / Page 1–100, default 1
+	Page *string `form:"page,omitempty" json:"page,omitempty"`
+
+	// PageSize 每页 1–50 条，默认 50 / Page size 1–50, default 50
+	PageSize *string `form:"page_size,omitempty" json:"page_size,omitempty"`
+}
+
+// ListLogFilterOptionsParamsField defines parameters for ListLogFilterOptions.
+type ListLogFilterOptionsParamsField string
 
 // ListLogsParams defines parameters for ListLogs.
 type ListLogsParams struct {
-	StartDate      *string `form:"start_date,omitempty" json:"start_date,omitempty"`
-	EndDate        *string `form:"end_date,omitempty" json:"end_date,omitempty"`
-	Page           *string `form:"page,omitempty" json:"page,omitempty"`
-	PageSize       *string `form:"page_size,omitempty" json:"page_size,omitempty"`
-	UserId         *string `form:"user_id,omitempty" json:"user_id,omitempty"`
-	TeamId         *string `form:"team_id,omitempty" json:"team_id,omitempty"`
-	ApiKey         *string `form:"api_key,omitempty" json:"api_key,omitempty"`
-	Model          *string `form:"model,omitempty" json:"model,omitempty"`
-	SessionId      *string `form:"session_id,omitempty" json:"session_id,omitempty"`
-	RequestId      *string `form:"request_id,omitempty" json:"request_id,omitempty"`
-	Search         *string `form:"search,omitempty" json:"search,omitempty"`
-	ErrorCode      *string `form:"error_code,omitempty" json:"error_code,omitempty"`
+	// StartDate 支持 YYYY-MM-DD（UTC整天）、YYYY-MM-DD HH:mm:ss（UTC）或 RFC3339；完整结束时间不延长一天 / Accepts UTC dates, UTC date-times, or RFC3339. Timestamp end bounds are not extended by one day.
+	StartDate *string `form:"start_date,omitempty" json:"start_date,omitempty"`
+
+	// EndDate 支持 YYYY-MM-DD（UTC整天）、YYYY-MM-DD HH:mm:ss（UTC）或 RFC3339；完整结束时间不延长一天 / Accepts UTC dates, UTC date-times, or RFC3339. Timestamp end bounds are not extended by one day.
+	EndDate   *string `form:"end_date,omitempty" json:"end_date,omitempty"`
+	Page      *string `form:"page,omitempty" json:"page,omitempty"`
+	PageSize  *string `form:"page_size,omitempty" json:"page_size,omitempty"`
+	UserId    *string `form:"user_id,omitempty" json:"user_id,omitempty"`
+	TeamId    *string `form:"team_id,omitempty" json:"team_id,omitempty"`
+	ApiKey    *string `form:"api_key,omitempty" json:"api_key,omitempty"`
+	Model     *string `form:"model,omitempty" json:"model,omitempty"`
+	SessionId *string `form:"session_id,omitempty" json:"session_id,omitempty"`
+	RequestId *string `form:"request_id,omitempty" json:"request_id,omitempty"`
+	Search    *string `form:"search,omitempty" json:"search,omitempty"`
+
+	// ErrorCode 最终 HTTP 状态精确匹配，100至599；非法非空值返回400 / Exact final HTTP status from 100 to 599; invalid non-empty values return 400
+	ErrorCode *string `form:"error_code,omitempty" json:"error_code,omitempty"`
+
+	// ErrorMessage 完整错误正文中不区分大小写的字面子串；%和_不是通配符 / Case-insensitive literal substring of the full error; % and _ are not wildcards
 	ErrorMessage   *string `form:"error_message,omitempty" json:"error_message,omitempty"`
 	SortBy         *string `form:"sort_by,omitempty" json:"sort_by,omitempty"`
 	SortOrder      *string `form:"sort_order,omitempty" json:"sort_order,omitempty"`
 	StatusFilter   *string `form:"status_filter,omitempty" json:"status_filter,omitempty"`
 	GroupBySession *string `form:"group_by_session,omitempty" json:"group_by_session,omitempty"`
+
+	// KeyHash 密钥 Hash 精确匹配；api_key 仍指密钥 ID / Exact recorded key hash; api_key still means key ID
+	KeyHash *string `form:"key_hash,omitempty" json:"key_hash,omitempty"`
+
+	// KeyAlias 调用时的密钥别名精确匹配，包含历史别名 / Exact recorded key alias, including historical aliases
+	KeyAlias *string `form:"key_alias,omitempty" json:"key_alias,omitempty"`
+
+	// Supplier 调用时的供应商连接名精确匹配 / Exact recorded supplier connection name
+	Supplier *string `form:"supplier,omitempty" json:"supplier,omitempty"`
+
+	// InboundEndpoint 入站路径精确匹配 / Exact inbound path
+	InboundEndpoint *string `form:"inbound_endpoint,omitempty" json:"inbound_endpoint,omitempty"`
+
+	// CacheHitFilter 网关响应缓存命中或未命中，不是上游提示词缓存；非法值返回400 / Gateway response cache hit or miss, not provider prompt cache; invalid values return 400
+	CacheHitFilter *ListLogsParamsCacheHitFilter `form:"cache_hit_filter,omitempty" json:"cache_hit_filter,omitempty"`
 }
+
+// ListLogsParamsCacheHitFilter defines parameters for ListLogs.
+type ListLogsParamsCacheHitFilter string
 
 // TeamDailyUsageParams defines parameters for TeamDailyUsage.
 type TeamDailyUsageParams struct {

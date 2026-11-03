@@ -12,12 +12,14 @@ import { LOG_FILTER_LABELS, type LogsWindow } from "./log_filter_logic";
 import { RequestLogsFilters } from "./RequestLogsFilters";
 import { getRequestLogsTableColumns } from "./RequestLogsTableColumns";
 import { useT } from "@/i18n";
+import { logColumnVisibility } from "./logPresentation";
 
 interface RequestLogsTableProps {
   data: LogEntry[];
   rowCount: number;
   isLoading: boolean;
   isRefreshing: boolean;
+  hasLoadError?: boolean;
   pagination: PaginationState;
   onPaginationChange: OnChangeFn<PaginationState>;
   sorting: SortingState;
@@ -35,6 +37,7 @@ interface RequestLogsTableProps {
   errorsOnly?: boolean;
 }
 
+/** 列表无数据提示；根据是否存在筛选显示调整建议，不将空结果表述为系统从未收到请求。 */
 function RequestLogsEmptyState({ filtered }: { filtered: boolean }) {
   const t = useT();
   return (
@@ -42,11 +45,11 @@ function RequestLogsEmptyState({ filtered }: { filtered: boolean }) {
       <div className="mb-1 flex size-10 items-center justify-center rounded-lg bg-muted">
         <ScrollText className="size-5 text-muted-foreground" />
       </div>
-      <div className="text-sm font-medium text-foreground">{filtered ? t("No matching requests") : t("No requests yet")}</div>
+      <div className="text-sm font-medium text-foreground">
+        {filtered ? t("No matching requests") : t("logsUX.empty")}
+      </div>
       <div className="max-w-xs text-center text-sm text-muted-foreground">
-        {filtered
-          ? t("No requests match your filters for this time range.")
-          : t("Requests proxied through LiteLLM will appear here.")}
+        {filtered ? t("No requests match your filters for this time range.") : t("logsUX.emptyHint")}
       </div>
     </div>
   );
@@ -59,6 +62,7 @@ export function RequestLogsTable({
   rowCount,
   isLoading,
   isRefreshing,
+  hasLoadError = false,
   pagination,
   onPaginationChange,
   sorting,
@@ -80,8 +84,24 @@ export function RequestLogsTable({
 
   const columns = useMemo(() => {
     const deps = { onSessionClick };
-    return getRequestLogsTableColumns(deps);
-  }, [onSessionClick]);
+    const columns = getRequestLogsTableColumns(deps);
+    const order = [
+      "startTime",
+      "model",
+      "status",
+      "diagnosis",
+      "user",
+      "request_duration_ms",
+      "total_tokens",
+      "spend",
+      "session_id",
+      "request_id",
+    ];
+    return columns.sort(
+      (a, b) =>
+        (order.includes(a.id!) ? order.indexOf(a.id!) : 99) - (order.includes(b.id!) ? order.indexOf(b.id!) : 99),
+    );
+  }, [onSessionClick, t]);
 
   const isFiltered = columnFilters.length > 0 || searchValue !== "";
 
@@ -90,6 +110,7 @@ export function RequestLogsTable({
       data={data}
       columns={columns}
       getRowId={(row) => row.request_id}
+      defaultColumnVisibility={logColumnVisibility(errorsOnly)}
       fillHeight
       sortingMode="server"
       sorting={sorting}
@@ -103,7 +124,7 @@ export function RequestLogsTable({
       onColumnFiltersChange={onColumnFiltersChange}
       isLoading={isLoading}
       loadingMessage={t("Loading request logs…")}
-      noDataMessage={<RequestLogsEmptyState filtered={isFiltered} />}
+      noDataMessage={hasLoadError ? t("logsUX.loadFailed") : <RequestLogsEmptyState filtered={isFiltered} />}
       size="compact"
       onRowClick={onRowClick}
       toolbar={(table) => (
@@ -116,8 +137,8 @@ export function RequestLogsTable({
             onRefresh={onRefresh}
             isRefreshing={isRefreshing}
             onOpenFilters={() => setFiltersOpen(true)}
-            filterLabels={LOG_FILTER_LABELS}
-            showViewOptions={false}
+            filterLabels={Object.fromEntries(Object.entries(LOG_FILTER_LABELS).map(([id, key]) => [id, t(key)]))}
+            showViewOptions={true}
           >
             {toolbarChildren}
           </DataTableToolbar>
@@ -126,9 +147,13 @@ export function RequestLogsTable({
             open={filtersOpen}
             onOpenChange={setFiltersOpen}
             title={t("Filters")}
+            applyLabel={t("logsUX.apply")}
+            resetLabel={t("Reset")}
             description={t("Narrow down request logs")}
           >
-            {({ get, set }) => <RequestLogsFilters get={get} set={set} teams={teams} logsWindow={logsWindow} errorsOnly={errorsOnly} />}
+            {({ get, set }) => (
+              <RequestLogsFilters get={get} set={set} teams={teams} logsWindow={logsWindow} errorsOnly={errorsOnly} />
+            )}
           </DataTableFilterDrawer>
         </>
       )}

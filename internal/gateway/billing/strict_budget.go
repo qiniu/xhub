@@ -388,7 +388,8 @@ func budgetAddCharge(c *catalog.Charge, rate catalog.Rate, quantity int) {
 	default:
 		c.Cache += amount
 	}
-	c.Applied = append(c.Applied, catalog.AppliedRate{Measure: rate.Measure, Side: rate.Side, Variant: rate.Variant, UnitSize: rate.UnitSize, USD: rate.USD, Quantity: float64(quantity), SourceKey: rate.SourceKey})
+	// 冻结费率本身的时段须随实测账单保存，避免日志依据请求时间误判固定价；此字段不参与计算。
+	c.Applied = append(c.Applied, catalog.AppliedRate{Measure: rate.Measure, Side: rate.Side, Variant: rate.Variant, UnitSize: rate.UnitSize, USD: rate.USD, Quantity: float64(quantity), SourceKey: rate.SourceKey, RateWindow: rate.Window})
 }
 
 // budgetRoundUp 将预占金额向上舍入到万亿分之一美元；参数必须非负有限，返回金额或溢出错误，不使用放宽比较的epsilon。

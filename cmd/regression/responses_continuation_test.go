@@ -84,8 +84,10 @@ func TestResponsesIncrementalContinuation(t *testing.T) {
 					continue
 				}
 				successes++
-				if amount != expectedCost() {
-					t.Fatalf("续接计费错误: %v", row)
+				// 日志是规范化输出；固定夹具每轮 11 个输入、5 个输出，精确比较十进制金额，不依赖内部浮点尾数。
+				const wantCost = 11*testInputRate + 5*testOutputRate
+				if amount != wantCost {
+					t.Fatalf("续接日志金额错误: 实际=%.18g 预期=%.18g", amount, float64(wantCost))
 				}
 			}
 			if successes != 3 {

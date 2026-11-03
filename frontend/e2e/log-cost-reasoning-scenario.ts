@@ -55,12 +55,16 @@ export function registerLogCostReasoningScenario(locale: "en" | "zh-CN") {
         expect(detail).toMatchObject({ reasoning_effort: effort, prompt_tokens: 10000, completion_tokens: 10 });
         expect(detail.spend).toBeCloseTo(0.00308641, 12);
         expect(detail.metadata.cost_breakdown.total_cost).toBeCloseTo(detail.spend, 12);
+        // 普通固定费率不能仅因请求发生在高峰时间而被标记为分时价。
+        expect(detail.metadata.cost_breakdown.pricing_window).toBeUndefined();
         await stableGoto(page, "/logs");
         await page.getByPlaceholder(tr("Search logs by ID…"), { exact: true }).fill(callID);
         const row = page.getByRole("row").filter({ hasText: callID });
         await expect(row).toContainText("$0.00308641");
         await row.click();
         const dialog = page.getByRole("dialog");
+        await expect(dialog.getByText(tr("Peak hours"), { exact: true })).toHaveCount(0);
+        await expect(dialog.getByText(tr("Off-peak"), { exact: true })).toHaveCount(0);
         await expect(dialog.getByText(tr("logs.reasoningEffort"), { exact: true })).toBeVisible();
         await expect(dialog.getByText(effort ? `${effort} (reasoning_effort=${effort})` : tr("logs.reasoningEffortUnknown"), { exact: true })).toBeVisible();
         await expect(dialog.getByText("$0.00308641", { exact: true }).first()).toBeVisible();
@@ -74,6 +78,31 @@ export function registerLogCostReasoningScenario(locale: "en" | "zh-CN") {
         await page.keyboard.press("Escape");
         await expect(dialog).not.toBeVisible();
       }
+      // 创建带分时费率的真实部署，通过网关产生账单，再核对存储快照与页面标签。
+      const windowModel = model + "-window";
+      /** 构造指定侧和时段的测试费率；返回 API 入参，不修改环境，由测试 finally 清理部署。 */
+      const rate = (side: string, window: string, usd: number) => ({ measure: "token", unit_size: 1, side, window, source_key: `${side}_${window}`, usd });
+      const windowCreated = await page.request.post(GATEWAY + "/model/new", { headers, data: {
+        model_name: windowModel,
+        litellm_params: { model: windowModel, custom_llm_provider: "openai", api_base: UPSTREAM, api_key: "sk-fake", rates: [rate("input", "peak", 0.000002), rate("input", "offpeak", 0.000001), rate("output", "peak", 0.000004), rate("output", "offpeak", 0.000002)] },
+        model_info: { transport: "bypass_openai_chat", endpoint_types: ["chat"], pricing_source: "manual" },
+      } });
+      expect(windowCreated.status(), await windowCreated.text()).toBe(200);
+      extraModelIDs.push((await windowCreated.json()).model_info.id);
+      const windowResponse = await page.request.post(GATEWAY + "/v1/chat/completions", { headers: { Authorization: "Bearer " + key }, data: { model: windowModel, messages: [{ role: "user", content: "Verify time-based pricing." }] } });
+      expect(windowResponse.status(), await windowResponse.text()).toBe(200);
+      const windowCallID = windowResponse.headers()["x-litellm-call-id"];
+      await expect.poll(async () => (await page.request.get(GATEWAY + "/spend/logs/ui/" + windowCallID, { headers })).status()).toBe(200);
+      const windowDetail = await (await page.request.get(GATEWAY + "/spend/logs/ui/" + windowCallID, { headers })).json();
+      const appliedWindow = windowDetail.metadata.cost_breakdown.pricing_window;
+      expect(["peak", "offpeak"]).toContain(appliedWindow);
+      expect(windowDetail.metadata.cost_breakdown.applied.some((r: { rate_window?: string }) => r.rate_window === appliedWindow)).toBe(true);
+      await stableGoto(page, "/logs");
+      await page.getByPlaceholder(tr("Search logs by ID…"), { exact: true }).fill(windowCallID);
+      await page.getByRole("row").filter({ hasText: windowCallID }).click();
+      const windowDialog = page.getByRole("dialog");
+      await expect(windowDialog.getByText(tr(appliedWindow === "peak" ? "Peak hours" : "Off-peak"), { exact: true })).toBeVisible();
+      await page.keyboard.press("Escape");
       // 未定价和显式免费都记 spend=0，必须走真实数据面才能证明页面没有把两者混同。
       for (const pricing of ["unpriced", "free"] as const) {
         const alias = model + "-" + pricing;

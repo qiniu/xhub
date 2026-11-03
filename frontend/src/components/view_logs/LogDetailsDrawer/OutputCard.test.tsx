@@ -62,7 +62,7 @@ describe("OutputCard", () => {
   it("should display cost when provided", () => {
     // 提供非零费用，验证共享标题的两位小数格式；组件由测试框架自动清理。
     render(<OutputCard message={mockMessage} outputCost={2.0025} />);
-    expect(screen.getByText("Cost: $2.00")).toBeInTheDocument();
+    expect(screen.getByText("Cost: $2.0025")).toBeInTheDocument();
   });
 
   it("should copy message content when copy button is clicked", async () => {
@@ -144,7 +144,7 @@ describe("OutputCard", () => {
     render(<OutputCard message={mockMessage} completionTokens={300} outputCost={3.003} />);
     expect(screen.getByText(/Tokens: 300/)).toBeInTheDocument();
     // 同时提供 token 和费用，验证两个指标都展示；组件由测试框架自动清理。
-    expect(screen.getByText("Cost: $3.00")).toBeInTheDocument();
+    expect(screen.getByText("Cost: $3.003")).toBeInTheDocument();
   });
 
   it("should handle collapse toggle when message is null", async () => {

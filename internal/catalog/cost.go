@@ -2,6 +2,7 @@
 package catalog
 
 import (
+	"math"
 	"strconv"
 	"sync"
 
@@ -27,6 +28,20 @@ func Cost(model string, prompt, completion int) (total, input, output float64, o
 	return input + output, input, output, true
 }
 
+// RoundMoney 以最多 15 位有效数字输出美元金额，清理二进制浮点加法尾数。
+// 参数 v 为金额，返回适合响应头和日志 JSON 的数值；只在输出边界调用，不改变计费、结算或历史账单。
+// 有效数字保留极小非零费用；NaN 与无穷值原样返回，由上层校验拒绝。
+func RoundMoney(v float64) float64 {
+	if v == 0 || math.IsNaN(v) || math.IsInf(v, 0) {
+		return v
+	}
+	result, err := strconv.ParseFloat(strconv.FormatFloat(v, 'g', 15, 64), 64)
+	if err != nil {
+		return v
+	}
+	return result
+}
+
 // rates returns the per-token dollar price for input and output from the built-in price map. An unknown model returns ok false.
 // 参数 model（string）：对外模型名，用来选部署和记用量。
 // 调用：仅在 cost.go 内使用
@@ -42,5 +57,5 @@ func rates(model string) (input, output float64, ok bool) {
 // 调用：catalog/model_cost.go、gateway/family/handlers.go、gateway/guard/guard.go、gateway/identity/handlers.go
 // 测试：activity_http_test.go、activity_test.go、log_completeness_test.go
 func Format(v float64) string {
-	return strconv.FormatFloat(v, 'f', -1, 64)
+	return strconv.FormatFloat(RoundMoney(v), 'f', -1, 64)
 }
