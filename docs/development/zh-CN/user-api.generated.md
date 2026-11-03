@@ -645,7 +645,17 @@
       "$ref": "#/components/schemas/LegacyBudget"
     },
     "max_budget_in_team": {
-      "$ref": "#/components/schemas/LegacyBudget",
+      "oneOf": [
+        {
+          "type": "number",
+          "minimum": 0,
+          "nullable": true,
+          "format": "double"
+        },
+        {
+          "type": "string"
+        }
+      ],
       "description": "兼容校验但不写入；不用于设置团队成员预算。"
     },
     "rpm_limit": {
@@ -721,7 +731,17 @@
       "$ref": "#/components/schemas/LegacyBudget"
     },
     "max_budget_in_team": {
-      "$ref": "#/components/schemas/LegacyBudget",
+      "oneOf": [
+        {
+          "type": "number",
+          "minimum": 0,
+          "nullable": true,
+          "format": "double"
+        },
+        {
+          "type": "string"
+        }
+      ],
       "description": "兼容校验但不写入；不用于设置团队成员预算。"
     },
     "rpm_limit": {

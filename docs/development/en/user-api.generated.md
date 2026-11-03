@@ -645,7 +645,17 @@ Reset password under existing authorization and revoke sessions; no password ret
       "$ref": "#/components/schemas/LegacyBudget"
     },
     "max_budget_in_team": {
-      "$ref": "#/components/schemas/LegacyBudget",
+      "oneOf": [
+        {
+          "type": "number",
+          "minimum": 0,
+          "nullable": true,
+          "format": "double"
+        },
+        {
+          "type": "string"
+        }
+      ],
       "description": "Validated compatibility field, not persisted; does not set team member budget."
     },
     "rpm_limit": {
@@ -721,7 +731,17 @@ Reset password under existing authorization and revoke sessions; no password ret
       "$ref": "#/components/schemas/LegacyBudget"
     },
     "max_budget_in_team": {
-      "$ref": "#/components/schemas/LegacyBudget",
+      "oneOf": [
+        {
+          "type": "number",
+          "minimum": 0,
+          "nullable": true,
+          "format": "double"
+        },
+        {
+          "type": "string"
+        }
+      ],
       "description": "Validated compatibility field, not persisted; does not set team member budget."
     },
     "rpm_limit": {

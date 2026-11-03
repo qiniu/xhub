@@ -277,7 +277,7 @@ export interface components {
         CreateUser: {
             max_budget?: components["schemas"]["LegacyBudget"];
             /** @description 兼容校验但不写入；不用于设置团队成员预算。 / Validated compatibility field, not persisted; does not set team member budget. */
-            max_budget_in_team?: components["schemas"]["LegacyBudget"];
+            max_budget_in_team?: (number | null) | string;
             rpm_limit?: components["schemas"]["LegacyRate"];
             tpm_limit?: components["schemas"]["LegacyRate"];
             /** @description 0关闭；1至31按北京时间00:00刷新，短月取末日；省略保留，null非法。 / Zero disables; 1–31 resets at Beijing midnight, clamped to month end; omission preserves, null invalid. */
@@ -303,7 +303,7 @@ export interface components {
         UpdateUser: {
             max_budget?: components["schemas"]["LegacyBudget"];
             /** @description 兼容校验但不写入；不用于设置团队成员预算。 / Validated compatibility field, not persisted; does not set team member budget. */
-            max_budget_in_team?: components["schemas"]["LegacyBudget"];
+            max_budget_in_team?: (number | null) | string;
             rpm_limit?: components["schemas"]["LegacyRate"];
             tpm_limit?: components["schemas"]["LegacyRate"];
             /** @description 0关闭；1至31按北京时间00:00刷新，短月取末日；省略保留，null非法。 / Zero disables; 1–31 resets at Beijing midnight, clamped to month end; omission preserves, null invalid. */
