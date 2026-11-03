@@ -122,7 +122,7 @@ export function registerKeyWrite(kind: "edit" | "block" | "unblock" | "delete", 
           if (kind === "block") await rejected(); else expect((await invoke()).status()).toBe(200);
         }
       }
-      guard.assertOk();
+      await guard.assertOk();
     } finally {
       if (!deleted) expect((await page.request.post(GATEWAY + "/key/delete", {headers, data:{keys:[key.token_id]}})).status()).toBe(200);
       expect((await page.request.get(GATEWAY + "/key/info?key=" + key.token_id, {headers})).status()).toBe(404);
@@ -195,7 +195,7 @@ export function registerModelWrite(kind: "edit" | "connection" | "disable" | "en
         await page.getByRole("dialog").getByRole("button", {name:"删除",exact:true}).click(); expect((await removed).status()).toBe(200); deleted = true;
         await expect(page.getByRole("region", {name:"公开模型 " + name,exact:true})).toHaveCount(0); expect(await stored()).toEqual([]); await denied();
       }
-      guard.assertOk();
+      await guard.assertOk();
     } finally {
       if (!deleted) expect((await page.request.post(GATEWAY + "/model/delete", {headers,data:{id}})).status()).toBe(200);
       expect(await stored(), "自建部署应全部删除").toEqual([]);
@@ -207,6 +207,11 @@ export function registerSC254() {
 
 
 test("team member add is listed", async ({ page }) => {
+  // 记录真实浏览器请求，防止创建表单重新依赖已退役的默认配置；上下文由运行器回收。
+  const retiredDefaults: string[] = [];
+  page.on("request", request => {
+    if (["/get/default_team_settings", "/team/metadata_schema"].some(path => new URL(request.url()).pathname.endsWith(path))) retiredDefaults.push(request.url());
+  });
   const guard = watchGateway(page);
   await loginAdmin(page);
   await page.goto(uiPath("/teams"));
@@ -236,7 +241,8 @@ test("team member add is listed", async ({ page }) => {
   await page.getByRole("option", { name: "e2e-member@example.com" }).click();
   await memberDialog.getByRole("button", { name: t("Add Member") }).click();
   await expect(page.getByText("e2e-member@example.com").first()).toBeVisible({ timeout: 15_000 });
-  guard.assertOk();
+  expect(retiredDefaults, "创建团队不应调用已退役的默认设置").toEqual([]);
+  await guard.assertOk();
 });
 }
 /** 用途：注册独立场景「router fallback update lists the mapping」；无参数、无返回值。前置真实浏览器、私有数据库和本地上游；验证页面及原始契约，保留原套件前后置清理，运行器最终回收专属 schema。异常由 Playwright 单独记录。 */
@@ -387,6 +393,6 @@ test("admin panel saves prompt storage and hides the unused settings", async ({ 
     await page.getByRole("button", {name:t("Save Settings")}).click();
     await expect(page.getByText(t("Spend logs settings updated successfully"))).toBeVisible();
   }
-  guard.assertOk();
+  await guard.assertOk();
 });
 }

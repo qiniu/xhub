@@ -46,6 +46,19 @@ vi.mock("@/utils/jwtUtils", () => ({
 }));
 
 describe("ModelHubTable", () => {
+  /** 管理目录失败必须传给Skill页，不能显示空列表或安装成功；真实组件配合网络替身，统一afterEach恢复环境。 */
+  it("shows a Skill error when the management catalog fails", async () => {
+    mockUseUISettings.mockReturnValue({ data: { values: {} }, isLoading: false });
+    vi.mocked(networking.modelHubCall).mockResolvedValue({ data: [] });
+    vi.mocked(networking.getConfigFieldSetting).mockResolvedValue({ field_value: false });
+    vi.mocked(networking.getAgentsList).mockResolvedValue({ agents: [] });
+    vi.mocked(networking.getClaudeCodePluginsList).mockRejectedValueOnce(new Error("HTTP 500"));
+    renderWithProviders(<ModelHubTable accessToken="fixture" publicPage={false} premiumUser={false} userRole={null} />);
+    await userEvent.click(await screen.findByRole("tab", { name: "Skill Hub" }));
+    expect(await screen.findByRole("alert")).toHaveTextContent("Unable to load the Skill directory");
+    expect(screen.queryByText("No Skill metadata found")).not.toBeInTheDocument();
+  });
+
   const originalLocation = window.location;
 
   beforeEach(() => {

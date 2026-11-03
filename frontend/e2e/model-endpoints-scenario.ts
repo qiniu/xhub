@@ -227,7 +227,7 @@ test("native gemini saves exact protocol and executes in Playground", async ({ p
       expect(disabled.status(), await disabled.text()).toBe(200);
       const denied = await page.request.post(GATEWAY + path, { headers, data: { ...body, model: name } });
       expect(denied.status(), "禁用部署必须拒绝实际调用").toBe(400);
-      guard.assertOk();
+      await guard.assertOk();
     } finally {
       if (id)
         expect((await page.request.post(GATEWAY + "/model/delete", { headers, data: { id } })).status()).toBe(200);
@@ -386,7 +386,7 @@ test("native vertex saves exact protocol and executes in Playground", async ({ p
       expect(disabled.status(), await disabled.text()).toBe(200);
       const denied = await page.request.post(GATEWAY + path, { headers, data: { ...body, model: name } });
       expect(denied.status(), "禁用部署必须拒绝实际调用").toBe(400);
-      guard.assertOk();
+      await guard.assertOk();
     } finally {
       if (id)
         expect((await page.request.post(GATEWAY + "/model/delete", { headers, data: { id } })).status()).toBe(200);
@@ -545,7 +545,7 @@ test("native image_generation saves exact protocol and executes in Playground", 
       expect(disabled.status(), await disabled.text()).toBe(200);
       const denied = await page.request.post(GATEWAY + path, { headers, data: { ...body, model: name } });
       expect(denied.status(), "禁用部署必须拒绝实际调用").toBe(400);
-      guard.assertOk();
+      await guard.assertOk();
     } finally {
       if (id)
         expect((await page.request.post(GATEWAY + "/model/delete", { headers, data: { id } })).status()).toBe(200);
@@ -704,7 +704,7 @@ test("native image_edit saves exact protocol and executes in Playground", async 
       expect(disabled.status(), await disabled.text()).toBe(200);
       const denied = await page.request.post(GATEWAY + path, { headers, data: { ...body, model: name } });
       expect(denied.status(), "禁用部署必须拒绝实际调用").toBe(400);
-      guard.assertOk();
+      await guard.assertOk();
     } finally {
       if (id)
         expect((await page.request.post(GATEWAY + "/model/delete", { headers, data: { id } })).status()).toBe(200);
@@ -818,7 +818,7 @@ test("editing retains the saved chat declaration when endpoint directory is dela
     await page.getByRole("button", { name: "编辑模型", exact: true }).click();
     await expect(endpoint).toBeEnabled();
     await expect(endpoint).toContainText("OpenAI · Chat Completions");
-    guard.assertOk();
+    await guard.assertOk();
   });
 }
 /** 用途：注册独立场景「editing retains the saved chat declaration when endpoint directory is failed」；无参数、无返回值。前置真实浏览器、私有数据库和本地上游；验证页面及原始契约，保留原套件前后置清理，运行器最终回收专属 schema。异常由 Playwright 单独记录。 */
@@ -892,7 +892,7 @@ test("editing retains the saved chat declaration when endpoint directory is fail
     await page.getByRole("button", { name: "编辑模型", exact: true }).click();
     await expect(endpoint).toBeEnabled();
     await expect(endpoint).toContainText("OpenAI · Chat Completions");
-    guard.assertOk();
+    await guard.assertOk();
   });
 }
 /** 用途：注册独立场景「switching supplier clears selection and isolates the model directory」；无参数、无返回值。前置真实浏览器、私有数据库和本地上游；验证页面及原始契约，保留原套件前后置清理，运行器最终回收专属 schema。异常由 Playwright 单独记录。 */
@@ -933,7 +933,7 @@ test("switching supplier clears selection and isolates the model directory", asy
   await expect(upstream).toHaveValue("e2e-unknown-model");
   await expect(endpoint).toBeEnabled();
   await expect(endpoint).toContainText("OpenAI · Chat Completions");
-  guard.assertOk();
+  await guard.assertOk();
 });
 }
 /** 用途：注册独立场景「unknown upstream model persists a manually declared chat endpoint and price」；无参数、无返回值。前置真实浏览器、私有数据库和本地上游；验证页面及原始契约，保留原套件前后置清理，运行器最终回收专属 schema。异常由 Playwright 单独记录。 */
@@ -1006,7 +1006,7 @@ test("unknown upstream model persists a manually declared chat endpoint and pric
       { message: "保存的人工费率必须用于实际账单：8×0.15/1M + 2×0.60/1M" },
     )
     .toBeCloseTo(0.0000024, 10);
-  guard.assertOk();
+  await guard.assertOk();
 });
 }
 /** 用途：注册独立场景「model connection test shows a localized upstream failure」；无参数、无返回值。前置真实浏览器、私有数据库和本地上游；验证页面及原始契约，保留原套件前后置清理，运行器最终回收专属 schema。异常由 Playwright 单独记录。 */
@@ -1189,10 +1189,8 @@ test("upstream-only chat automatically exposes all customer dialogue APIs", asyn
       id = (await created.json()).model_info.id;
       const available = await page.request.get(GATEWAY + "/model/available", { headers });
       const deployment = (await available.json()).data.find((row: { id: string }) => row.id === name);
-      expect(deployment.endpoints).toHaveLength(7);
-      expect(
-        deployment.endpoints.some((entry: { endpoint_id: string }) => entry.endpoint_id.startsWith("bypass:")),
-      ).toBe(false);
+      expect(deployment.endpoints).toHaveLength(8);
+      expect(deployment.endpoints.filter((entry: { endpoint_id: string }) => entry.endpoint_id.startsWith("bypass:")).map((entry: { endpoint_id: string }) => entry.endpoint_id)).toEqual(["bypass:openai-chat"]);
       await stableGoto(page, "/models-and-endpoints");
       await page.getByRole("tab", { name: t("pages.models.all") }).click();
       await openModelDetails(page, name);
@@ -1208,7 +1206,9 @@ test("upstream-only chat automatically exposes all customer dialogue APIs", asyn
       await stableGoto(page, "/playground");
       await page.getByPlaceholder(t("Select a Model"), { exact: true }).click();
       await page.getByRole("option", { name, exact: true }).click();
+      // 从真实端点选择器选择默认透传，并验证原生响应和实际账单。
       for (const target of [
+        { path: "/bypass/openai/v1/chat/completions", google: true },
         { path: "/v1/chat/completions", google: false },
         { path: "/v1/responses", google: false },
         { path: "/v1/messages", google: false },
@@ -1216,8 +1216,8 @@ test("upstream-only chat automatically exposes all customer dialogue APIs", asyn
         { path: "/vertex/v1/models/" + name + ":generateContent", google: true },
       ]) {
         await page.getByPlaceholder(t("Select an endpoint"), { exact: true }).click();
-        await expect(page.getByRole("option")).toHaveCount(7);
-        await page.getByRole("option").filter({ hasText: target.path }).click();
+        await expect(page.getByRole("option")).toHaveCount(8);
+        await page.getByRole("option").filter({ hasText: " · " + target.path }).click();
         // SDK 在代理根地址下使用无 /v1 前缀路径，原生编辑器使用完整注册路径；两者均为网关真实入口。
         const pending = page.waitForResponse(
           (response) =>
@@ -1228,7 +1228,7 @@ test("upstream-only chat automatically exposes all customer dialogue APIs", asyn
         if (target.google) {
           await page
             .getByLabel("原生请求参数")
-            .fill(JSON.stringify({ contents: [{ role: "user", parts: [{ text: "hello" }] }] }));
+            .fill(JSON.stringify(target.path.startsWith("/bypass/") ? { messages: [{ role: "user", content: "Say hello." }], max_tokens: 32 } : { contents: [{ role: "user", parts: [{ text: "hello" }] }] }));
           await page.getByRole("button", { name: "提交请求", exact: true }).click();
         } else {
           await page.getByRole("button", { name: t("Clear Chat"), exact: true }).click();
@@ -1298,10 +1298,8 @@ test("upstream-only responses automatically exposes all customer dialogue APIs",
       id = (await created.json()).model_info.id;
       const available = await page.request.get(GATEWAY + "/model/available", { headers });
       const deployment = (await available.json()).data.find((row: { id: string }) => row.id === name);
-      expect(deployment.endpoints).toHaveLength(7);
-      expect(
-        deployment.endpoints.some((entry: { endpoint_id: string }) => entry.endpoint_id.startsWith("bypass:")),
-      ).toBe(false);
+      expect(deployment.endpoints).toHaveLength(8);
+      expect(deployment.endpoints.filter((entry: { endpoint_id: string }) => entry.endpoint_id.startsWith("bypass:")).map((entry: { endpoint_id: string }) => entry.endpoint_id)).toEqual(["bypass:openai-responses"]);
       await stableGoto(page, "/models-and-endpoints");
       await page.getByRole("tab", { name: t("pages.models.all") }).click();
       await openModelDetails(page, name);
@@ -1317,7 +1315,9 @@ test("upstream-only responses automatically exposes all customer dialogue APIs",
       await stableGoto(page, "/playground");
       await page.getByPlaceholder(t("Select a Model"), { exact: true }).click();
       await page.getByRole("option", { name, exact: true }).click();
+      // 从真实端点选择器选择默认透传，并验证原生响应和实际账单。
       for (const target of [
+        { path: "/bypass/openai/v1/responses", google: false },
         { path: "/v1/chat/completions", google: false },
         { path: "/v1/responses", google: false },
         { path: "/v1/messages", google: false },
@@ -1325,8 +1325,8 @@ test("upstream-only responses automatically exposes all customer dialogue APIs",
         { path: "/vertex/v1/models/" + name + ":generateContent", google: true },
       ]) {
         await page.getByPlaceholder(t("Select an endpoint"), { exact: true }).click();
-        await expect(page.getByRole("option")).toHaveCount(7);
-        await page.getByRole("option").filter({ hasText: target.path }).click();
+        await expect(page.getByRole("option")).toHaveCount(8);
+        await page.getByRole("option").filter({ hasText: " · " + target.path }).click();
         // SDK 在代理根地址下使用无 /v1 前缀路径，原生编辑器使用完整注册路径；两者均为网关真实入口。
         const pending = page.waitForResponse(
           (response) =>
@@ -1407,10 +1407,8 @@ test("upstream-only claude automatically exposes all customer dialogue APIs", as
       id = (await created.json()).model_info.id;
       const available = await page.request.get(GATEWAY + "/model/available", { headers });
       const deployment = (await available.json()).data.find((row: { id: string }) => row.id === name);
-      expect(deployment.endpoints).toHaveLength(7);
-      expect(
-        deployment.endpoints.some((entry: { endpoint_id: string }) => entry.endpoint_id.startsWith("bypass:")),
-      ).toBe(false);
+      expect(deployment.endpoints).toHaveLength(8);
+      expect(deployment.endpoints.filter((entry: { endpoint_id: string }) => entry.endpoint_id.startsWith("bypass:")).map((entry: { endpoint_id: string }) => entry.endpoint_id)).toEqual(["bypass:anthropic-messages"]);
       await stableGoto(page, "/models-and-endpoints");
       await page.getByRole("tab", { name: t("pages.models.all") }).click();
       await openModelDetails(page, name);
@@ -1426,7 +1424,9 @@ test("upstream-only claude automatically exposes all customer dialogue APIs", as
       await stableGoto(page, "/playground");
       await page.getByPlaceholder(t("Select a Model"), { exact: true }).click();
       await page.getByRole("option", { name, exact: true }).click();
+      // 从真实端点选择器选择默认透传，并验证原生响应和实际账单。
       for (const target of [
+        { path: "/bypass/anthropic/v1/messages", google: false },
         { path: "/v1/chat/completions", google: false },
         { path: "/v1/responses", google: false },
         { path: "/v1/messages", google: false },
@@ -1434,8 +1434,8 @@ test("upstream-only claude automatically exposes all customer dialogue APIs", as
         { path: "/vertex/v1/models/" + name + ":generateContent", google: true },
       ]) {
         await page.getByPlaceholder(t("Select an endpoint"), { exact: true }).click();
-        await expect(page.getByRole("option")).toHaveCount(7);
-        await page.getByRole("option").filter({ hasText: target.path }).click();
+        await expect(page.getByRole("option")).toHaveCount(8);
+        await page.getByRole("option").filter({ hasText: " · " + target.path }).click();
         // SDK 在代理根地址下使用无 /v1 前缀路径，原生编辑器使用完整注册路径；两者均为网关真实入口。
         const pending = page.waitForResponse(
           (response) =>

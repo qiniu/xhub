@@ -15,11 +15,19 @@ import (
 )
 
 // TestSearchProbeUsesUpstream 通过真实管理员路由和HTTP搜索夹具验证探测确实发出请求；私有数据库由harness清理。
-// 参数t为测试上下文；夹具核对请求正文与凭据，并用不同供应商响应证明结果不是固定成功。
+// 参数t为测试上下文；从真实发现接口取得供应商，夹具核对请求正文与凭据，并用不同协议响应证明目录和执行一致。
 func TestSearchProbeUsesUpstream(t *testing.T) {
 	h := newHarness(t)
 	admin := h.adminSession()
-	for _, provider := range []string{"tavily", "perplexity", "serper"} {
+	providers := rowsOf(h.ok("GET", "/search_tools/ui/available_providers", admin, nil), "providers")
+	if len(providers) != 3 {
+		t.Fatal("发现目录未列出三个已有适配器", providers)
+	}
+	for _, row := range providers {
+		provider, ok := row["provider_name"].(string)
+		if !ok || provider == "" {
+			t.Fatal("供应商名称契约错误", row)
+		}
 		t.Run(provider, func(t *testing.T) {
 			var calls atomic.Int32
 			upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -213,6 +221,13 @@ func TestSearchProbeStorageFailure(t *testing.T) {
 		catalogSQL(t, h, `DROP FUNCTION IF EXISTS search_probe_read_failure()`)
 	})
 	catalogSQL(t, h, `CREATE VIEW kv AS SELECT kind, id, CASE WHEN kind = 'search_tools' THEN search_probe_read_failure() ELSE body END AS body, created_at FROM search_probe_original_kv`)
+	// 真实SQL故障使配置列表失败，但适配器目录不读取配置，仍须返回既有三个供应商。
+	if out := h.do("GET", "/search_tools/list", admin, nil); out.status != 500 {
+		t.Fatal("故障注入未命中真实配置读取", out.describe())
+	}
+	if rows := rowsOf(h.ok("GET", "/search_tools/ui/available_providers", admin, nil), "providers"); len(rows) != 3 {
+		t.Fatal("配置读取故障污染静态适配器目录", rows)
+	}
 	got := h.do("POST", "/search_tools/test_connection", admin, map[string]any{"search_tool_id": "search-storage-failure"})
 	if got.status != 500 || got.json()["error_type"] != "store_unavailable" || strings.Contains(got.text(), "private-search-sql-error") {
 		t.Fatalf("真实SQL读取故障被隐藏或泄漏: %s", got.describe())

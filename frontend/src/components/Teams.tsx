@@ -17,7 +17,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Plus, Users } from "lucide-react";
 import React, { useEffect, useMemo, useState } from "react";
 import { z } from "zod/v4";
-import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useQueryClient } from "@tanstack/react-query";
 import { PageHeader } from "@/components/shared/PageHeader";
 import { Button as UIButton } from "@/components/ui/button";
 import { teamsTableKeys } from "@/app/(dashboard)/hooks/teams/useTeams";
@@ -27,17 +27,15 @@ import {
   metadataPairsSchema,
   metadataPairsToObject,
 } from "./common_components/MetadataKeyValueFields";
-import { useTeamMetadataSchema } from "@/app/(dashboard)/hooks/teams/useTeamMetadataSchema";
 
 import { fetchAvailableModelsForTeamOrKey } from "./key_team_helpers/fetch_available_models_team_key";
 import type { Team } from "./key_team_helpers/key_list";
 import { toast } from "@/lib/toast";
 import { extractProxyErrorMessage } from "@/lib/http/client";
 import {
-  getBudgetDurationLabel,
   NEVER_RESETS_BUDGET_DURATION,
 } from "./common_components/budget_duration_dropdown";
-import { Organization, getDefaultTeamSettings, getGuardrailsList, teamDeleteCall } from "./networking";
+import { Organization, getGuardrailsList, teamDeleteCall } from "./networking";
 import NumericalInput from "./shared/numerical_input";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 
@@ -204,7 +202,6 @@ const Teams: React.FC<TeamProps> = ({ accessToken, userID, userRole, premiumUser
   const t = useT();
   const { data: organizationsData } = useOrganizations();
   const organizations = organizationsData ?? null;
-  const { data: teamMetadataSchemaFields = [], isLoading: isTeamMetadataSchemaLoading } = useTeamMetadataSchema();
   const queryClient = useQueryClient();
   const refreshTeams = () => queryClient.invalidateQueries({ queryKey: teamsTableKeys.all });
   const [currentOrg] = useState<Organization | null>(null);
@@ -266,17 +263,7 @@ const Teams: React.FC<TeamProps> = ({ accessToken, userID, userRole, premiumUser
   const [loggingSettings, setLoggingSettings] = useState<any[]>([]);
   const [modelAliases, setModelAliases] = useState<{ [key: string]: string }>({});
 
-  const { data: defaultTeamSettings } = useQuery({
-    queryKey: ["defaultTeamSettings"],
-    queryFn: () => getDefaultTeamSettings(accessToken as string),
-    enabled: isTeamModalVisible && accessToken != null,
-    retry: false,
-    staleTime: 60_000,
-  });
-  const defaultBudgetDuration: string | undefined = defaultTeamSettings?.values?.budget_duration ?? undefined;
-  const budgetDurationPlaceholder = defaultBudgetDuration
-    ? `Default: ${getBudgetDurationLabel(defaultBudgetDuration)} (${defaultBudgetDuration})`
-    : "n/a";
+  // 团队默认设置旧接口没有执行端消费者；创建表单不读取它，预算只取显式输入。
 
   // Add this useEffect to fetch guardrails
   useEffect(() => {

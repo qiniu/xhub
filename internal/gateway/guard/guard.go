@@ -221,7 +221,7 @@ func findingJSON(g map[string]any, action string, redacted bool) map[string]any 
 // listGuardrails 合并 YAML 和唯一当前 KV 空间规则，检查名称歧义、继承全局跳过设置并排序。
 // 参数：s：配置和存储宿主；无 KV 时仍加载 YAML。
 // 返回：可执行规则列表；存储错误或歧义配置返回默认拦截哨兵，无配置返回空列表。
-// 调用：Apply、Evaluate；管理列表使用 storedRules。
+// 调用：Apply、Evaluate；管理列表使用 managementService.List，不返回继承后的执行配置。
 // 测试：guard_regression_test.go、engine_test.go。
 func listGuardrails(s Host) []map[string]any {
 	if s == nil || s.RecordStore() == nil {

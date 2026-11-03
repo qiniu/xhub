@@ -281,6 +281,7 @@ export default function AgentBuilderView({
     goToTab("configure");
   };
 
+  /** 保存当前表单草稿并按后台model_info.id选择记录；无参数，失败显示已有翻译提示，不伪造新ID。 */
   const handleSaveAgent = async () => {
     if (!accessToken || !draftName?.trim() || !draftUnderlyingModel) {
       toast.fromError(t("Name and underlying model are required"));
@@ -299,10 +300,8 @@ export default function AgentBuilderView({
         },
         model_info: {},
       });
-      // /model/new returns the row with `model_id` at the top level.
-      // Prefer that id over name-matching so we land on the just-created
-      // agent even when its public name collides with another team's.
-      const createdId: string | null = response?.model_id ?? response?.model_info?.id ?? null;
+      // 使用真实模型契约的嵌套ID定位新记录，不能根据虚构的顶层model_id判断创建结果。
+      const createdId = response.model_info.id;
       const list = await loadAgents();
       const created = createdId
         ? list.find((a) => getAgentModelId(a) === createdId) ?? list.find((a) => a.model_name === draftName.trim())

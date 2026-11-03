@@ -14,6 +14,12 @@ Generated from OpenAPI; no production handler is replaced. See key-contract.md f
 | `POST /key/block` | Block a key | 200, 400, 401, 403, 404, 409, 500, 503 |
 | `POST /key/unblock` | Unblock a key | 200, 400, 401, 403, 404, 409, 500, 503 |
 | `POST /key/delete` | Delete one or more keys | 200, 400, 401, 403, 404, 409, 500, 503 |
+| `POST /key/regenerate` | Rotation immediately revokes the old key and returns new plaintext once | 200, 400, 401, 403, 404, 409, 500, 503 |
+| `POST /key/{key}/regenerate` | Rotation immediately revokes the old key and returns new plaintext once | 200, 400, 401, 403, 404, 409, 500, 503 |
+| `POST /key/{key}/reset_spend` | Reset key spend without deleting usage history or changing personal budget | 200, 400, 401, 403, 404, 409, 500, 503 |
+| `POST /key/bulk_update` | Per-key best effort; failures skipped, updated may be zero; non-atomic, inspect actual result | 200, 400, 401, 403, 404, 409, 500, 503 |
+| `GET /key/aliases` | Deduplicated scoped names with case-insensitive search; page/size/team_id ignored | 200, 400, 401, 403, 404, 409, 500, 503 |
+| `POST /key/health` | Credential authentication only, not model, budget or upstream health | 200, 400, 401, 403, 404, 409, 500, 503 |
 
 ### POST /key/generate
 
@@ -307,6 +313,126 @@ Authorizes every target before deleting individually; storage failure may leave 
   }
 }
 ```
+
+
+### POST /key/regenerate
+
+Rotation immediately revokes the old key and returns new plaintext once
+
+```json
+{
+  "required": true,
+  "content": {
+    "application/json": {
+      "schema": {
+        "$ref": "#/components/schemas/RotateKeyByBody"
+      }
+    }
+  }
+}
+```
+
+
+### POST /key/{key}/regenerate
+
+Rotation immediately revokes the old key and returns new plaintext once
+
+```json
+[
+  {
+    "in": "path",
+    "name": "key",
+    "required": true,
+    "schema": {
+      "type": "string"
+    }
+  }
+]
+```
+
+```json
+{
+  "required": true,
+  "content": {
+    "application/json": {
+      "schema": {
+        "$ref": "#/components/schemas/RotateKey"
+      }
+    }
+  }
+}
+```
+
+
+### POST /key/{key}/reset_spend
+
+Reset key spend without deleting usage history or changing personal budget
+
+```json
+[
+  {
+    "in": "path",
+    "name": "key",
+    "required": true,
+    "schema": {
+      "type": "string"
+    }
+  }
+]
+```
+
+```json
+{
+  "required": true,
+  "content": {
+    "application/json": {
+      "schema": {
+        "$ref": "#/components/schemas/ResetKeySpend"
+      }
+    }
+  }
+}
+```
+
+
+### POST /key/bulk_update
+
+Per-key best effort; failures skipped, updated may be zero; non-atomic, inspect actual result
+
+```json
+{
+  "required": true,
+  "content": {
+    "application/json": {
+      "schema": {
+        "$ref": "#/components/schemas/BulkKeyPatch"
+      }
+    }
+  }
+}
+```
+
+
+### GET /key/aliases
+
+Deduplicated scoped names with case-insensitive search; page/size/team_id ignored
+
+```json
+[
+  {
+    "in": "query",
+    "name": "search",
+    "schema": {
+      "type": "string"
+    }
+  }
+]
+```
+
+
+### POST /key/health
+
+Credential authentication only, not model, budget or upstream health
 
 
 ## Schemas
@@ -1562,5 +1688,399 @@ Authorizes every target before deleting individually; storage failure may leave 
       ]
     }
   }
+}
+```
+
+### RotateKey
+
+```json
+{
+  "type": "object",
+  "properties": {
+    "key": {
+      "type": "string",
+      "minLength": 1
+    },
+    "key_alias": {
+      "type": "string"
+    },
+    "models": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "nullable": true,
+      "description": "Empty array or all-model sentinel inherits without widening parent permissions."
+    },
+    "max_budget": {
+      "$ref": "#/components/schemas/BudgetInput"
+    },
+    "rpm_limit": {
+      "$ref": "#/components/schemas/RateInput"
+    },
+    "tpm_limit": {
+      "$ref": "#/components/schemas/RateInput"
+    },
+    "route_template_id": {
+      "type": "string",
+      "nullable": true,
+      "description": "Omission preserves; null or empty clears and inherits."
+    },
+    "duration": {
+      "type": "string",
+      "nullable": true,
+      "description": "Optional at creation; omission, null or empty preserves expiry on update; nonempty must be a valid positive duration such as 30d."
+    },
+    "key_type": {
+      "type": "string",
+      "nullable": true,
+      "enum": [
+        "llm_api",
+        "",
+        null
+      ]
+    },
+    "allowed_routes": {
+      "type": "array",
+      "nullable": true,
+      "items": {
+        "type": "string",
+        "enum": [
+          "llm_api_routes"
+        ]
+      }
+    },
+    "auto_rotate": {
+      "type": "boolean",
+      "nullable": true,
+      "enum": [
+        false,
+        null
+      ]
+    },
+    "rotation_interval": {
+      "type": "string",
+      "nullable": true,
+      "enum": [
+        "",
+        null
+      ]
+    },
+    "grace_period": {
+      "type": "string",
+      "nullable": true,
+      "enum": [
+        "",
+        null
+      ]
+    },
+    "grace_period_seconds": {
+      "type": "integer",
+      "enum": [
+        0
+      ],
+      "description": "Only immediate old key revocation supported"
+    }
+  },
+  "x-go-type": "map[string]json.RawMessage"
+}
+```
+
+### RotateKeyByBody
+
+```json
+{
+  "type": "object",
+  "properties": {
+    "key": {
+      "type": "string",
+      "minLength": 1
+    },
+    "key_alias": {
+      "type": "string"
+    },
+    "models": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "nullable": true,
+      "description": "Empty array or all-model sentinel inherits without widening parent permissions."
+    },
+    "max_budget": {
+      "$ref": "#/components/schemas/BudgetInput"
+    },
+    "rpm_limit": {
+      "$ref": "#/components/schemas/RateInput"
+    },
+    "tpm_limit": {
+      "$ref": "#/components/schemas/RateInput"
+    },
+    "route_template_id": {
+      "type": "string",
+      "nullable": true,
+      "description": "Omission preserves; null or empty clears and inherits."
+    },
+    "duration": {
+      "type": "string",
+      "nullable": true,
+      "description": "Optional at creation; omission, null or empty preserves expiry on update; nonempty must be a valid positive duration such as 30d."
+    },
+    "key_type": {
+      "type": "string",
+      "nullable": true,
+      "enum": [
+        "llm_api",
+        "",
+        null
+      ]
+    },
+    "allowed_routes": {
+      "type": "array",
+      "nullable": true,
+      "items": {
+        "type": "string",
+        "enum": [
+          "llm_api_routes"
+        ]
+      }
+    },
+    "auto_rotate": {
+      "type": "boolean",
+      "nullable": true,
+      "enum": [
+        false,
+        null
+      ]
+    },
+    "rotation_interval": {
+      "type": "string",
+      "nullable": true,
+      "enum": [
+        "",
+        null
+      ]
+    },
+    "grace_period": {
+      "type": "string",
+      "nullable": true,
+      "enum": [
+        "",
+        null
+      ]
+    },
+    "grace_period_seconds": {
+      "type": "integer",
+      "enum": [
+        0
+      ],
+      "description": "Only immediate old key revocation supported"
+    }
+  },
+  "x-go-type": "map[string]json.RawMessage",
+  "required": [
+    "key"
+  ]
+}
+```
+
+### ResetKeySpend
+
+```json
+{
+  "type": "object",
+  "properties": {
+    "reset_to": {
+      "$ref": "#/components/schemas/BudgetInput"
+    }
+  },
+  "required": [],
+  "additionalProperties": false
+}
+```
+
+### BulkKeyPatch
+
+```json
+{
+  "type": "object",
+  "properties": {
+    "key": {
+      "type": "string",
+      "minLength": 1
+    },
+    "key_alias": {
+      "type": "string"
+    },
+    "models": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "nullable": true,
+      "description": "Empty array or all-model sentinel inherits without widening parent permissions."
+    },
+    "max_budget": {
+      "$ref": "#/components/schemas/BudgetInput"
+    },
+    "rpm_limit": {
+      "$ref": "#/components/schemas/RateInput"
+    },
+    "tpm_limit": {
+      "$ref": "#/components/schemas/RateInput"
+    },
+    "route_template_id": {
+      "type": "string",
+      "nullable": true,
+      "description": "Omission preserves; null or empty clears and inherits."
+    },
+    "duration": {
+      "type": "string",
+      "nullable": true,
+      "description": "Optional at creation; omission, null or empty preserves expiry on update; nonempty must be a valid positive duration such as 30d."
+    },
+    "key_type": {
+      "type": "string",
+      "nullable": true,
+      "enum": [
+        "llm_api",
+        "",
+        null
+      ]
+    },
+    "allowed_routes": {
+      "type": "array",
+      "nullable": true,
+      "items": {
+        "type": "string",
+        "enum": [
+          "llm_api_routes"
+        ]
+      }
+    },
+    "auto_rotate": {
+      "type": "boolean",
+      "nullable": true,
+      "enum": [
+        false,
+        null
+      ]
+    },
+    "rotation_interval": {
+      "type": "string",
+      "nullable": true,
+      "enum": [
+        "",
+        null
+      ]
+    },
+    "grace_period": {
+      "type": "string",
+      "nullable": true,
+      "enum": [
+        "",
+        null
+      ]
+    },
+    "keys": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    }
+  },
+  "x-go-type": "map[string]json.RawMessage"
+}
+```
+
+### BulkKeyResult
+
+```json
+{
+  "type": "object",
+  "properties": {
+    "updated": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "keys": {
+      "type": "array",
+      "items": {
+        "$ref": "#/components/schemas/KeyRecord"
+      }
+    }
+  },
+  "required": [
+    "updated",
+    "keys"
+  ],
+  "additionalProperties": false
+}
+```
+
+### KeyAliases
+
+```json
+{
+  "type": "object",
+  "properties": {
+    "aliases": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "total_count": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "current_page": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "total_pages": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "size": {
+      "type": "integer",
+      "minimum": 0
+    }
+  },
+  "required": [
+    "aliases",
+    "total_count",
+    "current_page",
+    "total_pages",
+    "size"
+  ],
+  "additionalProperties": false
+}
+```
+
+### KeyHealth
+
+```json
+{
+  "type": "object",
+  "properties": {
+    "key": {
+      "type": "string",
+      "enum": [
+        "healthy"
+      ]
+    },
+    "logging_callbacks": {
+      "nullable": true,
+      "enum": [
+        null
+      ]
+    }
+  },
+  "required": [
+    "key",
+    "logging_callbacks"
+  ],
+  "additionalProperties": false
 }
 ```

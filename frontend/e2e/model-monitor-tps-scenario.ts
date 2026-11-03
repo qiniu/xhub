@@ -5,7 +5,7 @@ import { translate } from "../src/i18n/translate";
 import { GATEWAY, UPSTREAM, loginAdmin, sessionBearer, stableGoto } from "./helpers";
 
 /** 注册输出 TPS 浏览器闭环；locale 为界面语言，无返回值。
- * 前置隔离网关、数据库、Redis 与分帧本地上游；验证实际调用、日志公式、监控样本和旧指标升级保持账单。
+ * 前置隔离网关、数据库、Redis 与分帧本地上游；验证实际调用、日志公式、监控样本、可选 TPS 列和旧指标升级保持账单。
  * finally 恢复迁移状态并删除本场景模型/Key，原始调用由运行器删除私有 schema；不使用外部供应商。 */
 export function registerModelMonitorTPSScenario(locale: "en" | "zh-CN") {
   test("output TPS ignores input and synchronous calls " + locale, async ({ page }, info) => {
@@ -71,6 +71,14 @@ export function registerModelMonitorTPSScenario(locale: "en" | "zh-CN") {
       await stableGoto(page, "/logs");
       await page.getByPlaceholder(tr("Search logs by ID…"), { exact: true }).fill(calls[0]);
       const logRow = page.getByRole("row").filter({ hasText: calls[0] });
+      // TPS 属于按需查看的诊断列；通过用户实际使用的列菜单开启，不能假设默认表头包含所有指标。
+      await expect(page.getByRole("columnheader", { name: tr("requestMetrics.tps"), exact: true })).toHaveCount(0);
+      await page.getByRole("button", { name: tr("Columns"), exact: true }).click();
+      const tpsOption = page.getByRole("menuitemcheckbox", { name: tr("requestMetrics.tps"), exact: true });
+      await expect(tpsOption).not.toBeChecked();
+      await tpsOption.click();
+      await expect(tpsOption).toBeChecked();
+      await page.keyboard.press("Escape");
       await expect(page.getByRole("columnheader", { name: tr("requestMetrics.tps"), exact: true })).toBeVisible();
       const tpsColumn = (await page.getByRole("columnheader").allTextContents()).findIndex(text => text.trim() === tr("requestMetrics.tps"));
       expect(tpsColumn).toBeGreaterThanOrEqual(0);

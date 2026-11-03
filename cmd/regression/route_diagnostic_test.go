@@ -44,6 +44,11 @@ func TestRouteDiagnosticContract(t *testing.T) {
 			if stringField(err, "type") != tc.kind || !strings.Contains(stringField(err, "message"), tc.message) {
 				t.Fatalf("%s 分类错误: %s", tc.model, r.describe())
 			}
+			detail := logDetail(t, h, owner.session, r.header("x-litellm-call-id"))
+			route := detail["metadata"].(map[string]any)["upstream_response"].(map[string]any)["routing"].(map[string]any)
+			if route["endpoint"] != "chat" || route["available"] != float64(0) {
+				t.Fatalf("路由拒绝未保存排除事实: %v", route)
+			}
 			if r.headers.Get("x-litellm-call-id") == "" {
 				t.Fatal("拒绝请求缺失关联日志 ID")
 			}
@@ -61,4 +66,23 @@ func TestRouteDiagnosticContract(t *testing.T) {
 		t.Fatal("修复后响应未按11输入5输出记录费用")
 	}
 	h.ok("POST", "/model/delete", admin, map[string]any{"id": id})
+}
+
+// TestNativeRouteDiagnosticContract 验证原生入口协议不兼容时保存真实候选和排除原因，不误报供应商失败。
+// 前置私有PG、仅Chat部署及真实会话，拒绝不出站；harness清理所有配置和日志。
+func TestNativeRouteDiagnosticContract(t *testing.T) {
+	h := newHarness(t, chatDeployment("native-diagnostic"))
+	admin := h.adminSession()
+	r := h.do("POST", "/bypass/anthropic/v1/messages", admin, map[string]any{"model": "native-diagnostic", "messages": []any{}, "max_tokens": 16})
+	if r.status != 400 {
+		t.Fatal(r.describe())
+	}
+	detail := logDetail(t, h, admin, r.header("x-litellm-call-id"))
+	route := detail["metadata"].(map[string]any)["upstream_response"].(map[string]any)["routing"].(map[string]any)
+	if route["compatible"] != float64(0) || route["matched"] != float64(1) || len(route["candidates"].([]any)) != 1 {
+		t.Fatalf("原生协议排除证据错误: %v", route)
+	}
+	if len(h.upstreamCalls()) != 0 {
+		t.Fatal("不兼容原生接口仍访问上游")
+	}
 }

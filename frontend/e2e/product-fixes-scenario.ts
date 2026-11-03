@@ -11,7 +11,7 @@ import { translate } from "../src/i18n/translate";
  * 返回：日志详情对象；调用方断言费用、缓存和归属字段。超时或详情接口失败时由 expect.poll 报错。
  * 调用：缓存和继承路由用例；只读日志，不改变配额或业务数据。
  */
-async function waitForLog(request: APIRequestContext, headers: Record<string, string>, callID: string): Promise<any> {
+export async function waitForLog(request: APIRequestContext, headers: Record<string, string>, callID: string): Promise<any> {
   let row: any;
   await expect.poll(async () => {
     const response = await request.get(GATEWAY + "/spend/logs/ui/" + callID, { headers });
@@ -75,10 +75,10 @@ test("browser cache flush restores a billed miss after a free hit", async ({ pag
     const flushFromBrowser = async () => {
       await stableGoto(page, "/caching");
       const flushed = page.waitForResponse((response) => new URL(response.url()).pathname === "/flushall" && response.request().method() === "POST");
-      await page.getByRole("button", { name: "清空", exact: true }).click();
+      await page.getByRole("button", { name: "清空当前进程缓存", exact: true }).click();
       const response = await flushed;
       expect(response.status(), await response.text()).toBe(200);
-      await expect(page.getByTestId("column-result")).toContainText("cache flushed");
+      await expect(page.getByTestId("cache-result")).toContainText("当前进程的响应缓存已清空");
     };
 
     await flushFromBrowser();

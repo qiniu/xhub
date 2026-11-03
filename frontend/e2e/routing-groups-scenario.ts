@@ -260,7 +260,7 @@ export function registerSC123() {
       expect((await deletion).status()).toBe(200);
       await expect(deletionRow).toHaveCount(0);
       templateID = "";
-      guard.assertOk();
+      await guard.assertOk();
     } finally {
       if (key)
         expect(

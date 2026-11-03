@@ -42,10 +42,11 @@ describe("getSkillHubTableColumns", () => {
     expect(link).toHaveAttribute("href", "https://github.com/org/pdf-tools");
   });
 
-  it("shows Public for enabled skills and Draft for disabled ones", () => {
+  /** enabled只表示配置值；渲染启停两行，不能显示Public/Draft，测试框架清理DOM。 */
+  it("shows configuration status without claiming publication", () => {
     renderTable([mockSkill, { ...mockSkill, id: "skill-2", name: "draft-skill", enabled: false }]);
-    expect(screen.getByText("Public")).toBeInTheDocument();
-    expect(screen.getByText("Draft")).toBeInTheDocument();
+    expect(screen.getByText("Configuration enabled")).toBeInTheDocument();
+    expect(screen.getByText("Configuration disabled")).toBeInTheDocument();
   });
 
   it("opens the skill detail when the name is clicked", async () => {

@@ -42,7 +42,7 @@ for (const vendor of vendors) {
       await page.goto(uiPath("/logs"));
       await expect(page.getByText(alias, { exact: true }).first()).toBeVisible();
       recordChain(`real vendor=${vendor} model=${model} answer=ok usage=positive billing=snapshot`);
-      guard.assertOk();
+      await guard.assertOk();
     });
   }
 }

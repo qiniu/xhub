@@ -52,11 +52,16 @@ export const publicEndpointGroup = (entry?: EndpointDescriptor): "openai" | "ver
   if (entry.protocol === "anthropic-messages") return "claude";
   return "openai";
 };
-/** 由注册上游生成默认公开入口；参数为目录和执行配置，返回兼容的标准入口 ID。
+/** 判断目录项是否默认开放；参数为目录项，返回是否无需手动勾选。
+ * 表单展示和默认声明共用；调用方必须先做协议兼容检查，其他 Bypass 保留显式选择。 */
+export const automaticEndpoint = (entry: EndpointDescriptor): boolean =>
+  publicEndpointGroup(entry) !== "bypass" ||
+  ["bypass:openai-chat", "bypass:openai-responses", "bypass:anthropic-messages"].includes(entry.id);
+/** 由注册上游生成默认公开入口；参数为目录和执行配置，返回兼容的标准入口及默认对话透传 ID。
  * 仅原生 Bypass 可用时选择其明确登记的入口；未知配置返回空数组，不猜测协议或迁移数据。 */
 export const defaultEndpoints = (entries: EndpointDescriptor[], transport?: EndpointTransport): string[] => {
   const supported = entries.filter(entry => compatibleEndpoint(entry, transport));
-  const standard = supported.filter(entry => publicEndpointGroup(entry) !== "bypass");
+  const standard = supported.filter(automaticEndpoint);
   return (standard.length ? standard : supported.filter(entry => entry.id === transport?.endpoint_id)).map(entry => entry.id);
 };
 

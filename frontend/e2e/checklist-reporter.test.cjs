@@ -183,3 +183,208 @@ test('reporter 的 lint 使用真实 Node 环境且保留错误门禁', async ()
   const [esm] = await eslint.lintText('const fs = require("node:fs"); export default fs;', {filePath: path.join(__dirname, 'runtime-fixture.ts')});
   assert.ok(esm.messages.some(item => item.ruleId === '@typescript-eslint/no-require-imports'), 'CommonJS 规则不得扩散到 TypeScript');
 });
+
+/** 目的：Swagger双语结果必须绑定清单中的独立文件和精确标题；模拟通过/失败，验证登记及失败不可计通过；无外部资源。 */
+test('Swagger双语场景登记且失败不能假通过', () => {
+  const {evaluateScenarios} = require('./scenario-coverage.cjs');
+  const catalog = require('./scenario-catalog.json');
+  const results = [['en','en'],['zh-CN','zh']].map(([file,lang]) => ({file:`e2e/scenarios/regression/swagger-reference-${file}.test.ts`, title:`Swagger reference real user lifecycle ${lang}`, status:'passed'}));
+  assert.deepEqual(evaluateScenarios(catalog,results).unregistered,[]);
+  assert.equal(evaluateScenarios(catalog,results).passed,2);
+  results[0].status='failed';
+  assert.equal(evaluateScenarios(catalog,results).passed,1);
+});
+
+/** 护栏双语闭环必须进入固定全量分母；前置真实目录，验证精确文件/标题与未知项拒绝，无外部数据。 */
+test('护栏管理双语场景登记且不漏入全量分母', () => {
+  const fs = require('node:fs');
+  const path = require('node:path');
+  const catalog = require('./scenario-catalog.json');
+  const {evaluateScenarios} = require('./scenario-coverage.cjs');
+  const results = ['en','zh-CN'].map(locale => ({
+    file: `e2e/scenarios/regression/guard-management-service-${locale}.test.ts`,
+    title: 'guard management service lifecycle ' + locale, status: 'passed',
+  }));
+  for (const result of results) assert.ok(fs.existsSync(path.join(__dirname,'..',result.file)));
+  const report = evaluateScenarios(catalog, results);
+  assert.deepEqual(report.unregistered, []);
+  assert.equal(report.passed, 2);
+  assert.equal(catalog.filter(row => results.some(result => result.file === row.file && result.title === row.title)).length, 2);
+  assert.equal(evaluateScenarios(catalog, [{...results[0],title:'unknown guard scenario'}]).unregistered.length, 1);
+});
+
+/** 策略双语场景须登记精确标题，防止局部通过而全量漏测；只读清单无待清理资源。 */
+test('policy configuration scenarios are registered', () => {
+  const fs = require('node:fs');
+  const path = require('node:path');
+  const {evaluateScenarios} = require('./scenario-coverage.cjs');
+  const catalog = require('./scenario-catalog.json');
+  const results = ['en','zh-CN'].map(locale => {
+    const file = `e2e/scenarios/regression/policy-config-service-${locale}.test.ts`;
+    assert.ok(fs.existsSync(path.join(__dirname, '..', file)));
+    return {file, title: 'policy configuration persistence and isolation ' + locale, status: 'passed'};
+  });
+  const report = evaluateScenarios(catalog, results);
+  assert.deepEqual(report.unregistered, []);
+  assert.equal(report.passed, 2);
+});
+
+/** 访问组双语场景须登记精确标题，防止局部通过而全量漏测；只读清单无待清理资源。 */
+test('access group configuration scenarios are registered', () => {
+  const fs = require('node:fs');
+  const path = require('node:path');
+  const {evaluateScenarios} = require('./scenario-coverage.cjs');
+  const catalog = require('./scenario-catalog.json');
+  const results = ['en','zh-CN'].map(locale => {
+    const file = `e2e/scenarios/regression/access-group-config-service-${locale}.test.ts`;
+    assert.ok(fs.existsSync(path.join(__dirname, '..', file)));
+    return {file, title: 'access group configuration persistence and isolation ' + locale, status: 'passed'};
+  });
+  const report = evaluateScenarios(catalog, results);
+  assert.deepEqual(report.unregistered, []);
+  assert.equal(report.passed, 2);
+});
+
+/** 向量库配置双语场景须登记精确标题，防止局部通过而全量漏测；只读清单无待清理资源。 */
+test('vector configuration scenarios are registered', () => {
+  const fs = require('node:fs');
+  const path = require('node:path');
+  const {evaluateScenarios} = require('./scenario-coverage.cjs');
+  const catalog = require('./scenario-catalog.json');
+  const results = ['en','zh-CN'].map(locale => {
+    const file = `e2e/scenarios/regression/vector-config-service-${locale}.test.ts`;
+    assert.ok(fs.existsSync(path.join(__dirname, '..', file)));
+    return {file, title: 'vector configuration persistence and isolation ' + locale, status: 'passed'};
+  });
+  const report = evaluateScenarios(catalog, results);
+  assert.deepEqual(report.unregistered, []);
+  assert.equal(report.passed, 2);
+});
+
+/** 双语标签真实场景必须登记独立文件和真实标题，避免新测试通过却未进入业务清单；纯内存校验无需清理。 */
+test('tag catalog scenarios are registered independently', () => {
+ const {evaluateScenarios}=require('./scenario-coverage.cjs');
+ const catalog=require('./scenario-catalog.json');
+ const results=['en','zh-CN'].map(locale=>({file:`e2e/scenarios/regression/tag-catalog-${locale}.test.ts`,title:`tag catalog read after write ${locale}`,status:'passed'}));
+ const report=evaluateScenarios(catalog,results);
+ assert.deepEqual(report.unregistered,[]);
+ assert.equal(report.passed,2);
+});
+
+/** 双语元数据配置真实场景必须登记独立文件和真实标题，避免新测试通过却未进入业务清单；纯内存校验无需清理。 */
+test('metadata configuration scenarios are registered independently', () => {
+ const {evaluateScenarios}=require('./scenario-coverage.cjs');
+ const catalog=require('./scenario-catalog.json');
+ const results=['en','zh-CN'].map(locale=>({file:`e2e/scenarios/regression/metadata-config-service-${locale}.test.ts`,title:`metadata configuration lifecycle ${locale}`,status:'passed'}));
+ const report=evaluateScenarios(catalog,results);
+ assert.deepEqual(report.unregistered,[]);
+ assert.equal(report.passed,2);
+});
+
+/** C1双语流程必须进入固定业务分母；检查精确标题、文件和失败不可计通过，无业务数据需清理。 */
+test('service auxiliary scenarios are registered and failures stay failures', () => {
+  const fs = require('node:fs');
+  const path = require('node:path');
+  const {evaluateScenarios} = require('./scenario-coverage.cjs');
+  const catalog = require('./scenario-catalog.json');
+  const results = ['en','zh-CN'].map(locale => {
+    const file = `e2e/scenarios/regression/service-aux-${locale}.test.ts`;
+    assert.ok(fs.existsSync(path.join(__dirname, '..', file)));
+    return {file, title: 'service auxiliary boundaries preserve configuration and chat ' + locale, status: 'passed'};
+  });
+  assert.deepEqual(evaluateScenarios(catalog, results).unregistered, []);
+  assert.equal(evaluateScenarios(catalog, results).passed, 2);
+  results[0].status = 'failed';
+  assert.equal(evaluateScenarios(catalog, results).passed, 1);
+});
+
+/** 双语身份场景须登记精确标题，防止局部运行通过却漏出全量门禁；无外部数据。 */
+test('identity alias scenarios are registered', () => {
+  const fs = require('node:fs');
+  const path = require('node:path');
+  const {evaluateScenarios} = require('./scenario-coverage.cjs');
+  const catalog = require('./scenario-catalog.json');
+  const results = ['en','zh-CN'].map(locale => {
+    const file = `e2e/scenarios/regression/identity-alias-${locale}.test.ts`;
+    assert.ok(fs.existsSync(path.join(__dirname, '..', file)));
+    return {file, title: 'identity aliases reject false success without breaking login and chat ' + locale, status: 'passed'};
+  });
+  const report = evaluateScenarios(catalog, results);
+  assert.deepEqual(report.unregistered, []);
+  assert.equal(report.passed, 2);
+});
+
+/** 运维边界双语场景须登记精确标题，避免发布门禁漏测；仅检查注册信息，无外部数据。 */
+test('runtime operation scenarios are registered', () => {
+  const fs = require('node:fs');
+  const path = require('node:path');
+  const {evaluateScenarios} = require('./scenario-coverage.cjs');
+  const catalog = require('./scenario-catalog.json');
+  const results = ['en','zh-CN'].map(locale => {
+    const file = `e2e/scenarios/regression/runtime-operation-${locale}.test.ts`;
+    assert.ok(fs.existsSync(path.join(__dirname, '..', file)));
+    return {file, title: 'runtime operations reject false success without changing configuration and chat ' + locale, status: 'passed'};
+  });
+  const report = evaluateScenarios(catalog, results);
+  assert.deepEqual(report.unregistered, []);
+  assert.equal(report.passed, 2);
+});
+
+/** 设置边界双语场景须登记精确标题，避免发布门禁漏测；仅检查注册信息，无外部数据。 */
+test('settings operation scenarios are registered', () => {
+  const fs = require('node:fs');
+  const path = require('node:path');
+  const {evaluateScenarios} = require('./scenario-coverage.cjs');
+  const catalog = require('./scenario-catalog.json');
+  const results = ['en','zh-CN'].map(locale => {
+    const file = `e2e/scenarios/regression/settings-operation-${locale}.test.ts`;
+    assert.ok(fs.existsSync(path.join(__dirname, '..', file)));
+    return {file, title: 'unsupported settings preserve configuration and chat ' + locale, status: 'passed'};
+  });
+  const report = evaluateScenarios(catalog, results);
+  assert.deepEqual(report.unregistered, []);
+  assert.equal(report.passed, 2);
+});
+
+/** 模型旧入口双语场景须登记精确标题，避免发布门禁漏测；仅检查注册信息，无外部数据。 */
+test('model alias scenarios are registered', () => {
+  const fs = require('node:fs');
+  const path = require('node:path');
+  const {evaluateScenarios} = require('./scenario-coverage.cjs');
+  const catalog = require('./scenario-catalog.json');
+  const results = ['en','zh-CN'].map(locale => {
+    const file = `e2e/scenarios/regression/model-alias-${locale}.test.ts`;
+    assert.ok(fs.existsSync(path.join(__dirname, '..', file)));
+    return {file, title: 'legacy model aliases preserve real deployment and chat ' + locale, status: 'passed'};
+  });
+  const report = evaluateScenarios(catalog, results);
+  assert.deepEqual(report.unregistered, []);
+  assert.equal(report.passed, 2);
+});
+
+/** 双语统计边界必须进入场景清单；失败不可算通过，纯注册检查无外部数据。 */
+test('analytics boundary scenarios are registered and failures stay failures', () => {
+ const fs=require('node:fs'),path=require('node:path');
+ const {evaluateScenarios}=require('./scenario-coverage.cjs');const catalog=require('./scenario-catalog.json');
+ const results=['en','zh-CN'].map(locale=>{const file=`e2e/scenarios/regression/analytics-boundary-${locale}.test.ts`;assert.ok(fs.existsSync(path.join(__dirname,'..',file)));return {file,title:'analytics aliases preserve billed chat and logs '+locale,status:'passed'};});
+ assert.deepEqual(evaluateScenarios(catalog,results).unregistered,[]);assert.equal(evaluateScenarios(catalog,results).passed,2);results[0].status='failed';assert.equal(evaluateScenarios(catalog,results).passed,1);
+});
+
+/** 组合场景必须匹配真实标题并进入报告；静态夹具验证双语注册和不存在/错名会被报告，不创建业务数据。 */
+test('phase4 combined scenarios are registered with exact titles', () => {
+  const fs = require('node:fs');
+  const path = require('node:path');
+  const {evaluateScenarios} = require('./scenario-coverage.cjs');
+  const catalog = require('./scenario-catalog.json');
+  const results = ['en', 'zh-CN'].map(locale => {
+    const file = `e2e/scenarios/regression/stage4-combined-${locale}.test.ts`;
+    assert.ok(fs.existsSync(path.join(__dirname, '..', file)));
+    return {file, title: 'stage4 combined boundaries preserve chat and logs ' + locale, status: 'passed'};
+  });
+  const report = evaluateScenarios(catalog, results);
+  assert.deepEqual(report.unregistered, []);
+  assert.equal(report.passed, 2);
+  const wrong = evaluateScenarios(catalog, results.map(row => ({...row, title: row.title + '-wrong'})));
+  assert.equal(wrong.passed, 0);
+  assert.equal(wrong.unregistered.length, 2);
+});

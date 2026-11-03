@@ -68,6 +68,8 @@ type AppliedRate struct {
 	USD       float64 `json:"usd"`
 	Quantity  float64 `json:"quantity"`
 	SourceKey string  `json:"source_key,omitempty"`
+	// RateWindow 是实际命中费率自身的时段；空值表示旧快照没有记录，不能由调用时间反推。
+	RateWindow string `json:"rate_window,omitempty"`
 	// Fallback marks a rate that was chosen for the model rather than for the
 	// call. Some models quote a side only in qualified variants - per second of
 	// 1080p versus 4K video, per picture made from text versus from an image -
@@ -937,14 +939,15 @@ func chargeRate(charge *Charge, rate Rate, quantity float64) {
 		charge.Output += amount
 	}
 	charge.Applied = append(charge.Applied, AppliedRate{
-		Measure:   rate.Measure,
-		Side:      side,
-		Variant:   rate.Variant,
-		UnitSize:  rate.UnitSize,
-		USD:       rate.USD,
-		Quantity:  quantity,
-		SourceKey: rate.SourceKey,
-		Fallback:  rate.Fallback,
+		Measure:    rate.Measure,
+		Side:       side,
+		Variant:    rate.Variant,
+		UnitSize:   rate.UnitSize,
+		USD:        rate.USD,
+		Quantity:   quantity,
+		SourceKey:  rate.SourceKey,
+		RateWindow: rate.Window,
+		Fallback:   rate.Fallback,
 	})
 }
 

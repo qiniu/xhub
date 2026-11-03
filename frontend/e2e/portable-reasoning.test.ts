@@ -91,7 +91,7 @@ for (const locale of ["zh-CN", "en"] as const) for (const stream of [false, true
         await page.getByPlaceholder(t("Select an endpoint"), { exact: true }).click();
         await page
           .getByRole("option")
-          .filter({ hasText: /\/v1\/responses$/ })
+          .filter({ hasText: /(?:^|\s)\/v1\/responses$/ })
           .click();
         const session = page.getByRole("switch", { name: t("Use API session management") });
         if (await session.isChecked()) await session.click();

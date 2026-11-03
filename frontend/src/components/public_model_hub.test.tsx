@@ -1,4 +1,4 @@
-import { getPublicModelHubInfo } from "./networking";
+import { getPublicModelHubInfo, skillHubPublicCall } from "./networking";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { describe, it, expect, vi, beforeAll, beforeEach } from "vitest";
 import { render, screen, waitFor, within, fireEvent } from "@testing-library/react";
@@ -477,4 +477,13 @@ it("preserves administrator supplied model hub names", async () => {
   renderHub();
   expect(await screen.findByText("Contact user@berri.ai")).toBeInTheDocument();
   expect(screen.getByText("LiteLLM Guide")).toBeInTheDocument();
+});
+
+/** 公共Skill请求失败不能展示正常空目录；真实组件及请求替身，模型目录正常，框架清理DOM和查询上下文。 */
+it("shows Skill loading failure instead of an empty catalog", async () => {
+  vi.mocked(skillHubPublicCall).mockRejectedValueOnce(new Error("HTTP 404"));
+  renderHub();
+  await userEvent.click(await screen.findByRole("tab", { name: "Skill Hub" }));
+  expect(await screen.findByRole("alert")).toHaveTextContent("Unable to load the Skill directory");
+  expect(screen.queryByText("No Skill metadata found")).not.toBeInTheDocument();
 });

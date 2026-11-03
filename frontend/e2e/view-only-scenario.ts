@@ -42,7 +42,7 @@ export function registerMemberWrite(kind: "model" | "organization" | "user", tit
       requireAuthorizationError(denied.status(), await denied.json(), 403);
       expect(await snapshot(), kind + " 越权不能改变持久化数据").toEqual(before);
       expect(await count(), "越权不能调用上游").toEqual(upstream);
-      guard.assertOk();
+      await guard.assertOk();
     } finally {
       const deleted = await page.request.post(GATEWAY + "/user/delete", { headers, data: { user_id: user.user_id } });
       expect(deleted.status(), await deleted.text()).toBe(200);

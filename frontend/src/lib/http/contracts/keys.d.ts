@@ -159,6 +159,126 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/key/regenerate": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * 轮换成功立即撤销旧Key，仅本次返回新明文 / Rotation immediately revokes the old key and returns new plaintext once
+         * @description 轮换成功立即撤销旧Key，仅本次返回新明文 / Rotation immediately revokes the old key and returns new plaintext once
+         */
+        post: operations["regenerateKey"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/key/{key}/regenerate": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * 轮换成功立即撤销旧Key，仅本次返回新明文 / Rotation immediately revokes the old key and returns new plaintext once
+         * @description 轮换成功立即撤销旧Key，仅本次返回新明文 / Rotation immediately revokes the old key and returns new plaintext once
+         */
+        post: operations["regenerateKeyByPath"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/key/{key}/reset_spend": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * 重置Key计费计数，不删除历史用量或改变个人预算 / Reset key spend without deleting usage history or changing personal budget
+         * @description 重置Key计费计数，不删除历史用量或改变个人预算 / Reset key spend without deleting usage history or changing personal budget
+         */
+        post: operations["resetKeySpend"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/key/bulk_update": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * 逐项尝试，失败项跳过；updated可为0；不是原子操作，必须比较实际结果 / Per-key best effort; failures skipped, updated may be zero; non-atomic, inspect actual result
+         * @description 逐项尝试，失败项跳过；updated可为0；不是原子操作，必须比较实际结果 / Per-key best effort; failures skipped, updated may be zero; non-atomic, inspect actual result
+         */
+        post: operations["bulkUpdateKeys"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/key/aliases": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * 授权范围内去重名称，search不区分大小写；page/size/team_id忽略 / Deduplicated scoped names with case-insensitive search; page/size/team_id ignored
+         * @description 授权范围内去重名称，search不区分大小写；page/size/team_id忽略 / Deduplicated scoped names with case-insensitive search; page/size/team_id ignored
+         */
+        get: operations["listKeyAliases"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/key/health": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * 仅验证凭据鉴权存活，不证明模型、额度或上游健康 / Credential authentication only, not model, budget or upstream health
+         * @description 仅验证凭据鉴权存活，不证明模型、额度或上游健康 / Credential authentication only, not model, budget or upstream health
+         */
+        post: operations["checkKeyHealth"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -437,6 +557,103 @@ export interface components {
         UnblockedKey: {
             /** @enum {boolean} */
             blocked: false;
+        };
+        RotateKey: {
+            key?: string;
+            key_alias?: string;
+            /** @description 空数组或全部模型哨兵表示继承，不扩大父级权限 / Empty array or all-model sentinel inherits without widening parent permissions. */
+            models?: string[] | null;
+            max_budget?: components["schemas"]["BudgetInput"];
+            rpm_limit?: components["schemas"]["RateInput"];
+            tpm_limit?: components["schemas"]["RateInput"];
+            /** @description 省略保留；null/空串清除并继承 / Omission preserves; null or empty clears and inherits. */
+            route_template_id?: string | null;
+            /** @description 创建可省略；更新省略/null/空串保留旧期限，不清除；非空须有效正时长如30d / Optional at creation; omission, null or empty preserves expiry on update; nonempty must be a valid positive duration such as 30d. */
+            duration?: string | null;
+            /** @enum {string|null} */
+            key_type?: "llm_api" | "" | null;
+            allowed_routes?: "llm_api_routes"[] | null;
+            /** @enum {boolean|null} */
+            auto_rotate?: false | null;
+            /** @enum {string|null} */
+            rotation_interval?: "" | null;
+            /** @enum {string|null} */
+            grace_period?: "" | null;
+            /**
+             * @description 仅支持立即撤销旧Key / Only immediate old key revocation supported
+             * @enum {integer}
+             */
+            grace_period_seconds?: 0;
+        };
+        RotateKeyByBody: {
+            key: string;
+            key_alias?: string;
+            /** @description 空数组或全部模型哨兵表示继承，不扩大父级权限 / Empty array or all-model sentinel inherits without widening parent permissions. */
+            models?: string[] | null;
+            max_budget?: components["schemas"]["BudgetInput"];
+            rpm_limit?: components["schemas"]["RateInput"];
+            tpm_limit?: components["schemas"]["RateInput"];
+            /** @description 省略保留；null/空串清除并继承 / Omission preserves; null or empty clears and inherits. */
+            route_template_id?: string | null;
+            /** @description 创建可省略；更新省略/null/空串保留旧期限，不清除；非空须有效正时长如30d / Optional at creation; omission, null or empty preserves expiry on update; nonempty must be a valid positive duration such as 30d. */
+            duration?: string | null;
+            /** @enum {string|null} */
+            key_type?: "llm_api" | "" | null;
+            allowed_routes?: "llm_api_routes"[] | null;
+            /** @enum {boolean|null} */
+            auto_rotate?: false | null;
+            /** @enum {string|null} */
+            rotation_interval?: "" | null;
+            /** @enum {string|null} */
+            grace_period?: "" | null;
+            /**
+             * @description 仅支持立即撤销旧Key / Only immediate old key revocation supported
+             * @enum {integer}
+             */
+            grace_period_seconds?: 0;
+        };
+        ResetKeySpend: {
+            reset_to?: components["schemas"]["BudgetInput"];
+        };
+        BulkKeyPatch: {
+            key?: string;
+            key_alias?: string;
+            /** @description 空数组或全部模型哨兵表示继承，不扩大父级权限 / Empty array or all-model sentinel inherits without widening parent permissions. */
+            models?: string[] | null;
+            max_budget?: components["schemas"]["BudgetInput"];
+            rpm_limit?: components["schemas"]["RateInput"];
+            tpm_limit?: components["schemas"]["RateInput"];
+            /** @description 省略保留；null/空串清除并继承 / Omission preserves; null or empty clears and inherits. */
+            route_template_id?: string | null;
+            /** @description 创建可省略；更新省略/null/空串保留旧期限，不清除；非空须有效正时长如30d / Optional at creation; omission, null or empty preserves expiry on update; nonempty must be a valid positive duration such as 30d. */
+            duration?: string | null;
+            /** @enum {string|null} */
+            key_type?: "llm_api" | "" | null;
+            allowed_routes?: "llm_api_routes"[] | null;
+            /** @enum {boolean|null} */
+            auto_rotate?: false | null;
+            /** @enum {string|null} */
+            rotation_interval?: "" | null;
+            /** @enum {string|null} */
+            grace_period?: "" | null;
+            keys?: string[];
+        };
+        BulkKeyResult: {
+            updated: number;
+            keys: components["schemas"]["KeyRecord"][];
+        };
+        KeyAliases: {
+            aliases: string[];
+            total_count: number;
+            current_page: number;
+            total_pages: number;
+            size: number;
+        };
+        KeyHealth: {
+            /** @enum {string} */
+            key: "healthy";
+            /** @enum {unknown|null} */
+            logging_callbacks: null;
         };
     };
     responses: {
@@ -761,6 +978,190 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["DeletedKeys"];
+                };
+            };
+            400: components["responses"]["Error400"];
+            401: components["responses"]["Error401"];
+            403: components["responses"]["Error403"];
+            404: components["responses"]["Error404"];
+            409: components["responses"]["Error409"];
+            500: components["responses"]["Error500"];
+            503: components["responses"]["Error503"];
+        };
+    };
+    regenerateKey: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RotateKeyByBody"];
+            };
+        };
+        responses: {
+            /** @description 实际结果 / Actual result */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CreatedKey"];
+                };
+            };
+            400: components["responses"]["Error400"];
+            401: components["responses"]["Error401"];
+            403: components["responses"]["Error403"];
+            404: components["responses"]["Error404"];
+            409: components["responses"]["Error409"];
+            500: components["responses"]["Error500"];
+            503: components["responses"]["Error503"];
+        };
+    };
+    regenerateKeyByPath: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                key: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RotateKey"];
+            };
+        };
+        responses: {
+            /** @description 实际结果 / Actual result */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CreatedKey"];
+                };
+            };
+            400: components["responses"]["Error400"];
+            401: components["responses"]["Error401"];
+            403: components["responses"]["Error403"];
+            404: components["responses"]["Error404"];
+            409: components["responses"]["Error409"];
+            500: components["responses"]["Error500"];
+            503: components["responses"]["Error503"];
+        };
+    };
+    resetKeySpend: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                key: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ResetKeySpend"];
+            };
+        };
+        responses: {
+            /** @description 实际结果 / Actual result */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["KeyRecord"];
+                };
+            };
+            400: components["responses"]["Error400"];
+            401: components["responses"]["Error401"];
+            403: components["responses"]["Error403"];
+            404: components["responses"]["Error404"];
+            409: components["responses"]["Error409"];
+            500: components["responses"]["Error500"];
+            503: components["responses"]["Error503"];
+        };
+    };
+    bulkUpdateKeys: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["BulkKeyPatch"];
+            };
+        };
+        responses: {
+            /** @description 实际结果 / Actual result */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BulkKeyResult"];
+                };
+            };
+            400: components["responses"]["Error400"];
+            401: components["responses"]["Error401"];
+            403: components["responses"]["Error403"];
+            404: components["responses"]["Error404"];
+            409: components["responses"]["Error409"];
+            500: components["responses"]["Error500"];
+            503: components["responses"]["Error503"];
+        };
+    };
+    listKeyAliases: {
+        parameters: {
+            query?: {
+                search?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description 实际结果 / Actual result */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["KeyAliases"];
+                };
+            };
+            400: components["responses"]["Error400"];
+            401: components["responses"]["Error401"];
+            403: components["responses"]["Error403"];
+            404: components["responses"]["Error404"];
+            409: components["responses"]["Error409"];
+            500: components["responses"]["Error500"];
+            503: components["responses"]["Error503"];
+        };
+    };
+    checkKeyHealth: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description 实际结果 / Actual result */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["KeyHealth"];
                 };
             };
             400: components["responses"]["Error400"];

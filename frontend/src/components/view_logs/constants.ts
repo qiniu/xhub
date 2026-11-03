@@ -1,16 +1,17 @@
-import { t } from "@/i18n";
 export const ERROR_CODE_OPTIONS: { label: string; value: string }[] = [
-  { label: "400 - Bad Request", value: "400" },
-  { label: "401 - Invalid Authentication", value: "401" },
-  { label: "403 - Permission Denied", value: "403" },
-  { label: "404 - Not Found", value: "404" },
-  { label: "408 - Request Timeout", value: "408" },
-  { label: "422 - Unprocessable Entity", value: "422" },
-  { label: "429 - Rate Limited", value: "429" },
-  { label: "500 - Internal Server Error", value: "500" },
-  { label: "502 - Bad Gateway", value: "502" },
-  { label: "503 - Service Unavailable", value: "503" },
-  { label: "529 - Overloaded", value: "529" },
+  { label: "logsUX.code400", value: "400" },
+  { label: "logsUX.code401", value: "401" },
+  { label: "logsUX.code403", value: "403" },
+  { label: "logsUX.code404", value: "404" },
+  { label: "logsUX.code408", value: "408" },
+  { label: "logsUX.code413", value: "413" },
+  { label: "logsUX.code422", value: "422" },
+  { label: "logsUX.code499", value: "499" },
+  { label: "logsUX.code429", value: "429" },
+  { label: "logsUX.code500", value: "500" },
+  { label: "logsUX.code502", value: "502" },
+  { label: "logsUX.code503", value: "503" },
+  { label: "logsUX.code529", value: "529" },
 ];
 
 /** Call types that represent MCP tool invocations (shared across columns, index, drawer). */
@@ -23,10 +24,11 @@ export const AGENT_CALL_TYPES = ["asend_message"];
 export const BATCH_CALL_TYPES = ["acreate_batch", "create_batch", "aretrieve_batch", "retrieve_batch"];
 
 export const QUICK_SELECT_OPTIONS: { label: string; value: number; unit: string }[] = [
-  { /** 渲染时读取当前语言，避免初始化冻结文案；无写入副作用。 */ get label() { return t("Last Minute"); }, value: 1, unit: "minutes" },
-  { /** 渲染时读取当前语言，避免初始化冻结文案；无写入副作用。 */ get label() { return t("Last 15 Minutes"); }, value: 15, unit: "minutes" },
-  { /** 渲染时读取当前语言，避免初始化冻结文案；无写入副作用。 */ get label() { return t("Last Hour"); }, value: 1, unit: "hours" },
-  { /** 渲染时读取当前语言，避免初始化冻结文案；无写入副作用。 */ get label() { return t("Last 4 Hours"); }, value: 4, unit: "hours" },
-  { /** 渲染时读取当前语言，避免初始化冻结文案；无写入副作用。 */ get label() { return t("Last 24 Hours"); }, value: 24, unit: "hours" },
-  { /** 渲染时读取当前语言，避免初始化冻结文案；无写入副作用。 */ get label() { return t("Last 7 Days"); }, value: 7, unit: "days" },
+  { label: "logsUX.lastMinute", value: 1, unit: "minutes" },
+  { label: "logsUX.last15Minutes", value: 15, unit: "minutes" },
+  { label: "logsUX.lastHour", value: 1, unit: "hours" },
+  { label: "logsUX.last4Hours", value: 4, unit: "hours" },
+  { label: "logsUX.last24Hours", value: 24, unit: "hours" },
+  { label: "logsUX.last7Days", value: 7, unit: "days" },
+  { label: "logsUX.last14Days", value: 14, unit: "days" },
 ];

@@ -159,6 +159,8 @@ func serveBypassCreate(h dpcontract.Bypass, w http.ResponseWriter, r *http.Reque
 	}
 	pool, settings = fallbacks.SelectAffinity(&plan, pool, alias, list, state, settings)
 	if plan.Required && len(pool) == 0 {
+		diagnosis := dprouting.DiagnoseRoute(h.Models(), list, alias, hit.Transport.ID, settings, state, nil, false)
+		dpdiagnostics.RecordEarlyFailure(w, &dpdiagnostics.UpstreamDiagnostics{Routing: diagnosis.Snapshot(settings, plan.Target.DeploymentID)})
 		util.WriteTypedError(w, r.URL.Path, 409, "unavailable", "response deployment unavailable")
 		return
 	}
@@ -167,6 +169,8 @@ func serveBypassCreate(h dpcontract.Bypass, w http.ResponseWriter, r *http.Reque
 		return
 	}
 	if len(pool) == 0 {
+		diagnosis := dprouting.DiagnoseRoute(h.Models(), list, alias, hit.Transport.ID, settings, state, nil, false)
+		dpdiagnostics.RecordEarlyFailure(w, &dpdiagnostics.UpstreamDiagnostics{Routing: diagnosis.Snapshot(settings, "")})
 		util.WriteTypedError(w, r.URL.Path, 400, "invalid_request", "model not found: "+alias)
 		return
 	}
@@ -201,6 +205,7 @@ func serveBypassCreate(h dpcontract.Bypass, w http.ResponseWriter, r *http.Reque
 			}
 			// 原生入口与统一入口使用相同的连接归属检查，连接更新不能继承旧密文或游标。
 			if !dprouting.BindConnection(&plan, candidate) {
+				dpdiagnostics.RecordEarlyFailure(w, &dpdiagnostics.UpstreamDiagnostics{Routing: map[string]any{"required_deployment_id": plan.Target.DeploymentID, "required_deployment_reason": "connection_identity_changed_or_missing"}})
 				util.WriteTypedError(w, r.URL.Path, 409, "unavailable", "response deployment unavailable")
 				return
 			}
@@ -253,10 +258,19 @@ func serveBypassCreate(h dpcontract.Bypass, w http.ResponseWriter, r *http.Reque
 				dep = candidate
 				selectedID = router.CooldownID(rawDep)
 				if err != nil {
+					if response.Diagnostics == nil {
+						response.Diagnostics = &dpdiagnostics.UpstreamDiagnostics{}
+					}
+					phase := "upstream_request"
+					if response.Diagnostics.StatusCode != 0 {
+						phase = "response_transfer"
+					}
+					response.Diagnostics.Failure = dpdiagnostics.ObserveFailure(r.Context(), phase, err, time.Since(start))
 					// 原生入口同样区分客户端取消与供应商超时：只检查入站上下文，
 					// 不能检查上面已释放的尝试上下文；取消记499并停止重试，不污染共享冷却。
 					if r.Context().Err() != nil {
-						h.RememberExchange(callID, r, raw, []byte("client request canceled"))
+						response.Diagnostics.Failure.Kind = "request_canceled"
+						h.RememberExchange(callID, r, raw, []byte("request connection canceled; initiator unknown"))
 						note := dataplaneNote(hit, dep, plan.SessionID, time.Since(start))
 						applyStreamTiming(&note, response, start)
 						note.Upstream = response.Diagnostics

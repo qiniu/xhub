@@ -17,6 +17,12 @@ type DualCache struct {
 	c *lru.Cache[string, CachedResponse]
 }
 
+// Ready 判断进程缓存是否已初始化；无参数，由管理状态与清理入口调用，返回可用状态。
+// nil接收器及零值均不可用；只读固定实例指针，不增删条目、不访问外部网络。
+func (c *DualCache) Ready() bool {
+	return c != nil && c.c != nil
+}
+
 // CachedResponse 保存成功正文及其实际模型权限范围；命中时必须按当前身份复核 Models，
 // 不能把首次调用的授权当成永久许可。模型/组名仅供权限检查，不提交会话偏好。
 type CachedResponse struct {

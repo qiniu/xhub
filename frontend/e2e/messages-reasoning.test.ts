@@ -63,7 +63,7 @@ test("messages bridge preserves public thinking and file tool continuation", asy
       await page.getByPlaceholder(t("Select a Model"), { exact: true }).click();
       await page.getByRole("option", { name, exact: true }).click();
       await page.getByPlaceholder(t("Select an endpoint"), { exact: true }).click();
-      await page.getByRole("option").filter({ hasText: /\/v1\/messages$/ }).click();
+      await page.getByRole("option").filter({ hasText: /(?:^|\s)\/v1\/messages$/ }).click();
       await page.getByPlaceholder(t("Type your message... (Shift+Enter for new line)")).filter({ visible: true }).fill("Reply with a short greeting.");
       const pending = page.waitForResponse(r => /\/messages$/.test(new URL(r.url()).pathname) && r.request().method() === "POST");
       await page.getByRole("button", { name: t("Send message") }).click();

@@ -101,14 +101,18 @@ func TestServeMgmtRejectsInvalidJSON(t *testing.T) {
 type catalogMemoryStore struct {
 	rows      map[string]map[string]any
 	getErr    error
+	listErr   error
 	putErr    error
 	deleteErr map[string]error
 	putCalls  int
 	deleteIDs []string
 }
 
-// ListKV 返回单测内存记录的副本；kind 保留接口形状，单个测试只操作一种资源，空集合无副作用。
+// ListKV 返回单测内存记录副本或注入的列表故障；kind 保留接口形状，无外部副作用，失败不能伪报空列表。
 func (s *catalogMemoryStore) ListKV(string) ([]map[string]any, error) {
+	if s.listErr != nil {
+		return nil, s.listErr
+	}
 	rows := make([]map[string]any, 0, len(s.rows))
 	for _, row := range s.rows {
 		rows = append(rows, cloneCatalogTestObject(row))

@@ -28,7 +28,7 @@ export const pageDescriptionsEn = {
   api_ref: "Browse API documentation and endpoints",
   "model-hub-table": "Explore available AI models and providers",
   "learning-resources": "Access tutorials and documentation",
-  caching: "Configure response caching and coordination Redis settings",
+  caching: "Inspect and clear the current process response cache",
   "transform-request": "Set up request transformation rules",
   "cost-tracking": "Track and analyze API costs",
   "ui-theme": "Customize dashboard appearance",

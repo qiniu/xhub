@@ -105,12 +105,12 @@ test('quality runs the real Go selection and cleanup gate checks', () => {
   const steps = workflow.jobs['workflow-regression'].steps;
   assert.ok(steps.some(item => item.uses === 'actions/setup-go@v5'));
   const commands = steps.map(item => item.run || '').join('\n');
-  for (const name of ['scripts.test_regression_results', 'scripts.test_test_gates', 'scripts.test_e2e_summary', 'scripts.test_e2e_model_endpoints', 'frontend/e2e/checklist-reporter.test.cjs']) {
+  for (const name of ['scripts.test_regression_results', 'scripts.test_test_gates', 'scripts.test_e2e_summary', 'scripts.test_e2e_model_endpoints', 'frontend/e2e/checklist-reporter.test.cjs', 'frontend/e2e/guard-resource-cleanup.test.cjs', 'frontend/e2e/guard-resource-fixture.test.cjs']) {
     assert.ok(commands.includes(name), `缺少门禁测试 ${name}`);
   }
 });
 
-/** 前置真实质量工作流；契约漂移和真实数据库回归必须独立阻断，不能 continue-on-error，产物与清理必须保留；只读无清理。 */
+/** 前置真实质量工作流；契约和供应商轮换的真实数据库回归必须独立阻断，不能 continue-on-error，产物与清理必须保留；只读无清理。 */
 test('supplier pilot requires generation, schema validation and real HTTP regression', () => {
   const job = workflow.jobs['supplier-contract'];
   assert.ok(job, '必须注册供应商契约作业');
@@ -121,7 +121,7 @@ test('supplier pilot requires generation, schema validation and real HTTP regres
   assert.equal(step('supplier-contract', 'Validate OpenAPI and Go types').run, 'go test -race ./contracts/suppliers');
   assert.match(step('supplier-contract', 'Prepare contract database').run, /docker compose up -d --wait postgres redis/);
   assert.equal(step('supplier-contract', 'Run real supplier contract regression').run,
-    "bash scripts/regression.sh '^TestSupplierContract'");
+    "bash scripts/regression.sh '^TestSupplier(Contract|Service)'");
   assert.ok(job.steps.every(item => !item['continue-on-error']), '门禁不得忽略失败');
   const cleanup = job.steps.find(item => item.run === 'docker compose down -v');
   assert.equal(cleanup.if, 'always()');
@@ -141,7 +141,7 @@ test('user contract requires generation, permissions and real budget regression'
   assert.equal(step('user-contract', 'Validate OpenAPI and Go types').run, 'go test -race ./contracts/users');
   assert.match(step('user-contract', 'Prepare contract database').run, /docker compose up -d --wait postgres redis/);
   assert.equal(step('user-contract', 'Run real user contract regression').run,
-    "bash scripts/regression.sh '^Test(UserContract|UserBulkBudget|UserMonthlyBudget|UserEnterpriseIdentity|SoftBudgetAllocationHTTP)'");
+    "bash scripts/regression.sh '^Test(IdentityAliasBoundary|UserContract|UserBulkBudget|UserMonthlyBudget|UserEnterpriseIdentity|SoftBudgetAllocationHTTP)'");
   assert.ok(job.steps.every(item => !item['continue-on-error']), '门禁不得忽略失败');
   const cleanup = job.steps.find(item => item.run === 'docker compose down -v');
   assert.equal(cleanup.if, 'always()');
@@ -170,10 +170,10 @@ test('key contract requires generation, permissions and real budget regression',
   assert.equal(artifact.with['if-no-files-found'], 'error');
 });
 
-/** 四个真实 HTTP/PG 契约作业必须产出各自覆盖率并上传 backend，避免处理器执行证据遗漏。
+/** 五个真实 HTTP/PG 契约作业必须产出各自覆盖率并上传 backend，避免处理器执行证据遗漏。
  * 前置真实 YAML；检查插桩、报告校验、精确上传与诊断归档，失败不允许跳过，纯配置测试无数据需清理。 */
 test('real contract regression coverage is validated archived and uploaded', () => {
-  for (const area of ['supplier', 'user', 'key', 'model']) {
+  for (const area of ['supplier', 'user', 'key', 'model', 'usage']) {
     const job = `${area}-contract`;
     const profile = `coverage/${area}-contract.out`;
     const run = step(job, `Run real ${area} contract regression`);
@@ -184,7 +184,7 @@ test('real contract regression coverage is validated archived and uploaded', () 
     assert.ok(check.run.includes(`go tool cover -func=${profile}`), '报告必须可以被 Go 解析');
     const upload = step(job, 'Upload regression coverage');
     assert.equal(upload.uses, 'codecov/codecov-action@v5');
-    assert.equal(upload.with.files, profile);
+    assert.equal(upload.with.files, area === 'supplier' ? profile + ',coverage/search-config.out' : profile);
     assert.equal(upload.with.flags, 'backend');
     assert.equal(upload.with.name, job);
     assert.equal(upload.with.disable_search, true);
@@ -205,7 +205,7 @@ test('real contract regression coverage is validated archived and uploaded', () 
 /** 执行工作流中的真实 shell 校验，确认缺失、空文件和损坏的覆盖率报告均失败。
  * 前置本机 Go/bash；每个作业在临时目录注入报告故障，验证非零退出；finally 删除目录，无仓库或数据库副作用。 */
 test('regression coverage validation rejects missing empty and malformed reports', () => {
-  for (const area of ['supplier', 'user', 'key', 'model']) {
+  for (const area of ['supplier', 'user', 'key', 'model', 'usage']) {
     const directory = mkdtempSync(join(tmpdir(), 'xhub-coverage-gate-'));
     try {
       mkdirSync(join(directory, 'coverage'));
@@ -232,6 +232,585 @@ test('model contract requires generated types and real deployment regression', (
   assert.equal(step('model-contract', 'Test generator drift rejection').run, 'node --test frontend/scripts/gen-model-contract.test.mjs');
   assert.equal(step('model-contract', 'Validate OpenAPI and Go types').run, 'go test -race ./contracts/models');
   assert.equal(step('model-contract', 'Run real model contract regression').run, "bash scripts/regression.sh '^Test(ModelContract|OfficialCredentialSupportsNativeModel)'");
+  assert.ok(job.steps.every(item => !item['continue-on-error']));
+  assert.equal(job.steps.find(item => item.run === 'docker compose down -v').if, 'always()');
+});
+
+/** 日志契约作业必须实际执行HTTP/PG验证及清单漂移检查；只读YAML，不接触线上。 */
+test('usage contract includes real traffic and inventory gates', () => {
+ assert.equal(step('usage-contract', 'Run real usage contract regression').run, "bash scripts/regression.sh '^Test(UsageContractRealTraffic|BodyReadDiagnostics|LogExactTimeWindow|ClientCancellationDoesNotCoolDeployment|AnthropicTokenCountContract|ErrorLogFilterContract|UpstreamDiagnosticsContract|RouteDiagnosticContract|NativeRouteDiagnosticContract|ResponsesNativeToolContinuation|StreamReadFailureDiagnostics|ResponsesFailedStreamCannotContinue|ResponseConnectionChanges|LogFilterOptionsScope|MonitorRoutingAndFallback|MonitorEnvironmentIdentity|ModelMonitorCurrentAliasScope|ModelMonitorCatalogPermissions|ModelMonitorHTTP)$'");
+ assert.match(step('usage-contract', 'Check core migration inventory').run, /contract-inventory.mjs --check/);
+});
+
+/** 兼容门禁必须读取真实历史、固定工具、运行失败反例并阻断WARN；只读，不降低原覆盖率门槛。 */
+test('compatibility gate compares historical contracts with real pinned checker', () => {
+  const job = workflow.jobs['contract-compatibility'];
+  assert.equal(job.steps.find(s => s.uses === 'actions/checkout@v4').with['fetch-depth'], 0);
+  assert.equal(step('contract-compatibility', 'Install pinned compatibility checker').run,
+    'go install github.com/oasdiff/oasdiff@v1.11.7');
+  assert.match(step('contract-compatibility', 'Test compatibility failure gates').run, /node --test .*compatibility.test.mjs/);
+  const comparison = step('contract-compatibility', 'Compare contracts with baseline');
+  assert.match(comparison.env.CONTRACT_BASE, /pull_request.base.sha/);
+  assert.match(comparison.run, /set -euo pipefail/);
+  assert.match(comparison.run, /check-contract-compatibility.mjs "\$base"/);
+  assert.equal(codecov.coverage.status.patch.default.target, '70%');
+});
+
+/** 搜索配置服务复用真实数据库作业；验证回归与覆盖率上传不可遗漏，不降低门禁，只读无需清理。 */
+test('search configuration service requires real regression coverage', () => {
+  const run = step('supplier-contract', 'Run real search configuration regression');
+  assert.equal(run.run, "bash scripts/regression.sh '^Test(SearchConfigService|SearchProbe|SearchProviderDiscovery|DiscoveryBoundary|CatalogIntegrity)'");
+  assert.equal(run.env.XHUB_REGRESSION_COVERPROFILE, 'coverage/search-config.out');
+  assert.match(step('supplier-contract', 'Validate regression coverage').run, /test -s coverage\/search-config.out/);
+  const upload = step('supplier-contract', 'Upload regression coverage');
+  assert.ok(upload.with.files.split(',').includes('coverage/search-config.out'));
+  assert.equal(upload.with.fail_ci_if_error, true);
+  const artifact = workflow.jobs['supplier-contract'].steps.find(item => item.uses === 'actions/upload-artifact@v4');
+  assert.ok(artifact.with.path.includes('coverage/search-config.out'));
+});
+
+/** 提示词服务真实数据库回归必须产出并上传有效覆盖率，失败不得忽略；配置只读，无清理。 */
+test('prompt configuration has real regression coverage and cleanup', () => {
+  const job = workflow.jobs['supplier-contract'];
+  const run = step('supplier-contract', 'Run real prompt configuration regression');
+  assert.equal(run.run, "bash scripts/regression.sh '^Test(PromptConfigService|PromptProbe)'");
+  assert.equal(run.env.XHUB_REGRESSION_COVERPROFILE, 'coverage/prompt-config.out');
+  const check = step('supplier-contract', 'Validate prompt regression coverage');
+  assert.match(check.run, /set -euo pipefail/);
+  assert.match(check.run, /test -s coverage\/prompt-config.out/);
+  assert.match(check.run, /go tool cover -func=coverage\/prompt-config.out/);
+  const upload = step('supplier-contract', 'Upload prompt regression coverage');
+  assert.equal(upload.with.files, 'coverage/prompt-config.out');
+  assert.equal(upload.with.fail_ci_if_error, true);
+  assert.equal(upload.with.disable_search, true);
+  assert.equal(upload.with.flags, 'backend');
+  assert.ok(job.steps.indexOf(run) < job.steps.indexOf(check));
+  assert.ok(job.steps.indexOf(check) < job.steps.indexOf(upload));
+  assert.ok(!upload.if || upload.if === 'success()');
+  const artifact = step('supplier-contract', 'Archive prompt regression evidence');
+  assert.equal(artifact.if, 'always()');
+  assert.match(artifact.with.path, /coverage\/prompt-config.out/);
+  assert.equal(artifact.with['if-no-files-found'], 'error');
+  assert.ok(job.steps.every(item => !item['continue-on-error']));
+  assert.equal(job.steps.find(item => item.run === 'docker compose down -v').if, 'always()');
+});
+
+/** 护栏服务真实数据库回归必须产出并上传有效覆盖率，失败不得忽略；配置只读，无清理。 */
+test('guard management has real regression coverage and cleanup', () => {
+  const job = workflow.jobs['supplier-contract'];
+  const run = step('supplier-contract', 'Run real guard management regression');
+  assert.equal(run.run, "bash scripts/regression.sh '^Test(GuardManagementService|Guardrail|XGoGuardrail)'");
+  assert.equal(run.env.XHUB_REGRESSION_COVERPROFILE, 'coverage/guard-management.out');
+  const check = step('supplier-contract', 'Validate guard regression coverage');
+  assert.match(check.run, /set -euo pipefail/);
+  assert.match(check.run, /test -s coverage\/guard-management.out/);
+  assert.match(check.run, /go tool cover -func=coverage\/guard-management.out/);
+  const upload = step('supplier-contract', 'Upload guard regression coverage');
+  assert.equal(upload.with.files, 'coverage/guard-management.out');
+  assert.equal(upload.with.fail_ci_if_error, true);
+  assert.equal(upload.with.disable_search, true);
+  assert.equal(upload.with.flags, 'backend');
+  assert.ok(job.steps.indexOf(run) < job.steps.indexOf(check));
+  assert.ok(job.steps.indexOf(check) < job.steps.indexOf(upload));
+  assert.ok(!upload.if || upload.if === 'success()');
+  const artifact = step('supplier-contract', 'Archive guard regression evidence');
+  assert.equal(artifact.if, 'always()');
+  assert.match(artifact.with.path, /coverage\/guard-management.out/);
+  assert.equal(artifact.with['if-no-files-found'], 'error');
+  assert.ok(job.steps.every(item => !item['continue-on-error']));
+  assert.equal(job.steps.find(item => item.run === 'docker compose down -v').if, 'always()');
+});
+
+/** 策略服务真实数据库回归必须产出并上传有效覆盖率，失败不得忽略；配置只读，无清理。 */
+test('policy configuration has real regression coverage and cleanup', () => {
+  const job = workflow.jobs['supplier-contract'];
+  const run = step('supplier-contract', 'Run real policy configuration regression');
+  assert.equal(run.run, "bash scripts/regression.sh '^Test(PolicyConfigService|ServiceAuxBoundary|RuntimeOperationBoundary|SettingsOperationBoundary|ModelAliasBoundary|AnalyticsAliasBoundary|Stage4CombinedAcceptance)'");
+  assert.equal(run.env.XHUB_REGRESSION_COVERPROFILE, 'coverage/policy-config.out');
+  const check = step('supplier-contract', 'Validate policy regression coverage');
+  assert.match(check.run, /set -euo pipefail/);
+  assert.match(check.run, /test -s coverage\/policy-config.out/);
+  assert.match(check.run, /go tool cover -func=coverage\/policy-config.out/);
+  const upload = step('supplier-contract', 'Upload policy regression coverage');
+  assert.equal(upload.with.files, 'coverage/policy-config.out');
+  assert.equal(upload.with.fail_ci_if_error, true);
+  assert.equal(upload.with.disable_search, true);
+  assert.equal(upload.with.flags, 'backend');
+  assert.ok(job.steps.indexOf(run) < job.steps.indexOf(check));
+  assert.ok(job.steps.indexOf(check) < job.steps.indexOf(upload));
+  assert.ok(!upload.if || upload.if === 'success()');
+  const artifact = step('supplier-contract', 'Archive policy regression evidence');
+  assert.equal(artifact.if, 'always()');
+  assert.match(artifact.with.path, /coverage\/policy-config.out/);
+  assert.equal(artifact.with['if-no-files-found'], 'error');
+  assert.ok(job.steps.every(item => !item['continue-on-error']));
+  assert.equal(job.steps.find(item => item.run === 'docker compose down -v').if, 'always()');
+});
+
+/** 访问组服务真实数据库回归必须产出并上传有效覆盖率，失败不得忽略；配置只读，无清理。 */
+test('access group configuration has real regression coverage and cleanup', () => {
+  const job = workflow.jobs['supplier-contract'];
+  const run = step('supplier-contract', 'Run real access group configuration regression');
+  assert.equal(run.run, "bash scripts/regression.sh '^TestAccessGroupConfigService'");
+  assert.equal(run.env.XHUB_REGRESSION_COVERPROFILE, 'coverage/access-group-config.out');
+  const check = step('supplier-contract', 'Validate access group regression coverage');
+  assert.match(check.run, /set -euo pipefail/);
+  assert.match(check.run, /test -s coverage\/access-group-config.out/);
+  assert.match(check.run, /go tool cover -func=coverage\/access-group-config.out/);
+  const upload = step('supplier-contract', 'Upload access group regression coverage');
+  assert.equal(upload.with.files, 'coverage/access-group-config.out');
+  assert.equal(upload.with.fail_ci_if_error, true);
+  assert.equal(upload.with.disable_search, true);
+  assert.equal(upload.with.flags, 'backend');
+  assert.ok(job.steps.indexOf(run) < job.steps.indexOf(check));
+  assert.ok(job.steps.indexOf(check) < job.steps.indexOf(upload));
+  assert.ok(!upload.if || upload.if === 'success()');
+  const artifact = step('supplier-contract', 'Archive access group regression evidence');
+  assert.equal(artifact.if, 'always()');
+  assert.match(artifact.with.path, /coverage\/access-group-config.out/);
+  assert.equal(artifact.with['if-no-files-found'], 'error');
+  assert.ok(job.steps.every(item => !item['continue-on-error']));
+  assert.equal(job.steps.find(item => item.run === 'docker compose down -v').if, 'always()');
+});
+
+/** 向量库配置服务真实数据库回归必须产出并上传有效覆盖率，失败不得忽略；配置只读，无清理。 */
+test('vector configuration has real regression coverage and cleanup', () => {
+  const job = workflow.jobs['supplier-contract'];
+  const run = step('supplier-contract', 'Run real vector configuration regression');
+  assert.equal(run.run, "bash scripts/regression.sh '^TestVectorConfigService'");
+  assert.equal(run.env.XHUB_REGRESSION_COVERPROFILE, 'coverage/vector-config.out');
+  const check = step('supplier-contract', 'Validate vector regression coverage');
+  assert.match(check.run, /set -euo pipefail/);
+  assert.match(check.run, /test -s coverage\/vector-config.out/);
+  assert.match(check.run, /go tool cover -func=coverage\/vector-config.out/);
+  const upload = step('supplier-contract', 'Upload vector regression coverage');
+  assert.equal(upload.with.files, 'coverage/vector-config.out');
+  assert.equal(upload.with.fail_ci_if_error, true);
+  assert.equal(upload.with.disable_search, true);
+  assert.equal(upload.with.flags, 'backend');
+  assert.ok(job.steps.indexOf(run) < job.steps.indexOf(check));
+  assert.ok(job.steps.indexOf(check) < job.steps.indexOf(upload));
+  assert.ok(!upload.if || upload.if === 'success()');
+  const artifact = step('supplier-contract', 'Archive vector regression evidence');
+  assert.equal(artifact.if, 'always()');
+  assert.match(artifact.with.path, /coverage\/vector-config.out/);
+  assert.equal(artifact.with['if-no-files-found'], 'error');
+  assert.ok(job.steps.every(item => !item['continue-on-error']));
+  assert.equal(job.steps.find(item => item.run === 'docker compose down -v').if, 'always()');
+});
+
+/** 标签真实HTTP/数据库回归必须独立采集并上传backend覆盖率，缺失报告或清理失败不得通过；纯工作流结构验证，无外部副作用。 */
+test('tag configuration has real regression coverage and cleanup', () => {
+  const job = workflow.jobs['supplier-contract'];
+  const run = step('supplier-contract', 'Run real tag configuration regression');
+  assert.equal(run.run, "bash scripts/regression.sh '^TestTagCatalog'");
+  assert.equal(run.env.XHUB_REGRESSION_COVERPROFILE, 'coverage/tag-catalog.out');
+  const check = step('supplier-contract', 'Validate tag regression coverage');
+  assert.match(check.run, /set -euo pipefail/);
+  assert.match(check.run, /test -s coverage\/tag-catalog.out/);
+  assert.match(check.run, /go tool cover -func=coverage\/tag-catalog.out/);
+  const upload = step('supplier-contract', 'Upload tag regression coverage');
+  assert.equal(upload.with.files, 'coverage/tag-catalog.out');
+  assert.equal(upload.with.fail_ci_if_error, true);
+  assert.equal(upload.with.disable_search, true);
+  assert.equal(upload.with.flags, 'backend');
+  assert.ok(job.steps.indexOf(run) < job.steps.indexOf(check));
+  assert.ok(job.steps.indexOf(check) < job.steps.indexOf(upload));
+  assert.ok(!upload.if || upload.if === 'success()');
+  const artifact = step('supplier-contract', 'Archive tag regression evidence');
+  assert.equal(artifact.if, 'always()');
+  assert.match(artifact.with.path, /coverage\/tag-catalog.out/);
+  assert.equal(artifact.with['if-no-files-found'], 'error');
+  assert.ok(job.steps.every(item => !item['continue-on-error']));
+  assert.equal(job.steps.find(item => item.run === 'docker compose down -v').if, 'always()');
+});
+
+/** 元数据配置真实HTTP/数据库回归必须独立采集并上传backend覆盖率，缺失报告或清理失败不得通过；纯工作流结构验证，无外部副作用。 */
+test('metadata configuration has real regression coverage and cleanup', () => {
+  const job = workflow.jobs['supplier-contract'];
+  const run = step('supplier-contract', 'Run real metadata configuration regression');
+  assert.equal(run.run, "bash scripts/regression.sh '^Test(MetadataConfig|CustomerListReadFailure)'");
+  assert.equal(run.env.XHUB_REGRESSION_COVERPROFILE, 'coverage/metadata-config.out');
+  const check = step('supplier-contract', 'Validate metadata regression coverage');
+  assert.match(check.run, /set -euo pipefail/);
+  assert.match(check.run, /test -s coverage\/metadata-config.out/);
+  assert.match(check.run, /go tool cover -func=coverage\/metadata-config.out/);
+  const upload = step('supplier-contract', 'Upload metadata regression coverage');
+  assert.equal(upload.with.files, 'coverage/metadata-config.out');
+  assert.equal(upload.with.fail_ci_if_error, true);
+  assert.equal(upload.with.disable_search, true);
+  assert.equal(upload.with.flags, 'backend');
+  assert.ok(job.steps.indexOf(run) < job.steps.indexOf(check));
+  assert.ok(job.steps.indexOf(check) < job.steps.indexOf(upload));
+  assert.ok(!upload.if || upload.if === 'success()');
+  const artifact = step('supplier-contract', 'Archive metadata regression evidence');
+  assert.equal(artifact.if, 'always()');
+  assert.match(artifact.with.path, /coverage\/metadata-config.out/);
+  assert.equal(artifact.with['if-no-files-found'], 'error');
+  assert.ok(job.steps.every(item => !item['continue-on-error']));
+  assert.equal(job.steps.find(item => item.run === 'docker compose down -v').if, 'always()');
+});
+
+/** 预算配置与IAM真实数据库回归必须产出并上传有效覆盖率，失败不得忽略；配置只读，无清理。 */
+test('budget configuration has real regression coverage and cleanup', () => {
+  const job = workflow.jobs['supplier-contract'];
+  const run = step('supplier-contract', 'Run real budget configuration regression');
+  assert.equal(run.run, "bash scripts/regression.sh '^Test(BudgetConfigService|BudgetConfigurationBoundary|LegacyIAMNoFalseSuccess)'");
+  assert.equal(run.env.XHUB_REGRESSION_COVERPROFILE, 'coverage/budget-config.out');
+  const check = step('supplier-contract', 'Validate budget regression coverage');
+  assert.match(check.run, /set -euo pipefail/);
+  assert.match(check.run, /test -s coverage\/budget-config.out/);
+  assert.match(check.run, /go tool cover -func=coverage\/budget-config.out/);
+  const upload = step('supplier-contract', 'Upload budget regression coverage');
+  assert.equal(upload.with.files, 'coverage/budget-config.out');
+  assert.equal(upload.with.fail_ci_if_error, true);
+  assert.equal(upload.with.disable_search, true);
+  assert.equal(upload.with.flags, 'backend');
+  assert.ok(job.steps.indexOf(run) < job.steps.indexOf(check));
+  assert.ok(job.steps.indexOf(check) < job.steps.indexOf(upload));
+  assert.ok(!upload.if || upload.if === 'success()');
+  const artifact = step('supplier-contract', 'Archive budget regression evidence');
+  assert.equal(artifact.if, 'always()');
+  assert.match(artifact.with.path, /coverage\/budget-config.out/);
+  assert.equal(artifact.with['if-no-files-found'], 'error');
+  assert.ok(job.steps.every(item => !item['continue-on-error']));
+  assert.equal(job.steps.find(item => item.run === 'docker compose down -v').if, 'always()');
+});
+
+/** 运维边界真实数据库回归必须产出并上传有效覆盖率，失败不得忽略；配置只读，无清理。 */
+test('operations boundary has real regression coverage and cleanup', () => {
+  const job = workflow.jobs['supplier-contract'];
+  const run = step('supplier-contract', 'Run real operations boundary regression');
+  assert.equal(run.run, "bash scripts/regression.sh '^Test(OperationsNoFalseSuccess|ReadinessDetailsDatabaseFailure|HealthTestConnectionContract)$'");
+  assert.equal(run.env.XHUB_REGRESSION_COVERPROFILE, 'coverage/operations-config.out');
+  const check = step('supplier-contract', 'Validate operations regression coverage');
+  assert.match(check.run, /set -euo pipefail/);
+  assert.match(check.run, /test -s coverage\/operations-config.out/);
+  assert.match(check.run, /go tool cover -func=coverage\/operations-config.out/);
+  const upload = step('supplier-contract', 'Upload operations regression coverage');
+  assert.equal(upload.with.files, 'coverage/operations-config.out');
+  assert.equal(upload.with.fail_ci_if_error, true);
+  assert.equal(upload.with.disable_search, true);
+  assert.equal(upload.with.flags, 'backend');
+  assert.ok(job.steps.indexOf(run) < job.steps.indexOf(check));
+  assert.ok(job.steps.indexOf(check) < job.steps.indexOf(upload));
+  assert.ok(!upload.if || upload.if === 'success()');
+  const artifact = step('supplier-contract', 'Archive operations regression evidence');
+  assert.equal(artifact.if, 'always()');
+  assert.match(artifact.with.path, /coverage\/operations-config.out/);
+  assert.equal(artifact.with['if-no-files-found'], 'error');
+  assert.ok(job.steps.every(item => !item['continue-on-error']));
+  assert.equal(job.steps.find(item => item.run === 'docker compose down -v').if, 'always()');
+});
+
+/** 缓存真实回归必须独立采集上传覆盖率，失败不得忽略；只读配置，无清理。 */
+test('cache management has real regression coverage and cleanup', () => {
+  const job = workflow.jobs['supplier-contract'];
+  const run = step('supplier-contract', 'Run real cache management regression');
+  assert.equal(run.run, "bash scripts/regression.sh '^Test(CacheManagementTruth|CacheUnavailableManagement|CacheHitIsFreeAndLoggedAsOne)$'");
+  assert.equal(run.env.XHUB_REGRESSION_COVERPROFILE, 'coverage/cache-config.out');
+  const check = step('supplier-contract', 'Validate cache regression coverage');
+  assert.match(check.run, /set -euo pipefail/);
+  assert.match(check.run, /test -s coverage\/cache-config.out/);
+  assert.match(check.run, /go tool cover -func=coverage\/cache-config.out/);
+  const upload = step('supplier-contract', 'Upload cache regression coverage');
+  assert.equal(upload.with.files, 'coverage/cache-config.out');
+  assert.equal(upload.with.fail_ci_if_error, true);
+  assert.equal(upload.with.disable_search, true);
+  assert.equal(upload.with.flags, 'backend');
+  assert.ok(job.steps.indexOf(run) < job.steps.indexOf(check));
+  assert.ok(job.steps.indexOf(check) < job.steps.indexOf(upload));
+  assert.ok(!upload.if || upload.if === 'success()');
+  const artifact = step('supplier-contract', 'Archive cache regression evidence');
+  assert.equal(artifact.if, 'always()');
+  assert.match(artifact.with.path, /coverage\/cache-config.out/);
+  assert.equal(artifact.with['if-no-files-found'], 'error');
+  assert.ok(job.steps.every(item => !item['continue-on-error']));
+  assert.equal(job.steps.find(item => item.run === 'docker compose down -v').if, 'always()');
+});
+
+/** 旧server OAuth服务真实数据库回归必须产出并上传有效覆盖率，失败不得忽略；配置只读，无清理。 */
+test('server OAuth boundary has real regression coverage and cleanup', () => {
+  const job = workflow.jobs['supplier-contract'];
+  const run = step('supplier-contract', 'Run real server OAuth boundary regression');
+  assert.equal(run.run, "bash scripts/regression.sh '^TestServerOAuthBoundary$'");
+  assert.equal(run.env.XHUB_REGRESSION_COVERPROFILE, 'coverage/server-oauth.out');
+  const check = step('supplier-contract', 'Validate server OAuth regression coverage');
+  assert.match(check.run, /set -euo pipefail/);
+  assert.match(check.run, /test -s coverage\/server-oauth.out/);
+  assert.match(check.run, /go tool cover -func=coverage\/server-oauth.out/);
+  const upload = step('supplier-contract', 'Upload server OAuth regression coverage');
+  assert.equal(upload.with.files, 'coverage/server-oauth.out');
+  assert.equal(upload.with.fail_ci_if_error, true);
+  assert.equal(upload.with.disable_search, true);
+  assert.equal(upload.with.flags, 'backend');
+  assert.ok(job.steps.indexOf(run) < job.steps.indexOf(check));
+  assert.ok(job.steps.indexOf(check) < job.steps.indexOf(upload));
+  assert.ok(!upload.if || upload.if === 'success()');
+  const artifact = step('supplier-contract', 'Archive server OAuth regression evidence');
+  assert.equal(artifact.if, 'always()');
+  assert.match(artifact.with.path, /coverage\/server-oauth.out/);
+  assert.equal(artifact.with['if-no-files-found'], 'error');
+  assert.ok(job.steps.every(item => !item['continue-on-error']));
+  assert.equal(job.steps.find(item => item.run === 'docker compose down -v').if, 'always()');
+});
+
+/** 旧server运行时服务真实数据库回归必须产出并上传有效覆盖率，失败不得忽略；配置只读，无清理。 */
+test('server runtime boundary has real regression coverage and cleanup', () => {
+  const job = workflow.jobs['supplier-contract'];
+  const run = step('supplier-contract', 'Run real server runtime boundary regression');
+  assert.equal(run.run, "bash scripts/regression.sh '^TestServerRuntimeBoundary$'");
+  assert.equal(run.env.XHUB_REGRESSION_COVERPROFILE, 'coverage/server-runtime.out');
+  const check = step('supplier-contract', 'Validate server runtime regression coverage');
+  assert.match(check.run, /set -euo pipefail/);
+  assert.match(check.run, /test -s coverage\/server-runtime.out/);
+  assert.match(check.run, /go tool cover -func=coverage\/server-runtime.out/);
+  const upload = step('supplier-contract', 'Upload server runtime regression coverage');
+  assert.equal(upload.with.files, 'coverage/server-runtime.out');
+  assert.equal(upload.with.fail_ci_if_error, true);
+  assert.equal(upload.with.disable_search, true);
+  assert.equal(upload.with.flags, 'backend');
+  assert.ok(job.steps.indexOf(run) < job.steps.indexOf(check));
+  assert.ok(job.steps.indexOf(check) < job.steps.indexOf(upload));
+  assert.ok(!upload.if || upload.if === 'success()');
+  const artifact = step('supplier-contract', 'Archive server runtime regression evidence');
+  assert.equal(artifact.if, 'always()');
+  assert.match(artifact.with.path, /coverage\/server-runtime.out/);
+  assert.equal(artifact.with['if-no-files-found'], 'error');
+  assert.ok(job.steps.every(item => !item['continue-on-error']));
+  assert.equal(job.steps.find(item => item.run === 'docker compose down -v').if, 'always()');
+});
+
+/** 旧server审批服务真实数据库回归必须产出并上传有效覆盖率，失败不得忽略；配置只读，无清理。 */
+test('server submission boundary has real regression coverage and cleanup', () => {
+  const job = workflow.jobs['supplier-contract'];
+  const run = step('supplier-contract', 'Run real server submission boundary regression');
+  assert.equal(run.run, "bash scripts/regression.sh '^TestServerSubmissionBoundary$'");
+  assert.equal(run.env.XHUB_REGRESSION_COVERPROFILE, 'coverage/server-submission.out');
+  const check = step('supplier-contract', 'Validate server submission regression coverage');
+  assert.match(check.run, /set -euo pipefail/);
+  assert.match(check.run, /test -s coverage\/server-submission.out/);
+  assert.match(check.run, /go tool cover -func=coverage\/server-submission.out/);
+  const upload = step('supplier-contract', 'Upload server submission regression coverage');
+  assert.equal(upload.with.files, 'coverage/server-submission.out');
+  assert.equal(upload.with.fail_ci_if_error, true);
+  assert.equal(upload.with.disable_search, true);
+  assert.equal(upload.with.flags, 'backend');
+  assert.ok(job.steps.indexOf(run) < job.steps.indexOf(check));
+  assert.ok(job.steps.indexOf(check) < job.steps.indexOf(upload));
+  assert.ok(!upload.if || upload.if === 'success()');
+  const artifact = step('supplier-contract', 'Archive server submission regression evidence');
+  assert.equal(artifact.if, 'always()');
+  assert.match(artifact.with.path, /coverage\/server-submission.out/);
+  assert.equal(artifact.with['if-no-files-found'], 'error');
+  assert.ok(job.steps.every(item => !item['continue-on-error']));
+  assert.equal(job.steps.find(item => item.run === 'docker compose down -v').if, 'always()');
+});
+
+/** 插件启停服务真实数据库回归必须产出并上传有效覆盖率，失败不得忽略；配置只读，无清理。 */
+test('plugin activation boundary has real regression coverage and cleanup', () => {
+  const job = workflow.jobs['supplier-contract'];
+  const run = step('supplier-contract', 'Run real plugin activation boundary regression');
+  assert.equal(run.run, "bash scripts/regression.sh '^TestPluginActivationBoundary$'");
+  assert.equal(run.env.XHUB_REGRESSION_COVERPROFILE, 'coverage/plugin-activation.out');
+  const check = step('supplier-contract', 'Validate plugin activation regression coverage');
+  assert.match(check.run, /set -euo pipefail/);
+  assert.match(check.run, /test -s coverage\/plugin-activation.out/);
+  assert.match(check.run, /go tool cover -func=coverage\/plugin-activation.out/);
+  const upload = step('supplier-contract', 'Upload plugin activation regression coverage');
+  assert.equal(upload.with.files, 'coverage/plugin-activation.out');
+  assert.equal(upload.with.fail_ci_if_error, true);
+  assert.equal(upload.with.disable_search, true);
+  assert.equal(upload.with.flags, 'backend');
+  assert.ok(job.steps.indexOf(run) < job.steps.indexOf(check));
+  assert.ok(job.steps.indexOf(check) < job.steps.indexOf(upload));
+  assert.ok(!upload.if || upload.if === 'success()');
+  const artifact = step('supplier-contract', 'Archive plugin activation regression evidence');
+  assert.equal(artifact.if, 'always()');
+  assert.match(artifact.with.path, /coverage\/plugin-activation.out/);
+  assert.equal(artifact.with['if-no-files-found'], 'error');
+  assert.ok(job.steps.every(item => !item['continue-on-error']));
+  assert.equal(job.steps.find(item => item.run === 'docker compose down -v').if, 'always()');
+});
+
+/** 插件筛选服务真实数据库回归必须产出并上传有效覆盖率，失败不得忽略；配置只读，无清理。 */
+test('plugin filter boundary has real regression coverage and cleanup', () => {
+  const job = workflow.jobs['supplier-contract'];
+  const run = step('supplier-contract', 'Run real plugin filter boundary regression');
+  assert.equal(run.run, "bash scripts/regression.sh '^TestPluginFilter'");
+  assert.equal(run.env.XHUB_REGRESSION_COVERPROFILE, 'coverage/plugin-filter.out');
+  const check = step('supplier-contract', 'Validate plugin filter regression coverage');
+  assert.match(check.run, /set -euo pipefail/);
+  assert.match(check.run, /test -s coverage\/plugin-filter.out/);
+  assert.match(check.run, /go tool cover -func=coverage\/plugin-filter.out/);
+  const upload = step('supplier-contract', 'Upload plugin filter regression coverage');
+  assert.equal(upload.with.files, 'coverage/plugin-filter.out');
+  assert.equal(upload.with.fail_ci_if_error, true);
+  assert.equal(upload.with.disable_search, true);
+  assert.equal(upload.with.flags, 'backend');
+  assert.ok(job.steps.indexOf(run) < job.steps.indexOf(check));
+  assert.ok(job.steps.indexOf(check) < job.steps.indexOf(upload));
+  assert.ok(!upload.if || upload.if === 'success()');
+  const artifact = step('supplier-contract', 'Archive plugin filter regression evidence');
+  assert.equal(artifact.if, 'always()');
+  assert.match(artifact.with.path, /coverage\/plugin-filter.out/);
+  assert.equal(artifact.with['if-no-files-found'], 'error');
+  assert.ok(job.steps.every(item => !item['continue-on-error']));
+  assert.equal(job.steps.find(item => item.run === 'docker compose down -v').if, 'always()');
+});
+
+/** 插件注册服务真实数据库回归必须产出并上传有效覆盖率，失败不得忽略；配置只读，无清理。 */
+test('plugin registration boundary has real regression coverage and cleanup', () => {
+  const job = workflow.jobs['supplier-contract'];
+  const run = step('supplier-contract', 'Run real plugin registration boundary regression');
+  assert.equal(run.run, "bash scripts/regression.sh '^TestPluginRegistration'");
+  assert.equal(run.env.XHUB_REGRESSION_COVERPROFILE, 'coverage/plugin-registration.out');
+  const check = step('supplier-contract', 'Validate plugin registration regression coverage');
+  assert.match(check.run, /set -euo pipefail/);
+  assert.match(check.run, /test -s coverage\/plugin-registration.out/);
+  assert.match(check.run, /go tool cover -func=coverage\/plugin-registration.out/);
+  const upload = step('supplier-contract', 'Upload plugin registration regression coverage');
+  assert.equal(upload.with.files, 'coverage/plugin-registration.out');
+  assert.equal(upload.with.fail_ci_if_error, true);
+  assert.equal(upload.with.disable_search, true);
+  assert.equal(upload.with.flags, 'backend');
+  assert.ok(job.steps.indexOf(run) < job.steps.indexOf(check));
+  assert.ok(job.steps.indexOf(check) < job.steps.indexOf(upload));
+  assert.ok(!upload.if || upload.if === 'success()');
+  const artifact = step('supplier-contract', 'Archive plugin registration regression evidence');
+  assert.equal(artifact.if, 'always()');
+  assert.match(artifact.with.path, /coverage\/plugin-registration.out/);
+  assert.equal(artifact.with['if-no-files-found'], 'error');
+  assert.ok(job.steps.every(item => !item['continue-on-error']));
+  assert.equal(job.steps.find(item => item.run === 'docker compose down -v').if, 'always()');
+});
+
+/** Skill资源服务真实数据库回归必须产出并上传有效覆盖率，失败不得忽略；配置只读，无清理。 */
+test('skill resource boundary has real regression coverage and cleanup', () => {
+  const job = workflow.jobs['supplier-contract'];
+  const run = step('supplier-contract', 'Run real skill resource boundary regression');
+  assert.equal(run.run, "bash scripts/regression.sh '^TestSkillBoundary'");
+  assert.equal(run.env.XHUB_REGRESSION_COVERPROFILE, 'coverage/skill-boundary.out');
+  const check = step('supplier-contract', 'Validate skill resource regression coverage');
+  assert.match(check.run, /set -euo pipefail/);
+  assert.match(check.run, /test -s coverage\/skill-boundary.out/);
+  assert.match(check.run, /go tool cover -func=coverage\/skill-boundary.out/);
+  const upload = step('supplier-contract', 'Upload skill resource regression coverage');
+  assert.equal(upload.with.files, 'coverage/skill-boundary.out');
+  assert.equal(upload.with.fail_ci_if_error, true);
+  assert.equal(upload.with.disable_search, true);
+  assert.equal(upload.with.flags, 'backend');
+  assert.ok(job.steps.indexOf(run) < job.steps.indexOf(check));
+  assert.ok(job.steps.indexOf(check) < job.steps.indexOf(upload));
+  assert.ok(!upload.if || upload.if === 'success()');
+  const artifact = step('supplier-contract', 'Archive skill resource regression evidence');
+  assert.equal(artifact.if, 'always()');
+  assert.match(artifact.with.path, /coverage\/skill-boundary.out/);
+  assert.equal(artifact.with['if-no-files-found'], 'error');
+  assert.ok(job.steps.every(item => !item['continue-on-error']));
+  assert.equal(job.steps.find(item => item.run === 'docker compose down -v').if, 'always()');
+});
+
+/** SkillHub支持边界真实数据库回归必须产出并上传有效覆盖率，失败不得忽略；配置只读，无清理。 */
+test('SkillHub support has real regression coverage and cleanup', () => {
+  const job = workflow.jobs['supplier-contract'];
+  const run = step('supplier-contract', 'Run real SkillHub support regression');
+  assert.equal(run.run, "bash scripts/regression.sh '^TestSkillHubSupport'");
+  assert.equal(run.env.XHUB_REGRESSION_COVERPROFILE, 'coverage/skill-hub-support.out');
+  const check = step('supplier-contract', 'Validate SkillHub support regression coverage');
+  assert.match(check.run, /set -euo pipefail/);
+  assert.match(check.run, /test -s coverage\/skill-hub-support.out/);
+  assert.match(check.run, /go tool cover -func=coverage\/skill-hub-support.out/);
+  const upload = step('supplier-contract', 'Upload SkillHub support regression coverage');
+  assert.equal(upload.with.files, 'coverage/skill-hub-support.out');
+  assert.equal(upload.with.fail_ci_if_error, true);
+  assert.equal(upload.with.disable_search, true);
+  assert.equal(upload.with.flags, 'backend');
+  assert.ok(job.steps.indexOf(run) < job.steps.indexOf(check));
+  assert.ok(job.steps.indexOf(check) < job.steps.indexOf(upload));
+  assert.ok(!upload.if || upload.if === 'success()');
+  const artifact = step('supplier-contract', 'Archive SkillHub support regression evidence');
+  assert.equal(artifact.if, 'always()');
+  assert.match(artifact.with.path, /coverage\/skill-hub-support.out/);
+  assert.equal(artifact.with['if-no-files-found'], 'error');
+  assert.ok(job.steps.every(item => !item['continue-on-error']));
+  assert.equal(job.steps.find(item => item.run === 'docker compose down -v').if, 'always()');
+});
+
+/** 旧推理别名真实数据库回归必须产出并上传有效覆盖率，失败不得忽略；配置只读，无清理。 */
+test('legacy inference has real regression coverage and cleanup', () => {
+  const job = workflow.jobs['supplier-contract'];
+  const run = step('supplier-contract', 'Run real legacy inference regression');
+  assert.equal(run.run, "bash scripts/regression.sh '^Test(LegacyInferenceBoundary|EndpointRedesignNativeLifecycle|EndpointGoogleGuardrails)$'");
+  assert.equal(run.env.XHUB_REGRESSION_COVERPROFILE, 'coverage/legacy-inference.out');
+  const check = step('supplier-contract', 'Validate legacy inference regression coverage');
+  assert.match(check.run, /set -euo pipefail/);
+  assert.match(check.run, /test -s coverage\/legacy-inference.out/);
+  assert.match(check.run, /go tool cover -func=coverage\/legacy-inference.out/);
+  const upload = step('supplier-contract', 'Upload legacy inference regression coverage');
+  assert.equal(upload.with.files, 'coverage/legacy-inference.out');
+  assert.equal(upload.with.fail_ci_if_error, true);
+  assert.equal(upload.with.disable_search, true);
+  assert.equal(upload.with.flags, 'backend');
+  assert.ok(job.steps.indexOf(run) < job.steps.indexOf(check));
+  assert.ok(job.steps.indexOf(check) < job.steps.indexOf(upload));
+  assert.ok(!upload.if || upload.if === 'success()');
+  const artifact = step('supplier-contract', 'Archive legacy inference regression evidence');
+  assert.equal(artifact.if, 'always()');
+  assert.match(artifact.with.path, /coverage\/legacy-inference.out/);
+  assert.equal(artifact.with['if-no-files-found'], 'error');
+  assert.ok(job.steps.every(item => !item['continue-on-error']));
+  assert.equal(job.steps.find(item => item.run === 'docker compose down -v').if, 'always()');
+});
+
+/** 旧供应商批处理、文件和WebSocket边界的真实回归必须产出并上传有效覆盖率，失败不得忽略；配置只读，无清理。 */
+test('provider batch, file and websocket boundaries have real regression coverage and cleanup', () => {
+  const job = workflow.jobs['supplier-contract'];
+  const run = step('supplier-contract', 'Run real provider batch regression');
+  assert.equal(run.run, "bash scripts/regression.sh '^Test(ProviderBatchBoundary|ProviderFileBoundary|LegacyWebsocketBoundary)$'");
+  assert.equal(run.env.XHUB_REGRESSION_COVERPROFILE, 'coverage/provider-batch.out');
+  const check = step('supplier-contract', 'Validate provider batch regression coverage');
+  assert.match(check.run, /set -euo pipefail/);
+  assert.match(check.run, /test -s coverage\/provider-batch.out/);
+  assert.match(check.run, /go tool cover -func=coverage\/provider-batch.out/);
+  const upload = step('supplier-contract', 'Upload provider batch regression coverage');
+  assert.equal(upload.with.files, 'coverage/provider-batch.out');
+  assert.equal(upload.with.fail_ci_if_error, true);
+  assert.equal(upload.with.disable_search, true);
+  assert.equal(upload.with.flags, 'backend');
+  assert.ok(job.steps.indexOf(run) < job.steps.indexOf(check));
+  assert.ok(job.steps.indexOf(check) < job.steps.indexOf(upload));
+  assert.ok(!upload.if || upload.if === 'success()');
+  const artifact = step('supplier-contract', 'Archive provider batch regression evidence');
+  assert.equal(artifact.if, 'always()');
+  assert.match(artifact.with.path, /coverage\/provider-batch.out/);
+  assert.equal(artifact.with['if-no-files-found'], 'error');
+  assert.ok(job.steps.every(item => !item['continue-on-error']));
+  assert.equal(job.steps.find(item => item.run === 'docker compose down -v').if, 'always()');
+});
+
+/** 旧分析入口真实数据库回归必须产出并上传有效覆盖率，失败不得忽略；配置只读，无清理。 */
+test('medical alias has real regression coverage and cleanup', () => {
+  const job = workflow.jobs['supplier-contract'];
+  const run = step('supplier-contract', 'Run real medical alias regression');
+  assert.equal(run.run, "bash scripts/regression.sh '^TestMedicalAliasBoundary$'");
+  assert.equal(run.env.XHUB_REGRESSION_COVERPROFILE, 'coverage/medical-alias.out');
+  const check = step('supplier-contract', 'Validate medical alias regression coverage');
+  assert.match(check.run, /set -euo pipefail/);
+  assert.match(check.run, /test -s coverage\/medical-alias.out/);
+  assert.match(check.run, /go tool cover -func=coverage\/medical-alias.out/);
+  const upload = step('supplier-contract', 'Upload medical alias regression coverage');
+  assert.equal(upload.with.files, 'coverage/medical-alias.out');
+  assert.equal(upload.with.fail_ci_if_error, true);
+  assert.equal(upload.with.disable_search, true);
+  assert.equal(upload.with.flags, 'backend');
+  assert.ok(job.steps.indexOf(run) < job.steps.indexOf(check));
+  assert.ok(job.steps.indexOf(check) < job.steps.indexOf(upload));
+  assert.ok(!upload.if || upload.if === 'success()');
+  const artifact = step('supplier-contract', 'Archive medical alias regression evidence');
+  assert.equal(artifact.if, 'always()');
+  assert.match(artifact.with.path, /coverage\/medical-alias.out/);
+  assert.equal(artifact.with['if-no-files-found'], 'error');
   assert.ok(job.steps.every(item => !item['continue-on-error']));
   assert.equal(job.steps.find(item => item.run === 'docker compose down -v').if, 'always()');
 });

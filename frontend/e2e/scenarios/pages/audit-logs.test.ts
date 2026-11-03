@@ -21,7 +21,7 @@ test("审计日志 Hook 回归：中英文筛选与真实后台查询", async ({
   await page.getByRole("combobox").first().click();
   await page.getByRole("option", { name: translate("en", "audit.filters.created"), exact: true }).click();
   const filteredRead = page.waitForResponse(res => res.url().includes("/audit/logs?") && new URL(res.url()).searchParams.get("action") === "created");
-  await page.getByRole("button", { name: translate("en", "Apply Filters"), exact: true }).click();
+  await page.getByRole("button", { name: translate("en", "common.applyFilters"), exact: true }).click();
   const filteredResponse = await filteredRead;
   expect(filteredResponse.status()).toBe(200);
   const filtered = await filteredResponse.json();
@@ -39,7 +39,7 @@ test("审计日志 Hook 回归：中英文筛选与真实后台查询", async ({
   await expect(page.getByText(translate("zh-CN", "No matching audit logs"), { exact: true })).toBeVisible();
   await page.getByTestId("datatable-filters-trigger").click();
   await expect(page.getByRole("combobox").first()).toContainText(translate("zh-CN", "audit.filters.created"));
-  await expect(page.getByRole("button", { name: translate("zh-CN", "Apply Filters"), exact: true })).toBeVisible();
+  await expect(page.getByRole("button", { name: translate("zh-CN", "common.applyFilters"), exact: true })).toBeVisible();
   await expect(page.getByRole("button", { name: translate("zh-CN", "Reset"), exact: true })).toBeVisible();
-  guard.assertOk();
+  await guard.assertOk();
 });

@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"reflect"
@@ -185,6 +186,7 @@ func TestRequestProtocols(t *testing.T) {
 }
 
 // TestRunBoundsAndErrors 验证工作者上限、请求总数、错误统计和超时；前置本地 HTTP 服务，结束关闭服务器。
+// 超时服务读完请求后只等待连接取消，不用两个短sleep争抢调度顺序，不修改被测超时或容忍成功样本。
 func TestRunBoundsAndErrors(t *testing.T) {
 	var active, peak atomic.Int64
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -205,6 +207,13 @@ func TestRunBoundsAndErrors(t *testing.T) {
 	if err != nil || result.Attempted != 12 || result.Succeeded != 12 || result.Failed != 0 || peak.Load() > 4 || peak.Load() < 2 {
 		t.Fatalf("并发/计数错误: %+v peak=%d err=%v", result, peak.Load(), err)
 	}
+	// 独立服务器永不发送成功响应；客户端的真实HTTP超时必须取消请求。
+	timeoutServer := httptest.NewServer(http.HandlerFunc(func(_ http.ResponseWriter, r *http.Request) {
+		_, _ = io.Copy(io.Discard, r.Body)
+		<-r.Context().Done()
+	}))
+	defer timeoutServer.Close()
+	c.BaseURL = timeoutServer.URL
 	c.Timeout = time.Millisecond
 	result, err = Run(context.Background(), c)
 	if err != nil || result.Failed != 12 || result.Errors["timeout"] != 12 {

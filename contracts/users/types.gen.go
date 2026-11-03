@@ -37,6 +37,11 @@ const (
 	DeletedUserDeletedTrue DeletedUserDeleted = true
 )
 
+// Defines values for PasswordUpdatedPasswordUpdated.
+const (
+	True PasswordUpdatedPasswordUpdated = true
+)
+
 // Defines values for SelectedBudgetBatchAllUsers.
 const (
 	False SelectedBudgetBatchAllUsers = false
@@ -202,6 +207,15 @@ type LegacyBudget = json.RawMessage
 // LegacyRate 非负整数至2147483647，可用数字字符串，null/空字符串清空。 / Nonnegative integer up to 2147483647, numeric strings accepted; null/empty string clears.
 type LegacyRate = json.RawMessage
 
+// PasswordUpdated defines model for PasswordUpdated.
+type PasswordUpdated struct {
+	PasswordUpdated PasswordUpdatedPasswordUpdated `json:"password_updated"`
+	UserId          string                         `json:"user_id"`
+}
+
+// PasswordUpdatedPasswordUpdated defines model for PasswordUpdated.PasswordUpdated.
+type PasswordUpdatedPasswordUpdated bool
+
 // SelectedBudgetBatch defines model for SelectedBudgetBatch.
 type SelectedBudgetBatch struct {
 	AllUsers *SelectedBudgetBatchAllUsers `json:"all_users,omitempty"`
@@ -213,6 +227,20 @@ type SelectedBudgetBatchAllUsers bool
 
 // SelectedBudgetChange defines model for SelectedBudgetChange.
 type SelectedBudgetChange = map[string]json.RawMessage
+
+// SetPassword defines model for SetPassword.
+type SetPassword struct {
+	// Password 8–72 UTF-8字节，由服务校验 / 8–72 UTF-8 bytes, validated by server
+	Password string  `json:"password"`
+	UserId   *string `json:"user_id,omitempty"`
+}
+
+// SetPasswordByBody defines model for SetPasswordByBody.
+type SetPasswordByBody struct {
+	// Password 8–72 UTF-8字节，由服务校验 / 8–72 UTF-8 bytes, validated by server
+	Password string `json:"password"`
+	UserId   string `json:"user_id"`
+}
 
 // UpdateUser 完整单个JSON对象。目标省略为自己；普通用户只能改自己资料，管理字段不代表授予权限；预算写入单独授权。管理员密码与其他字段不是同一事务。 / Single complete JSON object. Target defaults to self; members edit own profile only, management fields do not grant privileges; budget writes separately authorized. Admin password and other fields are not one transaction.
 type UpdateUser = map[string]json.RawMessage
@@ -363,5 +391,11 @@ type DeleteUserJSONRequestBody = DeleteUser
 // CreateUserJSONRequestBody defines body for CreateUser for application/json ContentType.
 type CreateUserJSONRequestBody = CreateUser
 
+// SetUserPasswordJSONRequestBody defines body for SetUserPassword for application/json ContentType.
+type SetUserPasswordJSONRequestBody = SetPasswordByBody
+
 // UpdateUserJSONRequestBody defines body for UpdateUser for application/json ContentType.
 type UpdateUserJSONRequestBody = UpdateUser
+
+// SetUserPasswordByPathJSONRequestBody defines body for SetUserPasswordByPath for application/json ContentType.
+type SetUserPasswordByPathJSONRequestBody = SetPassword

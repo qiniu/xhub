@@ -72,10 +72,12 @@ export function registerMessagesReferenceScenario(locale: "zh-CN" | "en") {
       expect(bridge.status, bridge.raw).toBe(400);
       expect(bridge.raw).toContain("model_unavailable");
       const bypassPath = "/gw/bypass/anthropic/v1/messages";
-      const disabled = await postReference(page, key.key, referenceBody(model, true, false), bypassPath);
-      expect(disabled.status, disabled.raw).toBe(400);
-      expect(disabled.raw).toContain("model not found");
-      expect((await (await page.request.get(UPSTREAM + "/e2e/request-count")).json()).requests).toBe(before);
+      // 未显式声明透传时也应按上游协议开放，并真实调用上游和计费。
+      const automatic = await postReference(page, key.key, referenceBody(model, true, false), bypassPath);
+      expect(automatic.status, automatic.raw).toBe(200);
+      expect(automatic.raw).toContain("REFERENCE_OK");
+      calls.push(automatic.id!);
+      expect((await (await page.request.get(UPSTREAM + "/e2e/request-count")).json()).requests).toBe(before + 1);
       const enabled = await page.request.patch(GATEWAY + "/model/" + ids[0] + "/update", { headers, data: { model_info: { endpoint_types: ["messages", "bypass:anthropic-messages"] } } });
       expect(enabled.status(), await enabled.text()).toBe(200);
       const native = await postReference(page, key.key, referenceBody(model, true, true), bypassPath);
@@ -89,7 +91,7 @@ export function registerMessagesReferenceScenario(locale: "zh-CN" | "en") {
       await expect.poll(async () => {
         const info = (await (await page.request.get(GATEWAY + "/key/info?key=" + keyID, { headers })).json()).info;
         return { spend: Number(Number(info.spend).toFixed(6)), pending: Number(info.budget_pending || 0) };
-      }).toEqual({ spend: 0.000060, pending: 0 });
+      }).toEqual({ spend: 0.000072, pending: 0 });
       await stableGoto(page, "/logs");
       await expect(page.getByText(model, { exact: true }).first()).toBeVisible();
       await stableGoto(page, "/api-keys?key=" + keyID);

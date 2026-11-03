@@ -371,12 +371,13 @@ class Handler(BaseHTTPRequestHandler):
                 "[DONE]",
             ])
             return
-        if model in ("e2e-item-id-chat", "e2e-item-id-native", "e2e-item-id-grok", "e2e-item-id-tracked"):
-            # 严格原生夹具按真实 GPT 的 item 类型检查 ID，浏览器必须回放真实桥接产物而非手工修正。
-            if self.headers.get("Authorization") != "Bearer sk-fake":
+        if model in ("e2e-short-key-chat", "e2e-item-id-chat", "e2e-item-id-native", "e2e-item-id-grok", "e2e-item-id-tracked"):
+            # 严格原生夹具按真实 GPT 的 item 类型检查 ID；短 Key 型号只接受原值，不能把掩码也当合法凭据。
+            expected_key = "abcde" if model == "e2e-short-key-chat" else "sk-fake"
+            if self.headers.get("Authorization") != "Bearer " + expected_key:
                 self.send_error(401)
                 return
-            if model == "e2e-item-id-chat":
+            if model in ("e2e-item-id-chat", "e2e-short-key-chat"):
                 if "chat/completions" not in self.path:
                     self.send_error(400, "Chat source received wrong protocol")
                     return
@@ -500,9 +501,11 @@ class Handler(BaseHTTPRequestHandler):
                        "usage": {"input_tokens": 8, "output_tokens": 2}}
             if req.get("stream") is True:
                 self._sse([
-                    {"type": "message_start", "message": {"id": "msg_e2e", "usage": {"input_tokens": 8}}},
+                    # 原生客户端校验完整生命周期，夹具不能依赖标准转换器补齐身份字段或关闭内容块。
+                    {"type": "message_start", "message": {**payload, "content": [], "stop_reason": None, "usage": {"input_tokens": 8, "output_tokens": 0}}},
                     {"type": "content_block_start", "index": 0, "content_block": {"type": "text", "text": ""}},
                     {"type": "content_block_delta", "index": 0, "delta": {"type": "text_delta", "text": "e2e-ok"}},
+                    {"type": "content_block_stop", "index": 0},
                     {"type": "message_delta", "delta": {"stop_reason": "end_turn"}, "usage": {"output_tokens": 2}},
                     {"type": "message_stop"},
                 ])

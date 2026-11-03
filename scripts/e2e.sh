@@ -9,6 +9,8 @@ export E2E_UP_PORT="${E2E_UP_PORT:-4110}"
 export E2E_MASTER_KEY="${E2E_MASTER_KEY:-sk-e2e-enterprise-test-master-key-32}"
 export E2E_GATEWAY="http://127.0.0.1:$E2E_GW_PORT"
 export E2E_UPSTREAM="http://127.0.0.1:$E2E_UP_PORT"
+# 日志和监控回归验证数据库部署在执行时解析环境变量；该值仅用于隔离测试。
+export E2E_MONITOR_TEST_MODEL="e2e-monitor-upstream"
 # 每轮运行使用专属证据目录，迟到的清理进程不能读取下一轮的 schema 文件。
 export E2E_RUN_DIR="${E2E_RUN_DIR:-$ROOT/.e2e/run-$$-$RANDOM}"
 # 调用方可指定独立构建和数据库；名称先校验，防止清理指向错误目标。
@@ -110,6 +112,11 @@ config["include"].append(os.environ["E2E_BUILD_DIR"] + "/types/**/*.ts")
 config["exclude"] = [*config.get("exclude", []), ".next"]
 Path("tsconfig.e2e.json").write_text(json.dumps(config, indent=2) + "\n")
 PYCONFIG
+# 公共入口始终从当前源重建 Swagger，避免本地/全量运行依赖缺失或过期的 website/dist。
+# 安装/构建失败由 set -e 阻断；不触碰生产站点，SCARF 禁用依赖安装遥测。
+echo "Building current standalone API reference..."
+SCARF_ANALYTICS=false npm ci --prefix "$ROOT/website"
+npm run build --prefix "$ROOT/website"
 echo "Building production console ($E2E_BUILD_DIR)..."
 npm run build
 echo "Building gateway and catalog sweep before the service readiness timeout..."

@@ -86,6 +86,14 @@ export const enPhrases: Record<string, string> = {
   "Enter key ID…": "Enter key ID…",
   "Response cache hits": "Response cache hits",
   "Not reported": "Not reported",
+  "logDiagnostics.startTime": "Log window start",
+  "logDiagnostics.endTime": "Log window end",
+  "logDiagnostics.title": "Request diagnostics",
+  "logDiagnostics.cancelUnknown": "The request connection was canceled. Who initiated it is unknown; this does not prove a user stopped generation.",
+  "logDiagnostics.upstreamError": "Observed upstream error",
+  "logDiagnostics.bodyOmitted": "The request body was not fully read and was not saved. Bytes read, the size limit, and the error reason were retained.",
+  "logDiagnostics.noUpstreamError": "No explicit upstream error was observed. This does not prove the upstream was healthy.",
+  "logDiagnostics.noResponse": "No upstream HTTP response received",
   "Upstream Response": "Upstream Response",
   "Copy upstream response": "Copy upstream response",
   "Upstream Response Headers": "Upstream Response Headers",
@@ -8023,8 +8031,8 @@ export const enPhrases: Record<string, string> = {
   "Enter a FAL task path as the upstream model, for example byteplus/seedance-2.0/text-to-video.":
     "Enter a FAL task path as the upstream model, for example byteplus/seedance-2.0/text-to-video.",
   "XHub public endpoints": "XHub public endpoints",
-  "Standard endpoints are enabled automatically and use the same public model name.":
-    "Standard endpoints are enabled automatically and use the same public model name.",
+  "modelEndpoints.automaticDescription":
+    "Standard endpoints and matching Chat Completions, Responses or Messages passthrough endpoints are enabled automatically. Choose the request path to use standard processing or passthrough; both use the same public model name.",
   "This model uses a provider-specific protocol. The passthrough endpoints below are enabled from registered capabilities.":
     "This model uses a provider-specific protocol. The passthrough endpoints below are enabled from registered capabilities.",
   "Enabled endpoints": "Enabled endpoints",

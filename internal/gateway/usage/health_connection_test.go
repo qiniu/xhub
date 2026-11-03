@@ -150,3 +150,28 @@ func TestHealthTestConnectionSuccess(t *testing.T) {
 		t.Fatalf("连接成功契约错误: calls=%d body=%#v", calls, got)
 	}
 }
+
+// TestHealthServicesDoesNotInventHealth 验证服务健康未实现时明确501，退役告警服务仍400；内存处理器不访问网络或数据库。
+func TestHealthServicesDoesNotInventHealth(t *testing.T) {
+	for _, service := range []string{"", "redis", "database", "unknown", "email", "ms_teams", "msteams", "slack"} {
+		w := httptest.NewRecorder()
+		HealthServices(&healthHost{}, w, httptest.NewRequest("GET", "/health/services?service="+service, nil))
+		want := 501
+		if service == "email" || service == "ms_teams" || service == "msteams" || service == "slack" {
+			want = 400
+		}
+		if w.Code != want {
+			t.Fatal("无探测却报告健康或退役语义改变", service, w.Code)
+		}
+		var body map[string]any
+		if err := json.Unmarshal(w.Body.Bytes(), &body); err != nil {
+			t.Fatal(err)
+		}
+		if want == 501 {
+			e, _ := body["error"].(map[string]any)
+			if e["type"] != "unsupported_operation" || body["status"] != nil {
+				t.Fatal("应明确不支持", body)
+			}
+		}
+	}
+}
