@@ -54,7 +54,7 @@ export function registerStage4Combined(locale: Locale) {
       await page.getByPlaceholder(tr("Select an endpoint"), { exact: true }).click();
       await page
         .getByRole("option")
-        .filter({ hasText: /\/v1\/chat\/completions$/ })
+        .filter({ hasText: /(?:^|\s)\/v1\/chat\/completions$/ })
         .click();
       const prompt = "Verify billed chat remains visible after combined legacy operations.";
       await page.getByTestId("chat-composer-input").fill(prompt);

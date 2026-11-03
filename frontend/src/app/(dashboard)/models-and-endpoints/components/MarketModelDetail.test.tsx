@@ -81,3 +81,19 @@ it("读取完整部署分页并拒绝非法响应", async () => {
   vi.mocked(modelInfoCall).mockResolvedValueOnce({ data: null } as never);
   await expect(loadMarketAccess("token", "user", "Admin")).rejects.toThrow("部署列表读取失败");
 });
+/** 登录后旧部署仅声明标准接口；验证加载结果包含兼容的自动透传而不改原始对象，查询和 DOM 由测试隔离。 */
+it("目录加载时补充实际支持的自动透传入口", async () => {
+  const deployment = { model_name: "old", model_info: { transport: "bypass_openai_responses", endpoint_types: ["responses"] } };
+  vi.mocked(apiClient.get).mockResolvedValue({
+    endpoint_types: [
+      { id: "responses", category: "openai", kind: "adapted", protocol: "openai-responses" },
+      { id: "bypass:openai-responses", category: "bypass", kind: "bypass", protocol: "openai-responses" },
+      { id: "bypass:anthropic-messages", category: "bypass", kind: "bypass", protocol: "anthropic-messages" },
+    ],
+    transports: [{ id: "bypass_openai_responses", protocol: "openai-responses", endpoint_id: "bypass:openai-responses" }],
+  });
+  vi.mocked(modelInfoCall).mockResolvedValue({ data: [deployment], total_pages: 1 } as never);
+  const result = await loadMarketAccess("token", "user", "Admin");
+  expect(result.deployments[0].model_info?.endpoint_types).toEqual(["responses", "bypass:openai-responses"]);
+  expect(deployment.model_info.endpoint_types).toEqual(["responses"]);
+});

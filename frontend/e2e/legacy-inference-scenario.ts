@@ -31,7 +31,7 @@ export function registerLegacyInference(locale: Locale) {
     await page.getByPlaceholder(tr("Select a Model"), { exact: true }).click();
     await page.getByRole("option", { name: "gpt-4o-mini", exact: true }).click();
     await page.getByPlaceholder(tr("Select an endpoint"), { exact: true }).click();
-    await page.getByRole("option").filter({ hasText: /\/v1\/chat\/completions$/ }).click();
+    await page.getByRole("option").filter({ hasText: /(?:^|\s)\/v1\/chat\/completions$/ }).click();
     const prompt = "Verify normal chat after unsupported legacy operations.";
     await page.getByTestId("chat-composer-input").fill(prompt);
     const pending = page.waitForResponse(r => new URL(r.url()).pathname.endsWith("/chat/completions") && r.request().method() === "POST");

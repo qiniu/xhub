@@ -501,9 +501,11 @@ class Handler(BaseHTTPRequestHandler):
                        "usage": {"input_tokens": 8, "output_tokens": 2}}
             if req.get("stream") is True:
                 self._sse([
-                    {"type": "message_start", "message": {"id": "msg_e2e", "usage": {"input_tokens": 8}}},
+                    # 原生客户端校验完整生命周期，夹具不能依赖标准转换器补齐身份字段或关闭内容块。
+                    {"type": "message_start", "message": {**payload, "content": [], "stop_reason": None, "usage": {"input_tokens": 8, "output_tokens": 0}}},
                     {"type": "content_block_start", "index": 0, "content_block": {"type": "text", "text": ""}},
                     {"type": "content_block_delta", "index": 0, "delta": {"type": "text_delta", "text": "e2e-ok"}},
+                    {"type": "content_block_stop", "index": 0},
                     {"type": "message_delta", "delta": {"stop_reason": "end_turn"}, "usage": {"output_tokens": 2}},
                     {"type": "message_stop"},
                 ])

@@ -7,7 +7,7 @@ import (
 	"testing"
 )
 
-// TestTokenCountEndpointBoundary 验证标准计数沿用Messages权限、透传显式授权及跨协议拒绝。
+// TestTokenCountEndpointBoundary 验证标准计数沿用Messages权限、匹配协议透传默认可用及跨协议拒绝。
 // 参数t为测试上下文，返回无；前置只读注册表和内存部署，不访问上游或产生需清理数据。
 func TestTokenCountEndpointBoundary(t *testing.T) {
 	hit, _ := registry.Match("POST", "/v1/messages/count_tokens")
@@ -17,8 +17,8 @@ func TestTokenCountEndpointBoundary(t *testing.T) {
 		t.Fatalf("标准计数不可用: %+v %v", resolved, err)
 	}
 	bypass, _ := registry.Match("POST", "/bypass/anthropic/v1/messages/count_tokens")
-	if _, err := deployment.ResolveHit(bypass, m); err == nil {
-		t.Fatal("标准权限隐式开启透传")
+	if _, err := deployment.ResolveHit(bypass, m); err != nil {
+		t.Fatalf("匹配的原生计数未默认开放: %v", err)
 	}
 	m.ModelInfo["endpoint_types"] = []string{"messages", "bypass:anthropic-messages"}
 	if _, err := deployment.ResolveHit(bypass, m); err != nil {
