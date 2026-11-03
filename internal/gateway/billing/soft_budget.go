@@ -88,7 +88,12 @@ func (p SoftPricePlan) Charge(raw map[string]any) (catalog.Charge, error) {
 		snapshot.CacheWriteByTTL = prices.CacheWriteByTTL
 	}
 	plan := BudgetPlan{frozen: &snapshot, soft: true}
-	return plan.Charge(u, raw)
+	charge, err := plan.Charge(u, raw)
+	// 冻结费率完全缺少缓存写入项时，期限校验先返回通用错误；只改善日志分类，不改变原计费结果。
+	if err != nil && err.Error() == "measured cache creation TTL differs from the reserved price" && snapshot.CacheWrite == nil && u.CacheWriteTokens > 0 {
+		return charge, fmt.Errorf("measured cache writes have no reserved price")
+	}
+	return charge, err
 }
 
 // SoftTokenOnly 判断对话是否采用仅Token计费；参数为部署和出站协议，返回是否排除托管工具次数。

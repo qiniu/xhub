@@ -21,6 +21,11 @@ function logEntry(overrides: Partial<LogEntry> = {}): LogEntry {
 }
 
 describe("上游响应折叠", () => {
+  /** 有真实首响应字节耗时时展示正确口径，中英文均不将其误称首 Token；纯组件测试，自动卸载清理。 */
+  it.each(["zh-CN", "en"] as const)("%s 显示首响应字节耗时", (locale) => {
+    render(<I18nProvider initialLocale={locale}><LogDetailContent logEntry={logEntry({ ttft_ms: 1200 })} /></I18nProvider>);
+    expect(screen.getByText(translate(locale, "logsUX.firstResponse"))).toBeVisible();
+  });
   /** 前置后台未定价或真实免费零值，验证中英文指标与费用明细语义一致；纯组件渲染，自动卸载清理。 */
   it.each(["zh-CN", "en"] as const)("%s 指标区分未知费用和真实免费", (locale) => {
     const sample = logEntry({ spend: 0, cache_hit: false, metadata: { cost_breakdown: { pricing_status: "unpriced", total_cost: 0 } } });
@@ -86,7 +91,7 @@ describe("上游响应折叠", () => {
       http_status: 502, upstream_response: { status_code: 502, headers: {}, trailers: { "X-Trailer": ["last"] },
         usage_reported: false, usage_parse_error: "invalid upstream usage" },
     } })} />);
-    expect(screen.getByText("Request Failed")).toBeVisible();
+    expect(screen.getByText("Service error")).toBeVisible();
     expect(screen.getByRole("region", { name: "Full Error Details" })).toHaveTextContent("upstream failed");
     const region = screen.getByRole("region", { name: "Upstream Response" });
     expect(within(region).queryByRole("alert")).not.toBeInTheDocument();

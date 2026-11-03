@@ -9,6 +9,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { UiLoadingSpinner } from "@/components/ui/ui-loading-spinner";
 import { LogEntry } from "../columns";
+import { logOutcomeKey, logErrorSummary } from "../logPresentation";
 import { fullErrorDetails, isRequestFailure } from "../logErrors";
 import { formatNumberWithCommas } from "@/utils/dataUtils";
 import { formatLogCost } from "../formatLogCost";
@@ -57,6 +58,8 @@ export interface LogDetailContentProps {
   logEntry: LogEntry;
   /** When true, log details (messages/response) are still being lazy-loaded. */
   isLoadingDetails?: boolean;
+  /** 详情请求失败时由抽屉展示错误和重试，不把失败误报为历史正文缺失。 */
+  isDetailsError?: boolean;
   accessToken?: string | null;
 }
 
@@ -68,7 +71,7 @@ export interface LogDetailContentProps {
  * 推理强度只展示明确快照，缺省为未知；金额格式化不修改计费或用户内容。
  */
 /** 日志抽屉正文：按 logEntry 展示原始协议证据与国际化诊断，读取失败时说明正文省略；返回详情组件，不修改请求或费用。 */
-export function LogDetailContent({ logEntry, isLoadingDetails = false, accessToken }: LogDetailContentProps) {
+export function LogDetailContent({ logEntry, isLoadingDetails = false, isDetailsError = false, accessToken }: LogDetailContentProps) {
   const t = useT();
   const metadata = logEntry.metadata || {};
   const hasError = isRequestFailure(logEntry);
@@ -84,7 +87,7 @@ export function LogDetailContent({ logEntry, isLoadingDetails = false, accessTok
   const hasMessages = checkHasMessages(logEntry.messages);
   const hasResponse = checkHasResponse(logEntry.response);
   // Don't show "missing data" warning while details are still loading
-  const missingData = !hasMessages && !hasResponse && !hasError && !isLoadingDetails;
+  const missingData = !hasMessages && !hasResponse && !hasError && !isLoadingDetails && !isDetailsError;
 
   // Guardrail data
   const guardrailInfo = metadata?.guardrail_information;
@@ -119,48 +122,6 @@ export function LogDetailContent({ logEntry, isLoadingDetails = false, accessTok
 
   return (
     <div style={{ padding: `${DRAWER_CONTENT_PADDING} ${DRAWER_CONTENT_PADDING} 0` }}>
-      {(metadata.upstream_response?.failure || metadata.upstream_response?.routing || metadata.upstream_response?.rate_limit) && (
-        <section aria-label={t("logDiagnostics.title")} className="mb-6 rounded-lg border p-4">
-          <h3 className="font-semibold">{t("logDiagnostics.title")}</h3>
-          {metadata.upstream_response.failure?.cancellation_source === "unknown" && <p>{t("logDiagnostics.cancelUnknown")}</p>}
-          {metadata.upstream_response.failure?.request_body_omitted && <p>{t("logDiagnostics.bodyOmitted")}</p>}
-          <pre className="max-h-64 overflow-auto whitespace-pre-wrap break-all text-xs">{JSON.stringify(metadata.upstream_response.failure ?? metadata.upstream_response.routing ?? metadata.upstream_response.rate_limit, null, 2)}</pre>
-          <h4>{t("logDiagnostics.upstreamError")}</h4>
-          {metadata.upstream_response.error
-            ? <pre className="max-h-64 overflow-auto whitespace-pre-wrap break-all text-xs">{JSON.stringify(metadata.upstream_response.error, null, 2)}</pre>
-            : <p>{t("logDiagnostics.noUpstreamError")}</p>}
-        </section>
-      )}
-      {metadata.upstream_response && (
-        <section aria-label={t("Upstream Response")} className="mb-6 rounded-lg border p-4">
-          {/* 以请求 ID 隔离展开状态，避免查看下一条日志时继承上一条的展开状态。 */}
-          <Collapsible key={logEntry.request_id} defaultOpen={false}>
-            <div className="flex items-center justify-between gap-3">
-              <CollapsibleTrigger className="group flex flex-1 items-center gap-2 rounded-sm text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
-                <ChevronRight aria-hidden="true" className="size-4 shrink-0 text-muted-foreground group-aria-expanded:hidden" />
-                <ChevronDown aria-hidden="true" className="hidden size-4 shrink-0 text-muted-foreground group-aria-expanded:block" />
-                <h3 className="font-semibold">{t("Upstream Response")}</h3>
-              </CollapsibleTrigger>
-              <CopyButton getText={() => JSON.stringify(metadata.upstream_response, null, 2)} label={t("Copy upstream response")} />
-            </div>
-            {Array.isArray(metadata.upstream_response.dropped_capabilities) && metadata.upstream_response.dropped_capabilities.length > 0 && (
-              <p role="status" className="mt-2 text-sm text-muted-foreground">{t("providerGuideUI.searchDropped", { capabilities: metadata.upstream_response.dropped_capabilities.join(", ") })}</p>
-            )}
-            <CollapsibleContent className="pt-3">
-              <p>{t("HTTP Status")}: {metadata.upstream_response.status_code || t("logDiagnostics.noResponse")}</p>
-              {metadata.upstream_response.read_error && <p role="alert">{metadata.upstream_response.read_error}</p>}
-              {metadata.upstream_response.usage_parse_error && <p role="alert">{metadata.upstream_response.usage_parse_error}</p>}
-              <h4>{t("Upstream Response Headers")}</h4>
-              <pre className="max-h-64 overflow-auto whitespace-pre-wrap break-all text-xs">{JSON.stringify(metadata.upstream_response.headers, null, 2)}</pre>
-              {metadata.upstream_response.trailers && <pre className="max-h-64 overflow-auto whitespace-pre-wrap break-all text-xs">{JSON.stringify(metadata.upstream_response.trailers, null, 2)}</pre>}
-              <h4>{t("Upstream Usage")}</h4>
-              {metadata.upstream_response.usage_reported ? <pre className="max-h-64 overflow-auto whitespace-pre-wrap break-all text-xs">{JSON.stringify(metadata.upstream_response.usage, null, 2)}</pre> : <p>{t("Not reported")}</p>}
-              <h4>{t("Billing Usage")}</h4>
-              <pre className="max-h-64 overflow-auto whitespace-pre-wrap break-all text-xs">{JSON.stringify(metadata.upstream_response.billing_usage ?? {}, null, 2)}</pre>
-            </CollapsibleContent>
-          </Collapsible>
-        </section>
-      )}
       {/* Error Alert */}
       {hasError && (
         <div
@@ -169,9 +130,10 @@ export function LogDetailContent({ logEntry, isLoadingDetails = false, accessTok
         >
           <CircleAlert className="size-4 shrink-0 text-destructive" />
           <div>
-            <div className="font-medium text-destructive">{t("Request Failed")}</div>
+            <div className="font-medium text-destructive">{t(logOutcomeKey(logEntry))}</div>
+            <p className="text-muted-foreground">{t("logsUX.causeUnknown")}</p>
             {metadata.http_status != null && <div>{t("HTTP Status")}: {metadata.http_status}</div>}
-            {errorInfo && <ErrorDescription errorInfo={errorInfo} />}
+            {errorInfo ? <ErrorDescription errorInfo={errorInfo} /> : <p className="mt-1 break-words">{logErrorSummary(logEntry)}</p>}
           </div>
         </div>
       )}
@@ -181,7 +143,7 @@ export function LogDetailContent({ logEntry, isLoadingDetails = false, accessTok
             <h3 className="text-sm font-semibold">{t("Full Error Details")}</h3>
             <CopyButton getText={() => errorDetails} label={t("Copy error details")} />
           </div>
-          <pre className="max-h-96 overflow-auto whitespace-pre-wrap break-all p-3 text-xs">{errorDetails}</pre>
+          <details className="p-3"><summary className="cursor-pointer text-sm">{t("logsUX.rawError")}</summary><pre className="mt-2 max-h-96 overflow-auto whitespace-pre-wrap break-all text-xs">{errorDetails}</pre></details>
         </section>
       )}
 
@@ -235,27 +197,6 @@ export function LogDetailContent({ logEntry, isLoadingDetails = false, accessTok
       {/* Batch Results */}
       {isBatchCallType(logEntry.call_type) && <BatchResultsSection logEntry={logEntry} metadata={metadata} />}
 
-      {/* Routing */}
-      <RoutingDecisionCard decision={metadata?.routing_decision as RoutingDecision | undefined} />
-
-      {/* Metrics */}
-      <MetricsSection logEntry={logEntry} metadata={metadata} />
-
-      {/* Cost Breakdown */}
-      <CostBreakdownViewer
-        costBreakdown={metadata?.cost_breakdown}
-        totalSpend={logEntry.spend ?? 0}
-        promptTokens={logEntry.prompt_tokens}
-        completionTokens={logEntry.completion_tokens}
-        cacheHit={logEntry.cache_hit}
-        rawInputTokens={metadata?.additional_usage_values?.prompt_tokens_details?.text_tokens}
-        cacheReadTokens={metadata?.additional_usage_values?.cache_read_input_tokens}
-        cacheCreationTokens={metadata?.additional_usage_values?.cache_creation_input_tokens}
-      />
-
-      {/* Tools */}
-      <ToolsSection log={logEntry} />
-
       {/* Configuration Info Message */}
       {missingData && (
         <div className="mb-6">
@@ -285,6 +226,27 @@ export function LogDetailContent({ logEntry, isLoadingDetails = false, accessTok
         />
       )}
 
+      {/* Routing */}
+      <RoutingDecisionCard decision={metadata?.routing_decision as RoutingDecision | undefined} />
+
+      {/* Metrics */}
+      <MetricsSection logEntry={logEntry} metadata={metadata} />
+
+      {/* Cost Breakdown */}
+      <CostBreakdownViewer
+        costBreakdown={metadata?.cost_breakdown}
+        totalSpend={logEntry.spend ?? 0}
+        promptTokens={logEntry.prompt_tokens}
+        completionTokens={logEntry.completion_tokens}
+        cacheHit={logEntry.cache_hit}
+        rawInputTokens={metadata?.additional_usage_values?.prompt_tokens_details?.text_tokens}
+        cacheReadTokens={metadata?.additional_usage_values?.cache_read_input_tokens}
+        cacheCreationTokens={metadata?.additional_usage_values?.cache_creation_input_tokens}
+      />
+
+      {/* Tools */}
+      <ToolsSection log={logEntry} />
+
       {/* Guardrail Data */}
       {hasGuardrailData && (
         <div id="guardrail-section">
@@ -308,9 +270,52 @@ export function LogDetailContent({ logEntry, isLoadingDetails = false, accessTok
       {/* Vector Store Data */}
       {hasVectorStoreData && <VectorStoreViewer data={metadata.vector_store_request_metadata} />}
 
+      {(metadata.upstream_response?.failure || metadata.upstream_response?.routing || metadata.upstream_response?.rate_limit) && (
+        <section aria-label={t("logDiagnostics.title")} className="mb-6 rounded-lg border p-4">
+          <h3 className="font-semibold">{t("logDiagnostics.title")}</h3>
+          {metadata.upstream_response.failure?.cancellation_source === "unknown" && <p>{t("logDiagnostics.cancelUnknown")}</p>}
+          {metadata.upstream_response.failure?.request_body_omitted && <p>{t("logDiagnostics.bodyOmitted")}</p>}
+          <pre className="max-h-64 overflow-auto whitespace-pre-wrap break-all text-xs">{JSON.stringify(metadata.upstream_response.failure ?? metadata.upstream_response.routing ?? metadata.upstream_response.rate_limit, null, 2)}</pre>
+          <h4>{t("logDiagnostics.upstreamError")}</h4>
+          {metadata.upstream_response.error
+            ? <pre className="max-h-64 overflow-auto whitespace-pre-wrap break-all text-xs">{JSON.stringify(metadata.upstream_response.error, null, 2)}</pre>
+            : <p>{t("logDiagnostics.noUpstreamError")}</p>}
+        </section>
+      )}
+      {metadata.upstream_response && (
+        <section aria-label={t("Upstream Response")} className="mb-6 rounded-lg border p-4">
+          {/* 以请求 ID 隔离展开状态，避免查看下一条日志时继承上一条的展开状态。 */}
+          <Collapsible key={logEntry.request_id} defaultOpen={false}>
+            <div className="flex items-center justify-between gap-3">
+              <CollapsibleTrigger className="group flex flex-1 items-center gap-2 rounded-sm text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
+                <ChevronRight aria-hidden="true" className="size-4 shrink-0 text-muted-foreground group-aria-expanded:hidden" />
+                <ChevronDown aria-hidden="true" className="hidden size-4 shrink-0 text-muted-foreground group-aria-expanded:block" />
+                <h3 className="font-semibold">{t("Upstream Response")}</h3>
+              </CollapsibleTrigger>
+              <CopyButton getText={() => JSON.stringify(metadata.upstream_response, null, 2)} label={t("Copy upstream response")} />
+            </div>
+            {Array.isArray(metadata.upstream_response.dropped_capabilities) && metadata.upstream_response.dropped_capabilities.length > 0 && (
+              <p role="status" className="mt-2 text-sm text-muted-foreground">{t("providerGuideUI.searchDropped", { capabilities: metadata.upstream_response.dropped_capabilities.join(", ") })}</p>
+            )}
+            <CollapsibleContent className="pt-3">
+              <p>{t("HTTP Status")}: {metadata.upstream_response.status_code || t("logDiagnostics.noResponse")}</p>
+              {metadata.upstream_response.read_error && <p role="alert">{metadata.upstream_response.read_error}</p>}
+              {metadata.upstream_response.usage_parse_error && <p role="alert">{metadata.upstream_response.usage_parse_error}</p>}
+              <h4>{t("Upstream Response Headers")}</h4>
+              <pre className="max-h-64 overflow-auto whitespace-pre-wrap break-all text-xs">{JSON.stringify(metadata.upstream_response.headers, null, 2)}</pre>
+              {metadata.upstream_response.trailers && <pre className="max-h-64 overflow-auto whitespace-pre-wrap break-all text-xs">{JSON.stringify(metadata.upstream_response.trailers, null, 2)}</pre>}
+              <h4>{t("Upstream Usage")}</h4>
+              {metadata.upstream_response.usage_reported ? <pre className="max-h-64 overflow-auto whitespace-pre-wrap break-all text-xs">{JSON.stringify(metadata.upstream_response.usage, null, 2)}</pre> : <p>{t("Not reported")}</p>}
+              <h4>{t("Billing Usage")}</h4>
+              <pre className="max-h-64 overflow-auto whitespace-pre-wrap break-all text-xs">{JSON.stringify(metadata.upstream_response.billing_usage ?? {}, null, 2)}</pre>
+            </CollapsibleContent>
+          </Collapsible>
+        </section>
+      )}
+
       {/* Metadata */}
       {logEntry.metadata && Object.keys(logEntry.metadata).length > 0 && (
-        <MetadataSection metadata={logEntry.metadata} />
+        <details className="mb-4 rounded-md border p-3"><summary className="cursor-pointer text-sm font-medium">{t("logsUX.rawMetadata")}</summary><MetadataSection metadata={logEntry.metadata} /></details>
       )}
 
       {/* Bottom spacing */}
@@ -373,6 +378,7 @@ function CopyButton({
   );
 }
 
+/** 摘要展示已有错误代码与消息；长正文在原始错误中完整保留，避免顶部摘要撑满抽屉。参数是日志元数据，无副作用。 */
 function ErrorDescription({ errorInfo }: { errorInfo: any }) {
   const t = useT();
   return (
@@ -383,7 +389,7 @@ function ErrorDescription({ errorInfo }: { errorInfo: any }) {
         </div>
       )}
       {errorInfo.error_message && (
-        <div>
+        <div className="line-clamp-3 break-all">
           <span className="font-semibold">{t("Message:")}</span> {errorInfo.error_message}
         </div>
       )}
@@ -563,7 +569,7 @@ function MetricsSection({ logEntry, metadata }: { logEntry: LogEntry; metadata: 
               {logEntry.request_duration_ms != null ? (logEntry.request_duration_ms / 1000).toFixed(3) : "-"} s
             </DescriptionItem>
             {ttftMs != null && ttftMs >= 0 && (
-              <DescriptionItem label={t("requestMetrics.ttft")}>{(ttftMs / 1000).toFixed(2)} s</DescriptionItem>
+              <DescriptionItem label={t("logsUX.firstResponse")}>{(ttftMs / 1000).toFixed(2)} s</DescriptionItem>
             )}
 
             {showResponseCache && (
@@ -636,10 +642,10 @@ function MetricsSection({ logEntry, metadata }: { logEntry: LogEntry; metadata: 
             </DescriptionItem>
 
             <DescriptionItem label={t("Start Time")}>
-              {moment(logEntry.startTime).format("YYYY-MM-DDTHH:mm:ss.SSS[Z]")}
+              {moment(logEntry.startTime).format("YYYY-MM-DD HH:mm:ss.SSS Z")}
             </DescriptionItem>
             <DescriptionItem label={t("End Time")}>
-              {moment(logEntry.endTime).format("YYYY-MM-DDTHH:mm:ss.SSS[Z]")}
+              {moment(logEntry.endTime).format("YYYY-MM-DD HH:mm:ss.SSS Z")}
             </DescriptionItem>
           </DescriptionList>
         </CardContent>

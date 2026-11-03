@@ -15,10 +15,11 @@
 | `GET /team/daily/activity` | 授权后按天汇总；分页合计仅当前页，aggregated合计全范围；无效日期保留开放边界；缓存未知不填0 | 200, 400, 401, 403, 404, 409, 500, 503 |
 | `GET /team/daily/activity/aggregated` | 授权后按天汇总；分页合计仅当前页，aggregated合计全范围；无效日期保留开放边界；缓存未知不填0 | 200, 400, 401, 403, 404, 409, 500, 503 |
 | `GET /organization/daily/activity` | 授权后按天汇总；分页合计仅当前页，aggregated合计全范围；无效日期保留开放边界；缓存未知不填0 | 200, 400, 401, 403, 404, 409, 500, 503 |
+| `GET /spend/logs/ui/filter-options` | 日志筛选候选 | 200, 400, 401, 403, 500, 503 |
 
 ### GET /spend/logs/v2
 
-权限范围内日志，page无效回退1，page_size超出1..200回退50；日期按UTC含结束日；完整时间精确过滤，非法或倒置窗口返回400；会话聚合先分组后分页；未声明筛选不保证有效
+权限范围内日志，page无效回退1，page_size超出1..200回退50；日期按UTC含结束日；完整时间精确过滤，非法或倒置窗口返回400；会话聚合先分组后分页；未声明筛选不保证有效；筛选条件在权限范围内按且组合，先筛选再分页；非法错误码或缓存条件返回400
 
 ```json
 [
@@ -106,14 +107,16 @@
     "name": "error_code",
     "schema": {
       "type": "string"
-    }
+    },
+    "description": "最终 HTTP 状态精确匹配，100至599；非法非空值返回400"
   },
   {
     "in": "query",
     "name": "error_message",
     "schema": {
       "type": "string"
-    }
+    },
+    "description": "完整错误正文中不区分大小写的字面子串；%和_不是通配符"
   },
   {
     "in": "query",
@@ -142,6 +145,52 @@
     "schema": {
       "type": "string"
     }
+  },
+  {
+    "in": "query",
+    "name": "key_hash",
+    "schema": {
+      "type": "string"
+    },
+    "description": "密钥 Hash 精确匹配；api_key 仍指密钥 ID"
+  },
+  {
+    "in": "query",
+    "name": "key_alias",
+    "schema": {
+      "type": "string"
+    },
+    "description": "调用时的密钥别名精确匹配，包含历史别名"
+  },
+  {
+    "in": "query",
+    "name": "supplier",
+    "schema": {
+      "type": "string"
+    },
+    "description": "调用时的供应商连接名精确匹配"
+  },
+  {
+    "in": "query",
+    "name": "inbound_endpoint",
+    "schema": {
+      "type": "string"
+    },
+    "description": "入站路径精确匹配"
+  },
+  {
+    "in": "query",
+    "name": "cache_hit_filter",
+    "schema": {
+      "type": "string",
+      "enum": [
+        "",
+        "hit",
+        "miss"
+      ]
+    },
+    "description": "网关响应缓存命中或未命中，不是上游提示词缓存；非法值返回400",
+    "allowEmptyValue": true
   }
 ]
 ```
@@ -149,7 +198,7 @@
 
 ### GET /spend/logs/ui
 
-权限范围内日志，page无效回退1，page_size超出1..200回退50；日期按UTC含结束日；完整时间精确过滤，非法或倒置窗口返回400；会话聚合先分组后分页；未声明筛选不保证有效
+权限范围内日志，page无效回退1，page_size超出1..200回退50；日期按UTC含结束日；完整时间精确过滤，非法或倒置窗口返回400；会话聚合先分组后分页；未声明筛选不保证有效；筛选条件在权限范围内按且组合，先筛选再分页；非法错误码或缓存条件返回400
 
 ```json
 [
@@ -237,14 +286,16 @@
     "name": "error_code",
     "schema": {
       "type": "string"
-    }
+    },
+    "description": "最终 HTTP 状态精确匹配，100至599；非法非空值返回400"
   },
   {
     "in": "query",
     "name": "error_message",
     "schema": {
       "type": "string"
-    }
+    },
+    "description": "完整错误正文中不区分大小写的字面子串；%和_不是通配符"
   },
   {
     "in": "query",
@@ -273,6 +324,52 @@
     "schema": {
       "type": "string"
     }
+  },
+  {
+    "in": "query",
+    "name": "key_hash",
+    "schema": {
+      "type": "string"
+    },
+    "description": "密钥 Hash 精确匹配；api_key 仍指密钥 ID"
+  },
+  {
+    "in": "query",
+    "name": "key_alias",
+    "schema": {
+      "type": "string"
+    },
+    "description": "调用时的密钥别名精确匹配，包含历史别名"
+  },
+  {
+    "in": "query",
+    "name": "supplier",
+    "schema": {
+      "type": "string"
+    },
+    "description": "调用时的供应商连接名精确匹配"
+  },
+  {
+    "in": "query",
+    "name": "inbound_endpoint",
+    "schema": {
+      "type": "string"
+    },
+    "description": "入站路径精确匹配"
+  },
+  {
+    "in": "query",
+    "name": "cache_hit_filter",
+    "schema": {
+      "type": "string",
+      "enum": [
+        "",
+        "hit",
+        "miss"
+      ]
+    },
+    "description": "网关响应缓存命中或未命中，不是上游提示词缓存；非法值返回400",
+    "allowEmptyValue": true
   }
 ]
 ```
@@ -280,7 +377,7 @@
 
 ### GET /spend/logs/session/ui
 
-权限范围内日志，page无效回退1，page_size超出1..200回退50；日期按UTC含结束日；完整时间精确过滤，非法或倒置窗口返回400；会话聚合先分组后分页；未声明筛选不保证有效
+权限范围内日志，page无效回退1，page_size超出1..200回退50；日期按UTC含结束日；完整时间精确过滤，非法或倒置窗口返回400；会话聚合先分组后分页；未声明筛选不保证有效；session_id空时既有接口在鉴权前返回空页；筛选条件在权限范围内按且组合，先筛选再分页；非法错误码或缓存条件返回400
 
 ```json
 [
@@ -368,14 +465,16 @@
     "name": "error_code",
     "schema": {
       "type": "string"
-    }
+    },
+    "description": "最终 HTTP 状态精确匹配，100至599；非法非空值返回400"
   },
   {
     "in": "query",
     "name": "error_message",
     "schema": {
       "type": "string"
-    }
+    },
+    "description": "完整错误正文中不区分大小写的字面子串；%和_不是通配符"
   },
   {
     "in": "query",
@@ -404,6 +503,52 @@
     "schema": {
       "type": "string"
     }
+  },
+  {
+    "in": "query",
+    "name": "key_hash",
+    "schema": {
+      "type": "string"
+    },
+    "description": "密钥 Hash 精确匹配；api_key 仍指密钥 ID"
+  },
+  {
+    "in": "query",
+    "name": "key_alias",
+    "schema": {
+      "type": "string"
+    },
+    "description": "调用时的密钥别名精确匹配，包含历史别名"
+  },
+  {
+    "in": "query",
+    "name": "supplier",
+    "schema": {
+      "type": "string"
+    },
+    "description": "调用时的供应商连接名精确匹配"
+  },
+  {
+    "in": "query",
+    "name": "inbound_endpoint",
+    "schema": {
+      "type": "string"
+    },
+    "description": "入站路径精确匹配"
+  },
+  {
+    "in": "query",
+    "name": "cache_hit_filter",
+    "schema": {
+      "type": "string",
+      "enum": [
+        "",
+        "hit",
+        "miss"
+      ]
+    },
+    "description": "网关响应缓存命中或未命中，不是上游提示词缓存；非法值返回400",
+    "allowEmptyValue": true
   }
 ]
 ```
@@ -854,6 +999,77 @@
   {
     "in": "query",
     "name": "model",
+    "schema": {
+      "type": "string"
+    }
+  }
+]
+```
+
+
+### GET /spend/logs/ui/filter-options
+
+只返回当前账号有权查看的日志候选；模型和供应商还需当前模型授权及启用部署，不返回明文密钥或正文
+
+```json
+[
+  {
+    "name": "field",
+    "in": "query",
+    "required": true,
+    "schema": {
+      "type": "string",
+      "enum": [
+        "model",
+        "key_alias",
+        "key_hash",
+        "supplier",
+        "inbound_endpoint"
+      ]
+    },
+    "description": "候选字段"
+  },
+  {
+    "name": "start_date",
+    "in": "query",
+    "required": true,
+    "description": "授权范围内查询起始时间",
+    "schema": {
+      "type": "string"
+    }
+  },
+  {
+    "name": "end_date",
+    "in": "query",
+    "required": true,
+    "description": "授权范围内查询结束时间，最多366天",
+    "schema": {
+      "type": "string"
+    }
+  },
+  {
+    "name": "q",
+    "in": "query",
+    "required": false,
+    "description": "不区分大小写的字面子串，最多128字符",
+    "schema": {
+      "type": "string"
+    }
+  },
+  {
+    "name": "page",
+    "in": "query",
+    "required": false,
+    "description": "页码 1–100，默认 1",
+    "schema": {
+      "type": "string"
+    }
+  },
+  {
+    "name": "page_size",
+    "in": "query",
+    "required": false,
+    "description": "每页 1–50 条，默认 50",
     "schema": {
       "type": "string"
     }
@@ -1732,5 +1948,36 @@
     "metrics",
     "metadata"
   ]
+}
+```
+
+### LogFilterOptionPage
+
+```json
+{
+  "type": "object",
+  "required": [
+    "data",
+    "page",
+    "page_size",
+    "has_more"
+  ],
+  "properties": {
+    "data": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "page": {
+      "type": "integer"
+    },
+    "page_size": {
+      "type": "integer"
+    },
+    "has_more": {
+      "type": "boolean"
+    }
+  }
 }
 ```

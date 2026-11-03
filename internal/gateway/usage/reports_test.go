@@ -1,6 +1,8 @@
 package usage
 
 import (
+	"errors"
+	"fmt"
 	"net/http/httptest"
 	"net/url"
 	"testing"
@@ -9,6 +11,69 @@ import (
 	"github.com/sunqirui1987/xhub/internal/authz"
 	"github.com/sunqirui1987/xhub/internal/iam"
 )
+
+// TestDetailBodyOrMissing 区分真实正文、历史缺行和数据库故障；纯函数无需资源或清理。
+func TestDetailBodyOrMissing(t *testing.T) {
+	body := &iam.RequestLog{RequestID: "stored", ResponseBody: "answer"}
+	got, err := detailBodyOrMissing("stored", body, nil)
+	if err != nil || got != body {
+		t.Fatal("已有正文不应被替换", got, err)
+	}
+	got, err = detailBodyOrMissing("history", nil, fmt.Errorf("wrapped: %w", iam.ErrNotFound))
+	if err != nil || got == nil || got.RequestID != "history" || got.ResponseBody != "" {
+		t.Fatal("历史缺行应保留空正文", got, err)
+	}
+	failure := errors.New("connection lost")
+	got, err = detailBodyOrMissing("failed", nil, failure)
+	if got != nil || !errors.Is(err, failure) {
+		t.Fatal("存储失败不得伪装为空正文", got, err)
+	}
+}
+
+// TestLogTimeAndValidation 验证日期、精确时间和时区边界，以及无效条件返回错误；纯请求解析测试，无外部依赖和清理。
+func TestLogTimeAndValidation(t *testing.T) {
+	for _, tc := range []struct {
+		value string
+		end   bool
+		want  string
+	}{
+		{"2026-11-01", false, "2026-11-01T00:00:00Z"},
+		{"2026-11-01", true, "2026-11-01T23:59:59.999999999Z"},
+		{"2026-11-01 12:34:56", true, "2026-11-01T12:34:56Z"},
+		{"2026-11-01T12:34:56+08:00", false, "2026-11-01T04:34:56Z"},
+		{"2026-11-01T12:34:56.123Z", true, "2026-11-01T12:34:56.123Z"},
+	} {
+		parsed, err := logTime(tc.value, tc.end)
+		if got := parsed.UTC().Format(time.RFC3339Nano); err != nil || got != tc.want {
+			t.Errorf("时间 %q end=%t 得到 %s，期望 %s", tc.value, tc.end, got, tc.want)
+		}
+	}
+	for _, query := range []string{"", "error_code=499&cache_hit_filter=miss", "start_date=2026-11-01&end_date=2026-11-01"} {
+		if _, err := logQuery(httptest.NewRequest("GET", "/?"+query, nil), &authz.Scope{}); err != nil {
+			t.Errorf("有效筛选 %s 被拒绝: %v", query, err)
+		}
+	}
+	for _, query := range []string{"start_date=bad", "end_date=2026-02-30", "start_date=2026-11-02&end_date=2026-11-01", "error_code=99", "error_code=600", "error_code=4xx", "cache_hit_filter=true"} {
+		if _, err := logQuery(httptest.NewRequest("GET", "/?"+query, nil), &authz.Scope{}); err == nil {
+			t.Errorf("无效筛选 %s 未被拒绝", query)
+		}
+	}
+}
+
+// TestLogFilterMapping 验证筛选不混淆密钥 ID/Hash，并保留显式缓存未命中；纯函数无持久化和清理。
+func TestLogFilterMapping(t *testing.T) {
+	r := httptest.NewRequest("GET", "/?api_key=id&key_hash=hash&key_alias=alias&supplier=s&inbound_endpoint=/v1/responses&error_code=499&error_message=cancel&cache_hit_filter=miss", nil)
+	q, err := logQuery(r, &authz.Scope{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if q.KeyID != "id" || q.KeyHash != "hash" || q.KeyAlias != "alias" || q.Supplier != "s" || q.InboundEndpoint != "/v1/responses" || q.ErrorCode != "499" || q.ErrorMessage != "cancel" || q.CacheHit == nil || *q.CacheHit {
+		t.Fatalf("筛选映射不符合接口契约: %+v", q)
+	}
+	if got, err := logQuery(httptest.NewRequest("GET", "/", nil), &authz.Scope{}); err != nil || got.CacheHit != nil {
+		t.Fatal("未指定缓存条件不应等同未命中")
+	}
+}
 
 // TestTaskStatusFilters 验证日志查询接受任务阶段和旧失败筛选，未知状态不扩大筛选；纯函数测试无数据清理。
 func TestTaskStatusFilters(t *testing.T) {
@@ -173,7 +238,7 @@ func TestLogTPS(t *testing.T) {
 	}
 }
 
-// TestLogErrorFilters 验证日志接口完整接收错误码与消息，非法值交给查询层收窄为空集。
+// TestLogErrorFilters 验证日志接口完整接收错误码与消息，非法值返回错误且不能退化成无条件查询。
 // 前置内存请求，覆盖空值、组合、空白和SQL样式输入；无持久化副作用，不需清理。
 func TestLogErrorFilters(t *testing.T) {
 	for _, tc := range []struct{ code, message, want string }{
@@ -182,6 +247,12 @@ func TestLogErrorFilters(t *testing.T) {
 	} {
 		raw := url.Values{"error_code": {tc.code}, "error_message": {tc.message}}
 		q, err := logQuery(httptest.NewRequest("GET", "/spend/logs/ui?"+raw.Encode(), nil), &authz.Scope{})
+		if tc.code == "broken" || tc.code == "600" {
+			if err == nil {
+				t.Fatalf("非法错误码 %q 未拒绝", tc.code)
+			}
+			continue
+		}
 		if err != nil {
 			t.Fatal(err)
 		}

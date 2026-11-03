@@ -332,8 +332,8 @@ describe("RealtimePrettyView", () => {
       <RealtimePrettyView response={sampleRealtimeResponse} metrics={{ completion_tokens: 500, output_cost: 0.005 }} />,
     );
     expect(screen.getByText(/Tokens: 500/)).toBeInTheDocument();
-    // 非零汇总费用按照共享标题的两位小数舍入；render 清理由测试框架完成。
-    expect(screen.getByText("Cost: $0.01")).toBeInTheDocument();
+    // 非零汇总费用保留实际小额数值，不舍入到美分；render 清理由测试框架完成。
+    expect(screen.getByText("Cost: $0.005")).toBeInTheDocument();
   });
 
   it("should toggle output section collapse when header is clicked", async () => {

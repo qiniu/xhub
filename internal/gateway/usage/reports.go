@@ -18,6 +18,7 @@ import (
 	"fmt"
 	"net/http"
 	"sort"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -199,7 +200,7 @@ func collapseSessions(rows []map[string]any) []map[string]any {
 
 // logQuery builds the scoped log query from the request's filters. The scope is applied first and the filters only narrow inside it, so `user_id` or `api_key` from the query string can never widen a read beyond what the scope allows.
 // 参数 r（*http.Request）：入站 HTTP 请求；sc（*authz.Scope）：日志查询使用的权限范围。
-// 返回错误表示非法或倒置的时间窗口，调用方必须拒绝查询，不能忽略条件。
+// 返回错误表示非法时间窗口、错误码或响应缓存条件，调用方必须拒绝查询，不能忽略条件。
 // 返回 UsageQuery（iam.UsageQuery）：在权限范围之内、再按请求筛选收窄的日志查询。筛选不能把范围扩大。
 // 调用：仅在 reports.go 内使用
 // 错误码按最终客户端状态精确匹配，消息按完整诊断正文匹配；非法码不会扩大查询。
@@ -232,6 +233,21 @@ func logQuery(r *http.Request, sc *authz.Scope) (iam.UsageQuery, error) {
 		ErrorMessage: raw.Get("error_message"),
 		SortBy:       raw.Get("sort_by"),
 		SortAsc:      raw.Get("sort_order") == "asc",
+	}
+	q.KeyHash, q.KeyAlias = raw.Get("key_hash"), raw.Get("key_alias")
+	q.Supplier, q.InboundEndpoint = raw.Get("supplier"), raw.Get("inbound_endpoint")
+	if v := q.ErrorCode; v != "" {
+		n, err := strconv.Atoi(v)
+		if err != nil || n < 100 || n > 599 {
+			return iam.UsageQuery{}, errors.New("error_code must be an HTTP status between 100 and 599")
+		}
+	}
+	if v := raw.Get("cache_hit_filter"); v != "" && v != "hit" && v != "miss" {
+		return iam.UsageQuery{}, errors.New("cache_hit_filter must be hit or miss")
+	}
+	if v := raw.Get("cache_hit_filter"); v != "" {
+		hit := v == "hit"
+		q.CacheHit = &hit
 	}
 	switch raw.Get("status_filter") {
 	case "success", "completed", "executing", "polling", "non_error":
@@ -310,7 +326,7 @@ func eventRows(events []iam.UsageEvent) []map[string]any {
 			"model_id":            e.Model,
 			"call_type":           e.CallType,
 			"reasoning_effort":    e.ReasoningEffort,
-			"spend":               e.Cost,
+			"spend":               catalog.RoundMoney(e.Cost),
 			"total_tokens":        total,
 			"prompt_tokens":       e.PromptTokens,
 			"completion_tokens":   e.CompletionTokens,
@@ -394,7 +410,7 @@ func guardrailInformation(raw string) any {
 // 调用：eventRows。
 // 测试：cost_breakdown_test.go
 func costBreakdown(e iam.UsageEvent) map[string]any {
-	out := map[string]any{"total_cost": e.Cost}
+	out := map[string]any{"total_cost": catalog.RoundMoney(e.Cost)}
 
 	if snap := parsePriceSnapshot(e.PriceSnapshot); snap != nil {
 		out["window"] = snap.Window
@@ -409,17 +425,21 @@ func costBreakdown(e iam.UsageEvent) map[string]any {
 		if snap.PricingStatus == "unpriced" {
 			return out
 		}
+		// window 是调用时间所在的时段，固定价也会填；只有快照明确记录实际命中分时费率时才能说明本次按分时计价。
+		if window := snapshotPricingWindow(snap); window != "" {
+			out["pricing_window"] = window
+		}
 		for _, rate := range snap.Applied {
-			amount := rate.Quantity * rate.USD
+			amount := catalog.RoundMoney(rate.Quantity * rate.USD)
 			switch rate.Side {
 			case "input":
-				out["input_cost"] = valueOrZero(out["input_cost"]) + amount
+				out["input_cost"] = catalog.RoundMoney(valueOrZero(out["input_cost"]) + amount)
 			case "cache_read":
-				out["cache_read_cost"] = valueOrZero(out["cache_read_cost"]) + amount
+				out["cache_read_cost"] = catalog.RoundMoney(valueOrZero(out["cache_read_cost"]) + amount)
 			case "cache_write":
-				out["cache_creation_cost"] = valueOrZero(out["cache_creation_cost"]) + amount
+				out["cache_creation_cost"] = catalog.RoundMoney(valueOrZero(out["cache_creation_cost"]) + amount)
 			default:
-				out["output_cost"] = valueOrZero(out["output_cost"]) + amount
+				out["output_cost"] = catalog.RoundMoney(valueOrZero(out["output_cost"]) + amount)
 			}
 			// The per-token rates exist for the console's "N tokens × $X/1M"
 			// line, so they are set only for a rate that really is per token.
@@ -445,7 +465,7 @@ func costBreakdown(e iam.UsageEvent) map[string]any {
 		// excluded the cached tokens would render negative.
 		cacheTotal := valueOrZero(out["cache_read_cost"]) + valueOrZero(out["cache_creation_cost"])
 		if cacheTotal > 0 {
-			out["input_cost"] = valueOrZero(out["input_cost"]) + cacheTotal
+			out["input_cost"] = catalog.RoundMoney(valueOrZero(out["input_cost"]) + cacheTotal)
 		}
 		// A charged side that came out at exactly zero is still a side that was
 		// priced. Reporting it keeps the console from falling through to a
@@ -458,7 +478,7 @@ func costBreakdown(e iam.UsageEvent) map[string]any {
 		// The sum of the sides is what the rates add up to. It can differ from
 		// total_cost above if a model was repriced mid-flight; keeping both lets
 		// the console show the discrepancy instead of hiding it.
-		out["original_cost"] = valueOrZero(out["input_cost"]) + valueOrZero(out["output_cost"])
+		out["original_cost"] = catalog.RoundMoney(valueOrZero(out["input_cost"]) + valueOrZero(out["output_cost"]))
 		return out
 	}
 
@@ -475,16 +495,38 @@ func costBreakdown(e iam.UsageEvent) map[string]any {
 	// shaped them for the console - folded into input_cost, with the cached part
 	// broken out separately - so the drawer does not have to know which of the
 	// two shapes it is reading.
-	out["input_cost"] = charge.Input + charge.Cache
-	out["output_cost"] = charge.Output
+	out["input_cost"] = catalog.RoundMoney(charge.Input + charge.Cache)
+	out["output_cost"] = catalog.RoundMoney(charge.Output)
 	if charge.Cache > 0 {
-		out["cache_read_cost"] = charge.Cache
+		out["cache_read_cost"] = catalog.RoundMoney(charge.Cache)
 	}
-	out["original_cost"] = charge.Total
+	out["original_cost"] = catalog.RoundMoney(charge.Total)
 	out["window"] = charge.Window
 	out["applied"] = appliedRateRows(charge.Applied)
 	out["source"] = "recomputed"
 	return out
+}
+
+// snapshotPricingWindow 判断历史快照是否证明确实命中与调用时段一致的分时费率。
+// 参数 snap 是已经解析的调用快照；返回 peak/offpeak 或空串；缺失及冲突均不猜测。
+// 调用：costBreakdown；不读取当前价格、不修改快照或费用。
+func snapshotPricingWindow(snap *catalog.PriceSnapshot) string {
+	if snap == nil || (snap.Window != "peak" && snap.Window != "offpeak") || snap.PricingStatus == "unpriced" {
+		return ""
+	}
+	found := false
+	for _, rate := range snap.Applied {
+		if rate.RateWindow == "peak" || rate.RateWindow == "offpeak" {
+			if rate.RateWindow != snap.Window {
+				return ""
+			}
+			found = true
+		}
+	}
+	if !found {
+		return ""
+	}
+	return snap.Window
 }
 
 // parsePriceSnapshot decodes a stored snapshot. A row that was never priced has
@@ -522,14 +564,15 @@ func appliedRateRows(applied []catalog.AppliedRate) []map[string]any {
 	out := make([]map[string]any, 0, len(applied))
 	for _, rate := range applied {
 		out = append(out, map[string]any{
-			"measure":    rate.Measure,
-			"side":       rate.Side,
-			"variant":    rate.Variant,
-			"unit_size":  rate.UnitSize,
-			"usd":        rate.USD,
-			"quantity":   rate.Quantity,
-			"cost":       rate.Quantity * rate.USD,
-			"source_key": rate.SourceKey,
+			"measure":     rate.Measure,
+			"side":        rate.Side,
+			"variant":     rate.Variant,
+			"unit_size":   rate.UnitSize,
+			"usd":         rate.USD,
+			"quantity":    rate.Quantity,
+			"cost":        catalog.RoundMoney(rate.Quantity * rate.USD),
+			"source_key":  rate.SourceKey,
+			"rate_window": rate.RateWindow,
 		})
 	}
 	return out
@@ -622,8 +665,11 @@ func LogByID(s Host, w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	body, err := db.GetRequestLog(r.Context(), id)
+	body, err = detailBodyOrMissing(id, body, err)
 	if err != nil {
-		body = &iam.RequestLog{RequestID: id}
+		// 查询异常不能伪装成未保存正文；由统一错误处理记录原因并向用户返回可重试的失败。
+		s.WriteIAMError(w, r, err)
+		return
 	}
 	if p.UserID != "" && event.UserID != p.UserID {
 		if err := s.AuditLogRead(r, p, id, *event); err != nil {
@@ -646,6 +692,15 @@ func LogByID(s Host, w http.ResponseWriter, r *http.Request) {
 		row["proxy_server_request"] = jsonOrEmpty(body.ProxyRequest)
 	}
 	util.WriteJSON(w, 200, row)
+}
+
+// detailBodyOrMissing 区分历史正文缺行与存储读取失败，供 LogByID 在已验证日志权限后使用。
+// 参数 id 为请求标识，body 和 err 为存储返回；缺行返回空正文与 nil，读取失败原样返回错误，不产生副作用。
+func detailBodyOrMissing(id string, body *iam.RequestLog, err error) (*iam.RequestLog, error) {
+	if errors.Is(err, iam.ErrNotFound) {
+		return &iam.RequestLog{RequestID: id}, nil
+	}
+	return body, err
 }
 
 // jsonOrEmpty decodes a stored body for display. A body that is not JSON, or is empty, is returned as an empty document rather than as a parse error.
@@ -1203,7 +1258,7 @@ func openGlobal(s Host, w http.ResponseWriter, r *http.Request) (*authz.Scope, b
 
 // globalQuery builds the query for a global report from the request's window and filters.
 // 参数 r（*http.Request）：入站 HTTP 请求；sc（*authz.Scope）：global查询使用的权限范围。
-// 返回错误表示非法或倒置的时间窗口，调用方必须拒绝查询，不能忽略条件。
+// 返回错误表示非法时间窗口、错误码或响应缓存条件，调用方必须拒绝查询，不能忽略条件。
 // 返回 UsageQuery（iam.UsageQuery）：全局报表的查询。时间窗和筛选都落在权限范围之内。
 // 调用：仅在 reports.go 内使用
 // 测试：无直接单测

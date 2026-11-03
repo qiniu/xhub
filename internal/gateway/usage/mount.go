@@ -40,6 +40,7 @@ func Module(h mountHost) util.Module {
 		// page rendered no rows however much traffic the deployment had. It is
 		// the same read as v2, so it is served by the same handler.
 		reg.Handle("GET /spend/logs/ui", func(w http.ResponseWriter, r *http.Request) { LogsV2(h, w, r) })
+		reg.Handle("GET /spend/logs/ui/filter-options", func(w http.ResponseWriter, r *http.Request) { LogFilterOptions(h, w, r) })
 		reg.Handle("GET /spend/logs/ui/{request_id}", func(w http.ResponseWriter, r *http.Request) { LogByID(h, w, r) })
 		// The session drawer lists every call that shares a session id. It must
 		// not collapse them, or the clicked log has nothing to open.

@@ -93,3 +93,21 @@ func TestUsageGeneratedRoundTrip(t *testing.T) {
 		t.Fatal("无效原始JSON被悄悄发布")
 	}
 }
+
+// TestUsageFilterContract 前置离线契约；三个日志入口都声明历史密钥、端点和缓存条件，非法缓存值被拒绝；纯内存无需清理。
+func TestUsageFilterContract(t *testing.T) {
+	v, err := NewValidator(Document)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, route := range []string{"/spend/logs/ui", "/spend/logs/v2", "/spend/logs/session/ui"} {
+		for _, query := range []string{"key_hash=hash&key_alias=retired&supplier=connection&inbound_endpoint=/v1/responses&cache_hit_filter=hit", "cache_hit_filter=miss", "cache_hit_filter="} {
+			if err := v.Request(httptest.NewRequest("GET", route+"?"+query, nil)); err != nil {
+				t.Fatalf("合法筛选 %s: %v", route+"?"+query, err)
+			}
+		}
+		if err := v.Request(httptest.NewRequest("GET", route+"?cache_hit_filter=unknown", nil)); err == nil {
+			t.Fatalf("%s 接受未声明的缓存条件", route)
+		}
+	}
+}

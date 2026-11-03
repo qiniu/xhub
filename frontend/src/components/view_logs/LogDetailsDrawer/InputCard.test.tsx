@@ -92,7 +92,7 @@ describe("InputCard", () => {
   it("should display cost when provided", () => {
     // 提供非零费用，验证共享标题的两位小数格式；组件由测试框架自动清理。
     render(<InputCard messages={mockMessages} inputCost={1.0015} />);
-    expect(screen.getByText("Cost: $1.00")).toBeInTheDocument();
+    expect(screen.getByText("Cost: $1.0015")).toBeInTheDocument();
   });
 
   it("should copy last message content when copy button is clicked", async () => {

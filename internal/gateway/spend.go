@@ -114,7 +114,7 @@ func (s *Server) recordSpend(w http.ResponseWriter, p *auth.Principal, callID, a
 		softActive = true
 		charge, okc = frozen, valid
 		total, in, out = charge.Total, charge.Input, charge.Output
-		if !valid {
+		if !valid && status < 400 && !cacheHit {
 			billed.PricingBlocked = reason
 		}
 	}
@@ -129,6 +129,8 @@ func (s *Server) recordSpend(w http.ResponseWriter, p *auth.Principal, callID, a
 	if status >= 400 {
 		total, in, out = 0, 0, 0
 		charge = catalog.Charge{}
+		// 上游失败按现有规则不收费，不把没有 usage 误报为模型价格缺失。
+		billed.PricingBlocked = ""
 	}
 	var budgetMetadata map[string]any
 	if softActive {
@@ -225,6 +227,9 @@ func (s *Server) recordSpend(w http.ResponseWriter, p *auth.Principal, callID, a
 		pricingStatus := "unpriced"
 		if okc {
 			pricingStatus = "priced"
+		}
+		if status >= 400 {
+			pricingStatus = ""
 		}
 		rawSnapshot, _ := json.Marshal(catalog.PriceSnapshot{Window: charge.Window, Applied: charge.Applied, PricingStatus: pricingStatus, Usage: &billed})
 		priceSnapshot = string(rawSnapshot)

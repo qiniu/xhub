@@ -48,6 +48,23 @@ func TestSoftPricePlan(t *testing.T) {
 	}
 }
 
+// TestSoftPricePlanMissingCacheWriteReason 验证分桶缺价与不匹配期限的原因不同，且均保持未计价；仅内存数据无需清理。
+func TestSoftPricePlanMissingCacheWriteReason(t *testing.T) {
+	dep := strictBudgetDeployment()
+	dep.ModelInfo["pricing_source"] = "manual"
+	delete(dep.LiteLLMParams, "cache_creation_input_token_cost")
+	delete(dep.LiteLLMParams, "cache_creation_input_token_cost_above_1hr")
+	_, err := NewSoftPricePlan(dep, time.Now()).Charge(autoCacheRaw(10, 3, 0))
+	if err == nil || err.Error() != "measured cache writes have no reserved price" {
+		t.Fatalf("分桶缺少写入价格未正确说明: %v", err)
+	}
+	dep.LiteLLMParams["cache_creation_input_token_cost"] = 1e-6
+	_, err = NewSoftPricePlan(dep, time.Now()).Charge(autoCacheRaw(10, 0, 3))
+	if err == nil || err.Error() == "measured cache writes have no reserved price" {
+		t.Fatalf("已配置但期限不匹配不能误报完全缺价: %v", err)
+	}
+}
+
 // TestSoftBudgetNonTokenPricing 验证软预算不丢失原有非Token费用；纯内存部署，覆盖冻结价格、空用量和缺价，无需清理。
 func TestSoftBudgetNonTokenPricing(t *testing.T) {
 	dep := strictBudgetDeployment()

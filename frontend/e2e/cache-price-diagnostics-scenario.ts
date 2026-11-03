@@ -7,7 +7,7 @@ import { waitForLog } from "./product-fixes-scenario";
 
 /** 双语真实页面创建/编辑价格、同源对话及账单原因验证；本地上游报告缓存Token，不访问供应商。
  * 缺价保留原准入，补价和显式零价精确收费；finally删除模型/凭据并关闭服务，runner回收schema。 */
-for (const locale of ["en", "zh-CN"] as const) {
+export function registerCachePriceDiagnostics(locale: "en" | "zh-CN") {
   test("cache pricing warning and actual bill " + locale, async ({ page }) => {
     const tr = (key: string, params?: Record<string, string>) => translate(locale, key, params);
     const upstream = createServer(async (req, res) => {
@@ -69,6 +69,10 @@ for (const locale of ["en", "zh-CN"] as const) {
       const read = page.locator("#editor-cache_read_input_token_cost"),
         write = page.locator("#editor-cache_creation_input_token_cost");
       await expect(page.getByRole("status", { name: tr("cachePrice.warningTitle") })).toBeVisible();
+      // 切换到费率表后仍需提示缺项；切回平坦费率继续验证真实计费。
+      await page.getByLabel(tr("providerGuideUI.rateFormat"), { exact: true }).selectOption("rates");
+      await expect(page.getByRole("status", { name: tr("cachePrice.warningTitle") })).toBeVisible();
+      await page.getByLabel(tr("providerGuideUI.rateFormat"), { exact: true }).selectOption("flat");
       await read.fill("0");
       await write.fill("0");
       await expect(page.getByRole("status", { name: tr("cachePrice.warningTitle") })).toHaveCount(0);

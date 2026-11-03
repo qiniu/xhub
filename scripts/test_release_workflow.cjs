@@ -45,7 +45,8 @@ test('API client reliability gate runs all flows independently and preserves fai
       });
       assert.equal(result.status, status, '浏览器失败必须阻断发布：' + result.stderr);
       assert.deepEqual(readFileSync(join(directory, 'arguments'), 'utf8').trim().split('\n'), [
-        'client-docs-url-', 'client-cancellation-', 'stream-terminal-sc-',
+        'scenarios/legacy/error-logs/sc-020.test.ts',
+        'proxy-body-limit.test.ts', 'client-docs-url-', 'client-cancellation-', 'stream-terminal-sc-',
         'billing-pending-recovery', 'usage-spool-', 'key-lifecycle-', 'agent-history-', 'hard-budget-', 'budget-reconciliation-', 'messages-signed-history-', 'claude-client-compat-', 'user-bulk-budget-',
         'scenarios/enterprise/saml-', 'scenarios/enterprise/sso-valid.test.ts', 'scenarios/directory/sso-config.test.ts',
       ]);
@@ -628,6 +629,15 @@ test('release includes analytics boundary browser scenarios', () => {
  for(const locale of ['en','zh-CN']) assert.ok(source.includes(`scenarios/regression/analytics-boundary-${locale}.test.ts`));
 });
 
+/** 验证日志候选的中英文真实浏览器流程列入发布门禁；只读取工作流，不访问线上，无清理需求。 */
+test('release includes both log filter suggestion browser scenarios', () => {
+  const source = require('node:fs').readFileSync('.github/workflows/release.yml', 'utf8');
+  for (const locale of ['en', 'zh-CN']) {
+    const scenario = `scenarios/permissions/log-options-${locale}.test.ts`;
+    assert.equal(source.split(scenario).length - 1, 1, `日志筛选浏览器流程遗漏或重复: ${locale}`);
+  }
+});
+
 /** 组合验收不能仅靠五个PR各自通过；发布流水线必须运行同一网关中的双语组合流程。
  * 前置工作流静态文件，验证两种语言均登记且不重复；不连接GitHub或修改文件，无清理副作用。 */
 test('release includes combined phase4 browser acceptance once per locale', () => {
@@ -640,5 +650,5 @@ test('release includes combined phase4 browser acceptance once per locale', () =
 
 // 缓存缺价提示必须进入真实发布浏览器门禁；检查既有步骤保留新场景，不用静态检查代替E2E。
 test('release verifies cache pricing warnings and actual bills', () => {
- assert.ok(workflow.jobs.verify.steps.some(step => step.run?.includes('bash scripts/e2e.sh') && step.run.includes('cache-price-diagnostics.test.ts')));
+ assert.ok(workflow.jobs.verify.steps.some(step => step.run?.includes('bash scripts/e2e.sh') && step.run.includes('cache-price-diagnostics-en.test.ts') && step.run.includes('cache-price-diagnostics-zh-CN.test.ts')));
 });

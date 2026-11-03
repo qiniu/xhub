@@ -6,6 +6,8 @@ import { GATEWAY, loginAdmin, sessionBearer, stableGoto, t, watchGateway } from 
 /** 对照真实接口验证当前成本页可见请求、成功、失败与 Token；参数为页面和元数据，无返回值。
  * 供全部用量视图调用，允许异步渲染完成；只读取可访问标题及同卡片数字，无写入及清理需求。 */
 async function assertUsageTiles(page: import("@playwright/test").Page, metadata: Record<string, number>) {
+  // 切换视图后可能保留模型活动标签，先回到成本标签再比较预算和用量卡片。
+  await page.getByRole("tab", { name: t("pages.usage.cost"), exact: true }).click();
   for (const [title, key] of [["Total Requests", "total_api_requests"], ["Successful Requests", "total_successful_requests"], ["Failed Requests", "total_failed_requests"], ["Total Tokens", "total_tokens"]]) {
     const heading = page.getByRole("heading", { name: t(title), exact: true }).first();
     // 成功/失败标题可能含提示容器，选取最近含数字段落的卡片，避免绑定固定父层级。
@@ -13,7 +15,7 @@ async function assertUsageTiles(page: import("@playwright/test").Page, metadata:
   }
   // 全局费用使用四位小数，实体总览使用两位；均按界面的实际显示精度对账。
   const spendHeading = page.getByRole("heading", { name: t("Total Spend"), exact: true });
-  const spendLabel = page.getByText(t("Total Spend"), { exact: true }).filter({ visible: true });
+  const spendLabel = page.getByText(t("usageBudget.rangeSpend"), { exact: false }).filter({ visible: true });
   const entityView = await spendHeading.count() > 0;
   const spendValue = entityView
     ? spendHeading.locator("xpath=ancestor::*[p][1]").locator(":scope > p")
@@ -34,7 +36,7 @@ test("team usage displays recorded calls without requesting the removed Agent en
   let teamID = "", userID = "", key = "";
   const agentRequests: string[] = [], errors: string[] = [];
   page.on("request", request => {
-    if (new URL(request.url()).pathname === "/agent/daily/activity") agentRequests.push(request.url());
+    if (["/agent/daily/activity", "/gw/agent/daily/activity"].includes(new URL(request.url()).pathname)) agentRequests.push(request.url());
   });
   page.on("response", response => {
     if (response.url().includes("/daily/activity") && response.status() >= 400) errors.push(response.status() + " " + response.url());
@@ -78,7 +80,8 @@ test("team usage displays recorded calls without requesting the removed Agent en
       await stableGoto(page, "/usage");
       await expect(page.getByRole("tab", { name: t("pages.usage.customer"), exact: true })).toHaveCount(0);
       await expect(page.getByRole("tab", { name: t("pages.usage.tag"), exact: true })).toHaveCount(0);
-      const loaded = page.waitForResponse(response => new URL(response.url()).pathname === "/team/daily/activity/aggregated");
+      // 真实控制台使用 /gw 代理，本地开发模式可直连；两种情况都须核对实际响应。
+      const loaded = page.waitForResponse(response => ["/team/daily/activity/aggregated", "/gw/team/daily/activity/aggregated"].includes(new URL(response.url()).pathname));
       await page.getByRole("tab", { name: t("pages.usage.team"), exact: true }).click();
       const response = await loaded;
       expect(response.status(), await response.text()).toBe(200);
@@ -149,7 +152,7 @@ test("usage views reconcile stored successes, failures, dimensions, filters and 
     const exact = await (await page.request.get(GATEWAY + "/team/daily/activity/aggregated?team_ids=" + teamID, { headers })).json();
     expect(exact.metadata).toMatchObject({ total_api_requests: 2, total_successful_requests: 1, total_failed_requests: 1, total_tokens: 10 });
     expect(exact.metadata.total_spend).toBeCloseTo(0.12, 8);
-    const initial = page.waitForResponse(r => new URL(r.url()).pathname === "/user/daily/activity/aggregated");
+    const initial = page.waitForResponse(r => ["/user/daily/activity/aggregated", "/gw/user/daily/activity/aggregated"].includes(new URL(r.url()).pathname));
     await stableGoto(page, "/usage");
     const initialBody = await (await initial).json();
     await assertUsageTiles(page, initialBody.metadata);
@@ -181,7 +184,7 @@ test("usage views reconcile stored successes, failures, dimensions, filters and 
     await expect(page.getByText(failedModel, { exact: true }).filter({ visible: true }).first()).toBeVisible();
     await expect(page.getByRole("tabpanel")).not.toContainText(/NaN|Infinity/);
     for (const [view, path] of [["organization", "/organization/daily/activity"], ["team", "/team/daily/activity/aggregated"], ["user", "/user/daily/activity"]]) {
-      const loading = page.waitForResponse(r => new URL(r.url()).pathname === path && r.ok());
+      const loading = page.waitForResponse(r => [path, `/gw${path}`].includes(new URL(r.url()).pathname) && r.ok());
       await page.getByRole("tab", { name: t("pages.usage." + view), exact: true }).click();
       const body = await (await loading).json();
       await assertUsageTiles(page, body.metadata);
@@ -227,15 +230,17 @@ test("usage views reconcile stored successes, failures, dimensions, filters and 
     await page.getByRole("tab", { name: t("pages.usage.global"), exact: true }).click();
     const userInput = page.getByTestId("user-dropdown").getByRole("combobox");
     await userInput.click(); await userInput.fill("admin");
-    const userLoaded = page.waitForResponse(r => { const url = new URL(r.url()); return url.pathname === "/user/daily/activity/aggregated" && !!url.searchParams.get("user_id"); });
+    const userLoaded = page.waitForResponse(r => { const url = new URL(r.url()); return ["/user/daily/activity/aggregated", "/gw/user/daily/activity/aggregated"].includes(url.pathname) && !!url.searchParams.get("user_id"); });
     await page.getByRole("option", { name: /^admin/ }).first().click();
     await assertUsageTiles(page, (await (await userLoaded).json()).metadata);
-    const dateLoaded = page.waitForResponse(r => { const url = new URL(r.url()); return url.pathname === "/user/daily/activity/aggregated" && url.searchParams.get("start_date") === url.searchParams.get("end_date"); });
-    await page.getByRole("button", { name: /\d.* - .*\d/ }).first().click();
+    await page.getByRole("button", { name: t("Select Time Range"), exact: true }).click();
     await page.getByRole("button", { name: new RegExp("^" + t("Today")) }).click();
     // 日期预设只写入弹窗临时值；提交后才更新页面范围并发起单日聚合请求。
-    await page.getByRole("button", { name: t("Apply"), exact: true }).click();
-    await assertUsageTiles(page, (await (await dateLoaded).json()).metadata);
+    const [dateLoaded] = await Promise.all([
+      page.waitForResponse(r => { const url = new URL(r.url()); return ["/user/daily/activity/aggregated", "/gw/user/daily/activity/aggregated"].includes(url.pathname) && url.searchParams.get("start_date") === url.searchParams.get("end_date"); }, { timeout: 15000 }),
+      page.getByRole("button", { name: t("Apply"), exact: true }).click(),
+    ]);
+    await assertUsageTiles(page, (await dateLoaded.json()).metadata);
     await expect(page.getByRole("tab", { name: t("pages.usage.customer"), exact: true })).toHaveCount(0);
     await expect(page.getByRole("tab", { name: t("pages.usage.tag"), exact: true })).toHaveCount(0);
     expect(requests, "剩余视图不得请求移除维度").toEqual([]);

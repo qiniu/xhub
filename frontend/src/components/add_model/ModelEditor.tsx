@@ -13,7 +13,7 @@ import { Input } from "@/components/ui/input";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
 import EndpointTypeField from "./EndpointTypeField";
-import { CachePriceWarning } from "./CachePriceWarning";
+import { CachePriceWarning, cachePricesFromRates } from "./CachePriceWarning";
 import { BILLING_CATEGORIES, type BillingMode } from "./billing_categories";
 import {
   buildEditorModel,
@@ -508,10 +508,16 @@ export default function ModelEditor({
                     </select>
                   </div>
                   {values.pricing_format === "rates" ? (
-                    <RateEditor
-                      rates={Array.isArray(values.manual_rates) ? values.manual_rates : []}
-                      onChange={(rates) => set("manual_rates", rates)}
-                    />
+                    <>
+                      {(() => {
+                        const prices = cachePricesFromRates(Array.isArray(values.manual_rates) ? values.manual_rates : []);
+                        return prices ? <CachePriceWarning read={prices.read} write={prices.write} /> : null;
+                      })()}
+                      <RateEditor
+                        rates={Array.isArray(values.manual_rates) ? values.manual_rates : []}
+                        onChange={(rates) => set("manual_rates", rates)}
+                      />
+                    </>
                   ) : (
                     <>
                       <div className="space-y-2">

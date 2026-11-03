@@ -113,6 +113,10 @@ func TestAWindowPricedModelIsChargedTheWindowItLandedIn(t *testing.T) {
 	if window != want {
 		t.Fatalf("the breakdown says %q but the call started at an instant that is %q", window, want)
 	}
+	// 分时标签必须有实际费率快照证据，且与原有兼容字段一致。
+	if bill["pricing_window"] != window {
+		t.Fatalf("分时价已应用但实际计价时段缺失或不一致：%v", bill)
+	}
 	// 用到的费率必须来自这个时段那一档，不能是另一档。这一条是上面那个
 	// "收的钱等于该时段的价"的另一种说法，但它直接点名了键，失败信息更清楚。
 	applied, _ := bill["applied"].([]any)
@@ -121,6 +125,9 @@ func TestAWindowPricedModelIsChargedTheWindowItLandedIn(t *testing.T) {
 	}
 	for _, item := range applied {
 		rate, _ := item.(map[string]any)
+		if rate["rate_window"] != window {
+			t.Fatalf("选中费率没有记录与实际时段一致的证据：%v", rate)
+		}
 		key, _ := rate["source_key"].(string)
 		if key == "" {
 			continue
@@ -130,6 +137,32 @@ func TestAWindowPricedModelIsChargedTheWindowItLandedIn(t *testing.T) {
 		}
 		if strings.HasSuffix(key, "_offpeak") && window != "offpeak" {
 			t.Fatalf("a call in the %s window was billed at the off-peak rate %s", window, key)
+		}
+	}
+}
+
+// TestFixedPricingDoesNotClaimWindow 通过真实网关、隔离数据库及模拟上游验证固定费率不会显示分时；资源由测试 harness 清理。
+func TestFixedPricingDoesNotClaimWindow(t *testing.T) {
+	h := newHarness(t)
+	admin := h.adminSession()
+	tn := h.provision(t, admin, "fixed-window-label")
+	addPricedModel(t, h, admin, "fixed-window-label", tokenRates(testInputRate, testOutputRate), "chat")
+	r := h.ok(http.MethodPost, "/v1/chat/completions", tn.key, chatRequest("fixed-window-label", "Verify fixed price."))
+	bill := breakdownOf(t, h, admin, r.header("x-litellm-call-id"))
+	if _, exists := bill["pricing_window"]; exists {
+		t.Fatalf("固定价不应报告分时费率：%v", bill)
+	}
+	if bill["window"] != "peak" && bill["window"] != "offpeak" {
+		t.Fatalf("调用时段兼容字段不可删除：%v", bill)
+	}
+	applied, ok := bill["applied"].([]any)
+	if !ok || len(applied) == 0 {
+		t.Fatalf("固定价缺少真实费率快照：%v", bill)
+	}
+	for _, item := range applied {
+		rate, _ := item.(map[string]any)
+		if rate["rate_window"] != "all" {
+			t.Fatalf("固定价费率应明确记录 all：%v", rate)
 		}
 	}
 }
@@ -416,6 +449,45 @@ func TestACachedCallIsNotBilledAtTheInputRate(t *testing.T) {
 	// 提示侧整体（含缓存那部分）必须不小于缓存那一行，否则控制台减完会看到负数。
 	if input := numberOrZero(bill["input_cost"]); input < cacheCost {
 		t.Fatalf("input_cost %v is below cache_read_cost %v; the drawer would render a negative input cost", input, cacheCost)
+	}
+}
+
+// TestCostResponseAndLogUseStableDecimalMoney 验证真实请求链路不会把浮点尾数暴露给调用方或日志页。
+// 前置条件是隔离 PostgreSQL、本地假上游和一张包含缓存费率的部署；验证结果是响应头和详情接口都返回稳定金额；测试结束由 harness 清理模型、密钥和账单。
+func TestCostResponseAndLogUseStableDecimalMoney(t *testing.T) {
+	h := newHarness(t)
+	admin := h.adminSession()
+	tn := h.provision(t, admin, "money-format")
+	h.flushSpend()
+
+	addPricedModel(t, h, admin, "regression-money-format", []any{
+		map[string]any{"measure": "token", "unit_size": 1, "side": "input", "variant": "uncached", "window": "all", "source_key": "input", "usd": 0.000002},
+		map[string]any{"measure": "token", "unit_size": 1, "side": "cache_read", "window": "all", "source_key": "cache", "usd": 0.0000001},
+		map[string]any{"measure": "token", "unit_size": 1, "side": "output", "window": "all", "source_key": "output", "usd": 0.00001},
+	}, "chat")
+	h.usageOverride("regression-money-format", map[string]any{
+		"prompt_tokens": 28123, "completion_tokens": 117,
+		"prompt_tokens_details": map[string]any{"cached_tokens": 25856},
+	})
+
+	r := h.ok(http.MethodPost, "/v1/chat/completions", tn.key, chatRequest("regression-money-format", "money precision"))
+	if got, want := r.header("x-litellm-response-cost"), "0.0082896"; got != want {
+		t.Fatalf("response cost = %q, want %q", got, want)
+	}
+	callID := r.header("x-litellm-call-id")
+	h.flushSpend()
+	detailResponse := h.ok(http.MethodGet, "/spend/logs/ui/"+callID, admin, nil)
+	if strings.Contains(detailResponse.text(), "0.008289600000000001") {
+		t.Fatalf("log detail exposed a binary float tail: %s", truncate(detailResponse.text(), 500))
+	}
+	detail := detailResponse.json()
+	if got := numberOrZero(detail["spend"]); got != 0.0082896 {
+		t.Fatalf("log spend = %.18f, want 0.0082896", got)
+	}
+	bill, _ := detail["metadata"].(map[string]any)
+	costBreakdown, _ := bill["cost_breakdown"].(map[string]any)
+	if got := numberOrZero(costBreakdown["total_cost"]); got != 0.0082896 {
+		t.Fatalf("breakdown total = %.18f, want 0.0082896", got)
 	}
 }
 

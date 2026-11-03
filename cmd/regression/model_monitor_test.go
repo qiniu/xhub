@@ -255,8 +255,8 @@ func TestModelMonitorCatalogPermissions(t *testing.T) {
 		if got := body["options"].([]any); len(got) != 0 {
 			t.Fatal("组织/团队空交集必须返回空目录", got)
 		}
-		if body["summary"].(map[string]any)["requests"] != float64(1) {
-			t.Fatal("模型授权变更不应抹去本人历史统计", body)
+		if body["summary"].(map[string]any)["requests"] != float64(0) || len(body["models"].([]any)) != 0 {
+			t.Fatal("当前没有可用模型时，监控不能泄露历史供应商或模型", body)
 		}
 	}
 	if got := h.ok("GET", "/models/monitor", admin, nil).json()["options"].([]any); len(got) != 3 {
@@ -264,5 +264,28 @@ func TestModelMonitorCatalogPermissions(t *testing.T) {
 	}
 	if got := h.ok("GET", "/models/monitor?model=shared-actual&supplier=monitor-provider-b", mine.session, nil).json()["summary"].(map[string]any)["requests"]; got != float64(0) {
 		t.Fatal("显式选择未授权供应商不能读取其他用户统计", got)
+	}
+}
+
+// TestModelMonitorCurrentAliasScope 使用隔离 PostgreSQL 与真实网关验证权限收回后按公开别名过滤监控，
+// 同一供应商上游模型的不同别名不混淆；原始历史账单仍可按现有权限读取，harness 清理私有 schema。
+func TestModelMonitorCurrentAliasScope(t *testing.T) {
+	a, b := chatDeployment("monitor-current-a"), chatDeployment("monitor-revoked-b")
+	a.LiteLLMParams["model"], b.LiteLLMParams["model"] = "same-upstream", "same-upstream"
+	h := newHarness(t, a, b)
+	admin := h.adminSession()
+	mine := h.provision(t, admin, "monitor-ambiguous")
+	for _, alias := range []string{a.ModelName, b.ModelName} {
+		h.ok("POST", "/v1/chat/completions", mine.key, map[string]any{"model": alias, "messages": []any{map[string]any{"role": "user", "content": "Verify monitoring scope."}}})
+	}
+	h.flushSpend()
+	h.ok("PATCH", "/organization/update", admin, map[string]any{"organization_id": mine.orgID, "models": []string{a.ModelName}})
+	body := h.ok("GET", "/models/monitor", mine.session, nil).json()
+	if got := body["summary"].(map[string]any)["requests"]; got != float64(1) {
+		t.Fatalf("共享供应商和上游型号的撤权别名不得混入已授权统计，got=%v", got)
+	}
+	logs := h.ok("GET", "/spend/logs/ui", mine.session, nil).json()
+	if got := len(listField(logs, "data")); got != 2 {
+		t.Fatalf("监控收窄不能删除历史账单，got=%d", got)
 	}
 }
