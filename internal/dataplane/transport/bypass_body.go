@@ -24,13 +24,14 @@ type bypassPart struct {
 	Data []byte
 }
 
-// bypassBody 同时保存原生请求的完整字节和可用于路由、会话及计价的字段投影。
+// BypassBody 同时保存原生请求的完整字节和可用于路由、会话及计价的字段投影。
 // ParseBypassBody 产生，原生执行器消费；JSON 保留原始精度，multipart 保留边界、文件及分段顺序。
 // Payload 构建上游载荷时消费网关控制字段，不改写 Raw；字段投影不能替代原始正文进行无损转发。
-type bypassBody struct {
+// 由 ParseBypassBody 构造后在当前请求内只读传递；Raw、Fields、Parts 不得原地修改或跨请求共享。
+type BypassBody struct {
 	// 客户端原始正文；模型替换或控制字段过滤时构建新的正文，不原地改写观测内容。
 	Raw []byte
-	// 路由、会话识别与用量检查的字段投影；JSON 保留类型，multipart 非文件字段为字符串。
+	// 路由、会话识别与用量检查的字段投影；JSON 数字沿用 float64，精确出站值以 Raw 为准；multipart 非文件字段为字符串。
 	Fields map[string]any
 	// 解析后的媒体类型，支持 JSON 和 multipart；空 Content-Type 按 JSON 处理。
 	Media string
@@ -41,12 +42,12 @@ type bypassBody struct {
 }
 
 // ParseBypassBody 提取原生载荷的路由/计价字段，同时保留完整原字节和 multipart 分段。
-// 参数 raw 为入口已限制大小的载荷，contentType 为原始媒体类型；返回 bypassBody 或解析错误。
+// 参数 raw 为入口已限制大小的载荷，contentType 为原始媒体类型；返回 BypassBody 或解析错误。
 // ServeBypass 创建与转发测量调用；缺少媒体类型按 JSON，JSON 必须为对象，multipart 必须有合法 boundary。
 // 重复模型字段拒绝，避免路由投影与真实发送字段不一致；文件内容、头、顺序和边界保留。
 // 其他媒体类型只保留原文，无法安全模型重写时由 Payload 报错；纯解析，不关闭请求或访问上游。
-func ParseBypassBody(raw []byte, contentType string) (bypassBody, error) {
-	b := bypassBody{Raw: raw, Fields: map[string]any{}}
+func ParseBypassBody(raw []byte, contentType string) (BypassBody, error) {
+	b := BypassBody{Raw: raw, Fields: map[string]any{}}
 	b.Media, _, _ = mime.ParseMediaType(contentType)
 	if b.Media == "" {
 		b.Media = "application/json"
@@ -92,7 +93,7 @@ func ParseBypassBody(raw []byte, contentType string) (bypassBody, error) {
 // serveBypassCreate 在选定部署后调用；路径模型移除正文模型，避免供应商收到两个互相冲突的模型信号。
 // 无需改写时直接保留 Raw；JSON 使用 RawMessage 保留大整数与未知扩展，multipart 保留边界、文件字节、头及顺序。
 // 未知媒体类型不能安全改写时返回错误；不发送请求，也不把投影 Fields 的简化值替代原始文件或数字。
-func (b bypassBody) Payload(field, model string, pathModel bool) ([]byte, error) {
+func (b BypassBody) Payload(field, model string, pathModel bool) ([]byte, error) {
 	if field == "" && !pathModel && b.Fields["disable_fallbacks"] == nil && b.Fields["session_id"] == nil {
 		return b.Raw, nil
 	}

@@ -3490,5 +3490,47 @@
     "title": "cache pricing warning and actual bill zh-CN",
     "kind": "implemented",
     "environment": "default offline"
+  },
+  {
+    "id": "REG-upstream-stream-errors-en",
+    "file": "e2e/scenarios/regression/upstream-stream-errors-en.test.ts",
+    "title": "upstream stream error details en",
+    "kind": "implemented",
+    "environment": "default offline"
+  },
+  {
+    "id": "REG-upstream-stream-errors-zh-CN",
+    "file": "e2e/scenarios/regression/upstream-stream-errors-zh-CN.test.ts",
+    "title": "upstream stream error details zh-CN",
+    "kind": "implemented",
+    "environment": "default offline"
+  },
+  {
+    "id": "REG-bypass-body-en",
+    "file": "e2e/scenarios/regression/agent-history-bypass-body-en.test.ts",
+    "title": "bypass request body and log lifecycle en",
+    "kind": "implemented",
+    "environment": "default offline"
+  },
+  {
+    "id": "REG-bypass-body-zh-CN",
+    "file": "e2e/scenarios/regression/agent-history-bypass-body-zh-CN.test.ts",
+    "title": "bypass request body and log lifecycle zh-CN",
+    "kind": "implemented",
+    "environment": "default offline"
+  },
+  {
+    "id": "REG-model-view-en",
+    "file": "e2e/scenarios/regression/model-view-hot-update-en.test.ts",
+    "title": "model view hot update en",
+    "kind": "implemented",
+    "environment": "default offline"
+  },
+  {
+    "id": "REG-model-view-zh-CN",
+    "file": "e2e/scenarios/regression/model-view-hot-update-zh-CN.test.ts",
+    "title": "model view hot update zh-CN",
+    "kind": "implemented",
+    "environment": "default offline"
   }
 ]

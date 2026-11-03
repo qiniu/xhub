@@ -77,12 +77,9 @@ type RequestHost interface {
 	// 参数为响应、路径、主体、公开目标及估算 token；返回是否放行，拒绝已写响应。
 	// 成功占用分钟容量；后续目标切换、缓存目标和重试使用只读 EnforceIdentityLimits。
 	AdmitRequest(w http.ResponseWriter, path string, p *auth.Principal, alias string, est int) bool
-	// GatewayConfig 返回进程配置。Serve 用它的模型表；路由策略和重试次数改读 RouteSettingsFor。
-	// 参数：无。
-	// 返回 *config.Config（*config.Config）：当前进程配置，含模型表和路由策略，不会复制。
-	// 调用：dataplane/execution/official.go、dataplane/execution/serve.go、gateway/wire.go
-	// 测试：bypass_logic_test.go、failure_log_test.go
-	GatewayConfig() *config.Config
+	// Models 在模型锁内复制当前部署目录及嵌套配置；返回请求私有值，无参数。
+	// 目录仅描述候选，不授予权限；身份、预算、凭据和连接归属仍按原有时点复核。
+	Models() []config.ModelEntry
 	// RouteSettingsFor 返回这一次请求生效的路由设置：策略、重试次数、超时和冷却阈值。
 	//
 	// 调用方选中的模板由身份链在预算检查时解析出来，所以这里不遍历、不额外查询。
@@ -92,7 +89,8 @@ type RequestHost interface {
 	// 返回 router.RouteSettings（router.RouteSettings）：这次请求生效的设置和来源。
 	// 调用：dataplane/execution/serve.go
 	// 测试：route_settings_test.go
-	RouteSettingsFor(p *auth.Principal) router.RouteSettings
+	// models 必须与本轮候选使用同一独立目录；不再次读取进程模型表，且不承诺跨存储事务快照。
+	RouteSettingsFor(p *auth.Principal, models []config.ModelEntry) router.RouteSettings
 	// RouteState 返回这一刻的冷却、延迟、用量和正在处理的请求数。没有 Redis 时只有 Busy。
 	// 参数：无。
 	// 返回 router.State（router.State）：这一刻的冷却、延迟、用量和并发，交给路由器排序。
@@ -194,10 +192,6 @@ type Adapted interface {
 type Bypass interface {
 	// 嵌入 RequestHost 的公共能力；执行器通过同一宿主消费，不能省略其中的鉴权或记账约定。
 	RequestHost
-
-	// Models 返回当前原生调用可读取的全部部署目录；无参数，返回切片由实现持有，执行器只读使用。
-	// ServeBypass 进一步校验停用、端点、策略、权限和凭据，返回目录不代表任意条目都可执行。
-	Models() []config.ModelEntry
 
 	// FindDeployment 按钉住的部署 id 找回那条模型配置。进程里已经没有这行时返回假。
 	// 参数 id：PinOfficial 存下来的值。

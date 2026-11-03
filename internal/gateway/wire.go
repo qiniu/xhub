@@ -49,7 +49,7 @@ func (s *Server) ResolveRequest(r *http.Request) (*auth.Principal, error) {
 	return s.resolve(r)
 }
 
-// GatewayConfig 返回当前进程配置。空模型表表示没有部署，不是「不做限制」。
+// GatewayConfig 提供护栏运行时使用的进程配置；模型执行器改用独立的 Models 目录。
 // 参数 s：网关进程。
 // 返回：当前配置，不会复制。
 // 调用：dataplane Serve 与 ServeBypass。测试：failure_log_test.go、bypass_logic_test.go 的夹具实现同一方法。
@@ -158,15 +158,18 @@ func (s *Server) RememberExchange(callID string, r *http.Request, reqBody, respB
 	s.rememberExchange(callID, r, reqBody, respBody)
 }
 
-// 按部署 id 在当前模型表里查找。找不到时 ok 为假。
+// FindDeployment 在模型锁内按运行部署 id 查找并复制命中的配置，避免结算/轮询为单条查询复制整个目录。
+// 不持有模型锁访问网络或数据库；返回独立配置，无写入副作用。找不到时 ok 为假。
 // 参数 id（string）：部署、模型或凭据 id。空串表示没有选定。
 // 返回：模型行，以及是否在当前模型表里。没有时查询官方任务会得到 404。
 // 调用：dataplane/contract/host.go、dataplane/execution/official.go、gateway/spend.go
 // 测试：bypass_logic_test.go、failure_log_test.go
 func (s *Server) FindDeployment(id string) (config.ModelEntry, bool) {
-	for _, m := range s.Models() {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	for _, m := range s.Cfg.ModelList {
 		if router.CooldownID(m) == id {
-			return m, true
+			return config.CloneModels([]config.ModelEntry{m})[0], true
 		}
 	}
 	return config.ModelEntry{}, false
@@ -300,12 +303,14 @@ func (s *Server) EnforceIdentityLimits(w http.ResponseWriter, path string, p *au
 // 测试：bypass_logic_test.go、failure_log_test.go 的夹具返回 nil。
 func (s *Server) Redis() *live.Client { return s.Live }
 
-// Models returns the deployments loaded into this process. It is the model table, not an allow-list of names.
-// 参数 s：网关进程。
-// 返回：Cfg.ModelList。空切片表示当前没有部署，官方 Bypass 会因此找不到模型。
-// 调用：dataplane Bypass 的 eligible、Runtime 的 State、gateway bypass 匹配。
-// 测试：bypass_logic_test.go 用夹具模型表断言选中的密钥。
-func (s *Server) Models() []config.ModelEntry { return s.Cfg.ModelList }
+// Models 在模型锁内复制部署目录及其嵌套配置，供数据面、诊断和计数读取。
+// 无参数，返回请求私有目录；空目录保持 nil/空切片形状。调用方不得预先持有模型锁。
+// 只隔离配置所有权，不读取凭据库、不执行授权、不冻结后续请求；管理写入使用同一把锁。
+func (s *Server) Models() []config.ModelEntry {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return config.CloneModels(s.Cfg.ModelList)
+}
 
 // BusyMap returns how many requests each deployment is handling inside this process.
 // 参数 s：网关进程。

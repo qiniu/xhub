@@ -61,14 +61,12 @@ func (s *handler) tokenCounter(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
-// modelUsedForCount chooses the request model name or the deployment model name for the count.
+// modelUsedForCount 从宿主提供的独立目录选择计数所用型号，不再由调用方嵌套加锁。
 // 参数 requestModel（string）：模型名。对外名用来选部署，上游名写进转发正文。
 // 返回 string（string）：用来计数的部署上游模型名。没有对上的部署时用请求里的模型名。
 // 调用：仅在 tokens.go 内使用
 // 测试：无直接单测
 func (s *handler) modelUsedForCount(requestModel string) string {
-	s.host.LockModels()
-	defer s.host.UnlockModels()
 	for _, m := range s.host.Models() {
 		if m.ModelName != requestModel {
 			continue
@@ -138,8 +136,6 @@ func (s *handler) transformRequest(w http.ResponseWriter, r *http.Request) {
 type Host interface {
 	RequireMixed(http.ResponseWriter, *http.Request) *auth.Principal
 	Models() []config.ModelEntry
-	LockModels()
-	UnlockModels()
 }
 
 // Store 只提供转换记录所需的 KV 读写，错误由 HTTP 处理器返回。

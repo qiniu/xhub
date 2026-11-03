@@ -354,14 +354,14 @@ func TestModelFallbackPersistenceBoundaries(t *testing.T) {
 		if r := h.do("PUT", "/model/fallback", admin, map[string]any{"model_name": names[0], "policy": map[string]any{"fallbacks": []string{names[1]}}}); r.status != 503 {
 			t.Fatalf("其他损坏策略不应被忽略: %s", r.describe())
 		}
-		if settings := h.gw.RouteSettingsFor(nil); settings.Err == nil {
+		if settings := h.gw.RouteSettingsFor(nil, h.gw.Models()); settings.Err == nil {
 			t.Fatal("数据面配置忽略了损坏策略")
 		}
 		h.ok("PUT", "/model/fallback", admin, map[string]any{"model_name": independent, "policy": map[string]any{"fallbacks": []string{names[1]}}})
 		if read(independent) != independentBefore {
 			t.Fatal("覆盖损坏策略后未恢复原策略")
 		}
-		if settings := h.gw.RouteSettingsFor(nil); settings.Err != nil {
+		if settings := h.gw.RouteSettingsFor(nil, h.gw.Models()); settings.Err != nil {
 			t.Fatalf("修复后数据面仍拒绝执行: %v", settings.Err)
 		}
 	})
