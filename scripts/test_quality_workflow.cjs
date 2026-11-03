@@ -507,7 +507,7 @@ test('operations boundary has real regression coverage and cleanup', () => {
 test('cache management has real regression coverage and cleanup', () => {
   const job = workflow.jobs['supplier-contract'];
   const run = step('supplier-contract', 'Run real cache management regression');
-  assert.equal(run.run, "bash scripts/regression.sh '^Test(CacheManagementTruth|CacheUnavailableManagement|CacheHitIsFreeAndLoggedAsOne)$'");
+  assert.equal(run.run, "bash scripts/regression.sh '^Test(RequestCachePolicy|CacheManagementTruth|CacheUnavailableManagement|CacheHitIsFreeAndLoggedAsOne)$'");
   assert.equal(run.env.XHUB_REGRESSION_COVERPROFILE, 'coverage/cache-config.out');
   const check = step('supplier-contract', 'Validate cache regression coverage');
   assert.match(check.run, /set -euo pipefail/);
