@@ -146,15 +146,21 @@ try {
   await scenario("供应商帮助 → NewAPI/Suno → 双语接入指南 → 源码", async () => {
     await page.goto(base + "docs/center/zh/help/models.html");
     await page.getByRole("heading", { name: "供应商与模型部署", exact: true }).waitFor();
-    await expect(page.getByRole("img", { name: "中文模型供应商连接表单" })).toBeVisible();
-    assert.ok(await page.getByRole("img", { name: "中文模型供应商连接表单" }).evaluate((img) => img.complete && img.naturalWidth > 0), "中文供应商截图必须加载");
-    assert.ok(await page.getByRole("img", { name: "中文模型部署表单" }).evaluate((img) => img.complete && img.naturalWidth > 0), "中文部署截图必须加载");
+    for (const name of ["中文模型供应商连接表单", "中文模型部署表单"]) {
+      const img = page.getByRole("img", { name });
+      await img.scrollIntoViewIfNeeded();
+      await expect(img).toBeVisible();
+      await expect.poll(() => img.evaluate((element) => element.complete && element.naturalWidth > 0), `${name}必须加载`).toBe(true);
+    }
     assert.match(await page.getByRole("article").innerText(), /NewAPI[\s\S]*Suno/);
     await page.getByRole("link", { name: "Switch to English", exact: true }).click();
     assert.match(await page.getByRole("article").innerText(), /no Suno executor/);
-    await expect(page.getByRole("img", { name: "English provider connection form" })).toBeVisible();
-    assert.ok(await page.getByRole("img", { name: "English provider connection form" }).evaluate((img) => img.complete && img.naturalWidth > 0), "英文供应商截图必须加载");
-    assert.ok(await page.getByRole("img", { name: "English model deployment form" }).evaluate((img) => img.complete && img.naturalWidth > 0), "英文部署截图必须加载");
+    for (const name of ["English provider connection form", "English model deployment form"]) {
+      const img = page.getByRole("img", { name });
+      await img.scrollIntoViewIfNeeded();
+      await expect(img).toBeVisible();
+      await expect.poll(() => img.evaluate((element) => element.complete && element.naturalWidth > 0), `${name} must load`).toBe(true);
+    }
     await page.goto(base + "docs/development/zh-CN/provider-catalog.html");
     await page.getByRole("heading", { name: "添加模型供应商与开发新协议", exact: true }).waitFor();
     await page.getByRole("heading", { name: "自己添加一个 provider", exact: true }).waitFor();
