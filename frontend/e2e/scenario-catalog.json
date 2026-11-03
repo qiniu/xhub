@@ -3476,5 +3476,19 @@
     "title": "request failure diagnostics and exact time filtering zh-CN",
     "kind": "implemented",
     "environment": "default offline"
+  },
+  {
+    "id": "REG-CACHE-PRICE-en",
+    "file": "e2e/cache-price-diagnostics-en.test.ts",
+    "title": "cache pricing warning and actual bill en",
+    "kind": "implemented",
+    "environment": "default offline"
+  },
+  {
+    "id": "REG-CACHE-PRICE-zh-CN",
+    "file": "e2e/cache-price-diagnostics-zh-CN.test.ts",
+    "title": "cache pricing warning and actual bill zh-CN",
+    "kind": "implemented",
+    "environment": "default offline"
   }
 ]

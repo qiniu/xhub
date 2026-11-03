@@ -133,15 +133,31 @@ func (s *Server) tokenOnlyBudget(callID string) bool {
 	return attempt != nil && attempt.TokenOnly
 }
 
-// softBudgetCharge 使用出站时冻结价格计算实际token费用；返回账单、是否存在软预算尝试及计价有效性。
-// 供recordSpend调用；失败只标记未定价，不编造费用或冻结额度。
-func (s *Server) softBudgetCharge(callID string, usage map[string]any) (catalog.Charge, bool, bool) {
+// softBudgetCharge 使用出站时冻结价格计算费用；参数为请求ID和实测usage，返回账单、尝试存在性、有效性和安全原因码。
+// 供recordSpend调用；失败保留未定价原因，不编造费用或冻结额度，亦不公开内部配置/原始错误。
+func (s *Server) softBudgetCharge(callID string, usage map[string]any) (catalog.Charge, bool, bool, string) {
 	s.mu.Lock()
 	attempt := s.budgetCalls[callID]
 	s.mu.Unlock()
 	if attempt == nil {
-		return catalog.Charge{}, false, false
+		return catalog.Charge{}, false, false, ""
 	}
 	charge, err := attempt.SoftPrice.Charge(usage)
-	return charge, true, err == nil
+	return charge, true, err == nil, pricingFailureCode(err)
+}
+
+// pricingFailureCode 将本地结算错误转换成稳定日志原因码；参数err可为空，返回空串或有限枚举。
+// 仅供费用观察使用，不改变结算结果；未知错误不直接输出，避免把内部值带入日志接口。
+func pricingFailureCode(err error) string {
+	if err == nil {
+		return ""
+	}
+	switch err.Error() {
+	case "measured cache reads have no reserved price":
+		return "cache_read_price_missing"
+	case "measured cache writes have no reserved price":
+		return "cache_write_price_missing"
+	default:
+		return "pricing_unavailable"
+	}
 }

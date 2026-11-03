@@ -1,4 +1,11 @@
 export const zhPhrases: Record<string, string> = {
+  "cachePrice.warningTitle": "缓存价格不完整",
+  "cachePrice.missing": "缺少价格：{fields}。若上游返回这些 Token，本次请求将无法完整计费。请填写供应商费率，仅在明确免费时填 0。",
+  "cachePrice.blankHelp": "留空表示未设置，不会默认使用输入价格。上游报告缓存用量但缺少对应费率时，账单将标为未定价。",
+  "cachePrice.readMissing": "上游返回了缓存读取 Token，但模型未配置缓存读取价格。请补齐价格；本次请求尚无完整账单。",
+  "cachePrice.writeMissing": "上游返回了缓存写入 Token，但模型未配置缓存写入价格。请补齐价格；本次请求尚无完整账单。",
+  "cachePrice.unavailable": "实际用量无法完整定价。请核对模型价格和上游用量；这不表示请求免费。",
+
   "To:": "至：",
   "Identity request failed ({value0})": "身份信息请求失败（{value0}）",
   "Missing endpoint catalog": "端点目录缺失",
