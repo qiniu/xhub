@@ -11,6 +11,22 @@ import { cacheAdminZhCN } from "./cacheAdmin.zh-CN";
 
 export const zhCN = {
   logsUX: {
+    upstreamSummary: "上游返回的状态和用量；状态成功不代表客户端已收到完整回复。",
+    upstreamRequestId: "上游请求 ID",
+    upstreamRaw: "查看原始响应头和用量数据",
+    upstreamUsageHelp: "供应商实际报告的用量，未上报时不会推算为零。",
+    billingUsageHelp: "XHub 用于计费的规范化用量，可能与供应商字段名称不同。",
+    usageUnavailable: "没有可展示的用量字段",
+    inputTokens: "输入 Token",
+    outputTokens: "输出 Token",
+    totalTokens: "总 Token",
+    cacheReadTokens: "缓存读取 Token",
+    cacheWriteTokens: "缓存创建 Token",
+    responseCacheHelp: "网关响应缓存复用之前的完整回答；它与供应商的提示词缓存是两种不同的缓存。",
+    cacheKeyHelp: "网关为响应缓存生成的标识，用来查找可能复用的请求。相同标识不代表本次一定命中缓存。",
+    promptCacheReadHelp: "供应商报告从提示词缓存读取的输入 Token；实际费用取决于该模型的价格配置。",
+    promptCacheWriteHelp: "供应商报告写入提示词缓存的输入 Token，可供之后的请求复用；实际费用取决于价格配置。",
+    metadataHelp: "这里保留日志的原始附加字段，可能与上方卡片重复，主要用于详细排查。",
     bodyUnavailable: "此日志暂无可展示的请求和响应正文，原因未记录；其他已记录的信息仍可查看。",
     firstResponse: "上游首响应字节耗时（秒）",
     relatedCache: "关联请求（缓存键）", relatedPrompt: "关联请求（提示词）",

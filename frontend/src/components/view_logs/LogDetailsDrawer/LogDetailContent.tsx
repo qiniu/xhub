@@ -13,7 +13,6 @@ import { logOutcomeKey, logErrorSummary } from "../logPresentation";
 import { fullErrorDetails, isRequestFailure } from "../logErrors";
 import { formatNumberWithCommas } from "@/utils/dataUtils";
 import { formatLogCost } from "../formatLogCost";
-import { PROMPT_CACHE_CREATION_TOOLTIP, PROMPT_CACHE_READ_TOOLTIP } from "@/utils/promptCacheUsage";
 import GuardrailViewer from "../GuardrailViewer/GuardrailViewer";
 import EvalViewer from "../EvalViewer/EvalViewer";
 import {
@@ -298,16 +297,25 @@ export function LogDetailContent({ logEntry, isLoadingDetails = false, isDetails
               <p role="status" className="mt-2 text-sm text-muted-foreground">{t("providerGuideUI.searchDropped", { capabilities: metadata.upstream_response.dropped_capabilities.join(", ") })}</p>
             )}
             <CollapsibleContent className="pt-3">
+              <p className="mb-3 text-sm text-muted-foreground">{t("logsUX.upstreamSummary")}</p>
               <p>{t("HTTP Status")}: {metadata.upstream_response.status_code || t("logDiagnostics.noResponse")}</p>
               {metadata.upstream_response.read_error && <p role="alert">{metadata.upstream_response.read_error}</p>}
               {metadata.upstream_response.usage_parse_error && <p role="alert">{metadata.upstream_response.usage_parse_error}</p>}
-              <h4>{t("Upstream Response Headers")}</h4>
-              <pre className="max-h-64 overflow-auto whitespace-pre-wrap break-all text-xs">{JSON.stringify(metadata.upstream_response.headers, null, 2)}</pre>
-              {metadata.upstream_response.trailers && <pre className="max-h-64 overflow-auto whitespace-pre-wrap break-all text-xs">{JSON.stringify(metadata.upstream_response.trailers, null, 2)}</pre>}
-              <h4>{t("Upstream Usage")}</h4>
-              {metadata.upstream_response.usage_reported ? <pre className="max-h-64 overflow-auto whitespace-pre-wrap break-all text-xs">{JSON.stringify(metadata.upstream_response.usage, null, 2)}</pre> : <p>{t("Not reported")}</p>}
-              <h4>{t("Billing Usage")}</h4>
-              <pre className="max-h-64 overflow-auto whitespace-pre-wrap break-all text-xs">{JSON.stringify(metadata.upstream_response.billing_usage ?? {}, null, 2)}</pre>
+              {upstreamRequestId(metadata.upstream_response.headers) && <p className="break-all">{t("logsUX.upstreamRequestId")}: {upstreamRequestId(metadata.upstream_response.headers)}</p>}
+              <div className="mt-3 grid gap-3 md:grid-cols-2">
+                <UsageSummary title={t("Upstream Usage")} help={t("logsUX.upstreamUsageHelp")} usage={metadata.upstream_response.usage_reported ? metadata.upstream_response.usage : undefined} missing={metadata.upstream_response.usage_reported ? t("logsUX.usageUnavailable") : t("Not reported")} />
+                <UsageSummary title={t("Billing Usage")} help={t("logsUX.billingUsageHelp")} usage={metadata.upstream_response.billing_usage} missing={t("logsUX.usageUnavailable")} />
+              </div>
+              <details className="mt-3 rounded border p-3">
+                <summary className="cursor-pointer text-sm font-medium">{t("logsUX.upstreamRaw")}</summary>
+                <h4>{t("Upstream Response Headers")}</h4>
+                <pre className="max-h-64 overflow-auto whitespace-pre-wrap break-all text-xs">{JSON.stringify(metadata.upstream_response.headers ?? {}, null, 2)}</pre>
+                {metadata.upstream_response.trailers && <pre className="max-h-64 overflow-auto whitespace-pre-wrap break-all text-xs">{JSON.stringify(metadata.upstream_response.trailers, null, 2)}</pre>}
+                <h4>{t("Upstream Usage")}</h4>
+                {metadata.upstream_response.usage_reported && <pre className="max-h-64 overflow-auto whitespace-pre-wrap break-all text-xs">{JSON.stringify(metadata.upstream_response.usage, null, 2)}</pre>}
+                <h4>{t("Billing Usage")}</h4>
+                <pre className="max-h-64 overflow-auto whitespace-pre-wrap break-all text-xs">{JSON.stringify(metadata.upstream_response.billing_usage ?? {}, null, 2)}</pre>
+              </details>
             </CollapsibleContent>
           </Collapsible>
         </section>
@@ -315,7 +323,7 @@ export function LogDetailContent({ logEntry, isLoadingDetails = false, isDetails
 
       {/* Metadata */}
       {logEntry.metadata && Object.keys(logEntry.metadata).length > 0 && (
-        <details className="mb-4 rounded-md border p-3"><summary className="cursor-pointer text-sm font-medium">{t("logsUX.rawMetadata")}</summary><MetadataSection metadata={logEntry.metadata} /></details>
+        <details className="mb-4 rounded-md border p-3"><summary className="cursor-pointer text-sm font-medium">{t("logsUX.rawMetadata")}</summary><p className="mt-2 text-sm text-muted-foreground">{t("logsUX.metadataHelp")}</p><MetadataSection metadata={logEntry.metadata} /></details>
       )}
 
       {/* Bottom spacing */}
@@ -327,6 +335,37 @@ export function LogDetailContent({ logEntry, isLoadingDetails = false, isDetails
 // ============================================================================
 // Helper Components
 // ============================================================================
+
+/** 从上游响应头读取常见请求 ID；参数为可能缺失的响应头，返回已记录的第一个字符串或空值，不修改日志。 */
+function upstreamRequestId(headers: unknown): string | undefined {
+  if (!headers || typeof headers !== "object" || Array.isArray(headers)) return undefined;
+  for (const [key, value] of Object.entries(headers)) {
+    if (!["x-request-id", "request-id"].includes(key.toLowerCase())) continue;
+    const id = Array.isArray(value) ? value[0] : value;
+    if (typeof id === "string" && id) return id;
+  }
+  return undefined;
+}
+
+/** 展示已记录的输入、输出和总 Token；未知字段保留在原始数据中，缺失不推断为零。 */
+function UsageSummary({ title, help, usage, missing }: { title: string; help: string; usage: unknown; missing: string }) {
+  const t = useT();
+  const data = usage && typeof usage === "object" && !Array.isArray(usage) ? usage as Record<string, unknown> : {};
+  const rawDetails = data.input_tokens_details ?? data.prompt_tokens_details;
+  const details = rawDetails && typeof rawDetails === "object" && !Array.isArray(rawDetails) ? rawDetails as Record<string, unknown> : {};
+  const fields = [
+    [t("logsUX.inputTokens"), data.input_tokens ?? data.prompt_tokens],
+    [t("logsUX.outputTokens"), data.output_tokens ?? data.completion_tokens],
+    [t("logsUX.totalTokens"), data.total_tokens],
+    [t("logsUX.cacheReadTokens"), data.cache_read_input_tokens ?? details.cached_tokens],
+    [t("logsUX.cacheWriteTokens"), data.cache_creation_input_tokens ?? details.cache_write_tokens],
+  ].filter((entry): entry is [string, number] => typeof entry[1] === "number" && Number.isFinite(entry[1]));
+  return <section aria-label={title} className="rounded border p-3 text-sm">
+    <h4 className="font-medium">{title}</h4>
+    <p className="mb-2 text-muted-foreground">{help}</p>
+    {fields.length ? <dl>{fields.map(([label, value]) => <div key={label} className="flex justify-between gap-3"><dt>{label}</dt><dd>{formatNumberWithCommas(value)}</dd></div>)}</dl> : <p>{missing}</p>}
+  </section>;
+}
 
 function DescriptionList({ children }: { children: React.ReactNode }) {
   const t = useT();
@@ -444,11 +483,6 @@ function getUncachedInputTextTokens(metadata: Record<string, any>): number | und
   const n = Number(raw);
   return Number.isFinite(n) ? n : undefined;
 }
-
-const RESPONSE_CACHE_TOOLTIP =
-  "Whether this request was served from XHub's response cache (e.g. Redis / in-memory), skipping the LLM provider call entirely. This is separate from provider prompt caching; a Miss here does not mean prompt caching failed.";
-const CACHE_KEY_TOOLTIP =
-  "The key XHub computed for this request in the response cache. Requests with the same cache key share a cached response; a different key means the request content did not match any cached entry.";
 
 function MetricLabel({ label, tooltip }: { label: string; tooltip: string }) {
   const t = useT();
@@ -577,7 +611,7 @@ function MetricsSection({ logEntry, metadata }: { logEntry: LogEntry; metadata: 
                 label={
                   <MetricLabel
                     label={t("Response Cache")}
-                    tooltip={RESPONSE_CACHE_TOOLTIP}
+                    tooltip={t("logsUX.responseCacheHelp")}
                   />
                 }
               >
@@ -588,7 +622,7 @@ function MetricsSection({ logEntry, metadata }: { logEntry: LogEntry; metadata: 
             )}
             {responseCacheKey && (
               <DescriptionItem
-                label={<MetricLabel label={t("Cache Key")} tooltip={CACHE_KEY_TOOLTIP} />}
+                label={<MetricLabel label={t("Cache Key")} tooltip={t("logsUX.cacheKeyHelp")} />}
               >
                 <TruncatedValue value={responseCacheKey} />
               </DescriptionItem>
@@ -598,7 +632,7 @@ function MetricsSection({ logEntry, metadata }: { logEntry: LogEntry; metadata: 
                 label={
                   <MetricLabel
                     label={t("Prompt Cache Read Tokens")}
-                    tooltip={PROMPT_CACHE_READ_TOOLTIP}
+                    tooltip={t("logsUX.promptCacheReadHelp")}
                   />
                 }
               >
@@ -610,7 +644,7 @@ function MetricsSection({ logEntry, metadata }: { logEntry: LogEntry; metadata: 
                 label={
                   <MetricLabel
                     label={t("Prompt Cache Creation Tokens")}
-                    tooltip={PROMPT_CACHE_CREATION_TOOLTIP}
+                    tooltip={t("logsUX.promptCacheWriteHelp")}
                   />
                 }
               >

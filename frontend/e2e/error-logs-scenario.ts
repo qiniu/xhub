@@ -96,6 +96,10 @@ async function verifyUpstreamCollapse(page: Page, headers: Record<string, string
   await expect(page.getByRole("dialog").getByText(translate("zh-CN", "API Base"), { exact: true }).or(page.getByRole("dialog").getByText(translate("en", "API Base"), { exact: true }))).toBeVisible();
   const upstream = stored.metadata.upstream_response;
   expect(upstream.status_code, "后台应保存真实上游 HTTP 状态").toBe(status);
+  const responseCacheHelp = (locale: "zh-CN" | "en") => translate(locale, "{label} info", { label: translate(locale, "Response Cache") });
+  const cacheInfo = page.getByRole("dialog").getByRole("img", { name: responseCacheHelp("zh-CN") }).or(page.getByRole("dialog").getByRole("img", { name: responseCacheHelp("en") }));
+  await cacheInfo.hover();
+  await expect(page.getByText(translate("zh-CN", "logsUX.responseCacheHelp")).or(page.getByText(translate("en", "logsUX.responseCacheHelp")))).toBeVisible();
   const region = page.getByRole("dialog").getByRole("region", { name: /^(上游响应|Upstream Response)$/ });
   const trigger = region.getByRole("button", { name: /^(上游响应|Upstream Response)$/ });
   const header = region.getByRole("heading", { name: /上游响应头|Upstream Response Headers/ });
@@ -104,6 +108,8 @@ async function verifyUpstreamCollapse(page: Page, headers: Record<string, string
   await expect(region.getByRole("button", { name: /复制上游响应|Copy upstream response/ })).toBeVisible();
   await trigger.click();
   await expect(trigger).toHaveAttribute("aria-expanded", "true");
+  await expect(region.getByText(translate("zh-CN", "logsUX.upstreamSummary")).or(region.getByText(translate("en", "logsUX.upstreamSummary")))).toBeVisible();
+  await region.getByText(translate("zh-CN", "logsUX.upstreamRaw")).or(region.getByText(translate("en", "logsUX.upstreamRaw"))).click();
   await expect(header).toBeVisible();
   await expect(region.getByText(/^(HTTP 状态码|HTTP Status):/)).toContainText(String(status));
   await expect(region).toContainText(JSON.stringify(upstream.headers, null, 2));

@@ -71,7 +71,9 @@ describe("上游响应折叠", () => {
     expect(trigger).toHaveAttribute("aria-expanded", "true");
     expect(within(region).getByText("HTTP Status: 200")).toBeVisible();
     expect(within(region).getByText("Not reported")).toBeVisible();
+    await user.click(within(region).getByText("View raw response headers and usage"));
     expect(within(region).getByText("{}")).toBeVisible();
+    trigger.focus();
     await user.keyboard("{Enter}");
     expect(trigger).toHaveAttribute("aria-expanded", "false");
     expect(within(region).queryByText("HTTP Status: 200")).not.toBeInTheDocument();
@@ -97,6 +99,7 @@ describe("上游响应折叠", () => {
     expect(within(region).queryByRole("alert")).not.toBeInTheDocument();
     await user.click(within(region).getByRole("button", { name: "Upstream Response", exact: true }));
     expect(within(region).getByRole("alert")).toHaveTextContent("invalid upstream usage");
+    await user.click(within(region).getByText("View raw response headers and usage"));
     expect(region).toHaveTextContent("last");
   });
 
@@ -108,6 +111,46 @@ describe("上游响应折叠", () => {
     rerender(<LogDetailContent logEntry={logEntry({ request_id: "next-request" })} />);
     expect(screen.getByRole("button", { name: "Upstream Response", exact: true })).toHaveAttribute("aria-expanded", "false");
   });
+});
+
+/** 前置包含上游和计费用量的日志；双语验证零值、缺失、上游请求 ID 与原始详情，卸载组件清理。 */
+it.each(["zh-CN", "en"] as const)("%s 以可读字段显示上游用量", async (locale) => {
+  const user = userEvent.setup();
+  const info = { status_code: 200, headers: { "X-Request-ID": ["upstream-id"] }, usage_reported: true,
+    usage: { input_tokens: 0, output_tokens: 15, total_tokens: 15, input_tokens_details: { cached_tokens: 0 }, extra: "original" }, billing_usage: { prompt_tokens: 12, completion_tokens: 3, cache_creation_input_tokens: 4 } };
+  const { rerender } = render(<I18nProvider initialLocale={locale}><LogDetailContent logEntry={logEntry({ metadata: { upstream_response: info } })} /></I18nProvider>);
+  const region = screen.getByRole("region", { name: translate(locale, "Upstream Response") });
+  await user.click(within(region).getByRole("button", { name: translate(locale, "Upstream Response"), exact: true }));
+  expect(region).toHaveTextContent(translate(locale, "logsUX.upstreamSummary"));
+  expect(region).toHaveTextContent("upstream-id");
+  const upstream = within(region).getByRole("region", { name: translate(locale, "Upstream Usage") });
+  expect(upstream).toHaveTextContent(translate(locale, "logsUX.inputTokens"));
+  expect(upstream).toHaveTextContent("0");
+  expect(upstream).toHaveTextContent("15");
+  expect(upstream).toHaveTextContent(translate(locale, "logsUX.cacheReadTokens"));
+  const billing = within(region).getByRole("region", { name: translate(locale, "Billing Usage") });
+  expect(billing).toHaveTextContent("12");
+  expect(billing).toHaveTextContent("3");
+  expect(billing).toHaveTextContent(translate(locale, "logsUX.cacheWriteTokens"));
+  await user.click(within(region).getByText(translate(locale, "logsUX.upstreamRaw")));
+  expect(within(region).getByText(/original/)).toBeVisible();
+  rerender(<I18nProvider initialLocale={locale}><LogDetailContent logEntry={logEntry({ request_id: "other", metadata: { upstream_response: { status_code: 0, headers: {}, usage_reported: false } } })} /></I18nProvider>);
+  await user.click(screen.getByRole("button", { name: translate(locale, "Upstream Response"), exact: true }));
+  expect(within(screen.getByRole("region", { name: translate(locale, "Upstream Response") })).getByText(translate(locale, "Not reported"))).toBeVisible();
+  expect(screen.getByRole("region", { name: translate(locale, "Upstream Response") })).toHaveTextContent(translate(locale, "logDiagnostics.noResponse"));
+});
+
+/** 前置带缓存用量和响应缓存标识的日志；验证问号提示随语言切换且不把价格折扣当作保证，组件自动卸载。 */
+it.each(["zh-CN", "en"] as const)("%s 缓存解释按语言显示", async (locale) => {
+  const user = userEvent.setup();
+  render(<I18nProvider initialLocale={locale}><LogDetailContent logEntry={logEntry({ cache_hit: "true", cache_key: "fixture", metadata: { cached_tokens: 10, additional_usage_values: { cache_creation_input_tokens: 3 } } })} /></I18nProvider>);
+  for (const [labelKey, helpKey] of [["Response Cache", "logsUX.responseCacheHelp"], ["Cache Key", "logsUX.cacheKeyHelp"], ["Prompt Cache Read Tokens", "logsUX.promptCacheReadHelp"], ["Prompt Cache Creation Tokens", "logsUX.promptCacheWriteHelp"]]) {
+    const label = translate(locale, labelKey);
+    const icon = screen.getByRole("img", { name: translate(locale, "{label} info", { label }) });
+    await user.hover(icon);
+    expect(await screen.findByText(translate(locale, helpKey))).toBeVisible();
+    await user.unhover(icon);
+  }
 });
 
 /** 前置带降级诊断的日志组件；验证中英文提示和能力插值在折叠时也可见，旧日志无提示；自动卸载，无持久副作用。 */
