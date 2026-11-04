@@ -10,6 +10,22 @@ import { cacheAdminEn } from "./cacheAdmin.en";
 
 export const en = {
   logsUX: {
+    upstreamSummary: "Status and usage reported by the provider. A successful status does not prove the client received a complete reply.",
+    upstreamRequestId: "Upstream request ID",
+    upstreamRaw: "View raw response headers and usage",
+    upstreamUsageHelp: "Usage reported by the provider. Missing usage is not treated as zero.",
+    billingUsageHelp: "Normalized usage XHub uses for billing; field names may differ from the provider's.",
+    usageUnavailable: "No usage fields available to display",
+    inputTokens: "Input tokens",
+    outputTokens: "Output tokens",
+    totalTokens: "Total tokens",
+    cacheReadTokens: "Cache read tokens",
+    cacheWriteTokens: "Cache creation tokens",
+    responseCacheHelp: "The gateway response cache reuses an earlier complete reply. It is separate from the provider's prompt cache.",
+    cacheKeyHelp: "A gateway response-cache identifier used to look up reusable requests. The same identifier does not mean this request was a cache hit.",
+    promptCacheReadHelp: "Input tokens the provider reports reading from its prompt cache. The actual cost depends on the model's configured prices.",
+    promptCacheWriteHelp: "Input tokens the provider reports writing to its prompt cache for later requests. The actual cost depends on configured prices.",
+    metadataHelp: "Raw additional log fields for detailed troubleshooting; some repeat the cards above.",
     bodyUnavailable: "This log has no request or response body available. The reason was not recorded; other recorded details remain available.",
     firstResponse: "First upstream response byte (s)",
     relatedCache: "Related requests (cache key)", relatedPrompt: "Related requests (prompt)",

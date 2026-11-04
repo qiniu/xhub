@@ -524,7 +524,7 @@ describe("LogDetailContent", () => {
     expect(infoIcons).toHaveLength(1);
     await user.hover(infoIcons[0]);
 
-    expect(await screen.findByText(/served from XHub's response cache/i)).toBeInTheDocument();
+    expect(await screen.findByText(/gateway response cache reuses an earlier complete reply/i)).toBeInTheDocument();
     expect(screen.queryByRole("link", { name: "Docs" })).not.toBeInTheDocument();
   });
 
