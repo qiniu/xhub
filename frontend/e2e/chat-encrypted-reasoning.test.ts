@@ -55,6 +55,19 @@ test("Chat preserves encrypted Responses reasoning through tool continuation", a
     await page.getByRole("button", { name: t("Send message") }).click();
     expect((await pending).status()).toBe(200);
     await expect(page.getByText("e2e-ok", { exact: true }).last()).toBeVisible();
+    // WorkBuddy 会在 Chat 消息附加客户端跟踪字段；经真实浏览器、网关及 Responses 上游验证，并在 finally 清理模型和凭据。
+    const workbuddy = await chatRequest(page, bearer, {
+      model: name, stream: true,
+      messages: [{ role: "user", content: "Say hello.", agent: "cli", startsNewUserRequest: true, conversationRequestId: "e2e-workbuddy" }],
+      tools: [{ type: "function", function: { name: "read", parameters: { type: "object", properties: {} } } }],
+    });
+    expect(workbuddy.status, workbuddy.raw).toBe(200);
+    expect(workbuddy.raw).toContain("data: [DONE]");
+    expect(workbuddy.message.content || workbuddy.message.tool_calls.length).toBeTruthy();
+    const invalidWorkbuddy = await chatRequest(page, bearer, {
+      model: name, messages: [{ role: "user", content: "Say hello.", agent: "cli", unsupported_business_field: true }],
+    });
+    expect(invalidWorkbuddy.status).toBe(400);
     for (const stream of [false, true]) for (const echo of [false, true]) {
       const options = { model: name, stream, tools: [{ type: "function", function: { name: "read", parameters: { type: "object", properties: {} } } }] };
       // 每例使用独立英文提示词，避免重复请求命中结果缓存而跳过上游及付费记账验证。

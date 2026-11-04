@@ -99,6 +99,9 @@ func ParseDialogue(protocol string, body map[string]any) (Dialogue, error) {
 		}
 		cp, _ := cloneObject(m)
 		if protocol == "openai-chat" {
+			if err := projectWorkBuddyMessageTracking(cp); err != nil {
+				return Dialogue{}, err
+			}
 			if err := projectChatToolIndices(cp); err != nil {
 				return Dialogue{}, err
 			}
