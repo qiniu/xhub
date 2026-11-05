@@ -63,3 +63,26 @@ func TestPipeStreamReportsClientWriteFailure(t *testing.T) {
 		})
 	}
 }
+
+// TestWriteClient 验证写入成功、短写和底层错误保持长度与错误分类。
+// 仅使用内存写入器；不依赖网络或外部状态，无需清理。
+func TestWriteClient(t *testing.T) {
+	broken := errors.New("write failed")
+	for _, tc := range []struct {
+		name    string
+		writer  io.Writer
+		want    error
+		written int
+	}{
+		{"success", &strings.Builder{}, nil, 3},
+		{"short", &failingWriter{header: make(http.Header), short: true}, io.ErrShortWrite, 2},
+		{"error", &failingWriter{header: make(http.Header), err: broken}, broken, 0},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			n, err := WriteClient(tc.writer, []byte("abc"))
+			if n != tc.written || (tc.want != nil && (!errors.Is(err, tc.want) || !errors.Is(err, ErrClientWrite))) || (tc.want == nil && err != nil) {
+				t.Fatalf("写入结果错误: n=%d err=%v", n, err)
+			}
+		})
+	}
+}

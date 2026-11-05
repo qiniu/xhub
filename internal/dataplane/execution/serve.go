@@ -587,7 +587,7 @@ func Serve(h dpcontract.Adapted, w http.ResponseWriter, r *http.Request, op stri
 							h.RememberExchange(callID, r, raw, attempt.body)
 							h.AnnotateCall(callID, dpcontract.CallNote{Streamed: true, TTFTMs: dpusage.TtftMillis(attempt.ttft), Provider: supplier, CacheKey: ck, SessionID: plan.SessionID})
 							h.RecordSpend(w, p, callID, alias, op, attempt.usage, start, false, http.StatusBadGateway, did)
-							if !attempt.clientStarted {
+							if !attempt.clientStarted && !errors.Is(attempt.err, dpstream.ErrClientWrite) {
 								kind := "history_unavailable"
 								if dialogue.NativeResponses {
 									kind = "upstream_error"

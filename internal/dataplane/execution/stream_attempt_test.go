@@ -3,6 +3,8 @@ package execution
 import (
 	"errors"
 	"testing"
+
+	dpstream "github.com/sunqirui1987/xhub/internal/dataplane/stream"
 )
 
 // TestStreamAttemptFailureBoundary 验证流失败后的既有重试边界，涵盖输出、历史准备和原生响应。
@@ -29,5 +31,18 @@ func TestStreamAttemptFailureBoundary(t *testing.T) {
 				t.Fatalf("失败流是否停止不符: got=%v want=%v", got, tc.want)
 			}
 		})
+	}
+}
+
+// TestStreamAttemptClientWriteFailureNeverRetries 验证未写出字节的客户端写失败也不能重放。
+// 内存尝试结果覆盖包装错误和无错误；不访问数据库或网络，无需清理。
+func TestStreamAttemptClientWriteFailureNeverRetries(t *testing.T) {
+	a := streamAttempt{err: errors.Join(dpstream.ErrClientWrite, errors.New("closed"))}
+	if !a.mustStopAfterFailure(false, false) {
+		t.Fatal("客户端写失败不应重试")
+	}
+	a.err = nil
+	if a.mustStopAfterFailure(false, false) {
+		t.Fatal("成功请求不能被误判为失败")
 	}
 }

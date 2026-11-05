@@ -3,9 +3,9 @@ package dialogue
 import (
 	"encoding/json"
 	"fmt"
-	"io"
 	"net/http"
 
+	dpstream "github.com/sunqirui1987/xhub/internal/dataplane/stream"
 	llmdialogue "github.com/sunqirui1987/xhub/internal/llm/dialogue"
 )
 
@@ -50,8 +50,8 @@ func (s *dialogueStream) finishRefusal() error {
 			return err
 		}
 		s.capture.WriteString("data: [DONE]\n\n")
-		_, err = io.WriteString(s.writer, "data: [DONE]\n\n")
-		if f, ok := s.writer.(http.Flusher); ok {
+		_, err = dpstream.WriteClient(s.writer, []byte("data: [DONE]\n\n"))
+		if f, ok := s.writer.(http.Flusher); ok && err == nil {
 			f.Flush()
 		}
 		return err
