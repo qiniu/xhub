@@ -115,7 +115,7 @@ func (s *State) PlanRoute(r *http.Request, alias string, body map[string]any, p 
 			// 历史与归属使用相同的隔离范围；同样禁止共享故障时本机降级，且拒绝
 			// 空历史，避免在上下文丢失后把增量输入当成完整对话发送。其他入口
 			// 在此只恢复固定归属，不读取这份 responses 历史。
-			historyRaw, _, err := s.cacheRead(responseContextKey(alias, plan.Caller, prev, endpoint), false)
+			historyRaw, err := s.cacheReadHistory(responseContextKey(alias, plan.Caller, prev, endpoint), historyScopeKey(alias, plan.Caller, endpoint))
 			if err != nil || json.Unmarshal([]byte(historyRaw), &plan.History) != nil || len(plan.History) == 0 {
 				plan.Err = fmt.Errorf("response context is unavailable or expired; submit full history")
 				return plan
@@ -273,6 +273,12 @@ func (s *State) CommitRoute(plan dpcontract.RoutePlan, deploymentID, responseID 
 	_ = s.commitRoute(plan, deploymentID, responseID)
 }
 
+// CommitRouteChecked 保存成功响应的归属和历史，并将持久化错误返回给数据面。
+// 参数与 CommitRoute 相同；供 Responses 在发布成功终态之前调用，失败时禁止发布可续接成功。
+func (s *State) CommitRouteChecked(plan dpcontract.RoutePlan, deploymentID, responseID string) error {
+	return s.commitRoute(plan, deploymentID, responseID)
+}
+
 // commitRoute 保存实际目标、完整上下文与固定归属，并返回影响父响应续接的保存错误。
 // 参数与公开 CommitRoute 相同；Messages 桥接准备回调必须检查错误后才能发布终态。
 // 动态偏好允许失败；历史先于响应归属写入，保存失败返回错误；持久记录不依赖缓存TTL。
@@ -332,7 +338,7 @@ func (s *State) commitRoute(plan dpcontract.RoutePlan, deploymentID, responseID 
 			if err != nil {
 				return fmt.Errorf("response history could not be encoded")
 			}
-			if err := s.cacheWrite(responseContextKey(plan.Alias, plan.Caller, responseID, plan.Endpoint), string(raw)); err != nil {
+			if err := s.cacheWriteHistory(responseContextKey(plan.Alias, plan.Caller, responseID, plan.Endpoint), historyScopeKey(plan.Alias, plan.Caller, plan.Endpoint), string(raw)); err != nil {
 				return fmt.Errorf("response history could not be saved")
 			}
 		}

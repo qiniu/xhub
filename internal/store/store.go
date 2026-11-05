@@ -7,6 +7,7 @@
 package store
 
 import (
+	"context"
 	"database/sql"
 	"fmt"
 	"strings"
@@ -40,6 +41,10 @@ func Open(databaseURL string) (*Store, error) {
 	case strings.HasPrefix(u, "postgres://"), strings.HasPrefix(u, "postgresql://"):
 		engine, db, stmts, err := openEngine(databaseURL)
 		if err != nil {
+			return nil, err
+		}
+		if err := initHistoryTables(context.Background(), db); err != nil {
+			engine.Close()
 			return nil, err
 		}
 		return &Store{Engine: engine, DB: db, stmts: stmts}, nil

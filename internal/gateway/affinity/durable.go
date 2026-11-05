@@ -13,6 +13,13 @@ type ConversationStore interface {
 	WriteConversation(context.Context, string, string) error
 }
 
+// HistoryStore 可选扩展支持隔离范围内的压缩历史；旧存储实现仍通过 ConversationStore 工作。
+// key 是已授权的响应键，scope 是调用方、模型和入口计算的隔离范围；错误必须向上返回。
+type HistoryStore interface {
+	ReadHistory(context.Context, string, string) (string, error)
+	WriteHistory(context.Context, string, string, string) error
+}
+
 // NewDurable 组装生产会话状态；redis保存短期路由偏好，store保存续聊必需状态。
 // 返回独立状态；store为空时保留旧内存测试模式，不连接存储、不启动后台任务。
 func NewDurable(redis Redis, store ConversationStore) *State {

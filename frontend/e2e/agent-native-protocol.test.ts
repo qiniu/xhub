@@ -1,4 +1,5 @@
 import { expect, test } from "@playwright/test";
+import { expectCompactHistoryReuse } from "./compact-history-assertions";
 import { GATEWAY, UPSTREAM, loginAdmin, sessionBearer, stableGoto, t } from "./helpers";
 
 /** 验证标准 Responses 的浏览器调用、原生参数/流/工具续轮、连接修改后的历史拒绝、非法请求恢复和账单。前置真实浏览器、Go 后台、隔离数据库及本地协议夹具；参数来自 Playwright fixture，无返回值。finally 删除模型和凭据，运行器回收 schema；不使用外部密钥或修改现有数据。 */
@@ -65,6 +66,7 @@ test("native agent protocols preserve reasoning and tool continuation through th
       expect(fullHistory.status, fullHistory.text).toBe(200);
       callIDs.push(fullHistory.callID);
     }
+    expectCompactHistoryReuse();
     const chat = await page.request.post(GATEWAY + "/v1/chat/completions", { headers, data: {
       model: name, reasoning_effort: "medium", response_format: { type: "text" },
       messages: [{ role: "user", content: "Hello" }],

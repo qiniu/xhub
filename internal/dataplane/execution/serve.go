@@ -34,6 +34,21 @@ var (
 	errEmptyUpstream = errors.New("empty upstream stream")
 )
 
+// commitResponsesHistory 在公开 Responses 成功前确认历史已写入。
+// 支持检查结果的宿主返回实际错误；旧测试宿主保持原接口，调用方负责错误响应与计费记录。
+func commitResponsesHistory(h dpcontract.Adapted, plan dpcontract.RoutePlan, deploymentID, responseID string) error {
+	if responseID != "" && plan.SessionID != "" && len(plan.History) == 0 {
+		return errors.New("conversation history unavailable")
+	}
+	if checked, ok := h.(interface {
+		CommitRouteChecked(dpcontract.RoutePlan, string, string) error
+	}); ok {
+		return checked.CommitRouteChecked(plan, deploymentID, responseID)
+	}
+	h.CommitRoute(plan, deploymentID, responseID)
+	return nil
+}
+
 // Serve 执行一次统一推理请求，将调用方协议适配成部署登记的上游协议，并把结果转换回来。
 // 参数 h 提供身份、路由、凭据、缓存、护栏与记账能力；w 接收 HTTP 响应；r 提供上下文、头和只读取一次的 JSON 正文；op 是目录操作名，如 chat、responses、embedding。
 // 返回值：无；所有成功、拒绝和失败结果直接写入 w。网关统一推理入口调用本方法。
@@ -549,8 +564,14 @@ func Serve(h dpcontract.Adapted, w http.ResponseWriter, r *http.Request, op stri
 								h.CommitRoute(plan, router.DeploymentID(rawDep), result.ID)
 							}
 						}
+						checkedCommit := func(result llmdialogue.DialogueResult) error {
+							plan.History = dpdialogue.ResponseHistory(dialogue, body, result)
+							err := commitResponsesHistory(h, plan, router.DeploymentID(rawDep), result.ID)
+							preparationFailed = err != nil
+							return err
+						}
 						if op == "responses" && execution.Protocol == "openai-responses" {
-							wrote, usage, ttft, streamed, streamErr = dpdialogue.PipePortableResponsesMode(w, resp, start, alias, dialogue.NativeResponses, commit)
+							wrote, usage, ttft, streamed, streamErr = dpdialogue.PipePortableResponsesChecked(w, resp, start, alias, dialogue.NativeResponses, checkedCommit)
 						} else if op == "responses" && execution.Protocol == "anthropic-messages" && plan.PrepareMessages != nil {
 							// 引用必须在 output_item.done 之前持久化；工具增量可以先发送，完成项不能先于归属。
 							prepare := func(result llmdialogue.DialogueResult) (llmdialogue.DialogueResult, error) {
@@ -563,6 +584,8 @@ func Serve(h dpcontract.Adapted, w http.ResponseWriter, r *http.Request, op stri
 								return prepared, err
 							}
 							wrote, usage, ttft, streamed, streamErr = dpdialogue.PipeDialogueWithPreparation(w, resp, start, alias, execution.Protocol, dpdialogue.CallerProtocol(op), dialogue.ToolBindings, prepare)
+						} else if op == "responses" {
+							wrote, usage, ttft, streamed, streamErr = dpdialogue.PipeDialogueWithCheckedCommit(w, resp, start, alias, execution.Protocol, dpdialogue.CallerProtocol(op), dialogue.ToolBindings, checkedCommit)
 						} else {
 							wrote, usage, ttft, streamed, streamErr = dpdialogue.PipeDialogueWithTools(w, resp, start, alias, execution.Protocol, dpdialogue.CallerProtocol(op), dialogue.ToolBindings, commit)
 						}
@@ -577,7 +600,10 @@ func Serve(h dpcontract.Adapted, w http.ResponseWriter, r *http.Request, op stri
 						if stopCanceled(streamed, usage, did, ttft) {
 							return
 						}
-						h.NoteFailure(did, routeCfg)
+						// 本地历史写入失败不能触发供应商冷却，避免把存储故障误判成上游故障。
+						if !preparationFailed {
+							h.NoteFailure(did, routeCfg)
+						}
 						util.Error("upstream stream path=%s provider=%s model=%s base_host=%s err=%s", r.URL.Path, supplier, realModel, dpdiagnostics.BaseHost(apiBase), dpdiagnostics.SafeErr(streamErr))
 						if wrote || preparationFailed || dialogue.NativeResponses {
 							// 客户端已收到部分回复，不能重试或换模型；记录已有用量和 502 事实后结束。
@@ -714,7 +740,19 @@ func Serve(h dpcontract.Adapted, w http.ResponseWriter, r *http.Request, op stri
 					SessionID: plan.SessionID,
 				})
 				if resp.StatusCode < 400 && !messagesHistoryCommitted {
-					h.CommitRoute(plan, router.DeploymentID(rawDep), dpstream.ResponseID(respBody))
+					if op == "responses" {
+						if err := commitResponsesHistory(h, plan, router.DeploymentID(rawDep), dpstream.ResponseID(respBody)); err != nil {
+							var response struct {
+								Usage map[string]any `json:"usage"`
+							}
+							_ = json.Unmarshal(respBody, &response)
+							h.RecordSpend(w, p, callID, alias, op, llmdialogue.NormalizeDialogueUsage(response.Usage), start, false, http.StatusBadGateway, did)
+							util.WriteTypedError(w, r.URL.Path, http.StatusBadGateway, "history_unavailable", "conversation history could not be saved")
+							return
+						}
+					} else {
+						h.CommitRoute(plan, router.DeploymentID(rawDep), dpstream.ResponseID(respBody))
+					}
 				}
 				h.WriteChatJSON(w, p, callID, alias, ck, op, "", respBody, resp.StatusCode, start, depID, fallbacks.PoolAlias, rawDep.ModelName)
 				return
