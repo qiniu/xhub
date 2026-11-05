@@ -531,11 +531,7 @@ func Serve(h dpcontract.Adapted, w http.ResponseWriter, r *http.Request, op stri
 				h.NoteLatency(did, float64(time.Since(start).Milliseconds()))
 				h.SetChatHeaders(w, p, alias, apiBase)
 				if stream {
-					var wrote bool
-					var usage map[string]any
-					var ttft time.Duration
-					var streamed []byte
-					var streamErr error
+					attempt := streamAttempt{upstreamStatus: resp.StatusCode}
 					preparationFailed := false
 					if dpdialogue.CallerProtocol(op) != "" && resp.StatusCode < 400 {
 						execution, _ := providerdeployment.Execution(dep)
@@ -550,7 +546,7 @@ func Serve(h dpcontract.Adapted, w http.ResponseWriter, r *http.Request, op stri
 							}
 						}
 						if op == "responses" && execution.Protocol == "openai-responses" {
-							wrote, usage, ttft, streamed, streamErr = dpdialogue.PipePortableResponsesMode(w, resp, start, alias, dialogue.NativeResponses, commit)
+							attempt.clientStarted, attempt.usage, attempt.ttft, attempt.body, attempt.err = dpdialogue.PipePortableResponsesMode(w, resp, start, alias, dialogue.NativeResponses, commit)
 						} else if op == "responses" && execution.Protocol == "anthropic-messages" && plan.PrepareMessages != nil {
 							// 引用必须在 output_item.done 之前持久化；工具增量可以先发送，完成项不能先于归属。
 							prepare := func(result llmdialogue.DialogueResult) (llmdialogue.DialogueResult, error) {
@@ -562,57 +558,57 @@ func Serve(h dpcontract.Adapted, w http.ResponseWriter, r *http.Request, op stri
 								preparationFailed = err != nil
 								return prepared, err
 							}
-							wrote, usage, ttft, streamed, streamErr = dpdialogue.PipeDialogueWithPreparation(w, resp, start, alias, execution.Protocol, dpdialogue.CallerProtocol(op), dialogue.ToolBindings, prepare)
+							attempt.clientStarted, attempt.usage, attempt.ttft, attempt.body, attempt.err = dpdialogue.PipeDialogueWithPreparation(w, resp, start, alias, execution.Protocol, dpdialogue.CallerProtocol(op), dialogue.ToolBindings, prepare)
 						} else {
-							wrote, usage, ttft, streamed, streamErr = dpdialogue.PipeDialogueWithTools(w, resp, start, alias, execution.Protocol, dpdialogue.CallerProtocol(op), dialogue.ToolBindings, commit)
+							attempt.clientStarted, attempt.usage, attempt.ttft, attempt.body, attempt.err = dpdialogue.PipeDialogueWithTools(w, resp, start, alias, execution.Protocol, dpdialogue.CallerProtocol(op), dialogue.ToolBindings, commit)
 						}
 					} else {
-						wrote, usage, ttft, streamed, streamErr = dpstream.PipeStream(w, resp, start)
+						attempt.clientStarted, attempt.usage, attempt.ttft, attempt.body, attempt.err = dpstream.PipeStream(w, resp, start)
 					}
 					h.DecBusy(did)
 					cancelAttempt()
-					if streamErr != nil {
-						lastErr = streamErr
-						diagnostic.Failure = dpdiagnostics.ObserveFailure(r.Context(), "response_transfer", streamErr, time.Since(start))
-						if stopCanceled(streamed, usage, did, ttft) {
+					if attempt.err != nil {
+						lastErr = attempt.err
+						diagnostic.Failure = dpdiagnostics.ObserveFailure(r.Context(), "response_transfer", attempt.err, time.Since(start))
+						if stopCanceled(attempt.body, attempt.usage, did, attempt.ttft) {
 							return
 						}
 						h.NoteFailure(did, routeCfg)
-						util.Error("upstream stream path=%s provider=%s model=%s base_host=%s err=%s", r.URL.Path, supplier, realModel, dpdiagnostics.BaseHost(apiBase), dpdiagnostics.SafeErr(streamErr))
-						if wrote || preparationFailed || dialogue.NativeResponses {
+						util.Error("upstream stream path=%s provider=%s model=%s base_host=%s err=%s", r.URL.Path, supplier, realModel, dpdiagnostics.BaseHost(apiBase), dpdiagnostics.SafeErr(attempt.err))
+						if attempt.mustStopAfterFailure(preparationFailed, dialogue.NativeResponses) {
 							// 客户端已收到部分回复，不能重试或换模型；记录已有用量和 502 事实后结束。
-							h.RememberExchange(callID, r, raw, streamed)
-							h.AnnotateCall(callID, dpcontract.CallNote{Streamed: true, TTFTMs: dpusage.TtftMillis(ttft), Provider: supplier, CacheKey: ck, SessionID: plan.SessionID})
-							h.RecordSpend(w, p, callID, alias, op, usage, start, false, http.StatusBadGateway, did)
-							if !wrote {
+							h.RememberExchange(callID, r, raw, attempt.body)
+							h.AnnotateCall(callID, dpcontract.CallNote{Streamed: true, TTFTMs: dpusage.TtftMillis(attempt.ttft), Provider: supplier, CacheKey: ck, SessionID: plan.SessionID})
+							h.RecordSpend(w, p, callID, alias, op, attempt.usage, start, false, http.StatusBadGateway, did)
+							if !attempt.clientStarted {
 								kind := "history_unavailable"
 								if dialogue.NativeResponses {
 									kind = "upstream_error"
 								}
-								util.WriteTypedError(w, r.URL.Path, http.StatusBadGateway, kind, dpdiagnostics.SafeErr(streamErr))
+								util.WriteTypedError(w, r.URL.Path, http.StatusBadGateway, kind, dpdiagnostics.SafeErr(attempt.err))
 							}
 							return
 						}
 						continue
 					}
-					if wrote {
+					if attempt.clientStarted {
 						if dpdialogue.CallerProtocol(op) != "" {
-							usage = llmdialogue.NormalizeDialogueUsage(usage)
+							attempt.usage = llmdialogue.NormalizeDialogueUsage(attempt.usage)
 						} else {
-							usage = dpusage.CompleteUsage(usage, body, streamed)
+							attempt.usage = dpusage.CompleteUsage(attempt.usage, body, attempt.body)
 						}
-						pt, ct := dpusage.UsageCounts(usage)
-						dpdiagnostics.LogMetrics(r.URL.Path, alias, false, pt, ct, ttft, time.Since(start))
+						pt, ct := dpusage.UsageCounts(attempt.usage)
+						dpdiagnostics.LogMetrics(r.URL.Path, alias, false, pt, ct, attempt.ttft, time.Since(start))
 						depID := did
-						h.RememberExchange(callID, r, raw, streamed)
+						h.RememberExchange(callID, r, raw, attempt.body)
 						h.AnnotateCall(callID, dpcontract.CallNote{
-							Streamed: true, TTFTMs: dpusage.TtftMillis(ttft), Provider: supplier, CacheKey: ck,
+							Streamed: true, TTFTMs: dpusage.TtftMillis(attempt.ttft), Provider: supplier, CacheKey: ck,
 							SessionID: plan.SessionID,
 						})
-						if resp.StatusCode < 400 && op != "responses" {
-							h.CommitRoute(plan, router.DeploymentID(rawDep), dpstream.ResponseID(streamed))
+						if attempt.upstreamStatus < 400 && op != "responses" {
+							h.CommitRoute(plan, router.DeploymentID(rawDep), dpstream.ResponseID(attempt.body))
 						}
-						h.RecordSpend(w, p, callID, alias, op, usage, start, false, resp.StatusCode, depID)
+						h.RecordSpend(w, p, callID, alias, op, attempt.usage, start, false, attempt.upstreamStatus, depID)
 						return
 					}
 					lastErr = errEmptyUpstream
