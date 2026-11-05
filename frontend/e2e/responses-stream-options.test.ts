@@ -1,4 +1,5 @@
 import { expect, test } from "@playwright/test";
+import { expectCompactHistoryReuse } from "./compact-history-assertions";
 import { GATEWAY, UPSTREAM, loginAdmin, sessionBearer, stableGoto } from "./helpers";
 import { translate } from "../src/i18n/translate";
 
@@ -31,6 +32,16 @@ for (const locale of ["en", "zh-CN"] as const) test("Responses stream options " 
       expect(result.status, result.raw).toBe(200);
       expect(result.raw).toContain("e2e-ok");
       if (stream) expect(result.raw).toContain("response.completed");
+      if (!stream) {
+        const previousId = JSON.parse(result.raw).id;
+        const continuation = await page.evaluate(async ({ bearer, model, previousId, stream_options }) => {
+          const response = await fetch("/gw/v1/responses", { method: "POST", headers: { Authorization: "Bearer " + bearer, "Content-Type": "application/json" }, body: JSON.stringify({ model, input: "Continue.", previous_response_id: previousId, stream_options }) });
+          return { status: response.status, body: await response.text() };
+        }, { bearer, model: name, previousId, stream_options });
+        expect(continuation.status, continuation.body).toBe(200);
+        expect(continuation.body).toContain("e2e-ok");
+        expectCompactHistoryReuse();
+      }
       await expect.poll(async () => {
         const log = await page.request.get(GATEWAY + "/spend/logs/ui/" + result.id, { headers });
         return log.ok() ? (await log.json()).status : null;

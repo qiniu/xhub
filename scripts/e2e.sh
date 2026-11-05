@@ -22,6 +22,8 @@ if [[ ! "$E2E_DATABASE" =~ ^[a-z][a-z0-9_]*$ ]]; then
 fi
 # 完整浏览器套件包含 Responses 三轮续接场景，始终装载其本地离线模型夹具。
 export E2E_RESPONSES_CONTINUATION=1
+# 浏览器验收默认覆盖压缩历史，可显式设为 0 验证旧写入格式；仅影响隔离测试进程。
+export XHUB_COMPACT_HISTORY="${XHUB_COMPACT_HISTORY:-1}"
 # HTTPS 身份与官方 Kodo SDK 协议夹具仅编入测试程序。
 export E2E_ENTERPRISE_FIXTURE=1
 export XHUB_GATEWAY_ORIGIN="$E2E_GATEWAY"

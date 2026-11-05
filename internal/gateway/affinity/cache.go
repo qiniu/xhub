@@ -148,3 +148,29 @@ func (s *State) cacheWrite(key, value string) error {
 	s.affinitySet(key, value)
 	return nil
 }
+
+// cacheReadHistory 先读取可选的新历史格式，未命中时沿用旧持久层和旧缓存升级逻辑。
+// key 与 scope 均由可信路由计划计算；缺失返回空值，数据损坏或数据库失败不降级。
+func (s *State) cacheReadHistory(key, scope string) (string, error) {
+	if store, ok := s.durable.(HistoryStore); ok {
+		ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+		defer cancel()
+		value, err := store.ReadHistory(ctx, key, scope)
+		if err != nil || value != "" {
+			return value, err
+		}
+	}
+	value, _, err := s.cacheRead(key, false)
+	return value, err
+}
+
+// cacheWriteHistory 通过支持新格式的存储写入历史，旧实现保留原始行为。
+// key、scope 和 value 分别为响应键、隔离范围和完整历史；错误不得被转换为成功。
+func (s *State) cacheWriteHistory(key, scope, value string) error {
+	if store, ok := s.durable.(HistoryStore); ok {
+		ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+		defer cancel()
+		return store.WriteHistory(ctx, key, scope, value)
+	}
+	return s.cacheWrite(key, value)
+}

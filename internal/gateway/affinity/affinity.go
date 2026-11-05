@@ -29,6 +29,14 @@ func responseContextKey(alias, caller, responseID, endpoint string) string {
 	return strings.Replace(responsePinKey(alias, caller, responseID, endpoint), "session_route:v1:response:", "session_route:v1:history:", 1)
 }
 
+// historyScopeKey 按公开模型、认证调用方与协议入口计算不可逆的历史去重范围。
+// 供 PlanRoute 与 commitRoute 使用；相同范围可复用块，不同身份或入口不得共享块。
+func historyScopeKey(alias, caller, endpoint string) string {
+	raw, _ := json.Marshal([]string{alias, caller, endpoint})
+	sum := sha256.Sum256(raw)
+	return "scope:" + hex.EncodeToString(sum[:])
+}
+
 // responsePinKey 为父响应归属构造隔离键，供 PlanRoute/CommitRoute 使用。
 // 参数 alias 为请求公开别名，caller 为鉴权范围，responseID 为响应标识，endpoint 为可选入口列表。
 // 返回 response 命名空间下的完整 SHA256 摘要，不保留输入明文，不访问缓存或授予权限。

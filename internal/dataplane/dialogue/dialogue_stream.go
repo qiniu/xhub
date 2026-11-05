@@ -84,6 +84,7 @@ type dialogueStream struct {
 	// 可选完成回调，参数为已验证 DialogueResult，无返回；Responses 终态发出前提交历史。
 	// 终态校验前失败不调用；回调之后若客户端写入失败，已提交历史不回滚。
 	beforeComplete func(llmdialogue.DialogueResult)
+	checkedCommit  func(llmdialogue.DialogueResult) error
 	// namespace/custom 工具必须在参数完整时还原，避免把半截 JSON 包装泄露为 custom 输入。
 	toolBindings map[string]llmdialogue.ToolBinding
 }
@@ -433,6 +434,11 @@ func (s *dialogueStream) finish() error {
 	// 达到输出上限的工具回复仍是截断，不能被工具存在这一事实覆盖成可执行的正常结束。
 	if len(r.Calls) > 0 && r.Stop != "length" {
 		r.Stop = "tool_calls"
+	}
+	if s.checkedCommit != nil {
+		if err := s.checkedCommit(r); err != nil {
+			return err
+		}
 	}
 	switch s.protocol {
 	case "gemini", "vertex":
@@ -947,7 +953,21 @@ func PipeDialogueWithTools(w http.ResponseWriter, resp *http.Response, start tim
 // 参数与 WithTools 相同，prepare 接收完整原生结果并返回可发布结果；只用于 Messages→Responses，错误不能产生 done 或 completed。
 // 同协议保持既有路径；prepare 不得泄露原厂签名，存储成功后客户端写失败无需撤销已保存的临时记录。
 func PipeDialogueWithPreparation(w http.ResponseWriter, resp *http.Response, start time.Time, alias, upstream, caller string, bindings map[string]llmdialogue.ToolBinding, prepare func(llmdialogue.DialogueResult) (llmdialogue.DialogueResult, error), beforeComplete ...func(llmdialogue.DialogueResult)) (bool, map[string]any, time.Duration, []byte, error) {
+	return pipeDialogueWithPreparation(w, resp, start, alias, upstream, caller, bindings, prepare, nil, beforeComplete...)
+}
+
+// PipeDialogueWithCheckedCommit 在跨协议 Responses 终态前校验历史写入，返回原有流状态和错误。
+// 供数据面在无原生 Responses 上游时调用；写入失败发送失败事件，不发布成功终态。
+func PipeDialogueWithCheckedCommit(w http.ResponseWriter, resp *http.Response, start time.Time, alias, upstream, caller string, bindings map[string]llmdialogue.ToolBinding, checked func(llmdialogue.DialogueResult) error) (bool, map[string]any, time.Duration, []byte, error) {
+	return pipeDialogueWithPreparation(w, resp, start, alias, upstream, caller, bindings, nil, checked)
+}
+
+// pipeDialogueWithPreparation 执行共享流转换，checked 是可失败的终态提交；其他行为沿用公开入口。
+func pipeDialogueWithPreparation(w http.ResponseWriter, resp *http.Response, start time.Time, alias, upstream, caller string, bindings map[string]llmdialogue.ToolBinding, prepare func(llmdialogue.DialogueResult) (llmdialogue.DialogueResult, error), checked func(llmdialogue.DialogueResult) error, beforeComplete ...func(llmdialogue.DialogueResult)) (bool, map[string]any, time.Duration, []byte, error) {
 	if upstream == caller && (caller == "openai-chat" || caller == "openai-responses" || caller == "anthropic-messages") {
+		if checked != nil && caller == "openai-responses" {
+			return pipeNativeDialogue(w, resp, start, alias, caller, false, false, checked, beforeComplete...)
+		}
 		return PipeNativeDialogue(w, resp, start, alias, caller, beforeComplete...)
 	}
 	defer resp.Body.Close()
@@ -961,6 +981,7 @@ func PipeDialogueWithPreparation(w http.ResponseWriter, resp *http.Response, sta
 		s.responsesMessages, s.responsePrelude = true, true
 		s.responseReasoningBlocks = map[string]string{}
 	}
+	s.checkedCommit = checked
 	if len(beforeComplete) > 0 {
 		s.beforeComplete = beforeComplete[0]
 	}

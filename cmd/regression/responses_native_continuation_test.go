@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"net/http"
 	"net/http/httptest"
+	"os"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -15,6 +16,16 @@ import (
 // 参数 t 为测试上下文；本地上游返回函数调用，第二轮检查完整工具关联和当前 instructions。
 // JSON/SSE 都经过真实鉴权、数据库及路由；上游服务及私有 schema 由 cleanup 清理。
 func TestResponsesNativeToolContinuation(t *testing.T) {
+	for _, mode := range []string{"0", "1"} {
+		t.Run("compact="+mode, func(t *testing.T) {
+			t.Setenv("XHUB_COMPACT_HISTORY", mode)
+			verifyResponsesNativeToolContinuation(t)
+		})
+	}
+}
+
+// verifyResponsesNativeToolContinuation 运行两种历史格式的工具续接契约；每个子测试由夹具清理数据与上游。
+func verifyResponsesNativeToolContinuation(t *testing.T) {
 	for _, stream := range []bool{false, true} {
 		t.Run(fmt.Sprint(stream), func(t *testing.T) {
 			var mu sync.Mutex
@@ -81,6 +92,12 @@ func TestResponsesNativeToolContinuation(t *testing.T) {
 			if len(input) != 3 || calls[1]["instructions"] != "new instructions" || input[0].(map[string]any)["content"] != "lookup" || input[1].(map[string]any)["call_id"] != "call_lookup" || input[2].(map[string]any)["output"] != "result" {
 				t.Fatalf("工具关联或请求指令错误: %v", input)
 			}
+			if os.Getenv("XHUB_COMPACT_HISTORY") == "1" {
+				var blocks, refs int
+				if err := h.store.DB.QueryRow(`SELECT (SELECT count(*) FROM conversation_history_blocks), (SELECT COALESCE(sum(jsonb_array_length(digests)),0) FROM conversation_history_manifests)`).Scan(&blocks, &refs); err != nil || blocks == 0 || refs <= blocks {
+					t.Fatalf("真实续聊没有复用内容块: blocks=%d refs=%d err=%v", blocks, refs, err)
+				}
+			}
 			h.ok("PATCH", "/model/"+deploymentID+"/update", admin, map[string]any{"model_info": map[string]any{"disabled": true}})
 			unavailable := h.do("POST", "/responses", admin, map[string]any{"model": dep.ModelName, "input": "next", "previous_response_id": "resp_tool_2"})
 			if unavailable.status != 409 || !strings.Contains(string(unavailable.body), "continuation_unavailable") {
@@ -127,4 +144,11 @@ func TestResponsesFailedStreamCannotContinue(t *testing.T) {
 	if next.status != 400 || !strings.Contains(string(next.body), "invalid_request") || calls.Load() != 1 {
 		t.Fatalf("失败流发布了响应归属: %s", next.describe())
 	}
+}
+
+// TestCompactHistoryNativeContinuation 通过真实网关、独立 PostgreSQL 和本地上游验证新格式的工具续接。
+// 覆盖 JSON、流式、数据块复用和失效部署；每个子测试自动清理私有 schema 与上游。
+func TestCompactHistoryNativeContinuation(t *testing.T) {
+	t.Setenv("XHUB_COMPACT_HISTORY", "1")
+	verifyResponsesNativeToolContinuation(t)
 }
