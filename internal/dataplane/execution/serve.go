@@ -576,7 +576,7 @@ func Serve(h dpcontract.Adapted, w http.ResponseWriter, r *http.Request, op stri
 						h.NoteFailure(did, routeCfg)
 						util.Error("upstream stream path=%s provider=%s model=%s base_host=%s err=%s", r.URL.Path, supplier, realModel, dpdiagnostics.BaseHost(apiBase), dpdiagnostics.SafeErr(attempt.err))
 						if attempt.mustStopAfterFailure(preparationFailed, dialogue.NativeResponses) {
-							// 客户端已收到部分回复，不能重试或换模型；记录已有用量和 502 事实后结束。
+							// 已开始输出、历史准备失败或原生响应不可安全重放时，不重试或换模型；记录已有用量与失败事实后结束。
 							h.RememberExchange(callID, r, raw, attempt.body)
 							h.AnnotateCall(callID, dpcontract.CallNote{Streamed: true, TTFTMs: dpusage.TtftMillis(attempt.ttft), Provider: supplier, CacheKey: ck, SessionID: plan.SessionID})
 							h.RecordSpend(w, p, callID, alias, op, attempt.usage, start, false, http.StatusBadGateway, did)

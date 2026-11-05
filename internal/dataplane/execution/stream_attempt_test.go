@@ -17,6 +17,8 @@ func TestStreamAttemptFailureBoundary(t *testing.T) {
 		{"history_failure", false, true, false, true, true},
 		{"native_failure", false, false, true, true, true},
 		{"successful_output", true, false, false, false, false},
+		{"no_error_history", false, true, false, false, false},
+		{"no_error_native", false, false, true, false, false},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			a := streamAttempt{upstreamStatus: 200, clientStarted: tc.started}
