@@ -273,7 +273,7 @@ func (s *Server) recordSpend(w http.ResponseWriter, p *auth.Principal, callID, a
 	// 正文在独立存储中按实际用户选择保存，账单队列只携带状态，不携带正文，避免过期后重放恢复。
 	// 异步任务的查询复用初始日志，先保留初始请求的正文关联；不能用后续轮询覆盖原请求。
 	if note.TaskRequestID == "" || note.TaskInitial {
-		row.BodyCaptureStatus, row.BodyCaptureExpiresAt = s.captureExchange(p, callID, ex, start, note.Streamed)
+		row.BodyCaptureStatus, row.BodyCaptureExpiresAt = s.captureExchange(p, callID, ex, start, note.Streamed, row.Status == "error" || row.Status == "failed" || row.Status == "failure" || status >= 400)
 		if row.BodyCaptureStatus == "saved" {
 			row.BodyCaptureID = callID
 		}
@@ -375,10 +375,8 @@ func (s *Server) persistSpend(row live.SpendLog, spend float64, ex promptExchang
 	if s.IAM == nil {
 		return
 	}
-	// The event, its stored bodies, the daily roll-up and all five billing scopes
-	// commit together and deduplicate by request_id.
-	// 失败正文已经由 recordSpend 放入 row.Response，不能再用受提示词开关控制的
-	// ex.response 覆盖，否则直写数据库和 Redis 队列会保存不同的排障信息。
+	// 新调用的正文已独立保存；以下参数保留旧调用和测试夹具的兼容处理，
+	// usageFromSpend 会在存在新记录状态时清空这些字段，避免正文进入账单快照。
 	response := ex.response
 	if row.Status == "error" || row.Status == "failed" || row.Status == "failure" || row.HTTPStatus >= 400 {
 		response = row.Response

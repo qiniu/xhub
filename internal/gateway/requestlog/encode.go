@@ -310,8 +310,8 @@ func redactRequestURI(r *http.Request) string {
 	return u.RequestURI()
 }
 
-// 必须从单词边界识别密钥，避免把 task-1 等普通参数误删。
-var promptSecret = regexp.MustCompile(`\bsk-[A-Za-z0-9_\-]+`)
+// 短密钥要求单词边界以保留 task-1；较长密钥即使紧贴其他字符也需要掩盖。
+var promptSecret = regexp.MustCompile(`(?:\bsk-[A-Za-z0-9_\-]+|sk-[A-Za-z0-9_\-]{16,})`)
 
 // 把文本里的密钥样式替换成星号。
 // 参数 s（string）：即将写入日志的一行，可能含 bearer、sk- 或上游 URL。

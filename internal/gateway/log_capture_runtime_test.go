@@ -53,16 +53,23 @@ func TestCaptureExchangeBoundaryStates(t *testing.T) {
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			s.BeginLogCapture(tc.name, nil)
-			state, expiry := s.captureExchange(nil, tc.name, promptExchange{request: httptest.NewRequest("POST", "/v1/chat/completions", nil), requestBody: tc.req, rawResponse: tc.response}, tc.start, tc.name == "stream")
+			state, expiry := s.captureExchange(nil, tc.name, promptExchange{request: httptest.NewRequest("POST", "/v1/chat/completions", nil), requestBody: tc.req, rawResponse: tc.response}, tc.start, tc.name == "stream", false)
 			if state != tc.want || expiry != "" {
 				t.Fatalf("状态错误: got=%s expiry=%s want=%s", state, expiry, tc.want)
 			}
 		})
 	}
 	s.BeginLogCapture("large-nonstream", nil)
-	state, expiry := s.captureExchange(nil, "large-nonstream", promptExchange{request: httptest.NewRequest("POST", "/v1/chat/completions", nil), requestBody: []byte(`{}`), rawResponse: strings.Repeat("x", 2<<20)}, time.Now(), false)
+	state, expiry := s.captureExchange(nil, "large-nonstream", promptExchange{request: httptest.NewRequest("POST", "/v1/chat/completions", nil), requestBody: []byte(`{}`), rawResponse: strings.Repeat("x", 2<<20)}, time.Now(), false, false)
 	if state != "saved" || expiry == "" {
 		t.Fatalf("未截断的非流响应不应误报截断: %s", state)
+	}
+	rawFailure := "data: {\"choices\":[{\"delta\":{\"content\":\"partial\"}}]}\n\ndata: {\"error\":{\"code\":\"request_canceled\"}}\n\n"
+	s.BeginLogCapture("failure-stream", nil)
+	state, _ = s.captureExchange(nil, "failure-stream", promptExchange{request: httptest.NewRequest("POST", "/v1/chat/completions", nil), requestBody: []byte(`{}`), rawResponse: rawFailure}, time.Now(), true, true)
+	stored, err := db.GetLogCapture(t.Context(), "failure-stream", time.Now())
+	if state != "saved" || err != nil || stored.Response != rawFailure {
+		t.Fatalf("流式失败的终止事件未按原始字节保存: state=%s stored=%+v err=%v", state, stored, err)
 	}
 }
 

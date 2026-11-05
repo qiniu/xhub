@@ -11,7 +11,11 @@ export function isRequestFailure(log: Pick<LogEntry, "status" | "metadata" | "er
 export function fullErrorDetails(log: Pick<LogEntry, "error" | "response" | "metadata" | "body_capture_status">): string {
   if (log.body_capture_status === "saved") {
     const response = log.response;
-    if (typeof response === "string" && response.trim()) return response;
+    if (typeof response === "string" && response.trim()) {
+      // 流中的部分输出不是错误原因；优先显示已整理的取消或上游失败摘要。
+      if (/(?:^|\n)\s*data:/.test(response) && log.error?.trim()) return log.error;
+      return response;
+    }
     if (response && typeof response === "object" && Object.keys(response).length > 0) {
       if ("body" in response && typeof response.body === "string" && Object.keys(response).length === 1) return response.body;
       return JSON.stringify(response, null, 2);

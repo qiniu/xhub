@@ -12,8 +12,8 @@ import (
 	"github.com/sunqirui1987/xhub/internal/iam"
 )
 
-// TestUsageSpoolDatabaseDisconnect 验证上游已接收后整个IAM连接池关闭、无Redis或Redis队列损坏时仍保存完整账单。
-// 前置私有PG和本地供应商，覆盖同步/流式及有无硬额度；新连接、新网关启动自动恢复，重复Flush不重复费用或上游，最后清理schema/磁盘/连接。
+// TestUsageSpoolDatabaseDisconnect 验证上游已接收后数据库断开仍可恢复完整账单，正文存储失败则明确标记。
+// 前置私有PG和本地供应商，覆盖同步/流式及有无硬额度；重复Flush不重复费用或上游，最后清理schema/磁盘/连接。
 func TestUsageSpoolDatabaseDisconnect(t *testing.T) {
 	for _, protocol := range []string{"chat/completions", "responses", "messages"} {
 		for _, useRedis := range []bool{false, true} {
@@ -71,6 +71,9 @@ func TestUsageSpoolDatabaseDisconnect(t *testing.T) {
 						if err != nil {
 							t.Fatal(err)
 						}
+						if strings.Contains(string(snapshot), "Verify independent durable billing recovery.") || strings.Contains(string(snapshot), "regression-ok") {
+							t.Fatal("磁盘账单快照不应携带用户正文")
+						}
 						_ = h.gw.CloseUsageSpool()
 						reopened, err := iam.Open(t.Context(), h.gw.Cfg.GeneralSettings.DatabaseURL)
 						if err != nil {
@@ -114,8 +117,8 @@ func TestUsageSpoolDatabaseDisconnect(t *testing.T) {
 							t.Fatalf("账单非唯一: n=%d err=%v", rows, err)
 						}
 						log, err := reopened.GetRequestLog(t.Context(), callID)
-						if err != nil || !strings.Contains(log.RequestBody, "Verify independent") || log.ResponseBody == "" {
-							t.Fatalf("完整日志未恢复: err=%v", err)
+						if err != nil || log.BodyCaptureStatus != "storage_failed" || log.RequestBody != "" || log.ResponseBody != "" {
+							t.Fatalf("断库时正文应标记存储失败，账单重放不能恢复正文: log=%+v err=%v", log, err)
 						}
 						if len(h.upstreamCalls()) != 1 {
 							t.Fatal("重放错误地重试上游")

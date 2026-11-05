@@ -146,6 +146,61 @@ func TestUserContractPersonalLogCaptureFailure(t *testing.T) {
 	}
 }
 
+// TestUserContractPersonalLogCaptureErrorPrivacy 用真实网关和本地错误上游验证关闭正文时不会经供应商扩展字段旁路保存内容。
+// 开启后核对完整响应可读且错误摘要仍受限；隔离数据库与本地服务由夹具清理。
+func TestUserContractPersonalLogCaptureErrorPrivacy(t *testing.T) {
+	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusBadRequest)
+		writeJSON(w, map[string]any{"error": map[string]any{"code": "invalid_input", "message": "invalid data: format", "payload": map[string]any{"text": "private-payload-marker"}, "details": map[string]any{"terminal_cause": "unsupported format", "data": "private-detail-marker"}}})
+	}))
+	t.Cleanup(upstream.Close)
+	h := openHarness(t, false)
+	admin := h.adminSession()
+	member := h.provision(t, admin, "capture-error-privacy")
+	dep := chatDeployment("capture-error-privacy-model")
+	dep.LiteLLMParams["api_base"] = upstream.URL + "/v1"
+	h.ok(http.MethodPost, "/model/new", admin, map[string]any{"model_name": dep.ModelName, "litellm_params": dep.LiteLLMParams, "model_info": dep.ModelInfo})
+	for _, enabled := range []bool{false, true} {
+		h.ok(http.MethodPut, "/account/log-capture", member.session, map[string]any{"enabled": enabled})
+		response := h.do(http.MethodPost, "/v1/chat/completions", member.key, chatRequest(dep.ModelName, "Synthetic error request."))
+		if response.status != http.StatusBadRequest {
+			t.Fatalf("本地错误上游状态不正确: %s", response.describe())
+		}
+		h.flushSpend()
+		detail := logDetail(t, h, member.session, response.header("x-litellm-call-id"))
+		encoded := string(mustJSON(detail))
+		stored, err := h.db.GetRequestLog(t.Context(), response.header("x-litellm-call-id"))
+		if err != nil {
+			t.Fatal(err)
+		}
+		summary := stored.Error
+		if !strings.Contains(summary, "invalid data: format") || strings.Contains(summary, "private-") {
+			t.Fatalf("错误摘要遗漏原因或包含供应商扩展正文: %s", summary)
+		}
+		if enabled {
+			if detail["body_capture_status"] != "saved" || !strings.Contains(string(mustJSON(detail["response"])), "private-payload-marker") || !strings.Contains(fmt.Sprint(detail["error"]), "private-payload-marker") {
+				t.Fatalf("开启记录后完整响应不可用: %v", detail)
+			}
+			// 正文到期后原始错误不能从账单摘要或接口重新出现。
+			id := response.header("x-litellm-call-id")
+			expiredAt := time.Now().Add(-time.Minute)
+			if _, err := h.db.Engine.Exec(`UPDATE request_log_captures SET expires_at = ? WHERE request_id = ?`, expiredAt, id); err != nil {
+				t.Fatal(err)
+			}
+			if _, err := h.db.Engine.Exec(`UPDATE request_logs SET body_capture_expires_at = ? WHERE request_id = ?`, expiredAt.UTC().Format(time.RFC3339Nano), id); err != nil {
+				t.Fatal(err)
+			}
+			expired := logDetail(t, h, member.session, id)
+			if expired["body_capture_status"] != "expired" || strings.Contains(string(mustJSON(expired)), "private-") {
+				t.Fatalf("正文到期后仍可读取供应商扩展: %v", expired)
+			}
+		} else if detail["body_capture_status"] != "disabled" || strings.Contains(encoded, "private-") {
+			t.Fatalf("关闭记录后仍保存供应商扩展正文: %v", detail)
+		}
+	}
+}
+
 // TestUserContractPersonalLogCaptureInFlight 用本地上游暂停真实请求，在请求中切换个人开关。
 // 验证请求按开始时的选择记录，之后的新请求使用新状态；私有 schema 和本地服务由夹具清理。
 func TestUserContractPersonalLogCaptureInFlight(t *testing.T) {

@@ -25,6 +25,7 @@ describe("request error diagnostics", () => {
     const full = { error: { message: "x".repeat(5000), details: { trace: "full-tail-marker" } } };
     expect(fullErrorDetails({ body_capture_status: "saved", error: "short summary", response: full })).toContain("full-tail-marker");
     expect(fullErrorDetails({ body_capture_status: "saved", error: "short summary", response: { body: "plain error" } })).toBe("plain error");
+    expect(fullErrorDetails({ body_capture_status: "saved", error: "cancellation summary", response: "data: partial response" })).toBe("cancellation summary");
     expect(fullErrorDetails({ body_capture_status: "saved", error: "short summary", response: {} })).toBe("short summary");
     expect(fullErrorDetails({ body_capture_status: "disabled", error: "short summary", response: {} })).toBe("short summary");
     expect(fullErrorDetails({ error: "legacy error", response: full })).toBe("legacy error");

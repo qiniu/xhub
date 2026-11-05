@@ -69,3 +69,11 @@ func TestEncodeRedactsQueryAndCustomCredentialHeaders(t *testing.T) {
 		t.Fatal("日志脱敏修改了实际请求")
 	}
 }
+
+// TestRedactSecretTextHandlesEmbeddedKeys 验证普通任务标识保留且独立和嵌入的密钥样式被掩盖；纯函数无需清理。
+func TestRedactSecretTextHandlesEmbeddedKeys(t *testing.T) {
+	got := redactSecretText("task-1 sk-short prefixsk-ABCDEFGHIJKLMNOPQRST")
+	if !strings.Contains(got, "task-1") || strings.Contains(got, "sk-short") || strings.Contains(got, "sk-ABCDEFGHIJKLMNOPQRST") {
+		t.Fatalf("密钥或普通标识处理错误: %s", got)
+	}
+}

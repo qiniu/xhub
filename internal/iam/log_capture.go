@@ -187,8 +187,30 @@ func (db *DB) GetLogCapture(ctx context.Context, requestID string, now time.Time
 	return &c, nil
 }
 
+// reconcileCaptureQuota 在已持有全局锁的事务内重算指定占用；scope 只能是 global 或内部 user: 前缀。
+// 供异常计数修复使用，统计删除后的剩余正文并原子写回；查询或更新失败由调用方回滚整个清理批次。
+func reconcileCaptureQuota(s *xorm.Session, scope string) error {
+	var row struct {
+		SizeBytes int64 `xorm:"'size_bytes'"`
+	}
+	query := `SELECT COALESCE(SUM(size_bytes), 0) AS size_bytes FROM request_log_captures`
+	var err error
+	if scope == "global" {
+		_, err = s.SQL(query).Get(&row)
+	} else if strings.HasPrefix(scope, "user:") {
+		_, err = s.SQL(query+` WHERE user_id = ?`, strings.TrimPrefix(scope, "user:")).Get(&row)
+	} else {
+		return ErrInvalid
+	}
+	if err != nil {
+		return err
+	}
+	_, err = s.Exec(`INSERT INTO request_log_capture_quotas(scope, size_bytes) VALUES (?, ?) ON CONFLICT (scope) DO UPDATE SET size_bytes = EXCLUDED.size_bytes`, scope, row.SizeBytes)
+	return err
+}
+
 // PurgeExpiredLogCaptures 最多清理 limit 条到期正文，now 为清理边界。
-// 容量计数在同一独立事务中回收；重复调用和并发实例安全，不删除账单、诊断摘要或续聊历史。
+// 容量计数在同一独立事务中回收；异常时重算剩余占用，重算失败整体回滚；不删除账单、诊断摘要或续聊历史。
 func (db *DB) PurgeExpiredLogCaptures(ctx context.Context, now time.Time, limit int) (int, error) {
 	if limit < 1 || limit > 10000 {
 		return 0, ErrInvalid
@@ -221,7 +243,10 @@ func (db *DB) PurgeExpiredLogCaptures(ctx context.Context, now time.Time, limit 
 				return err
 			}
 			if n != 1 {
-				return fmt.Errorf("capture quota inconsistent for %s", scope)
+				// 单个损坏的计数不能让到期正文永久阻塞；全局锁确保重算不会与写入交叉。
+				if err := reconcileCaptureQuota(s, scope); err != nil {
+					return fmt.Errorf("reconcile capture quota %s: %w", scope, err)
+				}
 			}
 		}
 		count = len(rows)

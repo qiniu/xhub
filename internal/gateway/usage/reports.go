@@ -687,7 +687,7 @@ func LogByID(s Host, w http.ResponseWriter, r *http.Request) {
 	}
 	row["messages"] = jsonOrEmpty(body.RequestBody)
 	row["response"] = jsonOrText(body.ResponseBody)
-	row["error"] = body.Error
+	row["error"] = detailError(*event, body)
 	if body.BodyCaptureStatus != "" {
 		row["body_capture_status"] = body.BodyCaptureStatus
 	}
@@ -698,6 +698,18 @@ func LogByID(s Host, w http.ResponseWriter, r *http.Request) {
 		row["proxy_server_request"] = jsonOrEmpty(body.ProxyRequest)
 	}
 	util.WriteJSON(w, 200, row)
+}
+
+// detailError 返回经授权的错误详情；已保存的非流式失败正文沿用原接口的原始错误字节。
+// event 为用量事实，body 为已鉴权读取的正文；流式、取消、过期或未开启时保留有界诊断摘要。
+func detailError(event iam.UsageEvent, body *iam.RequestLog) string {
+	if body != nil && body.BodyCaptureStatus == "saved" && event.HTTPStatus >= 400 && event.HTTPStatus != 499 && !event.Streamed && strings.TrimSpace(body.ResponseBody) != "" {
+		return body.ResponseBody
+	}
+	if body == nil {
+		return ""
+	}
+	return body.Error
 }
 
 // detailBodyOrMissing 区分历史正文缺行与存储读取失败，供 LogByID 在已验证日志权限后使用。

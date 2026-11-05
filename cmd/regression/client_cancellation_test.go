@@ -11,7 +11,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/sunqirui1987/xhub/internal/iam"
 	"github.com/sunqirui1987/xhub/internal/router"
 )
 
@@ -187,10 +186,10 @@ func TestClientCancellationDoesNotCoolDeployment(t *testing.T) {
 								t.Fatalf("部分流被当成错误或虚构供应商错误: %v", detail["error"])
 							}
 							if !native && phase == "after_frame" {
-								var stored iam.RequestLog
-								found, err := h.db.Engine.Where("request_id = ?", stringField(row, "request_id")).Get(&stored)
-								if err != nil || !found {
-									t.Fatalf("取消后的真实流日志未保存: found=%v err=%v", found, err)
+								// 正文现在独立存储，使用真实日志读取接口验证完整响应和到期规则。
+								stored, err := h.db.GetRequestLog(t.Context(), stringField(row, "request_id"))
+								if err != nil {
+									t.Fatalf("取消后的真实流日志未保存: err=%v", err)
 								}
 								if !strings.Contains(stored.ResponseBody, `"code":"request_canceled"`) || !strings.Contains(stored.ResponseBody, `"error_origin":"gateway"`) || strings.Contains(stored.ResponseBody, `"code":"upstream_error"`) {
 									t.Fatalf("网关生成的取消事件不能冒充供应商错误: %s", stored.ResponseBody)

@@ -75,10 +75,10 @@ func captureUserID(p *auth.Principal) string {
 	return ""
 }
 
-// captureExchange 根据已认证身份和管理员全局设置保存一次交换的正文；start 为原始请求时间，streamed 标识实际流式传输。
+// captureExchange 根据已认证身份和管理员全局设置保存一次交换的正文；start 为原始请求时间，streamed 和 failed 标识执行结果。
 // 返回可展示状态和到期时间；超限或数据库故障不改变上游响应及账单，正文不进入持久账单队列。
 // 控制平面/调用结束时调用；流式捕获到达现有限额时保守标记为不完整，不伪称完整。
-func (s *Server) captureExchange(p *auth.Principal, requestID string, ex promptExchange, start time.Time, streamed bool) (string, string) {
+func (s *Server) captureExchange(p *auth.Principal, requestID string, ex promptExchange, start time.Time, streamed, failed bool) (string, string) {
 	s.mu.Lock()
 	policy, frozen := s.capturePolicies[requestID]
 	delete(s.capturePolicies, requestID)
@@ -117,6 +117,10 @@ func (s *Server) captureExchange(p *auth.Principal, requestID string, ex promptE
 		return "partial", ""
 	}
 	_, response, proxy := requestlog.Encode(ex.request, ex.requestBody, []byte(ex.rawResponse))
+	if failed {
+		// 失败正文必须保留原始字节，包括流内网关终止事件；摘要和账单不携带这份正文。
+		response = ex.rawResponse
+	}
 	days := logCaptureDays
 	if policy.source == "global" {
 		days = globalDays

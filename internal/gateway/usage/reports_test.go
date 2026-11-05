@@ -12,6 +12,31 @@ import (
 	"github.com/sunqirui1987/xhub/internal/iam"
 )
 
+// TestDetailErrorPreservesAuthorizedRawFailure 验证已记录的同步错误沿用原始响应，其他状态仅返回摘要。
+// 覆盖取消、流式、过期、历史及空值；纯函数无需外部依赖或清理。
+func TestDetailErrorPreservesAuthorizedRawFailure(t *testing.T) {
+	for _, tc := range []struct {
+		name  string
+		event iam.UsageEvent
+		body  *iam.RequestLog
+		want  string
+	}{
+		{"saved", iam.UsageEvent{HTTPStatus: 403}, &iam.RequestLog{BodyCaptureStatus: "saved", ResponseBody: "raw error\n", Error: "summary"}, "raw error\n"},
+		{"cancel", iam.UsageEvent{HTTPStatus: 499}, &iam.RequestLog{BodyCaptureStatus: "saved", ResponseBody: "partial stream", Error: "summary"}, "summary"},
+		{"stream", iam.UsageEvent{HTTPStatus: 502, Streamed: true}, &iam.RequestLog{BodyCaptureStatus: "saved", ResponseBody: "partial stream", Error: "summary"}, "summary"},
+		{"expired", iam.UsageEvent{HTTPStatus: 403}, &iam.RequestLog{BodyCaptureStatus: "expired", ResponseBody: "", Error: "summary"}, "summary"},
+		{"empty", iam.UsageEvent{HTTPStatus: 403}, &iam.RequestLog{BodyCaptureStatus: "saved", Error: "summary"}, "summary"},
+		{"legacy", iam.UsageEvent{HTTPStatus: 403}, &iam.RequestLog{Error: "legacy"}, "legacy"},
+		{"missing", iam.UsageEvent{HTTPStatus: 403}, nil, ""},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			if got := detailError(tc.event, tc.body); got != tc.want {
+				t.Fatalf("详情错误内容不正确: got=%q want=%q", got, tc.want)
+			}
+		})
+	}
+}
+
 // TestDetailBodyOrMissing 区分真实正文、历史缺行和数据库故障；纯函数无需资源或清理。
 func TestDetailBodyOrMissing(t *testing.T) {
 	body := &iam.RequestLog{RequestID: "stored", ResponseBody: "answer"}

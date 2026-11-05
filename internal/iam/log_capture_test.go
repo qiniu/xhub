@@ -117,22 +117,73 @@ func TestRequestMessagesRestoresStoredBody(t *testing.T) {
 	}
 }
 
-// TestCaptureCleanupRollsBackOnQuotaMismatch 在隔离数据库模拟占用计数损坏，验证清理失败不会删除正文。
-// 测试只写入合成内容，回滚后查询原记录与明确错误；私有 schema 自动清理。
-func TestCaptureCleanupRollsBackOnQuotaMismatch(t *testing.T) {
+// TestCaptureCleanupRepairsQuotaMismatch 在隔离数据库模拟占用计数损坏，验证过期清理和占用修复能继续。
+// 测试只写入合成内容，核对未到期正文与个人/全局计数；私有 schema 自动清理。
+func TestCaptureCleanupRepairsQuotaMismatch(t *testing.T) {
 	db := testDB(t)
 	now := time.Now().UTC()
-	state, err := db.SaveLogCapture(t.Context(), LogCapture{RequestID: "rollback", UserID: "owner", Source: "personal", CreatedAt: now, ExpiresAt: now.Add(time.Hour), Request: "synthetic"}, CaptureLimits{PerRequest: 1024, PerUser: 2048, Global: 4096}, now)
-	if err != nil || state != "saved" {
-		t.Fatalf("前置正文写入失败: %s %v", state, err)
+	limits := CaptureLimits{PerRequest: 1024, PerUser: 2048, Global: 4096}
+	for _, item := range []struct {
+		id      string
+		expires time.Time
+	}{{"expired", now.Add(time.Hour)}, {"active", now.Add(3 * time.Hour)}} {
+		state, err := db.SaveLogCapture(t.Context(), LogCapture{RequestID: item.id, UserID: "owner", Source: "personal", CreatedAt: now, ExpiresAt: item.expires, Request: "synthetic"}, limits, now)
+		if err != nil || state != "saved" {
+			t.Fatalf("前置正文写入失败: %s %v", state, err)
+		}
+	}
+	if _, err := db.Engine.Exec(`UPDATE request_log_capture_quotas SET size_bytes = 0 WHERE scope IN ('global', 'user:owner')`); err != nil {
+		t.Fatal(err)
+	}
+	if count, err := db.PurgeExpiredLogCaptures(t.Context(), now.Add(2*time.Hour), 100); err != nil || count != 1 {
+		t.Fatalf("计数异常阻塞过期清理: count=%d err=%v", count, err)
+	}
+	if _, err := db.GetLogCapture(t.Context(), "expired", now); err != ErrNotFound {
+		t.Fatalf("过期正文仍未删除: %v", err)
+	}
+	if got, err := db.GetLogCapture(t.Context(), "active", now); err != nil || got.Request != "synthetic" {
+		t.Fatalf("未过期正文丢失: %+v %v", got, err)
+	}
+	for _, scope := range []string{"global", "user:owner"} {
+		var row struct {
+			SizeBytes int64 `xorm:"'size_bytes'"`
+		}
+		if ok, err := db.Engine.SQL(`SELECT size_bytes FROM request_log_capture_quotas WHERE scope = ?`, scope).Get(&row); err != nil || !ok || row.SizeBytes != int64(len("synthetic")) {
+			t.Fatalf("占用计数未修复 scope=%s row=%+v err=%v", scope, row, err)
+		}
+	}
+	session := db.Engine.NewSession()
+	defer session.Close()
+	if err := reconcileCaptureQuota(session, "unknown"); err != ErrInvalid {
+		t.Fatalf("非法占用范围未拒绝: %v", err)
+	}
+}
+
+// TestCaptureCleanupRollsBackWhenRepairFails 验证计数修复遇数据库错误时仍回滚正文删除。
+// 在隔离库注入仅供测试的约束，确认未清理记录仍可读取；测试结束自动删除 schema。
+func TestCaptureCleanupRollsBackWhenRepairFails(t *testing.T) {
+	db := testDB(t)
+	now := time.Now().UTC()
+	limits := CaptureLimits{PerRequest: 1024, PerUser: 2048, Global: 4096}
+	for _, item := range []struct {
+		id      string
+		expires time.Time
+	}{{"expired", now.Add(time.Hour)}, {"active", now.Add(3 * time.Hour)}} {
+		state, err := db.SaveLogCapture(t.Context(), LogCapture{RequestID: item.id, UserID: "owner", Source: "personal", CreatedAt: now, ExpiresAt: item.expires, Request: "synthetic"}, limits, now)
+		if err != nil || state != "saved" {
+			t.Fatalf("前置正文写入失败: %s %v", state, err)
+		}
 	}
 	if _, err := db.Engine.Exec(`UPDATE request_log_capture_quotas SET size_bytes = 0 WHERE scope = 'user:owner'`); err != nil {
 		t.Fatal(err)
 	}
-	if count, err := db.PurgeExpiredLogCaptures(t.Context(), now.Add(2*time.Hour), 100); err == nil || count != 0 {
-		t.Fatalf("计数异常被当成清理成功: count=%d err=%v", count, err)
+	if _, err := db.Engine.Exec(`ALTER TABLE request_log_capture_quotas ADD CONSTRAINT reject_quota_repair CHECK (scope <> 'user:owner' OR size_bytes = 0)`); err != nil {
+		t.Fatal(err)
 	}
-	if got, err := db.GetLogCapture(t.Context(), "rollback", now); err != nil || got.Request != "synthetic" {
-		t.Fatalf("失败事务未回滚正文删除: %+v %v", got, err)
+	if count, err := db.PurgeExpiredLogCaptures(t.Context(), now.Add(2*time.Hour), 100); err == nil || count != 0 {
+		t.Fatalf("修复失败被当成清理成功: count=%d err=%v", count, err)
+	}
+	if got, err := db.GetLogCapture(t.Context(), "expired", now); err != nil || got.Request != "synthetic" {
+		t.Fatalf("修复失败未回滚正文删除: %+v %v", got, err)
 	}
 }

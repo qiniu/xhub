@@ -12,7 +12,7 @@ import { cacheAdminZhCN } from "./cacheAdmin.zh-CN";
 export const zhCN = {
   logsUX: {
     captureTitle: "记录我的请求与响应",
-    captureDescription: "开启后记录个人请求的正文，默认保留 {days} 天。平台管理员可按现有权限查看；错误信息可能包含上游回显。",
+    captureDescription: "开启后记录个人请求与响应的正文，默认保留 {days} 天。平台管理员可按现有权限查看；错误信息可能包含上游回显。",
     captureUsage: "新记录正文占用（按原始字节）：{used} / {limit} MiB",
     captureGlobal: "管理员已开启全局记录，正文保留 {days} 天；关闭个人开关不会停止全局记录。",
     captureLoading: "正在读取正文记录设置…",
