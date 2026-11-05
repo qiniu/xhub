@@ -254,7 +254,9 @@ func serveBypassCreate(h dpcontract.Bypass, w http.ResponseWriter, r *http.Reque
 				}
 				tried = true
 				ctx, cancel := context.WithTimeout(r.Context(), time.Duration(settings.TimeoutSeconds()*float64(time.Second)))
-				response, err = dptransport.ForwardOfficial(h.HTTPClient(), r.WithContext(ctx), candidateHit.Action.Method, url, key, payload, r.Header, candidateHit.Transport, w)
+				forwardedResponse, forwardErr := dptransport.ForwardOfficial(h.HTTPClient(), r.WithContext(ctx), candidateHit.Action.Method, url, key, payload, r.Header, candidateHit.Transport, w)
+				attemptResult := bypassAttempt{response: forwardedResponse, err: forwardErr}
+				response, err = attemptResult.response, attemptResult.err
 				respBody, status = response.Body, response.StatusCode
 				cancel()
 				dep = candidate
@@ -270,7 +272,8 @@ func serveBypassCreate(h dpcontract.Bypass, w http.ResponseWriter, r *http.Reque
 					response.Diagnostics.Failure = dpdiagnostics.ObserveFailure(r.Context(), phase, err, time.Since(start))
 					// 原生入口同样区分客户端取消与供应商超时：只检查入站上下文，
 					// 不能检查上面已释放的尝试上下文；取消记499并停止重试，不污染共享冷却。
-					if r.Context().Err() != nil {
+					failure := attemptResult.failure(r.Context().Err(), replayDialogue)
+					if failure == bypassCanceled {
 						response.Diagnostics.Failure.Kind = "request_canceled"
 						h.RememberExchange(callID, r, raw, []byte("request connection canceled; initiator unknown"))
 						note := dataplaneNote(hit, dep, plan.SessionID, time.Since(start))
@@ -280,7 +283,7 @@ func serveBypassCreate(h dpcontract.Bypass, w http.ResponseWriter, r *http.Reque
 						h.RecordSpend(w, principal, callID, alias, hit.Transport.ID+":"+hit.Action.Name, nil, start, false, 499, selectedID)
 						return
 					}
-					if response.Streamed {
+					if failure == bypassStarted {
 						h.RememberExchange(callID, r, raw, []byte(dpdiagnostics.SafeErr(err)))
 						note := dataplaneNote(hit, dep, plan.SessionID, time.Since(start))
 						applyStreamTiming(&note, response, start)
@@ -291,7 +294,7 @@ func serveBypassCreate(h dpcontract.Bypass, w http.ResponseWriter, r *http.Reque
 					}
 					util.Error("bypass forward path=%s err=%s", r.URL.Path, dpdiagnostics.SafeErr(err))
 					h.NoteFailure(router.CooldownID(rawDep), settings)
-					if replayDialogue {
+					if failure == bypassRetry {
 						continue
 					}
 					// 创建响应丢失时，上游可能已受理付费任务；结果不明确的创建请求不能重放。

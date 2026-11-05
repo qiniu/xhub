@@ -102,6 +102,10 @@ func TestModelContractDefaultDialogueBypass(t *testing.T) {
 				if !h.moneyOf(t, owner).grewBy(before, 8*testInputRate+2*testOutputRate) {
 					t.Fatal("默认透传未正确计费")
 				}
+				log := logDetail(t, h, owner.session, r.header("x-litellm-call-id"))
+				if log["status"] != "success" || parseFloatOrZero(fmt.Sprint(log["spend"])) <= 0 {
+					t.Fatalf("透传成功未留下对应的成功计费记录 stream=%v: %v", stream, log)
+				}
 			}
 			before := calls.Load()
 			if r := h.do("POST", tc.path, "sk-invalid", body); r.status != 401 {
