@@ -2,6 +2,7 @@ package regression
 
 import (
 	"io"
+	"math"
 	"net/http"
 	"strings"
 	"testing"
@@ -13,6 +14,8 @@ import (
 // 下面这些用例补上请求链上还没单独走完的分叉。
 // 可调用真实供应商的场景提供 live 子测试；脚本故障仅走本地模拟边界。
 
+// TestIdempotencyReplaysWithoutASecondCharge 验证真实请求、费用头、日志和幂等重放不重复扣费。
+// 隔离网关及数据库；本地或明确启用的外部上游执行，harness 清理创建的数据。
 func TestIdempotencyReplaysWithoutASecondCharge(t *testing.T) {
 	runBoth(t, func(t *testing.T) { idempotencyChain(t, false) }, func(t *testing.T) { idempotencyChain(t, true) })
 }
@@ -38,6 +41,19 @@ func idempotencyChain(t *testing.T, live bool) {
 	first := h.doHeaders(http.MethodPost, "/v1/chat/completions", c.key, body, headers)
 	if first.status != http.StatusOK {
 		t.Fatalf("first call: %s", first.describe())
+	}
+	// 首次响应费用必须是实际有价格的数字，日志金额与响应头保持一致。
+	cost := parseFloatOrZero(first.header("x-litellm-response-cost"))
+	if !h.live {
+		// 仅本地夹具保证正价格；真实供应商可能免费或缺少价格，不擅自改变其验收条件。
+		if cost <= 0 {
+			t.Fatalf("首次请求缺少有效费用头: %s", first.describe())
+		}
+		h.flushSpend()
+		log := logDetail(t, h, c.session, first.header("x-litellm-call-id"))
+		if spend, ok := log["spend"].(float64); !ok || math.Abs(spend-cost) > 1e-10 {
+			t.Fatalf("费用头与实际账单不一致: header=%v log=%v", cost, log["spend"])
+		}
 	}
 	second := h.doHeaders(http.MethodPost, "/v1/chat/completions", c.key, body, headers)
 	if second.status != first.status || second.text() != first.text() {
