@@ -11,6 +11,7 @@ export function registerBypassBody(locale: "en" | "zh-CN") {
   test(`bypass request body and log lifecycle ${locale}`, async ({ page }) => {
     const received: string[] = [];
     let reject = false;
+    let incomplete = false;
     // 此供应商仅产生确定的协议回复，网关、模型配置、浏览器代理和记账全部走真实代码。
     const upstream = createServer(async (req, res) => {
       const chunks: Buffer[] = [];
@@ -23,6 +24,11 @@ export function registerBypassBody(locale: "en" | "zh-CN") {
       if (reject) {
         res.writeHead(422, { "Content-Type": "application/json" });
         res.end(JSON.stringify({ error: { type: "fixture_rejected", message: "Payload fixture rejected" } }));
+        return;
+      }
+      if (incomplete) {
+        res.writeHead(200, { "Content-Type": "text/event-stream" });
+        res.end('event: response.output_text.delta\ndata: {"type":"response.output_text.delta","delta":"Partial answer"}\n\n');
         return;
       }
       const response = {
@@ -93,6 +99,23 @@ export function registerBypassBody(locale: "en" | "zh-CN") {
         else await expect(dialog).toContainText(model);
         await page.keyboard.press("Escape");
       }
+      incomplete = true;
+      const before = received.length;
+      const partial = await page.evaluate(async ({ bearer, model }) => {
+        // eslint-disable-next-line no-restricted-syntax
+        const response = await fetch("/gw/bypass/openai/v1/responses", { method: "POST", headers: { Authorization: "Bearer " + bearer, "Content-Type": "application/json" }, body: JSON.stringify({ model, input: "Continue.", stream: true }) });
+        return { status: response.status, text: await response.text(), callID: response.headers.get("x-litellm-call-id") };
+      }, { bearer, model });
+      expect(partial.status).toBe(200);
+      expect(partial.text).toContain("Partial answer");
+      expect(partial.text).not.toContain("response.completed");
+      expect(received.length).toBe(before + 1);
+      expect(partial.callID).toBeTruthy();
+      await expect.poll(async () => (await page.request.get(GATEWAY + "/spend/logs/ui/" + partial.callID, { headers })).status()).toBe(200);
+      const partialLog = await (await page.request.get(GATEWAY + "/spend/logs/ui/" + partial.callID, { headers })).json();
+      expect(partialLog.status).toBe("error");
+      await stableGoto(page, "/logs?log_id=" + partial.callID);
+      await expect(page.getByRole("dialog").getByRole("alert")).toContainText("502");
     } finally {
       try {
         if (modelID) expect((await page.request.post(GATEWAY + "/model/delete", { headers, data: { id: modelID } })).status()).toBe(200);
