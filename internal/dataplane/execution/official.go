@@ -254,9 +254,7 @@ func serveBypassCreate(h dpcontract.Bypass, w http.ResponseWriter, r *http.Reque
 				}
 				tried = true
 				ctx, cancel := context.WithTimeout(r.Context(), time.Duration(settings.TimeoutSeconds()*float64(time.Second)))
-				forwardedResponse, forwardErr := dptransport.ForwardOfficial(h.HTTPClient(), r.WithContext(ctx), candidateHit.Action.Method, url, key, payload, r.Header, candidateHit.Transport, w)
-				attemptResult := bypassAttempt{response: forwardedResponse, err: forwardErr}
-				response, err = attemptResult.response, attemptResult.err
+				response, err = dptransport.ForwardOfficial(h.HTTPClient(), r.WithContext(ctx), candidateHit.Action.Method, url, key, payload, r.Header, candidateHit.Transport, w)
 				respBody, status = response.Body, response.StatusCode
 				cancel()
 				dep = candidate
@@ -272,7 +270,7 @@ func serveBypassCreate(h dpcontract.Bypass, w http.ResponseWriter, r *http.Reque
 					response.Diagnostics.Failure = dpdiagnostics.ObserveFailure(r.Context(), phase, err, time.Since(start))
 					// 原生入口同样区分客户端取消与供应商超时：只检查入站上下文，
 					// 不能检查上面已释放的尝试上下文；取消记499并停止重试，不污染共享冷却。
-					failure := attemptResult.failure(r.Context().Err(), replayDialogue)
+					failure := classifyBypassFailure(r.Context().Err(), response.Streamed, replayDialogue)
 					if failure == bypassCanceled {
 						response.Diagnostics.Failure.Kind = "request_canceled"
 						h.RememberExchange(callID, r, raw, []byte("request connection canceled; initiator unknown"))
