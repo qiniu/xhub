@@ -104,6 +104,41 @@ func TestLogCaptureLimitsAreAtomic(t *testing.T) {
 	}
 }
 
+// TestLogCapturePostgresCompression 在隔离 PostgreSQL 写入可压缩的合成正文，验证实际存储压缩和无损读取。
+// 同时确认容量仍按原始字节计算，避免压缩率变化导致配额失效；测试结束自动删除私有 schema。
+func TestLogCapturePostgresCompression(t *testing.T) {
+	db := testDB(t)
+	now := time.Now().UTC()
+	capture := LogCapture{
+		RequestID: "compressed-capture", UserID: "owner", Source: "personal", CreatedAt: now, ExpiresAt: now.Add(time.Hour),
+		Request:  `{"body":{"messages":[{"role":"user","content":"` + strings.Repeat("Synthetic input 文本🙂 ", 1024) + `"}]}}`,
+		Response: `{"role":"assistant","content":"` + strings.Repeat("Synthetic output 文本🙂 ", 1024) + `"}`,
+	}
+	limits := CaptureLimits{PerRequest: 1 << 20, PerUser: 2 << 20, Global: 4 << 20}
+	if state, err := db.SaveLogCapture(t.Context(), capture, limits, now); err != nil || state != "saved" {
+		t.Fatalf("保存合成正文失败: state=%s err=%v", state, err)
+	}
+	stored, err := db.GetLogCapture(t.Context(), capture.RequestID, now)
+	if err != nil || stored.Request != capture.Request || stored.Response != capture.Response {
+		t.Fatalf("压缩正文读取不完整: err=%v", err)
+	}
+	var sizes struct {
+		RequestBytes  int64 `xorm:"'request_bytes'"`
+		ResponseBytes int64 `xorm:"'response_bytes'"`
+	}
+	ok, err := db.Engine.SQL(`SELECT pg_column_size(request_document) AS request_bytes, pg_column_size(response_document) AS response_bytes FROM request_log_captures WHERE request_id = ?`, capture.RequestID).Get(&sizes)
+	if err != nil || !ok {
+		t.Fatalf("读取正文实际存储大小失败: found=%v err=%v", ok, err)
+	}
+	t.Logf("合成正文存储大小: request=%d/%d response=%d/%d bytes", sizes.RequestBytes, len(capture.Request), sizes.ResponseBytes, len(capture.Response))
+	if sizes.RequestBytes >= int64(len(capture.Request)) || sizes.ResponseBytes >= int64(len(capture.Response)) {
+		t.Fatalf("可压缩正文未压缩: request=%d/%d response=%d/%d", sizes.RequestBytes, len(capture.Request), sizes.ResponseBytes, len(capture.Response))
+	}
+	if used, err := db.PersonalLogCaptureBytes(t.Context(), capture.UserID); err != nil || used != int64(len(capture.Request)+len(capture.Response)) {
+		t.Fatalf("配额未按原始字节计量: used=%d err=%v", used, err)
+	}
+}
+
 // TestRequestMessagesRestoresStoredBody 用合成 JSON 验证无重复存储时的兼容重建及非法输入。
 // 纯内存测试，不触及真实请求和外部资源。
 func TestRequestMessagesRestoresStoredBody(t *testing.T) {
