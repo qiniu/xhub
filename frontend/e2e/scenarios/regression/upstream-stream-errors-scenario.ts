@@ -3,18 +3,18 @@ import {createServer} from "node:http";
 import {once} from "node:events";
 import {GATEWAY,loginAdmin,sessionBearer,stableGoto} from "../../helpers";
 
-// 双语真实链路：管理员创建隔离模型，HTTP上游返回首帧/中途错误，客户端和日志抽屉保留同一诊断。
+// 双语真实链路：管理员创建隔离模型，HTTP上游返回首帧/中途错误或截断的非流式正文，客户端和日志抽屉保留同一诊断。
 // 前置真实网关/PG/浏览器；验证 Chat 原生及 Responses 转换和错误后的成功请求；finally 删除模型并关闭本地服务，schema 由运行器清理。
 export function registerUpstreamStreamErrors(locale: "en" | "zh-CN") {
 test("upstream stream error details "+locale,async({page})=>{
  test.setTimeout(120000);
  let partial=false,fail=true,truncated=false,calls=0;
  const marker="Vendor capacity exhausted: 保留原文";
- // 本地HTTP供应商夹具：接收真实请求，返回协议流，便于验证首帧失败与部分输出后失败；资源在finally回收。
+ // 本地HTTP供应商夹具：接收真实请求，返回协议流或长度不足的完整 JSON，验证流错误及非流式读取错误；资源在finally回收。
  const upstream=createServer((req,res)=>{
   calls++;
   req.resume();
-  if(truncated){res.writeHead(200,{"Content-Type":"application/json","Content-Length":"10000"});res.end('{"choices":');return;}
+  if(truncated){const full=JSON.stringify({id:"r-trunc",object:"chat.completion",choices:[{index:0,message:{role:"assistant",content:"ok"},finish_reason:"stop"}]});res.writeHead(200,{"Content-Type":"application/json","Content-Length":String(Buffer.byteLength(full)+100),"Connection":"close"});res.end(full);return;}
   res.writeHead(200,{"Content-Type":"text/event-stream","X-Request-Id":"req-upstream-header"});
   if(partial||!fail)res.write('data: {"id":"r-stream","choices":[{"index":0,"delta":{"content":"Partial answer"}}]}\n\n');
   if(fail)res.end("data: "+JSON.stringify({type:"error",error:{code:"vendor_capacity",type:"overloaded_error",message:marker,details:{retryable:true}},request_id:"req-upstream-body"})+"\n\n");
@@ -68,6 +68,7 @@ test("upstream stream error details "+locale,async({page})=>{
   await expect.poll(async()=> (await page.request.get(GATEWAY+"/spend/logs/ui/"+failedID,{headers})).status()).toBe(200);
   const failedLog=await (await page.request.get(GATEWAY+"/spend/logs/ui/"+failedID,{headers})).json();
   expect(failedLog.status).toBe("error");
+  expect(failedLog.metadata.upstream_response.read_error).toContain("unexpected EOF");
   await stableGoto(page,"/logs?log_id="+failedID);
   await expect(page.getByRole("dialog").getByRole("alert")).toContainText("502");
  }finally{
