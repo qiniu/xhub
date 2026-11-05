@@ -616,40 +616,39 @@ func Serve(h dpcontract.Adapted, w http.ResponseWriter, r *http.Request, op stri
 					continue
 				}
 				messagesHistoryCommitted := false
-				respBody, readErr := io.ReadAll(resp.Body)
-				resp.Body.Close()
+				attempt := readBufferedAttempt(resp)
 				cancelAttempt()
 				h.DecBusy(did)
-				if readErr != nil {
-					lastErr = readErr
-					if stopCanceled(respBody, nil, did, 0) {
+				if attempt.readErr != nil {
+					lastErr = attempt.readErr
+					if stopCanceled(attempt.body, nil, did, 0) {
 						return
 					}
 					h.NoteFailure(did, routeCfg)
 					if dialogue.NativeResponses {
-						h.RememberExchange(callID, r, raw, respBody)
+						h.RememberExchange(callID, r, raw, attempt.body)
 						h.RecordSpend(w, p, callID, alias, op, nil, start, false, http.StatusBadGateway, did)
-						util.WriteTypedError(w, r.URL.Path, http.StatusBadGateway, "upstream_error", dpdiagnostics.SafeErr(readErr))
+						util.WriteTypedError(w, r.URL.Path, http.StatusBadGateway, "upstream_error", dpdiagnostics.SafeErr(attempt.readErr))
 						return
 					}
 					continue
 				}
-				if dpdialogue.CallerProtocol(op) != "" && resp.StatusCode < 400 {
+				if dpdialogue.CallerProtocol(op) != "" && attempt.status < 400 {
 					execution, _ := providerdeployment.Execution(dep)
 					var result llmdialogue.DialogueResult
 					var conversionErr error
 					if dialogue.NativeResponses {
-						result, conversionErr = llmdialogue.ParseNativeResponsesResult(respBody)
+						result, conversionErr = llmdialogue.ParseNativeResponsesResult(attempt.body)
 					} else {
-						result, conversionErr = llmdialogue.ParseDialogueResult(execution.Protocol, respBody)
+						result, conversionErr = llmdialogue.ParseDialogueResult(execution.Protocol, attempt.body)
 					}
 					if conversionErr != nil {
 						if dialogue.NativeResponses {
 							// 上游已返回成功HTTP，原生终态损坏不能再次生成；保留失败和已有用量供对账。
 							h.NoteFailure(did, routeCfg)
-							h.RememberExchange(callID, r, raw, respBody)
+							h.RememberExchange(callID, r, raw, attempt.body)
 							var observed map[string]any
-							_ = json.Unmarshal(respBody, &observed)
+							_ = json.Unmarshal(attempt.body, &observed)
 							usage, _ := observed["usage"].(map[string]any)
 							h.RecordSpend(w, p, callID, alias, op, llmdialogue.NormalizeDialogueUsage(usage), start, false, http.StatusBadGateway, did)
 							util.WriteTypedError(w, r.URL.Path, http.StatusBadGateway, "upstream_error", dpdiagnostics.SafeErr(conversionErr))
@@ -680,13 +679,13 @@ func Serve(h dpcontract.Adapted, w http.ResponseWriter, r *http.Request, op stri
 						result = prepared
 						messagesHistoryCommitted = plan.CommitMessagesHistory != nil
 					}
-					respBody, conversionErr = llmdialogue.EncodeDialogueResult(result, dpdialogue.CallerProtocol(op), alias)
+					attempt.body, conversionErr = llmdialogue.EncodeDialogueResult(result, dpdialogue.CallerProtocol(op), alias)
 					if conversionErr == nil && op == "responses" {
 						// 编码后统一清理，覆盖原生和 Chat 桥接生成的 reasoning ID；原始结果仍供服务器续接。
 						var public map[string]any
-						conversionErr = json.Unmarshal(respBody, &public)
+						conversionErr = json.Unmarshal(attempt.body, &public)
 						if conversionErr == nil {
-							respBody, conversionErr = json.Marshal(llmdialogue.PortableResponsesObject(public, "output"))
+							attempt.body, conversionErr = json.Marshal(llmdialogue.PortableResponsesObject(public, "output"))
 						}
 					}
 					if conversionErr != nil {
@@ -700,19 +699,19 @@ func Serve(h dpcontract.Adapted, w http.ResponseWriter, r *http.Request, op stri
 					}
 				}
 				elapsed := time.Since(start)
-				pt, ct := dpusage.BodyUsage(respBody)
-				util.Info("process path=%s step=upstream status=%d provider=%s model=%s", r.URL.Path, resp.StatusCode, supplier, realModel)
+				pt, ct := dpusage.BodyUsage(attempt.body)
+				util.Info("process path=%s step=upstream status=%d provider=%s model=%s", r.URL.Path, attempt.status, supplier, realModel)
 				dpdiagnostics.LogMetrics(r.URL.Path, alias, false, pt, ct, elapsed, elapsed)
 				depID := did
-				h.RememberExchange(callID, r, raw, respBody)
+				h.RememberExchange(callID, r, raw, attempt.body)
 				h.AnnotateCall(callID, dpcontract.CallNote{
 					TTFTMs: dpusage.TtftMillis(elapsed), Provider: supplier, CacheKey: ck,
 					SessionID: plan.SessionID,
 				})
-				if resp.StatusCode < 400 && !messagesHistoryCommitted {
-					h.CommitRoute(plan, router.DeploymentID(rawDep), dpstream.ResponseID(respBody))
+				if attempt.status < 400 && !messagesHistoryCommitted {
+					h.CommitRoute(plan, router.DeploymentID(rawDep), dpstream.ResponseID(attempt.body))
 				}
-				h.WriteChatJSON(w, p, callID, alias, ck, op, "", respBody, resp.StatusCode, start, depID, fallbacks.PoolAlias, rawDep.ModelName)
+				h.WriteChatJSON(w, p, callID, alias, ck, op, "", attempt.body, attempt.status, start, depID, fallbacks.PoolAlias, rawDep.ModelName)
 				return
 			}
 		}

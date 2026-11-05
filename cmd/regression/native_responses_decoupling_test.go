@@ -199,6 +199,9 @@ func TestNativeResponsesFailureNoReplay(t *testing.T) {
 			if log["status"] != "error" {
 				t.Fatal("失败未记入日志")
 			}
+			if rows := h.spendLogs(t, admin); len(rows) != 1 {
+				t.Fatalf("失败请求不应产生多条账单记录: %v", rows)
+			}
 		})
 	}
 }

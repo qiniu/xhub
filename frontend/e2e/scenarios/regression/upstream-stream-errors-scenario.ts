@@ -8,12 +8,13 @@ import {GATEWAY,loginAdmin,sessionBearer,stableGoto} from "../../helpers";
 export function registerUpstreamStreamErrors(locale: "en" | "zh-CN") {
 test("upstream stream error details "+locale,async({page})=>{
  test.setTimeout(120000);
- let partial=false,fail=true,calls=0;
+ let partial=false,fail=true,truncated=false,calls=0;
  const marker="Vendor capacity exhausted: 保留原文";
  // 本地HTTP供应商夹具：接收真实请求，返回协议流，便于验证首帧失败与部分输出后失败；资源在finally回收。
  const upstream=createServer((req,res)=>{
   calls++;
   req.resume();
+  if(truncated){res.writeHead(200,{"Content-Type":"application/json","Content-Length":"10000"});res.end('{"choices":');return;}
   res.writeHead(200,{"Content-Type":"text/event-stream","X-Request-Id":"req-upstream-header"});
   if(partial||!fail)res.write('data: {"id":"r-stream","choices":[{"index":0,"delta":{"content":"Partial answer"}}]}\n\n');
   if(fail)res.end("data: "+JSON.stringify({type:"error",error:{code:"vendor_capacity",type:"overloaded_error",message:marker,details:{retryable:true}},request_id:"req-upstream-body"})+"\n\n");
@@ -60,6 +61,15 @@ test("upstream stream error details "+locale,async({page})=>{
   await expect.poll(async()=> (await page.request.get(GATEWAY+"/spend/logs/ui/"+successID,{headers})).status()).toBe(200);
   const successLog=await (await page.request.get(GATEWAY+"/spend/logs/ui/"+successID,{headers})).json();
   expect(successLog.status).toBe("success");
+  truncated=true;
+  const failedBody=await page.request.post(GATEWAY+"/chat/completions",{headers,data:{model,messages:[{role:"user",content:"Test a truncated response."}],stream:false}});
+  expect(failedBody.status()).toBe(502);
+  const failedID=failedBody.headers()["x-litellm-call-id"];
+  await expect.poll(async()=> (await page.request.get(GATEWAY+"/spend/logs/ui/"+failedID,{headers})).status()).toBe(200);
+  const failedLog=await (await page.request.get(GATEWAY+"/spend/logs/ui/"+failedID,{headers})).json();
+  expect(failedLog.status).toBe("error");
+  await stableGoto(page,"/logs?log_id="+failedID);
+  await expect(page.getByRole("dialog").getByRole("alert")).toContainText("502");
  }finally{
   if(modelID)expect((await page.request.post(GATEWAY+"/model/delete",{headers,data:{id:modelID}})).status()).toBe(200);
   upstream.closeAllConnections();await new Promise<void>((resolve,reject)=>upstream.close(err=>err?reject(err):resolve()));
