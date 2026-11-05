@@ -189,6 +189,17 @@ it.each(["zh-CN", "en"] as const)("%s 取消诊断不推断用户停止或供应
  expect(region).not.toHaveTextContent(translate(locale,"logDiagnostics.noUpstreamError"));
 });
 
+/** 写客户端失败日志以中英文说明未知来源；普通日志不显示该提示，组件自动清理。 */
+it.each(["zh-CN", "en"] as const)("%s 客户端写入失败不推断责任", (locale) => {
+  const failure = {phase:"client_write",kind:"client_write_error",transport_error:"synthetic write failure"};
+  const {rerender} = render(<I18nProvider initialLocale={locale}><LogDetailContent logEntry={logEntry({metadata:{upstream_response:{status_code:200,failure}}})} /></I18nProvider>);
+  const region = screen.getByRole("region", {name:translate(locale,"logDiagnostics.title")});
+  expect(region).toHaveTextContent(translate(locale,"logDiagnostics.clientWriteError"));
+  expect(region).toHaveTextContent("synthetic write failure");
+  rerender(<I18nProvider initialLocale={locale}><LogDetailContent logEntry={logEntry()} /></I18nProvider>);
+  expect(screen.queryByText(translate(locale,"logDiagnostics.clientWriteError"))).not.toBeInTheDocument();
+});
+
 /** 前置读取失败与旧日志；中英文验证正文省略说明、字节证据和原始错误，旧日志不误标；组件自动卸载。 */
 it.each(["zh-CN", "en"] as const)("%s 读取失败明确说明正文未保存", (locale) => {
   const failure = {phase: "request_body", kind: "body_too_large", bytes_read: 67108864, body_limit: 67108864, request_body_omitted: true, transport_error: "http: request body too large"};

@@ -46,7 +46,7 @@ export function registerClientScenario(locale: Locale) {
       });
     });
     await new Promise<void>((resolve) => upstream.listen(0, "127.0.0.1", resolve));
-    let modelID = "",
+    let modelID = "", completionID = "",
       key = "";
     const name = `e2e-cancel-health-${locale}`;
     await loginAdmin(page);
@@ -131,6 +131,38 @@ export function registerClientScenario(locale: Locale) {
       await expect(diagnostic).toContainText("request_canceled");
       await expect(diagnostic).toContainText(tr("logDiagnostics.cancelUnknown"));
       await expect(diagnostic).toContainText(tr("logDiagnostics.noUpstreamError"));
+      await page.keyboard.press("Escape");
+
+      const completionName = name + "-completion";
+      const completion = await page.request.post(GATEWAY + "/model/new", { headers, data: {
+        model_name: completionName,
+        litellm_params: { model: completionName, api_base: `http://127.0.0.1:${(upstream.address() as AddressInfo).port}/v1`, api_key:"local-fixture", custom_llm_provider:"openai", input_cost_per_token:0.000002, output_cost_per_token:0.000008 },
+        model_info: {transport:"openai_completions",endpoint_types:["completion"],pricing_source:"manual"},
+      } });
+      expect(completion.status(), await completion.text()).toBe(200);
+      completionID = (await completion.json()).model_info.id;
+      const beforeStopped = stopped;
+      const rawCall = await page.evaluate(async ({token, model}) => {
+        const controller = new AbortController();
+        // eslint-disable-next-line no-restricted-syntax
+        const response = await fetch("/gw/completions", {method:"POST",headers:{Authorization:token,"Content-Type":"application/json"},body:JSON.stringify({model,prompt:"Test cancellation.",stream:true}),signal:controller.signal});
+        const reader = response.body!.getReader();
+        await reader.read();
+        const id = response.headers.get("x-litellm-call-id");
+        controller.abort();
+        return {id,status:response.status};
+      }, {token:headers.Authorization,model:completionName});
+      expect(rawCall.status).toBe(200);
+      expect(rawCall.id).toBeTruthy();
+      await expect.poll(() => stopped).toBe(beforeStopped + 1);
+      await expect.poll(async () => {
+        const detail = await page.request.get(GATEWAY + "/spend/logs/ui/" + rawCall.id, {headers});
+        if (!detail.ok()) return null;
+        const row = await detail.json();
+        return {status:row.status,spend:Number(row.spend)};
+      }).toEqual({status:"error",spend:0});
+      await stableGoto(page, "/logs?log_id=" + rawCall.id);
+      await expect(page.getByRole("dialog").getByRole("alert")).toBeVisible();
     } finally {
       if (key)
         expect((await page.request.post(GATEWAY + "/key/delete", { headers, data: { keys: [key] } })).status()).toBe(
@@ -140,6 +172,8 @@ export function registerClientScenario(locale: Locale) {
         expect((await page.request.post(GATEWAY + "/model/delete", { headers, data: { id: modelID } })).status()).toBe(
           200,
         );
+      if (completionID)
+        expect((await page.request.post(GATEWAY + "/model/delete", { headers, data: { id: completionID } })).status()).toBe(200);
       upstream.closeAllConnections();
       await new Promise<void>((resolve, reject) => upstream.close((error) => (error ? reject(error) : resolve())));
     }

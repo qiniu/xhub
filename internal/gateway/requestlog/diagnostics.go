@@ -52,6 +52,13 @@ func FailureJSON(upstream *dpdiagnostics.UpstreamDiagnostics, fallback string) s
 			return string(raw)
 		}
 	}
+	if upstream != nil && upstream.Failure != nil && upstream.Failure.Kind == "client_write_error" {
+		// 写客户端失败与上游错误是独立事实，不把已观察到的部分生成正文冒充错误原因。
+		raw, err := json.Marshal(map[string]any{"error": map[string]any{"type": "client_write_error", "message": "client response write failed; initiator unknown"}, "diagnostics": upstream.Failure, "upstream_error": upstream.Error})
+		if err == nil {
+			return string(raw)
+		}
+	}
 	if upstream == nil || upstream.StatusCode >= 400 || upstream.Error == nil {
 		return fallback
 	}

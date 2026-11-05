@@ -573,8 +573,15 @@ func Serve(h dpcontract.Adapted, w http.ResponseWriter, r *http.Request, op stri
 						if stopCanceled(attempt.body, attempt.usage, did, attempt.ttft) {
 							return
 						}
-						h.NoteFailure(did, routeCfg)
-						util.Error("upstream stream path=%s provider=%s model=%s base_host=%s err=%s", r.URL.Path, supplier, realModel, dpdiagnostics.BaseHost(apiBase), dpdiagnostics.SafeErr(attempt.err))
+						if errors.Is(attempt.err, dpstream.ErrClientWrite) {
+							// 写客户端失败不证明供应商异常，也不证明用户主动取消；保留可观测阶段并避免污染供应商冷却。
+							diagnostic.Failure.Phase = "client_write"
+							diagnostic.Failure.Kind = "client_write_error"
+							util.Error("client response write path=%s model=%s err=%s", r.URL.Path, realModel, dpdiagnostics.SafeErr(attempt.err))
+						} else {
+							h.NoteFailure(did, routeCfg)
+							util.Error("upstream stream path=%s provider=%s model=%s base_host=%s err=%s", r.URL.Path, supplier, realModel, dpdiagnostics.BaseHost(apiBase), dpdiagnostics.SafeErr(attempt.err))
+						}
 						if attempt.mustStopAfterFailure(preparationFailed, dialogue.NativeResponses) {
 							// 已开始输出、历史准备失败或原生响应不可安全重放时，不重试或换模型；记录已有用量与失败事实后结束。
 							h.RememberExchange(callID, r, raw, attempt.body)

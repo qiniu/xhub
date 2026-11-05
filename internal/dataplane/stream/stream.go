@@ -5,6 +5,8 @@ package stream
 import (
 	"bytes"
 	"encoding/json"
+	"errors"
+	"fmt"
 	"io"
 	"net/http"
 	"strings"
@@ -17,6 +19,9 @@ import (
 // captureLimit 是一次流式响应最多保留给用量日志的字节数。超过这个量的正文
 // 不再留档，但要记一行：截断之后按正文估算的 token 会偏低。
 const captureLimit = 2 << 20
+
+// ErrClientWrite 标识响应写向客户端时的失败；调用方不得据此推断是谁中断连接。
+var ErrClientWrite = errors.New("client response write failed")
 
 // noteCaptureTruncated 在流式日志捕获达到上限时记录诊断提示。
 // 参数 kept 为已保存字节数；返回值无，PipeStream 追加捕获后调用，未到上限时不输出。
@@ -74,7 +79,7 @@ func responseDocumentID(raw []byte) string {
 // PipeStream 将无需协议转换的上游流字节透传，同时解析用量并捕获日志正文。
 // 参数 w 为客户端写入器，resp 为上游响应，start 为请求开始时间；返回 wrote、usage、ttft、captured、err。
 // Serve 的普通流分支调用；本函数负责关闭 resp.Body，首次读到字节时发送状态/流媒体头并测量耗时。
-// wrote 表示读到数据并开始响应，当前实现忽略 w.Write 的 n/err，不能等同于客户端实际完整接收。
+// wrote 表示已开始响应，不能等同于客户端实际完整接收；写失败和短写以 ErrClientWrite 返回。
 // 原始读取错误向调用方返回，EOF 视为正常结束；与 PipeDialogue 不同，这条透传链不校验协议成功终态。
 // 捕获最多 2 MiB，超过部分继续转发且仍全部送给用量解析器；截断只限制日志，不限制统计扫描。
 // 有写出后调用方不可重试，避免拼接两次回复；函数不执行路由、记账或会话提交。
@@ -98,12 +103,6 @@ func PipeStream(w http.ResponseWriter, resp *http.Response, start time.Time) (bo
 				w.WriteHeader(resp.StatusCode)
 				wrote = true
 			}
-			// 当前透传接口忽略客户端短写和写入错误；wrote 仅代表已开始
-			// 响应，不是完整送达确认。上层不得据此重放并拼接另一次回复。
-			_, _ = w.Write(buf[:n])
-			if flusher != nil {
-				flusher.Flush()
-			}
 			if len(captured) < 2<<20 {
 				take := n
 				if len(captured)+take > 2<<20 {
@@ -115,6 +114,18 @@ func PipeStream(w http.ResponseWriter, resp *http.Response, start time.Time) (bo
 			parser.write(buf[:n], false)
 			// 解析器始终消费完整读取片段；上面的 2 MiB 限制只作用于
 			// 日志留档，不能让末尾出现的供应商实测用量被忽略。
+			written, writeErr := w.Write(buf[:n])
+			if writeErr == nil && written != n {
+				writeErr = io.ErrShortWrite
+			}
+			if writeErr != nil {
+				// 上游已经读到的用量仍保留为诊断事实；写失败不代表用户主动停止，也不能继续重放。
+				parser.write(nil, true)
+				return wrote, parser.usage, ttft, captured, fmt.Errorf("%w: %w", ErrClientWrite, writeErr)
+			}
+			if flusher != nil {
+				flusher.Flush()
+			}
 		}
 		if err != nil {
 			parser.write(nil, true)
