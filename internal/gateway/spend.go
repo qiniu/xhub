@@ -25,7 +25,6 @@ import (
 	"github.com/sunqirui1987/xhub/internal/authz"
 	"github.com/sunqirui1987/xhub/internal/catalog"
 	"github.com/sunqirui1987/xhub/internal/gateway/billing"
-	"github.com/sunqirui1987/xhub/internal/gateway/prefs"
 	"github.com/sunqirui1987/xhub/internal/gateway/requestlog"
 	"github.com/sunqirui1987/xhub/internal/iam"
 	"github.com/sunqirui1987/xhub/internal/live"
@@ -469,28 +468,35 @@ type promptExchange struct {
 	rawResponse string
 }
 
-// promptsEnabled reports whether new spend logs should keep the request and response. The YAML flag wins when it is set. A database override can turn the same key on later.
-// 参数：无。
-// 返回 bool（bool）：新的花费日志要保存请求和响应正文时返回真。YAML 已设置时以 YAML 为准。
-// 调用：仅在 spend.go 内使用
-// 测试：无直接单测
-func (s *Server) promptsEnabled() bool {
+// promptsEnabled 使用有界查询读取全局正文开关；ctx 为调用上下文，返回是否开启及配置读取错误。
+// YAML 强制开启沿用原优先级，否则使用数据库覆盖或 YAML 原值；故障不能被误报为管理员关闭。
+// 日志设置页、请求策略快照和早期错误回退共用；不写入配置，不使用可能过时的 ORM 缓存。
+func (s *Server) promptsEnabled(ctx context.Context) (bool, error) {
 	if s == nil || s.Cfg == nil {
-		return false
+		return false, nil
 	}
 	if s.Cfg.GeneralSettings.StorePromptsInSpendLogs {
-		return true
+		return true, nil
 	}
 	if s.Store == nil {
-		return false
+		return false, nil
 	}
-	switch v := prefs.MergedGeneral(s)["store_prompts_in_spend_logs"].(type) {
+	ctx, cancel := context.WithTimeout(ctx, time.Second)
+	defer cancel()
+	v, found, err := s.Store.FreshConfigValueContext(ctx, "general_settings", "store_prompts_in_spend_logs")
+	if err != nil {
+		return false, err
+	}
+	if !found {
+		v = s.Cfg.GeneralRaw["store_prompts_in_spend_logs"]
+	}
+	switch value := v.(type) {
 	case bool:
-		return v
+		return value, nil
 	case string:
-		return strings.EqualFold(v, "true")
+		return strings.EqualFold(value, "true"), nil
 	default:
-		return false
+		return false, nil
 	}
 }
 

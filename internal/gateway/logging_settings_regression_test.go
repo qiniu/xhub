@@ -1,6 +1,7 @@
 package gateway
 
 import (
+	"context"
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
@@ -49,7 +50,7 @@ func TestPromptStorageReadWrite(t *testing.T) {
 			t.Fatalf("日志开关保存失败：%d %s", status, body)
 		}
 		read(value, true)
-		if got := New(cfg, st, db).promptsEnabled(); got != value {
+		if got, err := New(cfg, st, db).promptsEnabled(context.Background()); err != nil || got != value {
 			t.Fatalf("新服务实例实际执行值错误：%v", got)
 		}
 	}

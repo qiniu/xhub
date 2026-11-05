@@ -52,20 +52,20 @@ func TestCaptureExchangeBoundaryStates(t *testing.T) {
 		{"expired", []byte(`{}`), "answer", time.Now().Add(-31 * 24 * time.Hour), "expired"},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			s.BeginLogCapture(tc.name, nil)
+			s.BeginLogCapture(context.Background(), tc.name, nil)
 			state, expiry := s.captureExchange(nil, tc.name, promptExchange{request: httptest.NewRequest("POST", "/v1/chat/completions", nil), requestBody: tc.req, rawResponse: tc.response}, tc.start, tc.name == "stream", false)
 			if state != tc.want || expiry != "" {
 				t.Fatalf("状态错误: got=%s expiry=%s want=%s", state, expiry, tc.want)
 			}
 		})
 	}
-	s.BeginLogCapture("large-nonstream", nil)
+	s.BeginLogCapture(context.Background(), "large-nonstream", nil)
 	state, expiry := s.captureExchange(nil, "large-nonstream", promptExchange{request: httptest.NewRequest("POST", "/v1/chat/completions", nil), requestBody: []byte(`{}`), rawResponse: strings.Repeat("x", 2<<20)}, time.Now(), false, false)
 	if state != "saved" || expiry == "" {
 		t.Fatalf("未截断的非流响应不应误报截断: %s", state)
 	}
 	rawFailure := "data: {\"choices\":[{\"delta\":{\"content\":\"partial\"}}]}\n\ndata: {\"error\":{\"code\":\"request_canceled\"}}\n\n"
-	s.BeginLogCapture("failure-stream", nil)
+	s.BeginLogCapture(context.Background(), "failure-stream", nil)
 	state, _ = s.captureExchange(nil, "failure-stream", promptExchange{request: httptest.NewRequest("POST", "/v1/chat/completions", nil), requestBody: []byte(`{}`), rawResponse: rawFailure}, time.Now(), true, true)
 	stored, err := db.GetLogCapture(t.Context(), "failure-stream", time.Now())
 	if state != "saved" || err != nil || stored.Response != rawFailure {
@@ -136,7 +136,7 @@ func TestDisabledCaptureKeepsFailureSummary(t *testing.T) {
 	s := &Server{Cfg: &config.Config{}, IAM: db}
 	request := httptest.NewRequest("POST", "/v1/chat/completions", nil)
 	raw := []byte(`{"error":{"code":"vendor_busy","message":"Vendor busy","request":{"messages":[{"content":"secret-input"}]}},"choices":[{"text":"secret-output"}]}`)
-	s.BeginLogCapture("disabled-failure", nil)
+	s.BeginLogCapture(context.Background(), "disabled-failure", nil)
 	s.rememberExchange("disabled-failure", request, []byte(`{"messages":[{"content":"secret-input"}]}`), raw)
 	s.recordSpend(httptest.NewRecorder(), nil, "disabled-failure", "model", "chat", nil, time.Now(), false, 502, "")
 	log, err := db.GetRequestLog(context.Background(), "disabled-failure")

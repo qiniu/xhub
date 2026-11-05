@@ -701,9 +701,10 @@ func LogByID(s Host, w http.ResponseWriter, r *http.Request) {
 }
 
 // detailError 返回经授权的错误详情；已保存的非流式失败正文沿用原接口的原始错误字节。
-// event 为用量事实，body 为已鉴权读取的正文；流式、取消、过期或未开启时保留有界诊断摘要。
+// event 为用量事实，body 为已鉴权读取的正文；异步失败、流式、取消、过期或未开启时保留有界诊断摘要。
 func detailError(event iam.UsageEvent, body *iam.RequestLog) string {
-	if body != nil && body.BodyCaptureStatus == "saved" && event.HTTPStatus >= 400 && event.HTTPStatus != 499 && !event.Streamed && strings.TrimSpace(body.ResponseBody) != "" {
+	// failed 是异步任务终态，保存的正文可能仍是创建响应；HTTP 失败轮询也不能拿初始成功响应覆盖最终错误。
+	if body != nil && event.Status != "failed" && body.BodyCaptureStatus == "saved" && event.HTTPStatus >= 400 && event.HTTPStatus != 499 && !event.Streamed && strings.TrimSpace(body.ResponseBody) != "" {
 		return body.ResponseBody
 	}
 	if body == nil {

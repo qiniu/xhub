@@ -7,20 +7,8 @@ export function isRequestFailure(log: Pick<LogEntry, "status" | "metadata" | "er
   ) || Number(log.metadata?.http_status) >= 400 || Boolean(log.error?.trim());
 }
 
-/** 返回失败详情：新日志保存了正文时优先展示完整响应，其他情况保留旧日志 error 优先的规则；空值回退旧版元数据。 */
+/** 返回接口确定的最终错误：error 已包含可用的完整错误或摘要；仅在缺失时回退响应和旧元数据。异步任务保存的初始响应不能覆盖后续失败；不修改原日志。 */
 export function fullErrorDetails(log: Pick<LogEntry, "error" | "response" | "metadata" | "body_capture_status">): string {
-  if (log.body_capture_status === "saved") {
-    const response = log.response;
-    if (typeof response === "string" && response.trim()) {
-      // 流中的部分输出不是错误原因；优先显示已整理的取消或上游失败摘要。
-      if (/(?:^|\n)\s*data:/.test(response) && log.error?.trim()) return log.error;
-      return response;
-    }
-    if (response && typeof response === "object" && Object.keys(response).length > 0) {
-      if ("body" in response && typeof response.body === "string" && Object.keys(response).length === 1) return response.body;
-      return JSON.stringify(response, null, 2);
-    }
-  }
   if (log.error?.trim()) return log.error;
   const response = log.response;
   if (typeof response === "string" && response.trim()) return response;

@@ -19,14 +19,27 @@ var _ contract.CaptureBeginner = (*Server)(nil)
 // capturePolicy 是在请求鉴权后冻结的正文策略，不包含正文和凭据。
 type capturePolicy struct{ userID, source, status string }
 
-// BeginLogCapture 在身份确认后冻结当前个人和全局设置，callID 标识本次调用。
+// captureSnapshotKey 是仅在网关内部使用的上下文键，客户端不能构造记录策略。
+type captureSnapshotKey struct{}
+
+// captureSnapshot 在单次 HTTP 处理栈中保留已鉴权策略，直到外层补写早期错误日志。
+// 不保存正文；执行器的 ReleaseCall 仍立即清理共享 map，避免其他调用路径泄漏临时状态。
+type captureSnapshot struct {
+	callID string
+	policy capturePolicy
+}
+
+// BeginLogCapture 在身份确认后冻结个人和全局设置；ctx 为请求上下文，callID 标识本次调用。
 // 数据面在发往上游前调用；关闭只影响之后的新请求，查询错误按不记录处理并显式标记。
-// 临时策略由 recordSpend 消费或 ReleaseCall 回收，不保存用户正文或改变鉴权与账单。
-func (s *Server) BeginLogCapture(callID string, p *auth.Principal) {
+// 临时 map 由 recordSpend 或 ReleaseCall 回收；请求上下文副本供外层错误日志使用，不改变鉴权与账单。
+func (s *Server) BeginLogCapture(ctx context.Context, callID string, p *auth.Principal) {
 	if s == nil || callID == "" {
 		return
 	}
-	policy := s.selectCapturePolicy(p)
+	policy := s.selectCapturePolicy(ctx, p)
+	if snapshot, ok := ctx.Value(captureSnapshotKey{}).(*captureSnapshot); ok {
+		snapshot.callID, snapshot.policy = callID, policy
+	}
 	s.mu.Lock()
 	if s.capturePolicies == nil {
 		s.capturePolicies = map[string]capturePolicy{}
@@ -35,11 +48,19 @@ func (s *Server) BeginLogCapture(callID string, p *auth.Principal) {
 	s.mu.Unlock()
 }
 
-// selectCapturePolicy 使用认证主体及管理员设置解析一次策略；p 可以为空，绝不猜测共享密钥的个人归属。
+// selectCapturePolicy 在 ctx 下最多花一秒读取管理员及个人设置；p 可以为空，不猜测共享密钥归属。
 // 返回来源、用户及失败状态；读取失败不阻断模型请求，也不保存正文。
-func (s *Server) selectCapturePolicy(p *auth.Principal) capturePolicy {
+func (s *Server) selectCapturePolicy(ctx context.Context, p *auth.Principal) capturePolicy {
 	policy := capturePolicy{userID: captureUserID(p)}
-	if s.promptsEnabled() {
+	ctx, cancel := context.WithTimeout(ctx, time.Second)
+	defer cancel()
+	global, err := s.promptsEnabled(ctx)
+	if err != nil {
+		util.Error("read global capture preference failed: %v", err)
+		policy.status = "settings_unavailable"
+		return policy
+	}
+	if global {
 		policy.source = "global"
 		return policy
 	}
@@ -47,8 +68,6 @@ func (s *Server) selectCapturePolicy(p *auth.Principal) capturePolicy {
 		policy.status = "disabled"
 		return policy
 	}
-	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
-	defer cancel()
 	enabled, err := s.IAM.PersonalLogCaptureEnabled(ctx, policy.userID)
 	if err != nil {
 		util.Error("read personal capture preference failed: %v", err)
@@ -83,10 +102,21 @@ func (s *Server) captureExchange(p *auth.Principal, requestID string, ex promptE
 	policy, frozen := s.capturePolicies[requestID]
 	delete(s.capturePolicies, requestID)
 	s.mu.Unlock()
+	// 已鉴权的参数或路由错误由外层统一落日志，此时执行器的 defer 已经释放共享 map。
+	// 只恢复同一 HTTP 请求、同一 callID 的快照，不重新查询个人开关，也不让匿名请求继承他人策略。
+	if !frozen && ex.request != nil {
+		if snapshot, ok := ex.request.Context().Value(captureSnapshotKey{}).(*captureSnapshot); ok && snapshot.callID == requestID {
+			policy, frozen = snapshot.policy, true
+		}
+	}
 	// 入站读取错误等没有冻结个人策略；不能以失败时的新个人设置回溯保存已到达的正文。
 	// 管理员全局开启时仍按全局策略保留失败证据，个人开关不覆盖管理员策略。
 	if !frozen {
-		if !s.promptsEnabled() {
+		global, err := s.promptsEnabled(context.Background())
+		if err != nil {
+			return "settings_unavailable", ""
+		}
+		if !global {
 			return "early_failure", ""
 		}
 		policy = capturePolicy{userID: captureUserID(p), source: "global"}

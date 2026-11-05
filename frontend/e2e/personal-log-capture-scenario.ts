@@ -1,5 +1,5 @@
-import { expect, test } from "@playwright/test";
-import { GATEWAY, login, loginAdmin, sessionBearer, stableGoto } from "./helpers";
+import { expect, test, type Page } from "@playwright/test";
+import { GATEWAY, UPSTREAM, login, loginAdmin, sessionBearer, stableGoto } from "./helpers";
 import { waitForLog } from "./product-fixes-scenario";
 import { translate } from "../src/i18n/translate";
 
@@ -29,6 +29,8 @@ export function registerPersonalLogCapture(locale: "zh-CN" | "en") {
       await page.getByRole("row").filter({ hasText: id }).click();
       await expect(page.getByText("Synthetic capture browser request.").first()).toBeVisible();
       await page.keyboard.press("Escape");
+      await verifyCapturedFailures(page, headers, locale);
+      await stableGoto(page, "/logs");
       await toggle.click();
       await expect(toggle).not.toBeChecked();
       const offCall = await page.request.post(`${GATEWAY}/v1/chat/completions`, { headers, data: { model: "gpt-4o-mini", messages: [{ role: "user", content: "Do not retain this synthetic request." }] } });
@@ -43,6 +45,62 @@ export function registerPersonalLogCapture(locale: "zh-CN" | "en") {
       await page.request.put(`${GATEWAY}/account/log-capture`, { headers, data: { enabled: false } });
     }
   });
+}
+
+/** 验证已开启记录后的参数拒绝和异步失败；参数是已登录页面、会话头及语言，返回流程完成的 Promise。
+ * 真实浏览器读取网关和私有 PostgreSQL 的结果；独立模型在 finally 删除，任务和日志由运行器清理。 */
+async function verifyCapturedFailures(page: Page, headers: Record<string, string>, locale: "zh-CN" | "en") {
+  const rejected = await page.request.post(`${GATEWAY}/v1/chat/completions`, { headers, data: {
+    model: "missing-capture-model", messages: [{ role: "user", content: "Synthetic rejected capture request." }],
+  } });
+  expect(rejected.status(), await rejected.text()).toBe(400);
+  const rejectedID = rejected.headers()["x-litellm-call-id"];
+  const rejectedDetail = await waitForLog(page.request, headers, rejectedID);
+  expect(rejectedDetail.body_capture_status).toBe("saved");
+  expect(JSON.stringify(rejectedDetail.messages)).toContain("Synthetic rejected capture request.");
+  await stableGoto(page, "/logs/?log_id=" + rejectedID);
+  await expect(page.getByRole("dialog").getByText("Synthetic rejected capture request.").first()).toBeVisible();
+  const errorRegion = page.getByRole("region", { name: translate(locale, "Full Error Details") });
+  await errorRegion.getByText(translate(locale, "logsUX.rawError"), { exact: true }).click();
+  await expect(errorRegion).toContainText("model not found");
+  await page.keyboard.press("Escape");
+
+  const name = "capture-failed-task-" + Date.now();
+  const model = await page.request.post(`${GATEWAY}/model/new`, { headers, data: {
+    model_name: name,
+    litellm_params: { model: "volcengine/doubao-seedance-2-0-260128", custom_llm_provider: "volcengine", api_base: UPSTREAM, api_key: "sk-fake", output_cost_per_token: 0.00001 },
+    model_info: { transport: "ark_contents_generation", endpoint_types: ["bypass:ark-video"], pricing_source: "manual" },
+  } });
+  expect(model.status(), await model.text()).toBe(200);
+  const deploymentID = (await model.json()).model_info.id;
+  try {
+    const created = await page.request.post(`${GATEWAY}/api/v3/contents/generations/tasks`, { headers, data: {
+      model: name, content: [{ type: "text", text: "e2e-task-failure" }],
+    } });
+    expect(created.status(), await created.text()).toBe(200);
+    const task = (await created.json()).id;
+    for (const status of ["running", "failed"]) {
+      const poll = await page.request.get(`${GATEWAY}/api/v3/contents/generations/tasks/${task}`, { headers });
+      expect(poll.status(), await poll.text()).toBe(200);
+      expect((await poll.json()).status).toBe(status);
+    }
+    const id = created.headers()["x-litellm-call-id"];
+    const detail = await waitForLog(page.request, headers, id);
+    expect(detail.status).toBe("failed");
+    expect(detail.body_capture_status).toBe("saved");
+    expect(detail.response).toEqual({ id: task });
+    expect(detail.error).toContain("failed");
+    expect(Number(detail.spend)).toBe(0);
+    await stableGoto(page, "/logs/?log_id=" + id);
+    await expect(errorRegion).toBeVisible();
+    await errorRegion.getByText(translate(locale, "logsUX.rawError"), { exact: true }).click();
+    await expect(errorRegion).toContainText(detail.error);
+    await expect(errorRegion).not.toContainText(task);
+    await page.keyboard.press("Escape");
+  } finally {
+    const deleted = await page.request.post(`${GATEWAY}/model/delete`, { headers, data: { id: deploymentID } });
+    expect(deleted.status(), await deleted.text()).toBe(200);
+  }
 }
 
 /** 注册普通用户记录场景，无参数或返回值；真实会话发起同步和流式对话，核对页面与后台，finally 删除测试账号。 */

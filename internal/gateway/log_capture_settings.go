@@ -99,6 +99,10 @@ func (s *Server) LogCaptureSettings(w http.ResponseWriter, r *http.Request) {
 		s.WriteIAMError(w, r, err)
 		return
 	}
-	global := s.promptsEnabled()
+	global, err := s.promptsEnabled(r.Context())
+	if err != nil {
+		util.WriteError(w, http.StatusServiceUnavailable, "unavailable", "Log capture configuration unavailable")
+		return
+	}
 	util.WriteJSON(w, 200, map[string]any{"enabled": enabled, "global_enabled": global, "effective_enabled": enabled || global, "retention_days": logCaptureDays, "global_retention_days": globalDays, "used_bytes": used, "limit_bytes": limits.PerUser})
 }

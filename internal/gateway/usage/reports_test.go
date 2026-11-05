@@ -21,6 +21,8 @@ func TestDetailErrorPreservesAuthorizedRawFailure(t *testing.T) {
 		body  *iam.RequestLog
 		want  string
 	}{
+		{"task-http-error", iam.UsageEvent{Status: "failed", HTTPStatus: 502}, &iam.RequestLog{BodyCaptureStatus: "saved", ResponseBody: `{"id":"task","status":"queued"}`, Error: "render failed"}, "render failed"},
+		{"task-body-error", iam.UsageEvent{Status: "failed", HTTPStatus: 200}, &iam.RequestLog{BodyCaptureStatus: "saved", ResponseBody: `{"id":"task","status":"queued"}`, Error: "render failed"}, "render failed"},
 		{"saved", iam.UsageEvent{HTTPStatus: 403}, &iam.RequestLog{BodyCaptureStatus: "saved", ResponseBody: "raw error\n", Error: "summary"}, "raw error\n"},
 		{"cancel", iam.UsageEvent{HTTPStatus: 499}, &iam.RequestLog{BodyCaptureStatus: "saved", ResponseBody: "partial stream", Error: "summary"}, "summary"},
 		{"stream", iam.UsageEvent{HTTPStatus: 502, Streamed: true}, &iam.RequestLog{BodyCaptureStatus: "saved", ResponseBody: "partial stream", Error: "summary"}, "summary"},
