@@ -75,9 +75,8 @@ type Server struct {
 	yamlStoreModelInDB bool
 	modules            []util.Module
 	modulesReady       bool
-	// exchanges holds headers and bodies until recordSpend copies them onto the
-	// usage row. callNotes holds provider, TTFT, session, and deployment.
-	// guardrailNotes holds the rule name when a guardrail refused the call.
+	// exchanges 暂存请求及响应，直到记账时按设置独立保存或丢弃正文。
+	// callNotes 暂存供应商、首字节耗时、会话和部署；guardrailNotes 暂存触发的护栏规则。
 	exchanges       map[string]promptExchange
 	capturePolicies map[string]capturePolicy
 	callNotes       map[string]dpcontract.CallNote
@@ -185,7 +184,7 @@ func (s *Server) Run(addr string) error {
 }
 
 // serveListener 在成功监听后启动维护任务并提供 HTTP 服务；ln 为 Run 或隔离测试创建的监听器。
-// 返回服务退出错误；退出取消预算/归档/SSO 刷新任务，IAM 存在时即启动维护，不以 Redis 可用性为条件。
+// 返回服务退出错误；退出取消预算、归档、SSO 刷新和正文清理任务，IAM 存在时即启动维护，不以 Redis 可用性为条件。
 func (s *Server) serveListener(ln net.Listener) error {
 	ctx, cancel := context.WithCancel(context.Background())
 	var flush sync.WaitGroup
