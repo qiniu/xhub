@@ -514,15 +514,15 @@ func Serve(h dpcontract.Adapted, w http.ResponseWriter, r *http.Request, op stri
 
 				// 专用 4xx 在分类后切换模型；普通 4xx 保留原状态与正文。
 				if resp.StatusCode >= 400 {
-					errorBody, readErr := io.ReadAll(resp.Body)
-					resp.Body.Close()
-					resp.Body = io.NopCloser(bytes.NewReader(errorBody))
-					errorKind := dprouting.FallbackKind(resp.StatusCode, errorBody)
-					if readErr == nil && errorKind != "" && !fallbacks.Disabled && len(baseRouteCfg.ModelFallbacks[fallbacks.Current].Targets(errorKind)) > 0 {
+					// 回退判断基于原始预读事实：传输截断时不能仅凭错误片段切换模型。
+					errorAttempt := readBufferedAttempt(resp)
+					resp.Body = io.NopCloser(bytes.NewReader(errorAttempt.body))
+					errorKind := dprouting.FallbackKind(errorAttempt.status, errorAttempt.body)
+					if errorAttempt.readErr == nil && errorKind != "" && !fallbacks.Disabled && len(baseRouteCfg.ModelFallbacks[fallbacks.Current].Targets(errorKind)) > 0 {
 						cancelAttempt()
 						h.DecBusy(did)
 						lastStatus = resp.StatusCode
-						lastResponse = errorBody
+						lastResponse = errorAttempt.body
 						lastErr = errUpstreamStatus
 						kind = errorKind
 						goto nextFallbackModel
