@@ -146,7 +146,7 @@ func TestNativeResponsesGovernance(t *testing.T) {
 }
 
 // TestNativeResponsesFailureNoReplay 验证已收到上游成功HTTP后遇无效终态或断流，不重放生成，错误及日志一致。
-// 每个子例真实HTTP和隔离PG；harness清理，计数断言无隐式旧路径回退/二次扣费。
+// 每个子例真实HTTP和隔离PG；截断正文设置可重试路由并断言调用次数、费用及错误日志，harness清理。
 func TestNativeResponsesFailureNoReplay(t *testing.T) {
 	for _, kind := range []string{"malformed", "stream-first-error", "stream-truncated", "connection-lost", "body-truncated"} {
 		t.Run(kind, func(t *testing.T) {
@@ -163,8 +163,14 @@ func TestNativeResponsesFailureNoReplay(t *testing.T) {
 					return
 				}
 				if kind == "body-truncated" {
-					w.Header().Set("Content-Length", "10000")
-					fmt.Fprint(w, "{}")
+					raw, err := json.Marshal(nativeAgentResponse("resp_truncated", "Completed result", false, nil))
+					if err != nil {
+						t.Error(err)
+						return
+					}
+					w.Header().Set("Content-Type", "application/json")
+					w.Header().Set("Content-Length", fmt.Sprint(len(raw)+100))
+					_, _ = w.Write(raw)
 					return
 				}
 				if kind == "malformed" {
@@ -180,6 +186,11 @@ func TestNativeResponsesFailureNoReplay(t *testing.T) {
 			}))
 			h.ok("POST", "/model/update", admin, map[string]any{"id": id, "model_info": map[string]any{"transport": "bypass_openai_responses", "endpoint_types": []string{"responses"}}})
 			h.ok("POST", "/config/update", admin, map[string]any{"general_settings": map[string]any{"native_responses": map[string]any{"enabled": true, "user_ids": []string{owner.userID}}}})
+			if kind == "body-truncated" {
+				// 配置真实重试机会，才能证明原生响应在收到成功状态后不会再次生成。
+				template := routeTemplate(t, h, admin, "native-no-replay", routeTemplateBody([]any{}, 3, 10, 10, 60))
+				bindTemplate(t, h, admin, "key", owner.keyID, template)
+			}
 			got := h.do("POST", "/v1/responses", owner.key, map[string]any{"model": "history-model", "input": "Hello", "stream": strings.HasPrefix(kind, "stream-")})
 			if calls.Load() != 1 {
 				t.Fatalf("上游已执行却重放: %d", calls.Load())
@@ -198,6 +209,13 @@ func TestNativeResponsesFailureNoReplay(t *testing.T) {
 			log := h.ok("GET", "/spend/logs/ui/"+got.header("x-litellm-call-id"), admin, nil).json()
 			if log["status"] != "error" {
 				t.Fatal("失败未记入日志")
+			}
+			if spend, ok := log["spend"].(float64); !ok || spend != 0 {
+				t.Fatalf("失败请求应为零费用: %v", log["spend"])
+			}
+			info := h.ok("GET", "/key/info?key="+owner.keyID, admin, nil).json()["info"].(map[string]any)
+			if spend, ok := info["spend"].(float64); !ok || spend != 0 {
+				t.Fatalf("失败请求不应消耗密钥额度: %v", info["spend"])
 			}
 		})
 	}
