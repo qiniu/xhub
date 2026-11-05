@@ -52,8 +52,14 @@ test("upstream stream error details "+locale,async({page})=>{
    await page.keyboard.press("Escape");
   }}
   fail=false;
+  const beforeSuccess=calls;
   const success=await page.request.post(GATEWAY+"/responses",{headers,data:{model,input:"Respond successfully.",stream:true}});
   expect(success.status()).toBe(200);expect(await success.text()).toContain("response.completed");
+  expect(calls-beforeSuccess,"恢复请求只应调用一次上游").toBe(1);
+  const successID=success.headers()["x-litellm-call-id"];
+  await expect.poll(async()=> (await page.request.get(GATEWAY+"/spend/logs/ui/"+successID,{headers})).status()).toBe(200);
+  const successLog=await (await page.request.get(GATEWAY+"/spend/logs/ui/"+successID,{headers})).json();
+  expect(successLog.status).toBe("success");
  }finally{
   if(modelID)expect((await page.request.post(GATEWAY+"/model/delete",{headers,data:{id:modelID}})).status()).toBe(200);
   upstream.closeAllConnections();await new Promise<void>((resolve,reject)=>upstream.close(err=>err?reject(err):resolve()));

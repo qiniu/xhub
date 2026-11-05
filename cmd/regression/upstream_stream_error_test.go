@@ -75,6 +75,9 @@ func TestUpstreamStreamErrorContract(t *testing.T) {
 						t.Fatalf("失败请求被重放 %d 次", calls.Load())
 					}
 					detail := logDetail(t, h, admin, got.header("x-litellm-call-id"))
+					if rows := h.spendLogs(t, admin); len(rows) != 1 {
+						t.Fatalf("单次失败流应只产生一条调用记录: %v", rows)
+					}
 					diag := detail["metadata"].(map[string]any)["upstream_response"].(map[string]any)
 					if diag["status_code"] != float64(200) || detail["status"] != "error" {
 						t.Fatalf("HTTP握手与失败状态混淆: %v", detail)

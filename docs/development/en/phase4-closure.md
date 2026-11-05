@@ -1,5 +1,10 @@
 # Phase-four fixed closure inventory
 
+## Status checked on 2026-11-05
+
+#229, #240, and the C3–C7 changes #231, #233, #235, #237 and #239 have been merged into main. The integration record and the JSON baseline, observations and pending markers below are historical evidence, not current PR status. A merge does not prove deployment or live-provider acceptance. Entries without an executor remain explicitly unsupported.
+
+
 ## Combined acceptance (2026-10-29)
 
 Main baseline: `e8a29c4f972e8832e1c6e02a8226d0befcc65584`. The earlier accumulated batches (#182–#228, including #202) entered main through #229 and are no longer pending.
