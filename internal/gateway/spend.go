@@ -14,6 +14,8 @@ package gateway
 import (
 	"context"
 	"encoding/json"
+	"errors"
+	"fmt"
 	"net/http"
 	"net/url"
 	"strconv"
@@ -229,7 +231,12 @@ func (s *Server) recordSpend(w http.ResponseWriter, p *auth.Principal, callID, a
 	}
 	guardrail := s.takeGuardrail(callID)
 	if !cacheHit && tokens > 0 && !note.SkipRouteUsage {
-		s.noteUsage(depID, tokens)
+		if pending := deliveryBuffer(w); pending != nil && status >= 200 && status < 300 && !note.Streamed && note.TaskRequestID == "" {
+			// 对话写出失败不计入成功路由用量；最终写入成功后由入口提交。
+			pending.routeDeployment, pending.routeTokens = depID, tokens
+		} else {
+			s.noteUsage(depID, tokens)
+		}
 	}
 	keyID := ""
 	if p != nil {
@@ -305,6 +312,48 @@ func (s *Server) recordSpend(w http.ResponseWriter, p *auth.Principal, callID, a
 			if err := s.IAM.RecordTaskUsage(context.Background(), rec, note.TaskInitial, note.TaskSettlement); err != nil {
 				util.Error("task usage persistence failed request=%s err=%v", row.RequestID, err)
 			}
+		}
+		return
+	}
+	if pending := deliveryBuffer(w); pending != nil && !note.Streamed && (status >= 200 && status < 300 || pending.preparedID == callID) {
+		// 执行器即将释放请求级事实，先冻结费用与日志快照；未确认写出时仅登记零费用恢复记录。
+		record := usageFromSpend(row, spend, ex.messages, row.Response, ex.proxy, start, end)
+		if s.usageSpoolEnabled {
+			record.DeliveryPending, record.DeliverySpoolOnly = true, true
+		}
+		if pending.preparedID != callID {
+			ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+			if s.IAM == nil {
+				pending.deliveryErr = fmt.Errorf("delivery storage unavailable")
+			} else {
+				pending.deliveryErr = s.IAM.PrepareDelivery(ctx, record, time.Now().Add(24*time.Hour))
+			}
+			cancel()
+			if pending.deliveryErr == nil && s.usageSpoolEnabled {
+				marker, markerErr := iam.UnconfirmedDelivery(record)
+				marker.DeliveryUnconfirmed = true
+				if markerErr == nil && s.usageSpool != nil {
+					markerErr = s.usageSpool.BeginDelivery(marker)
+				} else if markerErr == nil {
+					markerErr = fmt.Errorf("delivery spool unavailable")
+				}
+				pending.deliveryErr = markerErr
+			}
+		}
+		if pending.deliveryErr != nil && !errors.Is(pending.deliveryErr, iam.ErrConflict) && s.usageSpoolEnabled && s.usageSpool != nil {
+			// 数据库不可用时，独立磁盘先保留零费用未确认状态；进程退出后只能按未知结果恢复。
+			record.DeliveryPending, record.DeliverySpoolOnly, record.DeliveryUnconfirmed = true, true, true
+			marker, markerErr := iam.UnconfirmedDelivery(record)
+			if markerErr == nil {
+				markerErr = s.usageSpool.BeginDelivery(marker)
+			}
+			if markerErr == nil {
+				record.DeliveryUnconfirmed = false
+				pending.deliveryErr = nil
+			}
+		}
+		if pending.deliveryErr == nil {
+			pending.delivery = &record
 		}
 		return
 	}

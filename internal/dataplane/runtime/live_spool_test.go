@@ -2,8 +2,12 @@ package runtime
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
+	"net"
+	"os/exec"
 	"testing"
+	"time"
 
 	"github.com/sunqirui1987/xhub/cmd/regression/testsupport"
 	"github.com/sunqirui1987/xhub/internal/iam"
@@ -47,5 +51,105 @@ func TestFlushLocalSpoolHook(t *testing.T) {
 				t.Fatalf("恢复调用次数=%d，预期%d", h.calls, tc.calls)
 			}
 		})
+	}
+}
+
+// deliveryRuntime 使用隔离的 Redis 和 PostgreSQL 测试确认队列，不访问真实供应商。
+type deliveryRuntime struct {
+	Runtime
+	db    *iam.DB
+	redis *live.Client
+}
+
+// Identity 返回本测试私有数据库，不修改任何外部数据。
+func (s *deliveryRuntime) Identity() *iam.DB { return s.db }
+
+// Redis 返回本测试独立 Redis 客户端，供实际队列和热费用验证。
+func (s *deliveryRuntime) Redis() *live.Client { return s.redis }
+
+// TestFlushConfirmedDelivery 验证到期标记先处理已确认 Redis 快照、准确结算并释放热费用。
+// 前置私有 PostgreSQL 和本地临时 Redis；测试结束关闭连接并自动回收服务及 schema。
+func TestFlushConfirmedDelivery(t *testing.T) {
+	binary, err := exec.LookPath("redis-server")
+	if err != nil {
+		t.Fatal("Redis is required for queue recovery test")
+	}
+	listener, err := net.Listen("tcp", "127.0.0.1:0")
+	if err != nil {
+		t.Fatal(err)
+	}
+	address := listener.Addr().String()
+	_ = listener.Close()
+	_, port, _ := net.SplitHostPort(address)
+	cmd := exec.Command(binary, "--bind", "127.0.0.1", "--port", port, "--save", "", "--appendonly", "no")
+	if err := cmd.Start(); err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = cmd.Process.Kill(); _ = cmd.Wait() })
+	var redis *live.Client
+	for deadline := time.Now().Add(5 * time.Second); time.Now().Before(deadline); {
+		redis, err = live.Open("redis://" + address + "/0")
+		if err == nil {
+			break
+		}
+		time.Sleep(10 * time.Millisecond)
+	}
+	if err != nil {
+		t.Fatalf("isolated Redis did not start: %v", err)
+	}
+	t.Cleanup(func() { _ = redis.Close() })
+	db, err := iam.Open(t.Context(), testsupport.Postgres(t, "runtime_delivery"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = db.Close() })
+	user, err := db.CreateUser(t.Context(), iam.Actor{Kind: "system"}, iam.UserInput{Email: "runtime-delivery@example.com", Password: "password123"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	rec := iam.UsageRecord{RequestID: "runtime-confirmed", UserID: user.ID, OwnerType: iam.OwnerPersonal, TS: time.Now().UTC(), Model: "test", CallType: "chat", Status: "success", HTTPStatus: 200, Cost: 0.25}
+	if err := db.PrepareDelivery(t.Context(), rec, time.Now().Add(time.Minute)); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := db.Engine.Exec(`UPDATE usage_delivery_pending SET expires_at=now()-interval '1 second'`); err != nil {
+		t.Fatal(err)
+	}
+	raw, err := json.Marshal(rec)
+	if err != nil {
+		t.Fatal(err)
+	}
+	row := live.SpendLog{RequestID: rec.RequestID, UserID: rec.UserID, Spend: rec.Cost, SpendValid: true, Start: rec.TS.Format(time.RFC3339Nano), DeliverySnapshot: string(raw)}
+	if err := redis.EnqueueConfirmedDelivery(row); err != nil {
+		t.Fatal(err)
+	}
+	if redis.HotSpend("user/"+user.ID) != 0.25 {
+		t.Fatal("热费用缺失")
+	}
+	Flush(&deliveryRuntime{db: db, redis: redis})
+	event, err := db.GetUsageEvent(t.Context(), iam.UsageQuery{}, rec.RequestID)
+	if err != nil || event.Status != "success" || event.Cost != 0.25 {
+		t.Fatalf("确认费用被错误恢复: %+v err=%v", event, err)
+	}
+	if empty, err := redis.SpendQueueEmpty(t.Context()); err != nil || !empty || redis.HotSpend("user/"+user.ID) != 0 {
+		t.Fatal("结算后队列或热费用未清理")
+	}
+	bad := rec
+	bad.RequestID = "runtime-corrupt"
+	if err := db.PrepareDelivery(t.Context(), bad, time.Now().Add(time.Minute)); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := db.Engine.Exec(`UPDATE usage_delivery_pending SET expires_at=now()-interval '1 second'`); err != nil {
+		t.Fatal(err)
+	}
+	row.RequestID, row.DeliverySnapshot = bad.RequestID, string(raw) // 快照 ID 故意与队列条目不符。
+	if err := redis.EnqueueConfirmedDelivery(row); err != nil {
+		t.Fatal(err)
+	}
+	Flush(&deliveryRuntime{db: db, redis: redis})
+	if empty, err := redis.SpendQueueEmpty(t.Context()); err != nil || empty {
+		t.Fatal("损坏终态必须留在队列中")
+	}
+	if n, err := db.Engine.Table("usage_delivery_pending").Where("request_id = ?", bad.RequestID).Count(); err != nil || n != 1 {
+		t.Fatalf("损坏队列不能触发零费用恢复: n=%d err=%v", n, err)
 	}
 }

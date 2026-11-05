@@ -88,6 +88,23 @@ export function registerLogCostReasoningScenario(locale: "en" | "zh-CN") {
         await page.keyboard.press("Escape");
         await expect(dialog).not.toBeVisible();
       }
+      // 测试二进制在真实 HTTP 写边界注入连接错误，浏览器随后核对日志和零费用。
+      const writeFailure = await page.request.post(GATEWAY + "/v1/chat/completions", {
+        headers: { Authorization: "Bearer " + key, "X-E2E-Client-Write": "fail" },
+        data: { model, stream: false, messages: [{ role: "user", content: "Verify client write failure." }] },
+      });
+      expect(await writeFailure.text()).not.toContain("e2e-ok");
+      const writeFailureID = writeFailure.headers()["x-litellm-call-id"];
+      expect(writeFailureID).toBeTruthy();
+      await expect.poll(async () => (await page.request.get(GATEWAY + "/spend/logs/ui/" + writeFailureID, { headers })).status()).toBe(200);
+      const failureDetail = await (await page.request.get(GATEWAY + "/spend/logs/ui/" + writeFailureID, { headers })).json();
+      expect(failureDetail.status).toBe("error");
+      expect(failureDetail.spend).toBe(0);
+      expect(failureDetail.metadata.upstream_response.failure.kind).toBe("client_write_error");
+      await stableGoto(page, "/logs?log_id=" + encodeURIComponent(writeFailureID));
+      const failureDialog = page.getByRole("dialog");
+      await expect(failureDialog.getByText(tr("logDiagnostics.clientWriteError"))).toBeVisible();
+      await page.keyboard.press("Escape");
       // 创建带分时费率的真实部署，通过网关产生账单，再核对存储快照与页面标签。
       const windowModel = model + "-window";
       /** 构造指定侧和时段的测试费率；返回 API 入参，不修改环境，由测试 finally 清理部署。 */

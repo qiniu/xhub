@@ -2,6 +2,7 @@
 package usagespool
 
 import (
+	"bytes"
 	"context"
 	"crypto/rand"
 	"crypto/sha256"
@@ -61,14 +62,15 @@ type envelope struct {
 
 // Spool 独占本机目录；进程锁防止两实例共享目录，mu 保护文件更新、容量预留和失败重试时间。
 type Spool struct {
-	mu       sync.Mutex
-	root     *os.Root
-	lock     *flock.Flock
-	config   Config
-	reserved map[string]bool
-	retry    map[string]time.Time
-	lastErr  error
-	closed   bool
+	mu             sync.Mutex
+	root           *os.Root
+	lock           *flock.Flock
+	config         Config
+	reserved       map[string]bool
+	activeDelivery map[string]bool
+	retry          map[string]time.Time
+	lastErr        error
+	closed         bool
 }
 
 // Open 创建或打开专用目录并取得非阻塞进程锁，返回可恢复队列或错误；网关启动调用。
@@ -138,7 +140,7 @@ func Open(config Config) (*Spool, error) {
 		root.Close()
 		return nil, fmt.Errorf("%w: directory already in use", ErrUnavailable)
 	}
-	s := &Spool{root: root, lock: lock, config: config, reserved: map[string]bool{}, retry: map[string]time.Time{}}
+	s := &Spool{root: root, lock: lock, config: config, reserved: map[string]bool{}, activeDelivery: map[string]bool{}, retry: map[string]time.Time{}}
 	if len(entries) == 0 {
 		marker, createErr := root.OpenFile(".spool-format", os.O_CREATE|os.O_EXCL|os.O_WRONLY, 0600)
 		if createErr != nil {
@@ -330,7 +332,13 @@ func (s *Spool) scanLocked(recover bool) error {
 		if temporary && recover {
 			target := basename(record.RequestID)
 			if old, oldErr := s.readLocked(target); oldErr == nil {
-				if string(old) != string(raw) {
+				previous, previousErr := decode(old, target)
+				if previousErr == nil && previous.DeliveryUnconfirmed && previous.DeliverySpoolOnly && record.DeliveryPending && record.DeliverySpoolOnly && !record.DeliveryUnconfirmed && (record.Cost == 0 || record.Status == "success" && record.HTTPStatus < 400) && sameDeliveryOwner(previous, record) {
+					// 完整终态临时文件在客户端写出后 fsync；崩溃发生在 rename 前时可安全发布。
+					if err = s.root.Rename(name, target); err != nil {
+						return err
+					}
+				} else if string(old) != string(raw) {
 					if err = s.quarantineLocked(name); err != nil {
 						return err
 					}
@@ -352,6 +360,12 @@ func (s *Spool) scanLocked(recover bool) error {
 		}
 	}
 	return nil
+}
+
+// sameDeliveryOwner 校验磁盘标记与终态属于同一请求和计费范围；不比较费用或用户正文。
+// 参数 a/b 为校验过的快照，返回是否可原子替换；扫描恢复与正常终态写入共用。
+func sameDeliveryOwner(a, b iam.UsageRecord) bool {
+	return a.RequestID == b.RequestID && a.KeyID == b.KeyID && a.OwnerType == b.OwnerType && a.UserID == b.UserID && a.TeamID == b.TeamID && a.ProjectID == b.ProjectID && a.OrganizationID == b.OrganizationID && a.Model == b.Model && (a.CallType == "" || a.CallType == b.CallType) && a.BudgetReservationID == b.BudgetReservationID
 }
 
 // statusLocked 汇总容量和隔离状态；持mu调用，读取失败返回错误，不读取正文或对外暴露身份。
@@ -468,6 +482,9 @@ func (s *Spool) Release(callID string) {
 	}
 	s.mu.Lock()
 	defer s.mu.Unlock()
+	if s.activeDelivery[basename(callID)] {
+		return
+	}
 	delete(s.reserved, callID)
 }
 
@@ -480,6 +497,13 @@ func (s *Spool) Put(record iam.UsageRecord) error {
 	}
 	s.mu.Lock()
 	defer s.mu.Unlock()
+	return s.putLocked(record, raw)
+}
+
+// putLocked 写入已编码快照；调用方持有队列锁，返回完整持久化、容量或快照冲突错误。
+// 正常账单和同步响应的未确认标记共用容量检查，不能覆盖不同内容。
+func (s *Spool) putLocked(record iam.UsageRecord, raw []byte) error {
+	var err error
 	defer delete(s.reserved, record.RequestID)
 	if s.closed {
 		return ErrUnavailable
@@ -528,6 +552,123 @@ func (s *Spool) Put(record iam.UsageRecord) error {
 		return ErrFull
 	}
 	return s.writeLocked(raw, name)
+}
+
+// BeginDelivery 持久化零费用未确认标记并将其标记为当前实例在途；参数只包含脱敏账单元数据。
+// 返回错误时不允许把标记视为持久化；在途标记不由后台重放，进程退出后才允许作为未知结果恢复。
+func (s *Spool) BeginDelivery(record iam.UsageRecord) error {
+	if !record.DeliveryPending || !record.DeliverySpoolOnly || !record.DeliveryUnconfirmed || record.Cost != 0 || record.Status != "error" || record.RequestBody != "" || record.ResponseBody != "" || record.ProxyRequest != "" {
+		return fmt.Errorf("invalid delivery marker")
+	}
+	raw, err := encode(record)
+	if err != nil {
+		return err
+	}
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	name := basename(record.RequestID)
+	if s.activeDelivery[name] {
+		return ErrConflict
+	}
+	reserved := s.reserved[record.RequestID]
+	if err := s.putLocked(record, raw); err != nil {
+		return err
+	}
+	if reserved {
+		s.reserved[record.RequestID] = true
+	}
+	s.activeDelivery[name] = true
+	return nil
+}
+
+// CompleteDelivery 原子替换当前实例持有的未确认标记为写出终态；参数为同一次调用的完整最终快照。
+// 写入或目录同步失败时保留未知结果证据并阻止本实例重放；成功后后台可恢复最终账单。
+func (s *Spool) CompleteDelivery(record iam.UsageRecord) error {
+	if !record.DeliveryPending || !record.DeliverySpoolOnly || record.DeliveryUnconfirmed {
+		return fmt.Errorf("invalid delivery final snapshot")
+	}
+	if record.Cost > 0 && (record.Status != "success" || record.HTTPStatus >= 400) {
+		return fmt.Errorf("invalid failed delivery charge")
+	}
+	raw, err := encode(record)
+	if err != nil {
+		return err
+	}
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	name := basename(record.RequestID)
+	if s.closed || !s.activeDelivery[name] {
+		return ErrUnavailable
+	}
+	oldRaw, err := s.readLocked(name)
+	if err != nil {
+		return err
+	}
+	old, err := decode(oldRaw, name)
+	if err != nil {
+		return err
+	}
+	if !old.DeliveryUnconfirmed || !sameDeliveryOwner(old, record) {
+		return ErrConflict
+	}
+	status, err := s.statusLocked()
+	if err != nil {
+		return err
+	}
+	reservedBytes := status.ReservedBytes
+	if s.reserved[record.RequestID] {
+		reservedBytes -= s.config.MaxRecordBytes
+	}
+	if int64(len(raw)) > s.config.MaxRecordBytes || status.Bytes-int64(len(oldRaw))+int64(len(raw))+reservedBytes > s.config.MaxBytes {
+		return ErrFull
+	}
+	if err := s.writeLocked(raw, name); err != nil {
+		return err
+	}
+	delete(s.activeDelivery, name)
+	delete(s.reserved, record.RequestID)
+	return nil
+}
+
+// DiscardUnconfirmedDelivery 清理已由数据库严格结算的磁盘标记或相同终态。
+// record 为数据库已确认的完整终态；仅归属一致的未确认标记或逐字相同的终态可删除。
+// 调用方必须先完成严格结算；删除或目录同步失败返回错误，保留后续恢复机会。
+func (s *Spool) DiscardUnconfirmedDelivery(record iam.UsageRecord) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if s.closed {
+		return ErrUnavailable
+	}
+	name := basename(record.RequestID)
+	raw, err := s.readLocked(name)
+	if os.IsNotExist(err) {
+		return nil
+	}
+	if err != nil {
+		return err
+	}
+	marker, err := decode(raw, name)
+	if err != nil {
+		return err
+	}
+	if !sameDeliveryOwner(marker, record) {
+		return ErrConflict
+	}
+	if !marker.DeliveryUnconfirmed {
+		expected, err := encode(record)
+		if err != nil {
+			return err
+		}
+		if !bytes.Equal(raw, expected) {
+			return ErrConflict
+		}
+	}
+	if err := s.root.Remove(name); err != nil {
+		return err
+	}
+	delete(s.activeDelivery, name)
+	delete(s.reserved, record.RequestID)
+	return s.syncDirectoryLocked(".")
 }
 
 // writeLocked 将完整字节原子发布到根内指定名字；持mu调用，任何同步失败保留临时或已发布文件供恢复。
@@ -648,6 +789,10 @@ func (s *Spool) Replay(ctx context.Context, limit int, commit func(context.Conte
 		}
 		name := entry.Name()
 		s.mu.Lock()
+		if s.activeDelivery[name] {
+			s.mu.Unlock()
+			continue
+		}
 		if time.Now().Before(s.retry[name]) {
 			s.mu.Unlock()
 			continue

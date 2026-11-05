@@ -156,6 +156,12 @@ func (UsageDaily) TableName() string { return "usage_daily" }
 // UsageRecord 是等待持久化的一次调用，由网关或 Redis 消费者交给 RecordUsage。
 // 身份采用鉴权时快照，刷库不重新解析层级关系；正文、费用和会话来源分别保留各自记录规则。
 type UsageRecord struct {
+	// DeliveryPending 表示磁盘快照已确认客户端写出，恢复时须先原子转换数据库待确认标记。
+	DeliveryPending bool `json:",omitempty"`
+	// DeliverySpoolOnly 标记待确认事实曾在数据库不可用时由独立磁盘保存。
+	DeliverySpoolOnly bool `json:",omitempty"`
+	// DeliveryUnconfirmed 只用于磁盘恢复，表示客户端写出终态尚未持久化。
+	DeliveryUnconfirmed bool `json:",omitempty"`
 	// BudgetReservationID 关联已验证实际费用的独立尝试；为空时不释放其他尝试的未知费用占用。
 	BudgetReservationID string
 	// 客户端明确指定的推理强度快照；独立于提示词保存，空值表示未指定或历史未记录，不推断厂商默认值。

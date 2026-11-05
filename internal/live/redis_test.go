@@ -96,6 +96,46 @@ func TestOrganizationPendingPeriod(t *testing.T) {
 	}
 }
 
+// TestConfirmedDeliveryQueue 验证响应终态和各预算热费用原子入队，重复 ID 或缺失快照不得伪报持久化。
+// 使用临时独立 Redis；测试结束关闭连接并终止进程，不访问用户数据。
+func TestConfirmedDeliveryQueue(t *testing.T) {
+	c := testRedis(t)
+	if empty, err := c.SpendQueueEmpty(t.Context()); err != nil || !empty {
+		t.Fatalf("新队列应为空: empty=%t err=%v", empty, err)
+	}
+	row := SpendLog{RequestID: "delivery", DeliverySnapshot: `{"RequestID":"delivery"}`, APIKey: "key", UserID: "user", TeamID: "team", OrgID: "org", ProjectID: "project", Spend: 0.25, SpendValid: true, Start: time.Now().UTC().Format(time.RFC3339Nano)}
+	if err := c.EnqueueConfirmedDelivery(row); err != nil {
+		t.Fatal(err)
+	}
+	if empty, err := c.SpendQueueEmpty(t.Context()); err != nil || empty {
+		t.Fatalf("待结算队列不能视为空: empty=%t err=%v", empty, err)
+	}
+	if err := c.EnqueueConfirmedDelivery(row); err == nil {
+		t.Fatal("重复终态不能伪报成功")
+	}
+	empty := row
+	empty.RequestID, empty.DeliverySnapshot = "empty", ""
+	if err := c.EnqueueConfirmedDelivery(empty); err == nil {
+		t.Fatal("缺失快照应拒绝")
+	}
+	rows, raw := c.PeekLogs(10)
+	if len(rows) != 1 || rows[0].DeliverySnapshot != row.DeliverySnapshot || c.HotSpend("user/user") != 0.25 {
+		t.Fatal("终态或预算热费用未唯一保存")
+	}
+	if err := c.AckFlushed(map[string]float64{"key/key": 0.25, "user/user": 0.25, "team/team": 0.25, "org/org": 0.25, "project/project": 0.25}, len(raw), raw[0]); err != nil {
+		t.Fatal(err)
+	}
+	if c.HotSpend("user/user") != 0 {
+		t.Fatal("队列确认未释放热费用")
+	}
+	if err := c.rdb.Set(t.Context(), "xhub:spendlog", "wrong-type", 0).Err(); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := c.SpendQueueEmpty(t.Context()); err == nil {
+		t.Fatal("损坏队列不应视为空")
+	}
+}
+
 // testRedis 为热状态单元测试启动随机端口的专用 Redis；参数 t 提供断言和清理注册。
 // 返回独立客户端；缺少 Redis 二进制时跳过，连接失败时报错，结束关闭客户端并终止进程，不访问共享数据。
 func testRedis(t *testing.T) *Client {

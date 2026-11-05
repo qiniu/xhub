@@ -1,12 +1,15 @@
 package gateway
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"net/http"
 	"time"
 
 	"github.com/sunqirui1987/xhub/internal/auth"
+	"github.com/sunqirui1987/xhub/internal/authz"
 	"github.com/sunqirui1987/xhub/internal/catalog"
 	"github.com/sunqirui1987/xhub/internal/config"
 	dpcontract "github.com/sunqirui1987/xhub/internal/dataplane/contract"
@@ -82,6 +85,46 @@ func (s *Server) PrepareBudgetAttempt(w http.ResponseWriter, r *http.Request, p 
 		w.Header().Set("X-XHub-Budget-State", "soft")
 		w.Header().Set("X-XHub-Billing-Scope", "model_usage")
 		w.Header().Del("X-XHub-Tool-Costs")
+	}
+	if pending := deliveryBuffer(w); pending != nil && pending.preparedID == "" {
+		// 在实际调用上游前持久化零费用标记，避免供应商处理期间网关退出后没有恢复证据。
+		record := iam.UsageRecord{RequestID: callID, TS: start, KeyID: p.KeyID, UserID: p.UserID, OwnerType: p.OwnerType, Model: w.Header().Get("x-litellm-model-name")}
+		if p.Key != nil {
+			record.TeamID, record.OrganizationID, record.ProjectID = p.BillingTeamID, p.BillingOrgID, deref(p.Key.ProjectID)
+			if p.Key.UserID != nil {
+				record.UserID = *p.Key.UserID
+			}
+		} else if p.Kind == authz.KindSession && p.UserID != "" {
+			record.OwnerType, record.TeamID, record.OrganizationID = iam.OwnerSession, p.BillingTeamID, p.BillingOrgID
+		}
+		if s.usageSpoolEnabled {
+			record.DeliveryPending, record.DeliverySpoolOnly, record.DeliveryUnconfirmed = true, true, true
+		}
+		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+		err := s.IAM.PrepareDelivery(ctx, record, time.Now().Add(24*time.Hour))
+		cancel()
+		if err == nil && s.usageSpoolEnabled {
+			marker, markerErr := iam.UnconfirmedDelivery(record)
+			if markerErr == nil && s.usageSpool != nil {
+				markerErr = s.usageSpool.BeginDelivery(marker)
+			} else if markerErr == nil {
+				markerErr = fmt.Errorf("delivery spool unavailable")
+			}
+			err = markerErr
+		}
+		if err != nil {
+			s.finishBudgetCall(callID)
+			util.WriteTypedError(w, r.URL.Path, http.StatusServiceUnavailable, "billing_storage_unavailable", "response delivery tracking is unavailable")
+			return nil, false
+		}
+		pending.preparedID = callID
+		// 失败兜底使用已鉴权归属快照；后续预算变化不能抹去原团队/组织归属。
+		principal := *p
+		if p.Key != nil {
+			key := *p.Key
+			principal.Key = &key
+		}
+		pending.principal = &principal
 	}
 	return body, true
 }

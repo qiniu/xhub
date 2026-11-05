@@ -4,6 +4,7 @@ package runtime
 
 import (
 	"context"
+	"encoding/json"
 	"sync"
 	"time"
 
@@ -125,14 +126,46 @@ func Flush(h Runtime) {
 	if db == nil {
 		return
 	}
+	allowRecovery := true
+	defer func() {
+		if !allowRecovery {
+			return
+		}
+		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+		defer cancel()
+		if local, ok := h.(interface {
+			HasPendingLocalUsage(context.Context) (bool, error)
+		}); ok {
+			pending, err := local.HasPendingLocalUsage(ctx)
+			if err != nil || pending {
+				return
+			}
+		}
+		if redis != nil {
+			empty, err := redis.SpendQueueEmpty(ctx)
+			if err != nil || !empty {
+				return
+			}
+		}
+		// 确认队列已清空后才恢复未知响应，避免已保存的成功账单被零费用抢先覆盖。
+		if _, err := db.RecoverExpiredDeliveries(ctx, time.Now(), 500); err != nil {
+			util.Error("unconfirmed delivery recovery failed: %v", err)
+			return
+		}
+		if err := db.FlushPendingUsage(ctx, 500); err != nil {
+			util.Error("pending spend flush failed: %v", err)
+		}
+	}()
 	// 独立磁盘队列可在PG完全不可写期间保留最终账单；可选宿主先恢复它，再清算旧PG/Redis队列。
 	if local, ok := h.(interface{ FlushLocalUsage(context.Context) error }); ok {
 		if err := local.FlushLocalUsage(context.Background()); err != nil {
 			util.Error("local usage spool flush failed: %v", err)
+			allowRecovery = false
 		}
 	}
 	if err := db.FlushPendingUsage(context.Background(), 500); err != nil {
 		util.Error("pending spend flush failed: %v", err)
+		allowRecovery = false
 	}
 	if redis == nil {
 		return
@@ -146,20 +179,48 @@ func Flush(h Runtime) {
 	// logs 与 raw 是同一有效前缀的两种表示；只确认这段前缀，不越过损坏记录删除后续数据。
 	records := make([]iam.UsageRecord, 0, len(logs))
 	for _, row := range logs {
+		if row.DeliverySnapshot != "" {
+			var confirmed iam.UsageRecord
+			if err := json.Unmarshal([]byte(row.DeliverySnapshot), &confirmed); err != nil || confirmed.RequestID != row.RequestID || confirmed.Cost != row.Spend || confirmed.KeyID != row.KeyID || confirmed.UserID != row.UserID || confirmed.TeamID != row.TeamID || confirmed.OrganizationID != row.OrgID || confirmed.ProjectID != row.ProjectID || confirmed.KeyHash != row.APIKey {
+				util.Error("invalid confirmed delivery queue snapshot request=%s", row.RequestID)
+				allowRecovery = false
+				return
+			}
+			if err := db.SettleConfirmedDelivery(context.Background(), confirmed); err != nil {
+				util.Error("confirmed delivery flush failed request=%s: %v", row.RequestID, err)
+				allowRecovery = false
+				return
+			}
+			if local, ok := h.(interface {
+				AcknowledgeDeliverySpool(context.Context, iam.UsageRecord) error
+			}); ok {
+				if err := local.AcknowledgeDeliverySpool(context.Background(), confirmed); err != nil {
+					util.Error("confirmed delivery disk acknowledgement failed: %v", err)
+					allowRecovery = false
+					return
+				}
+			}
+			continue
+		}
 		records = append(records, queuedUsageRecord(row))
 	}
 	if len(records) == 0 {
-		// 防御性处理有原始条目却没有转换记录的批次；当前 PeekLogs 不会把损坏条目放进 raw。
-		_ = redis.AckFlushed(nil, n, head)
+		// 本批只包含已严格结算的同步终态，仍须归还它们的 Redis 热费用。
+		if err := redis.AckFlushed(hotDeltas(logs), n, head); err != nil {
+			allowRecovery = false
+		}
 		return
 	}
 	if err := db.RecordUsage(context.Background(), records); err != nil {
 		util.Error("spend flush failed: %v", err)
+		allowRecovery = false
 		return
 	}
 	// 数据库先成功再删除队列；同时扣回热预算，避免同一笔费用同时算在热状态与持久余额中。
 	// Ack 的队头比较防止另一刷写者改变队列后误删新记录，失败留待下一轮重试。
-	_ = redis.AckFlushed(hotDeltas(logs), n, head)
+	if err := redis.AckFlushed(hotDeltas(logs), n, head); err != nil {
+		allowRecovery = false
+	}
 }
 
 // queuedUsageRecord 将一条 Redis 日志转成完整数据库用量快照。

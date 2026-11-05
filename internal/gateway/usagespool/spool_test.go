@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"os"
 	"path/filepath"
 	"reflect"
@@ -77,6 +78,194 @@ func TestSpoolRestartAndIdempotence(t *testing.T) {
 	status, err := s.Status()
 	if err != nil || status.Pending != 0 || committed != 1 {
 		t.Fatalf("重复恢复或残留: %+v commits=%d err=%v", status, committed, err)
+	}
+}
+
+// TestSpoolDeliveryMarkerRecovery 验证在途零费用标记不会被后台提前重放，进程退出后可安全恢复。
+// 使用独占临时目录，覆盖终态原子替换和未确认退出；测试结束关闭并删除文件。
+func TestSpoolDeliveryMarkerRecovery(t *testing.T) {
+	for _, confirmed := range []bool{false, true} {
+		t.Run(fmt.Sprintf("confirmed=%v", confirmed), func(t *testing.T) {
+			dir := filepath.Join(t.TempDir(), "spool")
+			s := openSpool(t, Config{Dir: dir})
+			final := spoolRecord("delivery")
+			final.Status, final.HTTPStatus = "success", 200
+			final.DeliveryPending, final.DeliverySpoolOnly = true, true
+			marker, err := iam.UnconfirmedDelivery(final)
+			if err != nil {
+				t.Fatal(err)
+			}
+			marker.DeliveryUnconfirmed = true
+			if err := s.BeginDelivery(marker); err != nil {
+				t.Fatal(err)
+			}
+			calls := 0
+			if _, err := s.Replay(t.Context(), 10, func(context.Context, iam.UsageRecord) error { calls++; return nil }); err != nil || calls != 0 {
+				t.Fatalf("在途标记被提前恢复: calls=%d err=%v", calls, err)
+			}
+			if confirmed {
+				wrong := final
+				wrong.UserID = "other-user"
+				if err := s.CompleteDelivery(wrong); !errors.Is(err, ErrConflict) {
+					t.Fatalf("不同归属不应覆盖标记: %v", err)
+				}
+				invalid := final
+				invalid.Status = "error"
+				if err := s.CompleteDelivery(invalid); err == nil {
+					t.Fatal("失败终态不应带非零费用")
+				}
+				if err := s.CompleteDelivery(final); err != nil {
+					t.Fatal(err)
+				}
+			}
+			if err := s.Close(); err != nil {
+				t.Fatal(err)
+			}
+			s = openSpool(t, Config{Dir: dir})
+			if _, err := s.Replay(t.Context(), 10, func(_ context.Context, got iam.UsageRecord) error {
+				calls++
+				if confirmed && (got.Cost != final.Cost || got.DeliveryUnconfirmed) {
+					t.Fatalf("已确认快照错误: %+v", got)
+				}
+				if !confirmed && (got.Cost != 0 || got.Status != "error" || !got.DeliveryUnconfirmed || got.RequestBody != "" || got.ResponseBody != "") {
+					t.Fatalf("未知结果快照错误: %+v", got)
+				}
+				return nil
+			}); err != nil || calls != 1 {
+				t.Fatalf("重启恢复失败: calls=%d err=%v", calls, err)
+			}
+		})
+	}
+}
+
+// TestSpoolDeliveryInterruptedRename 验证确认终态已经完整写盘但尚未替换标记时，重启能恢复已确认终态。
+// 前置独占临时目录，通过完整临时文件模拟 rename 前退出；不访问用户目录并自动清理。
+func TestSpoolDeliveryInterruptedRename(t *testing.T) {
+	dir := filepath.Join(t.TempDir(), "spool")
+	s := openSpool(t, Config{Dir: dir})
+	final := spoolRecord("delivery-rename")
+	final.Status, final.HTTPStatus = "success", 200
+	final.DeliveryPending, final.DeliverySpoolOnly = true, true
+	marker, err := iam.UnconfirmedDelivery(final)
+	if err != nil {
+		t.Fatal(err)
+	}
+	marker.DeliveryUnconfirmed = true
+	if err := s.BeginDelivery(marker); err != nil {
+		t.Fatal(err)
+	}
+	raw, err := encode(final)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(dir, ".pending-interrupted.tmp"), raw, 0600); err != nil {
+		t.Fatal(err)
+	}
+	if err := s.Close(); err != nil {
+		t.Fatal(err)
+	}
+	s = openSpool(t, Config{Dir: dir})
+	status, err := s.Status()
+	if err != nil || status.Quarantined != 0 {
+		t.Fatalf("已确认的临时文件被隔离: status=%+v err=%v", status, err)
+	}
+	count := 0
+	_, err = s.Replay(t.Context(), 10, func(_ context.Context, got iam.UsageRecord) error {
+		count++
+		if got.Cost != final.Cost || got.DeliveryUnconfirmed {
+			t.Fatalf("终态恢复错误: %+v", got)
+		}
+		return nil
+	})
+	if err != nil || count != 1 {
+		t.Fatalf("未恢复唯一终态: count=%d err=%v", count, err)
+	}
+}
+
+// TestDiscardUnconfirmedDelivery 验证其他持久队列确认后只能清除同一归属的未确认磁盘标记。
+// 使用独占临时目录，覆盖不同归属、重复清理及已有终态，测试结束自动删除目录。
+func TestDiscardUnconfirmedDelivery(t *testing.T) {
+	s := openSpool(t, Config{})
+	final := spoolRecord("delivery-cleanup")
+	final.Status, final.HTTPStatus, final.DeliveryPending, final.DeliverySpoolOnly = "success", 200, true, true
+	marker, err := iam.UnconfirmedDelivery(final)
+	if err != nil {
+		t.Fatal(err)
+	}
+	marker.DeliveryUnconfirmed = true
+	if err := s.BeginDelivery(marker); err != nil {
+		t.Fatal(err)
+	}
+	wrong := final
+	wrong.UserID = "other"
+	if err := s.DiscardUnconfirmedDelivery(wrong); !errors.Is(err, ErrConflict) {
+		t.Fatalf("不能清除其他归属: %v", err)
+	}
+	if err := s.DiscardUnconfirmedDelivery(final); err != nil {
+		t.Fatal(err)
+	}
+	if err := s.DiscardUnconfirmedDelivery(final); err != nil {
+		t.Fatal(err)
+	}
+	if status, err := s.Status(); err != nil || status.Pending != 0 {
+		t.Fatalf("标记未清理: %+v %v", status, err)
+	}
+	final.RequestID = "delivery-cleanup-confirmed"
+	marker, err = iam.UnconfirmedDelivery(final)
+	if err != nil {
+		t.Fatal(err)
+	}
+	marker.DeliveryUnconfirmed = true
+	if err := s.BeginDelivery(marker); err != nil {
+		t.Fatal(err)
+	}
+	if err := s.CompleteDelivery(final); err != nil {
+		t.Fatal(err)
+	}
+	changed := final
+	changed.Cost += 1
+	if err := s.DiscardUnconfirmedDelivery(changed); !errors.Is(err, ErrConflict) {
+		t.Fatal("不同终态不能被确认删除")
+	}
+	if err := s.DiscardUnconfirmedDelivery(final); err != nil {
+		t.Fatal(err)
+	}
+}
+
+// TestDeliveryReservationPersists 验证未确认响应持续占有账单容量，直到终态落盘才允许其他请求使用。
+// 使用有限容量临时队列；模拟执行器释放、并发准入与终态确认，测试后自动清理磁盘。
+func TestDeliveryReservationPersists(t *testing.T) {
+	s := openSpool(t, Config{MaxEntries: 4, MaxBytes: 8192, MaxRecordBytes: 4096})
+	final := spoolRecord("delivery-capacity")
+	final.Status, final.HTTPStatus, final.DeliveryPending, final.DeliverySpoolOnly = "success", 200, true, true
+	if err := s.Reserve(final.RequestID); err != nil {
+		t.Fatal(err)
+	}
+	marker, err := iam.UnconfirmedDelivery(final)
+	if err != nil {
+		t.Fatal(err)
+	}
+	marker.DeliveryUnconfirmed = true
+	if err := s.BeginDelivery(marker); err != nil {
+		t.Fatal(err)
+	}
+	s.Release(final.RequestID)
+	status, err := s.Status()
+	if err != nil || status.Reserved != 1 {
+		t.Fatalf("未确认时提前释放容量: %+v %v", status, err)
+	}
+	if err := s.Reserve("other"); !errors.Is(err, ErrFull) {
+		t.Fatalf("并发占用未受保护: %v", err)
+	}
+	if err := s.CompleteDelivery(final); err != nil {
+		t.Fatal(err)
+	}
+	status, err = s.Status()
+	if err != nil || status.Reserved != 0 {
+		t.Fatalf("终态后未释放容量: %+v %v", status, err)
+	}
+	if err := s.Reserve("other"); err != nil {
+		t.Fatalf("释放后仍不能准入: %v", err)
 	}
 }
 

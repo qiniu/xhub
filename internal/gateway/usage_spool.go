@@ -109,9 +109,56 @@ func (s *Server) FlushLocalUsage(ctx context.Context) error {
 	ctx, cancel := context.WithTimeout(ctx, 10*time.Second)
 	defer cancel()
 	_, err := s.usageSpool.Replay(ctx, 500, func(ctx context.Context, record iam.UsageRecord) error {
+		if record.DeliveryPending {
+			if record.Cost > 0 && (record.Status != "success" || record.HTTPStatus >= 400) {
+				return fmt.Errorf("invalid delivery charge")
+			}
+			if record.DeliveryUnconfirmed {
+				// 仅新进程能重放在途标记；保留零费用及结果未知，不重现未确认正文。
+				record.DeliveryUnconfirmed = false
+			}
+			return s.IAM.SettleConfirmedDelivery(ctx, record)
+		}
 		return s.IAM.RecordUsageExact(ctx, []iam.UsageRecord{record})
 	})
 	return err
+}
+
+// HasPendingLocalUsage 检查独立磁盘是否有未确认或待结算快照，供未知响应恢复前使用。
+// 参数为兼容维护接口的上下文；返回待处理状态或存储错误；没有启用独立队列时返回 false。
+func (s *Server) HasPendingLocalUsage(_ context.Context) (bool, error) {
+	if !s.usageSpoolEnabled {
+		return false, nil
+	}
+	if s.usageSpoolErr != nil {
+		return false, s.usageSpoolErr
+	}
+	if s.usageSpool == nil {
+		return false, usagespool.ErrUnavailable
+	}
+	state, err := s.usageSpool.Status()
+	if err != nil {
+		return false, err
+	}
+	if state.Quarantined > 0 {
+		return false, usagespool.ErrCorrupt
+	}
+	return state.Pending > 0 || state.Reserved > 0, nil
+}
+
+// AcknowledgeDeliverySpool 在 Redis 终态已严格入账后清除同一请求的本机未确认标记。
+// ctx 为维护上下文，record 为已核对的最终账单；未启用磁盘时无副作用，失败保留 Redis 证据。
+func (s *Server) AcknowledgeDeliverySpool(_ context.Context, record iam.UsageRecord) error {
+	if !s.usageSpoolEnabled {
+		return nil
+	}
+	if s.usageSpoolErr != nil {
+		return s.usageSpoolErr
+	}
+	if s.usageSpool == nil {
+		return usagespool.ErrUnavailable
+	}
+	return s.usageSpool.DiscardUnconfirmedDelivery(record)
 }
 
 // persistUsageSnapshot 将完整最终账单先落独立磁盘，再精确提交PG事务；磁盘失败才使用PG pending兜底；返回是否已有可靠介质。
