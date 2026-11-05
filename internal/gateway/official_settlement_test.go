@@ -1,10 +1,12 @@
 package gateway
 
 import (
+	"context"
 	"fmt"
 	"net"
 	"net/http/httptest"
 	"os/exec"
+	"strings"
 	"sync"
 	"testing"
 	"time"
@@ -45,16 +47,20 @@ func settlementRedis(t *testing.T) *live.Client {
 	}
 }
 
+// TestOfficialSettlementSkipsRouteTPMAndConsumesOwnMetadata 并发执行合成轮询，验证去重后的正文关联与队列为同一调用。
+// 前置独立 Redis 与 PostgreSQL；普通同步请求仍更新 TPM，测试结束自动关闭服务并回收数据库。
 func TestOfficialSettlementSkipsRouteTPMAndConsumesOwnMetadata(t *testing.T) {
 	c := settlementRedis(t)
-	s := &Server{Cfg: &config.Config{}, Live: c, exchanges: map[string]promptExchange{}}
+	db := testIdentityStore(t)
+	s := &Server{Cfg: &config.Config{}, IAM: db, Live: c, exchanges: map[string]promptExchange{}}
+	s.Cfg.GeneralSettings.StorePromptsInSpendLogs = true
 	const dep = "official-deployment"
 	const settlement = "official-settlement:shared"
 	const polls = 16
 	// All temporary metadata coexists before any recordSpend consumes it.
 	for i := 0; i < polls; i++ {
 		id := fmt.Sprintf("poll-%d", i)
-		s.exchanges[id] = promptExchange{messages: id, response: id, proxy: id}
+		s.exchanges[id] = promptExchange{request: httptest.NewRequest("POST", "/v1/chat/completions", nil), requestBody: []byte(`{"messages":[{"content":"` + id + `"}]}`), rawResponse: id}
 		s.AnnotateCall(id, dpcontract.CallNote{SettlementID: settlement, SkipRouteUsage: true, Provider: id})
 	}
 	var wg sync.WaitGroup
@@ -74,8 +80,12 @@ func TestOfficialSettlementSkipsRouteTPMAndConsumesOwnMetadata(t *testing.T) {
 		t.Fatalf("duplicate settlement rows: %+v", rows)
 	}
 	row := rows[0]
-	if row.Messages == "" || row.Messages != row.Response || row.Messages != row.ProxyRequest || row.Messages != row.Provider {
-		t.Fatalf("mixed exchange metadata: %+v", row)
+	if row.Messages != "" || row.Response != "" || row.ProxyRequest != "" || row.BodyCaptureID == "" {
+		t.Fatalf("队列携带正文或缺少关联: %+v", row)
+	}
+	captured, err := db.GetLogCapture(context.Background(), row.BodyCaptureID, time.Now())
+	if err != nil || !strings.Contains(captured.Request, row.Provider) || !strings.Contains(captured.Response, row.Provider) {
+		t.Fatalf("正文与结算队列错配: provider=%s err=%v", row.Provider, err)
 	}
 	if len(s.exchanges) != 0 || len(s.callNotes) != 0 {
 		t.Fatal("temporary metadata leaked")

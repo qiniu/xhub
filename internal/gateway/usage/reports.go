@@ -688,6 +688,12 @@ func LogByID(s Host, w http.ResponseWriter, r *http.Request) {
 	row["messages"] = jsonOrEmpty(body.RequestBody)
 	row["response"] = jsonOrText(body.ResponseBody)
 	row["error"] = body.Error
+	if body.BodyCaptureStatus != "" {
+		row["body_capture_status"] = body.BodyCaptureStatus
+	}
+	if body.BodyCaptureExpiresAt != "" {
+		row["body_capture_expires_at"] = body.BodyCaptureExpiresAt
+	}
 	if strings.TrimSpace(body.ProxyRequest) != "" {
 		row["proxy_server_request"] = jsonOrEmpty(body.ProxyRequest)
 	}

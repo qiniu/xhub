@@ -16,6 +16,7 @@ vi.mock("../networking", async (importOriginal) => {
     ...actual,
     uiSpendLogsCall: vi.fn(),
     uiSpendLogDetailsCall: vi.fn().mockResolvedValue(null),
+    getPersonalLogCapture: vi.fn().mockResolvedValue({ enabled: false, global_enabled: false, effective_enabled: false, retention_days: 30, global_retention_days: 30, used_bytes: 0, limit_bytes: 1048576 }),
     keyInfoV1Call: vi.fn().mockResolvedValue({ info: {} }),
     allEndUsersCall: vi.fn().mockResolvedValue([]),
   };

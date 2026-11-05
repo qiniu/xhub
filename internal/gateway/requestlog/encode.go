@@ -3,6 +3,7 @@ package requestlog
 import (
 	"encoding/json"
 	"net/http"
+	"net/url"
 	"regexp"
 	"sort"
 	"strings"
@@ -35,7 +36,7 @@ func Encode(r *http.Request, reqBody, respBody []byte) (messages, response, prox
 	method, path := "", ""
 	if r != nil {
 		method = r.Method
-		path = r.URL.RequestURI()
+		path = redactRequestURI(r)
 		for k, vals := range r.Header {
 			headers[k] = strings.Join(vals, ", ")
 		}
@@ -270,7 +271,11 @@ func redactHeaders(h map[string]string) {
 // 调用：仅在 spend.go 内使用
 // 测试：无直接单测
 func sensitiveHeader(name string) bool {
-	switch strings.ToLower(name) {
+	name = strings.ToLower(name)
+	if strings.Contains(name, "token") || strings.Contains(name, "secret") || strings.Contains(name, "password") || strings.Contains(name, "api-key") || strings.Contains(name, "apikey") || strings.Contains(name, "authorization") {
+		return true
+	}
+	switch name {
 	case "authorization", "proxy-authorization", "cookie", "set-cookie", "x-api-key", "api-key", "x-litellm-api-key", "x-goog-api-key":
 		return true
 	default:
@@ -278,7 +283,36 @@ func sensitiveHeader(name string) bool {
 	}
 }
 
-var promptSecret = regexp.MustCompile(`sk-[A-Za-z0-9_\-]+`)
+// redactRequestURI 复制请求路径和查询参数，将常见凭据参数的值替换；r 为原始 HTTP 请求。
+// 返回脱敏后的请求 URI；非法查询不保存查询串，不修改实际请求，也不声称识别所有敏感文本。
+func redactRequestURI(r *http.Request) string {
+	if r == nil || r.URL == nil {
+		return ""
+	}
+	u := *r.URL
+	query, err := url.ParseQuery(u.RawQuery)
+	if err != nil {
+		u.RawQuery = ""
+		u.ForceQuery = false
+		return u.RequestURI()
+	}
+	for key, values := range query {
+		lower := strings.ToLower(strings.ReplaceAll(key, "_", "-"))
+		if strings.Contains(lower, "token") || strings.Contains(lower, "secret") || strings.Contains(lower, "password") || strings.Contains(lower, "api-key") || strings.Contains(lower, "apikey") || strings.Contains(lower, "authorization") {
+			query[key] = []string{"***"}
+			continue
+		}
+		for i, value := range values {
+			values[i] = redactSecretText(value)
+		}
+	}
+	u.RawQuery = query.Encode()
+	u.ForceQuery = false
+	return u.RequestURI()
+}
+
+// 必须从单词边界识别密钥，避免把 task-1 等普通参数误删。
+var promptSecret = regexp.MustCompile(`\bsk-[A-Za-z0-9_\-]+`)
 
 // 把文本里的密钥样式替换成星号。
 // 参数 s（string）：即将写入日志的一行，可能含 bearer、sk- 或上游 URL。

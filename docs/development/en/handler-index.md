@@ -16,6 +16,8 @@ rg 'GET|POST|DELETE|PATCH' internal/gateway/*/mount.go
 
 | Method and path | Handler | Registration source |
 | --- | --- | --- |
+| `GET /account/log-capture` | `LogCaptureSettings` | [mount.go](../../../internal/gateway/identity/mount.go) |
+| `PUT /account/log-capture` | `LogCaptureSettings` | [mount.go](../../../internal/gateway/identity/mount.go) |
 | `GET /spend/logs/ui/filter-options` | `LogFilterOptions` | [mount.go](../../../internal/gateway/usage/mount.go) |
 
 [Consumer API guide](api-reference.md)

@@ -406,6 +406,15 @@ export const apiClient = createApiClient({
   onError: handleError,
 });
 
+/** 个人正文记录设置的真实后台结果；占用按未压缩字节统计，管理员全局开关可覆盖个人选择。 */
+export type PersonalLogCaptureSettings = UserContract["schemas"]["PersonalLogCaptureSettings"];
+
+/** 读取当前登录用户的正文记录设置；accessToken 为会话凭据，失败由调用方展示，不修改设置。 */
+export const getPersonalLogCapture = (accessToken: string) => apiClient.get<PersonalLogCaptureSettings>("/account/log-capture", { accessToken });
+
+/** 修改当前登录用户的个人开关；enabled 不影响管理员全局记录或历史正文。 */
+export const setPersonalLogCapture = (accessToken: string, enabled: boolean) => apiClient.put<PersonalLogCaptureSettings>("/account/log-capture", { accessToken, body: { enabled } });
+
 registerBaseUrlGetter(getProxyBaseUrl);
 registerAuthHeaderNameGetter(getGlobalLitellmHeaderName);
 registerAuthTokenGetter(() => decodeToken(getCookie("token"))?.key ?? null);

@@ -305,6 +305,16 @@ export interface components {
             session_llm_count?: number;
             session_spend?: number;
             session_total_tokens?: number;
+            /**
+             * @description 正文记录状态；历史日志可能缺少 / Body capture status; may be absent on older logs
+             * @enum {string}
+             */
+            body_capture_status?: "disabled" | "saved" | "expired" | "empty" | "early_failure" | "too_large" | "capacity" | "partial" | "unsupported" | "storage_failed" | "settings_unavailable";
+            /**
+             * Format: date-time
+             * @description 采集时固定的正文到期时刻 / Body expiry fixed at capture time
+             */
+            body_capture_expires_at?: string;
         } & {
             [key: string]: unknown;
         };

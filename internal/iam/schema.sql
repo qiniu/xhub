@@ -255,6 +255,34 @@ CREATE TABLE IF NOT EXISTS request_logs (
     proxy_request TEXT NOT NULL DEFAULT '',
     upstream_response TEXT NOT NULL DEFAULT ''
 );
+-- 空状态表示旧记录，不能推断其未保存正文的原因。
+ALTER TABLE request_logs ADD COLUMN IF NOT EXISTS body_capture_status TEXT NOT NULL DEFAULT '';
+ALTER TABLE request_logs ADD COLUMN IF NOT EXISTS body_capture_expires_at TEXT NOT NULL DEFAULT '';
+ALTER TABLE request_logs ADD COLUMN IF NOT EXISTS body_capture_id TEXT NOT NULL DEFAULT '';
+
+-- 个人选择只按已认证用户读取；共享密钥不会因此获得个人身份。
+CREATE TABLE IF NOT EXISTS personal_log_preferences (
+    user_id TEXT PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
+    enabled BOOLEAN NOT NULL DEFAULT FALSE,
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+-- 正文独立于账单和续聊历史；队列重放不携带此表的正文。
+CREATE TABLE IF NOT EXISTS request_log_captures (
+    request_id TEXT PRIMARY KEY,
+    user_id TEXT NOT NULL DEFAULT '',
+    source TEXT NOT NULL CHECK (source IN ('personal', 'global')),
+    created_at TIMESTAMPTZ NOT NULL,
+    expires_at TIMESTAMPTZ NOT NULL,
+    request_document TEXT NOT NULL DEFAULT '',
+    response_document TEXT NOT NULL DEFAULT '',
+    size_bytes BIGINT NOT NULL CHECK (size_bytes >= 0)
+);
+CREATE INDEX IF NOT EXISTS request_log_captures_expiry ON request_log_captures (expires_at, request_id);
+CREATE TABLE IF NOT EXISTS request_log_capture_quotas (
+    scope TEXT PRIMARY KEY,
+    size_bytes BIGINT NOT NULL DEFAULT 0 CHECK (size_bytes >= 0)
+);
 
 CREATE TABLE IF NOT EXISTS usage_daily (
     day               DATE NOT NULL,

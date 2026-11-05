@@ -635,6 +635,89 @@
           }
         ]
       }
+    },
+    "/account/log-capture": {
+      "get": {
+        "operationId": "getPersonalLogCapture",
+        "summary": "读取个人正文记录设置 / Read personal body capture settings",
+        "responses": {
+          "200": {
+            "description": "当前账号的有效记录设置 / Effective capture settings for the signed-in account",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PersonalLogCaptureSettings"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/Error400"
+          },
+          "401": {
+            "$ref": "#/components/responses/Error401"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error403"
+          },
+          "500": {
+            "$ref": "#/components/responses/Error500"
+          },
+          "503": {
+            "$ref": "#/components/responses/Error503"
+          }
+        }
+      },
+      "put": {
+        "operationId": "setPersonalLogCapture",
+        "summary": "修改当前账号的正文记录选择 / Update the signed-in account body capture choice",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "enabled"
+                ],
+                "properties": {
+                  "enabled": {
+                    "type": "boolean"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "当前账号的有效记录设置 / Effective capture settings for the signed-in account",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PersonalLogCaptureSettings"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/Error400"
+          },
+          "401": {
+            "$ref": "#/components/responses/Error401"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error403"
+          },
+          "500": {
+            "$ref": "#/components/responses/Error500"
+          },
+          "503": {
+            "$ref": "#/components/responses/Error503"
+          }
+        }
+      }
     }
   },
   "components": {
@@ -919,7 +1002,17 @@
             "$ref": "#/components/schemas/LegacyBudget"
           },
           "max_budget_in_team": {
-            "oneOf": [{ "type": "number", "minimum": 0, "nullable": true, "format": "double" }, { "type": "string" }],
+            "oneOf": [
+              {
+                "type": "number",
+                "minimum": 0,
+                "nullable": true,
+                "format": "double"
+              },
+              {
+                "type": "string"
+              }
+            ],
             "description": "兼容校验但不写入；不用于设置团队成员预算。 / Validated compatibility field, not persisted; does not set team member budget."
           },
           "rpm_limit": {
@@ -990,7 +1083,17 @@
             "$ref": "#/components/schemas/LegacyBudget"
           },
           "max_budget_in_team": {
-            "oneOf": [{ "type": "number", "minimum": 0, "nullable": true, "format": "double" }, { "type": "string" }],
+            "oneOf": [
+              {
+                "type": "number",
+                "minimum": 0,
+                "nullable": true,
+                "format": "double"
+              },
+              {
+                "type": "string"
+              }
+            ],
             "description": "兼容校验但不写入；不用于设置团队成员预算。 / Validated compatibility field, not persisted; does not set team member budget."
           },
           "rpm_limit": {
@@ -1569,6 +1672,49 @@
           "password_updated"
         ],
         "additionalProperties": false
+      },
+      "PersonalLogCaptureSettings": {
+        "type": "object",
+        "required": [
+          "enabled",
+          "global_enabled",
+          "effective_enabled",
+          "retention_days",
+          "global_retention_days",
+          "used_bytes",
+          "limit_bytes"
+        ],
+        "properties": {
+          "enabled": {
+            "type": "boolean"
+          },
+          "global_enabled": {
+            "type": "boolean"
+          },
+          "effective_enabled": {
+            "type": "boolean"
+          },
+          "retention_days": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 0
+          },
+          "global_retention_days": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 0
+          },
+          "used_bytes": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 0
+          },
+          "limit_bytes": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 0
+          }
+        }
       }
     },
     "securitySchemes": {

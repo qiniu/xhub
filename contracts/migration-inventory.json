@@ -590,6 +590,17 @@
       "status": "peripheral-unmigrated"
     },
     {
+      "route": "GET /account/log-capture",
+      "sources": [
+        "internal/gateway/identity/mount.go"
+      ],
+      "contract": {
+        "domain": "users",
+        "operation": "getPersonalLogCapture"
+      },
+      "status": "core-contracted"
+    },
+    {
       "route": "GET /active/callbacks",
       "sources": [
         "catalog"
@@ -6747,6 +6758,17 @@
       ],
       "contract": null,
       "status": "peripheral-unmigrated"
+    },
+    {
+      "route": "PUT /account/log-capture",
+      "sources": [
+        "internal/gateway/identity/mount.go"
+      ],
+      "contract": {
+        "domain": "users",
+        "operation": "setPersonalLogCapture"
+      },
+      "status": "core-contracted"
     },
     {
       "route": "PUT /admin/archive/kodo",

@@ -17,6 +17,8 @@ Generated from OpenAPI; no production handler is replaced. See user-contract.md 
 | `POST /user/delete` | Delete user except self | 200, 400, 401, 403, 404, 409, 500, 503 |
 | `POST /user/set_password` | Reset password under existing authorization and revoke sessions; no password returned, API keys retained | 200, 400, 401, 403, 404, 409, 500, 503 |
 | `POST /user/{user_id}/password` | Reset password under existing authorization and revoke sessions; no password returned, API keys retained | 200, 400, 401, 403, 404, 409, 500, 503 |
+| `GET /account/log-capture` | Read personal body capture settings | 200, 400, 401, 403, 500, 503 |
+| `PUT /account/log-capture` | Update the signed-in account body capture choice | 200, 400, 401, 403, 500, 503 |
 
 ### GET /user/list
 
@@ -318,6 +320,38 @@ Reset password under existing authorization and revoke sessions; no password ret
     "application/json": {
       "schema": {
         "$ref": "#/components/schemas/SetPassword"
+      }
+    }
+  }
+}
+```
+
+
+### GET /account/log-capture
+
+Read personal body capture settings
+
+
+### PUT /account/log-capture
+
+Update the signed-in account body capture choice
+
+```json
+{
+  "required": true,
+  "content": {
+    "application/json": {
+      "schema": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "enabled"
+        ],
+        "properties": {
+          "enabled": {
+            "type": "boolean"
+          }
+        }
       }
     }
   }
@@ -1420,5 +1454,53 @@ Reset password under existing authorization and revoke sessions; no password ret
     "password_updated"
   ],
   "additionalProperties": false
+}
+```
+
+### PersonalLogCaptureSettings
+
+```json
+{
+  "type": "object",
+  "required": [
+    "enabled",
+    "global_enabled",
+    "effective_enabled",
+    "retention_days",
+    "global_retention_days",
+    "used_bytes",
+    "limit_bytes"
+  ],
+  "properties": {
+    "enabled": {
+      "type": "boolean"
+    },
+    "global_enabled": {
+      "type": "boolean"
+    },
+    "effective_enabled": {
+      "type": "boolean"
+    },
+    "retention_days": {
+      "type": "integer",
+      "format": "int64",
+      "minimum": 0
+    },
+    "global_retention_days": {
+      "type": "integer",
+      "format": "int64",
+      "minimum": 0
+    },
+    "used_bytes": {
+      "type": "integer",
+      "format": "int64",
+      "minimum": 0
+    },
+    "limit_bytes": {
+      "type": "integer",
+      "format": "int64",
+      "minimum": 0
+    }
+  }
 }
 ```

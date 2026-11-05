@@ -86,7 +86,7 @@ export function LogDetailContent({ logEntry, isLoadingDetails = false, isDetails
   const hasMessages = checkHasMessages(logEntry.messages);
   const hasResponse = checkHasResponse(logEntry.response);
   // Don't show "missing data" warning while details are still loading
-  const missingData = !hasMessages && !hasResponse && !hasError && !isLoadingDetails && !isDetailsError;
+  const missingData = !hasMessages && !hasResponse && !isLoadingDetails && !isDetailsError;
 
   // Guardrail data
   const guardrailInfo = metadata?.guardrail_information;
@@ -199,7 +199,7 @@ export function LogDetailContent({ logEntry, isLoadingDetails = false, isDetails
       {/* Configuration Info Message */}
       {missingData && (
         <div className="mb-6">
-          <ConfigInfoMessage show={missingData} />
+          <ConfigInfoMessage show={missingData} status={logEntry.body_capture_status} />
         </div>
       )}
 

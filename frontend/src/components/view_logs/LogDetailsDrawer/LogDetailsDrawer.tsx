@@ -305,6 +305,8 @@ export function LogDetailsDrawer({
       messages: detailsData?.messages || currentLog.messages,
       response: detailsData?.response || currentLog.response,
       error: detailsData?.error ?? currentLog.error,
+      body_capture_status: detailsData?.body_capture_status ?? currentLog.body_capture_status,
+      body_capture_expires_at: detailsData?.body_capture_expires_at ?? currentLog.body_capture_expires_at,
       metadata: { ...currentLog.metadata, ...detailsData?.metadata },
       proxy_server_request: detailsData?.proxy_server_request || currentLog.proxy_server_request,
     };

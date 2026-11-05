@@ -869,6 +869,7 @@
       "PUT /scim/v2/connections/{connection_id}/Users/{id}"
     ],
     "identity": [
+      "GET /account/log-capture",
       "GET /audit/logs",
       "GET /budget/reservations",
       "GET /project/info",
@@ -893,7 +894,8 @@
       "POST /route_template/{template_id}/update",
       "POST /team/move",
       "POST /user/set_password",
-      "POST /user/{user_id}/password"
+      "POST /user/{user_id}/password",
+      "PUT /account/log-capture"
     ],
     "ingress": [
       "POST /audio/translations",

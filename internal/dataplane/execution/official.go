@@ -43,6 +43,7 @@ func ServeBypass(h dpcontract.Bypass, w http.ResponseWriter, r *http.Request, hi
 	if p == nil {
 		return
 	}
+	beginLogCapture(h, callID, p)
 	raw, err := io.ReadAll(io.LimitReader(r.Body, (64<<20)+1))
 	if err != nil || len(raw) > 64<<20 {
 		util.WriteTypedError(w, r.URL.Path, 400, "invalid_request", "could not read request body within 64 MiB")

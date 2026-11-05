@@ -11,15 +11,21 @@ import (
 var logTraceOnceMount sync.Once
 
 // Module is users, organizations, teams, members, projects, access groups and the audit trail. The process implements Gate. This package does not import gateway. The paths are the LiteLLM-compatible ones the console already calls, mounted over the new authorization. The routes whose subject does not exist in the new model are gone rather than stubbed: there is no budget object to create, no organization member, no account role beyond the two the matrix has, and no bulk role assignment.
-// 参数 h（Gate）：带当前操作者的鉴权守卫。允许时返回 nil，拒绝时返回禁止或未找到。
+// 参数 h 提供身份授权与个人正文设置处理器；身份不满足时由对应处理器拒绝。
 // 返回 util.Module（util.Module）：可挂到网关上的模块。
 // 调用：gateway/family/mount.go、gateway/guard/mount.go、gateway/keys/mount.go、gateway/models/mount.go
 // 测试：无直接单测
-func Module(h Gate) util.Module {
+func Module(h interface {
+	Gate
+	LogCaptureSettings(http.ResponseWriter, *http.Request)
+}) util.Module {
 	logTraceOnceMount.Do(func() { util.Trace("enter identity.Module") })
 
 	traceModule("identity")
 	return util.Bind("identity", func(reg util.Registrar) {
+		// 用户个人设置沿用会话鉴权，具体处理器不接受指定其他账号。
+		reg.Handle("GET /account/log-capture", func(w http.ResponseWriter, r *http.Request) { LogCaptureSettings(h, w, r) })
+		reg.Handle("PUT /account/log-capture", func(w http.ResponseWriter, r *http.Request) { LogCaptureSettings(h, w, r) })
 		// Accounts. Only a platform administrator reaches the store; a member
 		// reads other people through a team's member list.
 		reg.Handle("POST /user/new", func(w http.ResponseWriter, r *http.Request) { UserNew(h, w, r) })
@@ -101,4 +107,12 @@ func Module(h Gate) util.Module {
 		// Audit.
 		reg.Handle("GET /audit/logs", func(w http.ResponseWriter, r *http.Request) { AuditLog(h, w, r) })
 	})
+}
+
+// LogCaptureSettings 把个人正文设置请求交给网关宿主；h 负责会话鉴权及存储，w、r 为 HTTP 请求响应。
+// 仅由身份模块路由调用，函数不接受用户 ID、不修改权限，也不自行处理数据。
+func LogCaptureSettings(h interface {
+	LogCaptureSettings(http.ResponseWriter, *http.Request)
+}, w http.ResponseWriter, r *http.Request) {
+	h.LogCaptureSettings(w, r)
 }

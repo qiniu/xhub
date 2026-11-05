@@ -78,9 +78,10 @@ type Server struct {
 	// exchanges holds headers and bodies until recordSpend copies them onto the
 	// usage row. callNotes holds provider, TTFT, session, and deployment.
 	// guardrailNotes holds the rule name when a guardrail refused the call.
-	exchanges      map[string]promptExchange
-	callNotes      map[string]dpcontract.CallNote
-	guardrailNotes map[string]string
+	exchanges       map[string]promptExchange
+	capturePolicies map[string]capturePolicy
+	callNotes       map[string]dpcontract.CallNote
+	guardrailNotes  map[string]string
 	// budgetCalls 仅保存活跃请求最新尝试；冻结价格只用于实际计费，不预占额度。
 	budgetCalls map[string]*budgetAttempt
 	// State 独立管理会话与任务归属；通过组合提供数据面需要的路由接口。
@@ -197,6 +198,8 @@ func (s *Server) serveListener(ln net.Listener) error {
 		go func() { defer flush.Done(); s.flushLoop(ctx) }()
 		flush.Add(1)
 		go func() { defer flush.Done(); s.samlRefreshLoop(ctx) }()
+		flush.Add(1)
+		go func() { defer flush.Done(); s.logCaptureCleanupLoop(ctx) }()
 	}
 	go s.archiveLoop(ctx)
 	return (&http.Server{Handler: s.Handler()}).Serve(ln)

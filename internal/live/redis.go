@@ -424,6 +424,10 @@ return tostring(total)
 // SpendLog 是网关发送到 Redis 队列的单次用量载荷，消费者转换为 iam.UsageRecord 写 PostgreSQL。
 // RequestID 用于去重结算，SessionID 用于授权范围内归组，字段记录调用时事实而非刷库时配置。
 type SpendLog struct {
+	// 正文保存在独立存储；实时账单队列只保存结果与到期时刻。
+	BodyCaptureStatus    string `json:"body_capture_status,omitempty"`
+	BodyCaptureExpiresAt string `json:"body_capture_expires_at,omitempty"`
+	BodyCaptureID        string `json:"body_capture_id,omitempty"`
 	// 已验证完整用量的预算尝试 ID，随队列保留至 PostgreSQL 同事务结算。
 	BudgetReservationID string `json:"budget_reservation_id,omitempty"`
 	// 客户端明确指定的推理强度快照；独立于提示词保存，空值表示未指定或历史未记录，不推断厂商默认值。

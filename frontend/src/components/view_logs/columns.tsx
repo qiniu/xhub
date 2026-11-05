@@ -44,6 +44,9 @@ export type LogEntry = {
   messages: unknown;
   response: unknown;
   proxy_server_request?: unknown;
+  /** 仅为新记录提供正文保存状态；旧日志缺少该字段。 */
+  body_capture_status?: string;
+  body_capture_expires_at?: string;
   session_id?: string;
   /** 后端 PlanRoute 识别会话的来源：explicit（标准 ID）、parent（父响应）、
    * cache_key（缓存键哈希）、prompt（稳定首轮指纹）、generated（随机 UUID）。

@@ -55,6 +55,12 @@ type SpendLog interface {
 	RecordSpend(w http.ResponseWriter, p *auth.Principal, callID, alias, op string, usage map[string]any, start time.Time, cacheHit bool, status int, depID string)
 }
 
+// CaptureBeginner 允许真实网关在请求鉴权后冻结正文设置；不需要正文功能的测试宿主可不实现。
+// BeginLogCapture 只保存临时策略，不影响鉴权或计费，调用结束时由宿主清理。
+type CaptureBeginner interface {
+	BeginLogCapture(callID string, p *auth.Principal)
+}
+
 // RequestHost 定义两类执行器共有的身份、路由、凭据和 HTTP 能力。
 // gateway 实现此接口，使数据面不依赖具体 Server、身份库或缓存布局；方法的拒绝响应与返回值约定见各项说明。
 // 执行器必须先鉴权、再校验每个实际目标；读到偏好或能力匹配都不等于获得调用权限。

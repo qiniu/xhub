@@ -216,6 +216,17 @@ type PasswordUpdated struct {
 // PasswordUpdatedPasswordUpdated defines model for PasswordUpdated.PasswordUpdated.
 type PasswordUpdatedPasswordUpdated bool
 
+// PersonalLogCaptureSettings defines model for PersonalLogCaptureSettings.
+type PersonalLogCaptureSettings struct {
+	EffectiveEnabled    bool  `json:"effective_enabled"`
+	Enabled             bool  `json:"enabled"`
+	GlobalEnabled       bool  `json:"global_enabled"`
+	GlobalRetentionDays int64 `json:"global_retention_days"`
+	LimitBytes          int64 `json:"limit_bytes"`
+	RetentionDays       int64 `json:"retention_days"`
+	UsedBytes           int64 `json:"used_bytes"`
+}
+
 // SelectedBudgetBatch defines model for SelectedBudgetBatch.
 type SelectedBudgetBatch struct {
 	AllUsers *SelectedBudgetBatchAllUsers `json:"all_users,omitempty"`
@@ -316,6 +327,11 @@ type UserTeam struct {
 	UserRole       string `json:"user_role"`
 }
 
+// SetPersonalLogCaptureJSONBody defines parameters for SetPersonalLogCapture.
+type SetPersonalLogCaptureJSONBody struct {
+	Enabled bool `json:"enabled"`
+}
+
 // AvailableUsersParams defines parameters for AvailableUsers.
 type AvailableUsersParams struct {
 	// UserId 兼容查询字符串；授权及字段组合由服务执行。 / Compatibility query string; authorization and combinations checked by service.
@@ -381,6 +397,9 @@ type GetUserV2Params struct {
 	// UserId 兼容查询字符串；授权及字段组合由服务执行。 / Compatibility query string; authorization and combinations checked by service.
 	UserId *string `form:"user_id,omitempty" json:"user_id,omitempty"`
 }
+
+// SetPersonalLogCaptureJSONRequestBody defines body for SetPersonalLogCapture for application/json ContentType.
+type SetPersonalLogCaptureJSONRequestBody SetPersonalLogCaptureJSONBody
 
 // BulkUpdateUserBudgetJSONRequestBody defines body for BulkUpdateUserBudget for application/json ContentType.
 type BulkUpdateUserBudgetJSONRequestBody = BulkBudgetInput

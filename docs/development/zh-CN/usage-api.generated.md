@@ -1519,6 +1519,28 @@
     },
     "session_total_tokens": {
       "type": "number"
+    },
+    "body_capture_status": {
+      "type": "string",
+      "description": "正文记录状态；历史日志可能缺少",
+      "enum": [
+        "disabled",
+        "saved",
+        "expired",
+        "empty",
+        "early_failure",
+        "too_large",
+        "capacity",
+        "partial",
+        "unsupported",
+        "storage_failed",
+        "settings_unavailable"
+      ]
+    },
+    "body_capture_expires_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "采集时固定的正文到期时刻"
     }
   },
   "required": [
