@@ -20,4 +20,13 @@ describe("request error diagnostics", () => {
     expect(fullErrorDetails({ response: {}, metadata: { error_information: { error_message: "legacy" } } })).toContain("legacy");
     expect(fullErrorDetails({ response: {}, error: " " })).toBe("");
   });
+  /** 前置新日志正文已保存、仅有摘要或旧日志；验证完整响应优先且旧记录行为不变，纯函数无需清理。 */
+  it("prefers captured response over a limited summary only for new saved bodies", () => {
+    const full = { error: { message: "x".repeat(5000), details: { trace: "full-tail-marker" } } };
+    expect(fullErrorDetails({ body_capture_status: "saved", error: "short summary", response: full })).toContain("full-tail-marker");
+    expect(fullErrorDetails({ body_capture_status: "saved", error: "short summary", response: { body: "plain error" } })).toBe("plain error");
+    expect(fullErrorDetails({ body_capture_status: "saved", error: "short summary", response: {} })).toBe("short summary");
+    expect(fullErrorDetails({ body_capture_status: "disabled", error: "short summary", response: {} })).toBe("short summary");
+    expect(fullErrorDetails({ error: "legacy error", response: full })).toBe("legacy error");
+  });
 });

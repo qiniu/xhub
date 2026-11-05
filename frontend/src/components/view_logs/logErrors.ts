@@ -7,8 +7,16 @@ export function isRequestFailure(log: Pick<LogEntry, "status" | "metadata" | "er
   ) || Number(log.metadata?.http_status) >= 400 || Boolean(log.error?.trim());
 }
 
-/** 返回完整诊断正文：优先独立 error，其次完整响应，最后旧版错误元数据；JSON 可读格式化，纯文本原样保留，空捕获返回空字符串。 */
-export function fullErrorDetails(log: Pick<LogEntry, "error" | "response" | "metadata">): string {
+/** 返回失败详情：新日志保存了正文时优先展示完整响应，其他情况保留旧日志 error 优先的规则；空值回退旧版元数据。 */
+export function fullErrorDetails(log: Pick<LogEntry, "error" | "response" | "metadata" | "body_capture_status">): string {
+  if (log.body_capture_status === "saved") {
+    const response = log.response;
+    if (typeof response === "string" && response.trim()) return response;
+    if (response && typeof response === "object" && Object.keys(response).length > 0) {
+      if ("body" in response && typeof response.body === "string" && Object.keys(response).length === 1) return response.body;
+      return JSON.stringify(response, null, 2);
+    }
+  }
   if (log.error?.trim()) return log.error;
   const response = log.response;
   if (typeof response === "string" && response.trim()) return response;

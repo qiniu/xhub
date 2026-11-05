@@ -1,10 +1,10 @@
 import { expect, test } from "@playwright/test";
-import { GATEWAY, login, loginAdmin, sessionBearer, stableGoto } from "../../helpers";
-import { waitForLog } from "../../product-fixes-scenario";
-import { translate } from "../../../src/i18n/translate";
+import { GATEWAY, login, loginAdmin, sessionBearer, stableGoto } from "./helpers";
+import { waitForLog } from "./product-fixes-scenario";
+import { translate } from "../src/i18n/translate";
 
-// 真实浏览器、隔离网关、PostgreSQL 和本地供应商验证个人记录开关与完整请求详情；结束关闭开关并由运行器回收独立库。
-for (const locale of ["zh-CN", "en"] as const) {
+/** 按 locale 注册个人记录场景，无返回值；真实浏览器连接隔离网关、PostgreSQL 和本地上游，finally 关闭开关，由运行器回收独立库。 */
+export function registerPersonalLogCapture(locale: "zh-CN" | "en") {
   test(`personal request body recording ${locale}`, async ({ page }) => {
     await loginAdmin(page);
     if (locale === "en") await page.getByRole("button", { name: "English", exact: true }).click();
@@ -45,8 +45,9 @@ for (const locale of ["zh-CN", "en"] as const) {
   });
 }
 
-// 普通用户实际登录后开启个人记录并通过个人会话发起对话，核对页面和后台结果；finally 删除测试账号。
-test("personal body recording for an ordinary user", async ({ page }) => {
+/** 注册普通用户记录场景，无参数或返回值；真实会话发起同步和流式对话，核对页面与后台，finally 删除测试账号。 */
+export function registerPersonalLogCaptureOrdinary() {
+  test("personal body recording for an ordinary user", async ({ page }) => {
   await loginAdmin(page);
   const adminHeaders = { Authorization: `Bearer ${await sessionBearer(page)}` };
   const email = `capture-browser-${Date.now()}@example.test`;
@@ -90,3 +91,5 @@ test("personal body recording for an ordinary user", async ({ page }) => {
     expect(removed.status(), await removed.text()).toBe(200);
   }
 });
+
+}

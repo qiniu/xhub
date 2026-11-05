@@ -6,7 +6,7 @@ import { GATEWAY, UPSTREAM, loginAdmin, sessionBearer, stableGoto, t } from "./h
 
 const JSON_DIAGNOSTIC =
   "E2E upstream JSON diagnostic begin | " +
-  "0123456789abcdef".repeat(128) +
+  "0123456789abcdef".repeat(512) +
   " | E2E upstream JSON diagnostic end";
 
 
@@ -392,7 +392,7 @@ test("错误日志详情完整显示上游正文并可返回普通日志", async
     }
     await page.screenshot({ path: "../.e2e/upstream-response-collapsed.png", fullPage: true });
     await page.keyboard.press("Escape");
-    // 关闭正文保存后发起真实请求：已记录的用量及上游证据仍可查看，原因未知不能展示伪配置结论。
+    // 关闭正文保存后发起真实请求：已记录的用量及上游证据仍可查看，明确说明关闭状态。
     const disabled = await page.request.post(GATEWAY + "/config/update", { headers,
       data: { general_settings: { store_prompts_in_spend_logs: false } } });
     expect(disabled.status()).toBe(200);
@@ -405,11 +405,14 @@ test("错误日志详情完整显示上游正文并可返回普通日志", async
     await waitForStoredLog(page, headers, noBodyId);
     const noBodyDetail = await page.request.get(GATEWAY + "/spend/logs/ui/" + noBodyId, { headers });
     const noBodyData = await noBodyDetail.json();
+    expect(noBodyData.body_capture_status).toBe("disabled");
     expect(noBodyData.metadata.upstream_response.status_code).toBe(200);
     expect(Number(noBodyData.spend)).toBeGreaterThan(0);
     await openLogDetails(page, noBodyId);
     const noBodyDialog = page.getByRole("dialog");
-    await expect(noBodyDialog.getByRole("note")).toContainText(/原因未记录|reason was not recorded/);
+    const noBodyNote = noBodyDialog.getByRole("note");
+    await expect(noBodyNote).toBeVisible();
+    expect([translate("zh-CN", "logsUX.captureDisabled"), translate("en", "logsUX.captureDisabled")]).toContain((await noBodyNote.textContent())?.trim());
     await expect(noBodyDialog).not.toContainText("store_model_in_db");
     await verifyUpstreamCollapse(page, headers, noBodyId, 200);
     await page.keyboard.press("Escape");

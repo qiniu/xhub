@@ -1,6 +1,22 @@
 const {test} = require('node:test');
 const assert = require('node:assert/strict');
 const Reporter = require('./checklist-reporter.cjs');
+/** 目的：个人正文记录的双语与普通用户场景各有独立清单入口；验证文件、标题和数量，只读无需清理。 */
+test('个人正文记录场景全部登记且文件存在', () => {
+  const fs = require('node:fs');
+  const path = require('node:path');
+  const catalog = require('./scenario-catalog.json');
+  const {evaluateScenarios} = require('./scenario-coverage.cjs');
+  const cases = [['zh-CN', 'personal request body recording zh-CN'], ['en', 'personal request body recording en'], ['user', 'personal body recording for an ordinary user']];
+  const results = cases.map(([suffix, title]) => {
+    const file = `e2e/scenarios/regression/personal-log-capture-${suffix}.test.ts`;
+    assert.ok(fs.existsSync(path.join(__dirname, '..', file)), file);
+    return {file, title, status: 'passed'};
+  });
+  const report = evaluateScenarios(catalog, results);
+  assert.deepEqual(report.unregistered, []);
+  assert.equal(report.passed, 3);
+});
 /** 目的：组织、用量及日志双语回归必须登记精确文件/标题；前置静态清单，验证六个独立场景，无文件写入或清理。 */
 test('组织、用量与日志六个场景全部登记且文件存在', () => {
   const fs = require('node:fs');
