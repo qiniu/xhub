@@ -101,6 +101,39 @@ func TestIdempotencyConcurrentRequestWaitsForOwner(t *testing.T) {
 	}
 }
 
+// TestIdempotencyCrossInstanceAndStorageFailure 验证跨实例重复、不同正文和存储失败的响应。
+// 使用独立 PostgreSQL 与隔离会话；故障约束和数据库由测试框架清理，不涉及外部供应商。
+func TestIdempotencyCrossInstanceAndStorageFailure(t *testing.T) {
+	first, db, _, sessions := idempotencyFixture(t)
+	body := []byte(`{"value":1}`)
+	owner, _, conflict := first.beginIdempotency(idemTestRequest(sessions[0]), "cross-instance", body)
+	if owner == nil || conflict {
+		t.Fatal("首次调用未取得资格")
+	}
+	owner.complete(&idemRec{Code: 200, Body: []byte("private-response")})
+	other := &Server{Cfg: first.Cfg, IAM: db, Authz: first.Authz, sessions: first.sessions, idem: map[string]*idemRec{}, idemTTL: defaultIdempotencyTTL, now: time.Now}
+	lease, hit, conflict := other.beginIdempotency(idemTestRequest(sessions[0]), "cross-instance", body)
+	if lease != nil || conflict || hit == nil || hit.Code != 409 || !hit.Synthetic || !strings.Contains(string(hit.Body), "idempotency_result_unavailable") || strings.Contains(string(hit.Body), "private-response") {
+		t.Fatalf("跨实例重放结果错误: %#v", hit)
+	}
+	if _, _, conflict := other.beginIdempotency(idemTestRequest(sessions[0]), "cross-instance", []byte(`{"value":2}`)); !conflict {
+		t.Fatal("不同正文应冲突")
+	}
+	w := httptest.NewRecorder()
+	lw := &statusRecorder{ResponseWriter: w}
+	other.writeIdempotentResponse(lw, lw, hit)
+	if w.Code != 409 || lw.usageRecorded || !strings.Contains(lw.note, "idempotency_result_unavailable") {
+		t.Fatal("跨实例拒绝应保留错误日志路径")
+	}
+	if _, err := db.Engine.Exec("ALTER TABLE inference_idempotency_fences ADD CONSTRAINT test_reject CHECK (false) NOT VALID"); err != nil {
+		t.Fatal(err)
+	}
+	lease, hit, conflict = other.beginIdempotency(idemTestRequest(sessions[0]), "storage-unavailable", body)
+	if lease != nil || conflict || hit == nil || hit.Code != 503 || !hit.Synthetic || !strings.Contains(string(hit.Body), "idempotency_unavailable") {
+		t.Fatalf("存储故障未关闭: %#v", hit)
+	}
+}
+
 func idempotencyFixture(t *testing.T) (*Server, *iam.DB, *iam.User, []string) {
 	t.Helper()
 	db := testIdentityStore(t)
