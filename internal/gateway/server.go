@@ -95,6 +95,8 @@ type idemRec struct {
 	CT          string
 	Body        []byte
 	Hdr         map[string]string
+	// Synthetic 表示本次请求生成的拒绝响应，需要单独记零费用错误日志。
+	Synthetic bool
 }
 
 const defaultIdempotencyTTL = 24 * time.Hour

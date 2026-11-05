@@ -30,6 +30,7 @@ import (
 	"github.com/sunqirui1987/xhub/internal/catalog"
 	dpcontract "github.com/sunqirui1987/xhub/internal/dataplane/contract"
 	dpdiagnostics "github.com/sunqirui1987/xhub/internal/dataplane/diagnostics"
+	"github.com/sunqirui1987/xhub/internal/iam"
 	providercontract "github.com/sunqirui1987/xhub/internal/provider/contract"
 	providerregistry "github.com/sunqirui1987/xhub/internal/provider/registry"
 	"github.com/sunqirui1987/xhub/internal/util"
@@ -286,7 +287,26 @@ func (s *Server) beginIdempotency(r *http.Request, key string, body []byte) (*id
 			rec = &idemRec{RequestHash: hash, ExpiresAt: now.Add(ttl), Done: make(chan struct{})}
 			s.idem[cacheKey] = rec
 			s.mu.Unlock()
-			return &idempotencyLease{server: s, key: cacheKey, rec: rec}, nil, false
+			lease := &idempotencyLease{server: s, key: cacheKey, rec: rec}
+			// 本机并发先占位；跨实例再以不可逆摘要竞争数据库 fence，不保存会话或对话正文。
+			keyHash := sha256.Sum256([]byte(cacheKey))
+			if s.IAM == nil {
+				lease.abort()
+				return nil, &idemRec{Synthetic: true, Code: http.StatusServiceUnavailable, CT: "application/json", Body: []byte(`{"error":{"message":"idempotency protection unavailable","type":"idempotency_unavailable"}}`)}, false
+			}
+			claim, err := s.IAM.ClaimInferenceFence(r.Context(), stringHex(keyHash[:]), stringHex(hash[:]), now, now.Add(ttl))
+			if err != nil {
+				lease.abort()
+				return nil, &idemRec{Synthetic: true, Code: http.StatusServiceUnavailable, CT: "application/json", Body: []byte(`{"error":{"message":"idempotency protection unavailable","type":"idempotency_unavailable"}}`)}, false
+			}
+			if claim != iam.InferenceFenceAcquired {
+				lease.abort()
+				if claim == iam.InferenceFenceConflict {
+					return nil, nil, true
+				}
+				return nil, &idemRec{Synthetic: true, Code: http.StatusConflict, CT: "application/json", Body: []byte(`{"error":{"message":"original result cannot be replayed on this instance","type":"idempotency_result_unavailable"}}`)}, false
+			}
+			return lease, nil, false
 		}
 		if rec.RequestHash != hash {
 			s.mu.Unlock()
@@ -387,8 +407,10 @@ func cloneStringMap(in map[string]string) map[string]string {
 // 调用：Handler 在 beginIdempotency 返回缓存命中时调用。
 // 测试：TestIdempotencyReplaysWithoutASecondCharge 通过完整入口重放覆盖。
 func (s *Server) writeIdempotentResponse(w http.ResponseWriter, lw *statusRecorder, hit *idemRec) {
-	// 重放沿用原调用的账单，不能为同一调用重新生成错误快照。
-	lw.usageRecorded = true
+	// 同进程重放沿用原账单；跨实例拒绝是本次新请求，应记录零费用错误。
+	if !hit.Synthetic {
+		lw.usageRecorded = true
+	}
 	for k, v := range hit.Hdr {
 		w.Header().Set(k, v)
 	}
