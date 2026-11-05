@@ -210,11 +210,11 @@ func TestNativeResponsesFailureNoReplay(t *testing.T) {
 			if log["status"] != "error" {
 				t.Fatal("失败未记入日志")
 			}
-			if spend := parseFloatOrZero(fmt.Sprint(log["spend"])); spend != 0 {
+			if spend, ok := log["spend"].(float64); !ok || spend != 0 {
 				t.Fatalf("失败请求应为零费用: %v", log["spend"])
 			}
 			info := h.ok("GET", "/key/info?key="+owner.keyID, admin, nil).json()["info"].(map[string]any)
-			if spend := parseFloatOrZero(fmt.Sprint(info["spend"])); spend != 0 {
+			if spend, ok := info["spend"].(float64); !ok || spend != 0 {
 				t.Fatalf("失败请求不应消耗密钥额度: %v", info["spend"])
 			}
 		})
