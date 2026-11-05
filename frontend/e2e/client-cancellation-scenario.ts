@@ -64,7 +64,7 @@ export function registerClientScenario(locale: Locale) {
             input_cost_per_token: 0.000002,
             output_cost_per_token: 0.000008,
           },
-          model_info: { transport: "bypass_openai_chat", endpoint_types: ["chat", "responses"], pricing_source: "manual" },
+          model_info: { transport: "bypass_openai_chat", endpoint_types: ["chat", "responses", "bypass:openai-chat"], pricing_source: "manual" },
         },
       });
       expect(created.status(), await created.text()).toBe(200);
@@ -185,6 +185,29 @@ export function registerClientScenario(locale: Locale) {
         return {status:row.status,spend:Number(row.spend)};
       }).toEqual({status:"error",spend:0});
       await stableGoto(page, "/logs?log_id=" + bridgeCall.id);
+      await expect(page.getByRole("dialog").getByRole("alert")).toBeVisible();
+      await page.keyboard.press("Escape");
+
+      // 透传流同样通过真实浏览器中断，验证上游连接释放及日志费用。
+      const beforeBypassStopped = stopped;
+      const bypassCall = await page.evaluate(async ({token, model}) => {
+        const controller = new AbortController();
+        const response = await fetch("/gw/bypass/openai/v1/chat/completions", {method:"POST",headers:{Authorization:token,"Content-Type":"application/json"},body:JSON.stringify({model,messages:[{role:"user",content:"Test bypass cancellation."}],stream:true}),signal:controller.signal});
+        const reader = response.body!.getReader();
+        await reader.read();
+        const id = response.headers.get("x-litellm-call-id");
+        controller.abort();
+        return {id,status:response.status};
+      }, {token:headers.Authorization,model:name});
+      expect(bypassCall.status).toBe(200);expect(bypassCall.id).toBeTruthy();
+      await expect.poll(() => stopped).toBe(beforeBypassStopped + 1);
+      await expect.poll(async () => {
+        const detail = await page.request.get(GATEWAY + "/spend/logs/ui/" + bypassCall.id, {headers});
+        if (!detail.ok()) return null;
+        const row = await detail.json();
+        return {status:row.status,spend:Number(row.spend)};
+      }).toEqual({status:"error",spend:0});
+      await stableGoto(page, "/logs?log_id=" + bypassCall.id);
       await expect(page.getByRole("dialog").getByRole("alert")).toBeVisible();
     } finally {
       if (key)

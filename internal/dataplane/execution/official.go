@@ -7,6 +7,7 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
+	"errors"
 	"io"
 	"net/http"
 	"net/url"
@@ -19,6 +20,7 @@ import (
 	dpcontract "github.com/sunqirui1987/xhub/internal/dataplane/contract"
 	dpdiagnostics "github.com/sunqirui1987/xhub/internal/dataplane/diagnostics"
 	dprouting "github.com/sunqirui1987/xhub/internal/dataplane/routing"
+	dpstream "github.com/sunqirui1987/xhub/internal/dataplane/stream"
 	dptransport "github.com/sunqirui1987/xhub/internal/dataplane/transport"
 	dpusage "github.com/sunqirui1987/xhub/internal/dataplane/usage"
 	providercontract "github.com/sunqirui1987/xhub/internal/provider/contract"
@@ -282,6 +284,11 @@ func serveBypassCreate(h dpcontract.Bypass, w http.ResponseWriter, r *http.Reque
 						return
 					}
 					if failure == bypassStarted {
+						if errors.Is(err, dpstream.ErrClientWrite) {
+							// 流已提交后写入失败不证明上游故障，也不能据此推断用户主动停止。
+							response.Diagnostics.Failure.Phase = "client_write"
+							response.Diagnostics.Failure.Kind = "client_write_error"
+						}
 						h.RememberExchange(callID, r, raw, []byte(dpdiagnostics.SafeErr(err)))
 						note := dataplaneNote(hit, dep, plan.SessionID, time.Since(start))
 						applyStreamTiming(&note, response, start)
