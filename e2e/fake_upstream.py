@@ -30,7 +30,7 @@ except ModuleNotFoundError:
 
 ERROR_LOG_JSON_DIAGNOSTIC = (
     "E2E upstream JSON diagnostic begin | "
-    + "0123456789abcdef" * 128
+    + "0123456789abcdef" * 512
     + " | E2E upstream JSON diagnostic end"
 )
 ERROR_LOG_TEXT_DIAGNOSTIC = (

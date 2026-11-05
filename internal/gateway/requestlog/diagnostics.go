@@ -15,6 +15,17 @@ func DiagnosticJSON(upstream *dpdiagnostics.UpstreamDiagnostics, usage map[strin
 		return ""
 	}
 	saved := *upstream
+	if upstream.Error != nil {
+		if raw, err := json.Marshal(upstream.Error); err == nil {
+			var summary map[string]any
+			message := FailureSummary(string(raw))
+			if json.Unmarshal([]byte(message), &summary) == nil {
+				saved.Error = summary
+			} else {
+				saved.Error = map[string]any{"error": map[string]any{"message": message}}
+			}
+		}
+	}
 	saved.Headers = diagnosticHeaders(upstream.Headers)
 	saved.Trailers = diagnosticHeaders(upstream.Trailers)
 	saved.BillingUsage = usage

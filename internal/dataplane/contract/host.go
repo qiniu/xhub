@@ -3,6 +3,7 @@
 package contract
 
 import (
+	"context"
 	"net/http"
 	"time"
 
@@ -53,6 +54,12 @@ type SpendLog interface {
 	// 调用：Serve、ServeBypass，以及 gateway WriteChatJSON、WriteCacheHit 内部。
 	// 测试：prompt_log_test.go TestSpendLogRoundTripReturnsPromptPayload；bypass_logic_test.go 检查 call_type 和只扣一次。
 	RecordSpend(w http.ResponseWriter, p *auth.Principal, callID, alias, op string, usage map[string]any, start time.Time, cacheHit bool, status int, depID string)
+}
+
+// CaptureBeginner 允许真实网关在请求鉴权后冻结正文设置；不需要正文功能的测试宿主可不实现。
+// BeginLogCapture 接收请求 ctx、调用 ID 和可信主体，只保存临时策略，不影响鉴权或计费，结束时由宿主清理。
+type CaptureBeginner interface {
+	BeginLogCapture(ctx context.Context, callID string, p *auth.Principal)
 }
 
 // RequestHost 定义两类执行器共有的身份、路由、凭据和 HTTP 能力。

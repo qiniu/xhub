@@ -5,7 +5,7 @@ import { translate } from "../src/i18n/translate";
 import { GATEWAY, UPSTREAM, loginAdmin, sessionBearer, stableGoto } from "./helpers";
 
 /** 注册中英文磁盘账单恢复闭环；前置无 Redis 的真实网关、私有数据库和本地供应商，从 Playground 发起唯一推理后关闭整个IAM连接池。
- * 验证错误日志唯一且不阻止后续对话、页面成功、本机快照、新连接及新队列对象重放、日志和模型监控唯一入账；finally 移除故障并删除模型，运行器回收账单/schema。 */
+ * 验证页面成功、磁盘账单恢复及正文存储失败提示；finally 关闭个人记录、移除故障并删除模型，运行器回收账单/schema。 */
 export function registerUsageSpoolScenario(locale: "en" | "zh-CN") {
   test("durable disk billing recovers after database disconnect " + locale, async ({ page }) => {
     test.setTimeout(120000);
@@ -22,6 +22,8 @@ export function registerUsageSpoolScenario(locale: "en" | "zh-CN") {
     let guardID = "";
     let injected = false;
     try {
+      const capture = await page.request.put(GATEWAY + "/account/log-capture", { headers, data: { enabled: true } });
+      expect(capture.status(), await capture.text()).toBe(200);
       const created = await page.request.post(GATEWAY + "/model/new", {
         headers,
         data: {
@@ -115,6 +117,8 @@ export function registerUsageSpoolScenario(locale: "en" | "zh-CN") {
       const bill = await billResponse.json();
       expect(bill.status).toBe("success");
       expect(Number(bill.spend)).toBeCloseTo(0.12, 8);
+      expect(bill.body_capture_status).toBe("storage_failed");
+      expect(JSON.stringify(bill)).not.toContain("Verify durable billing recovery.");
       const monitor = await page.request.get(GATEWAY + "/models/monitor?model=" + model, { headers });
       expect(monitor.status()).toBe(200);
       const metrics = await monitor.json();
@@ -127,6 +131,7 @@ export function registerUsageSpoolScenario(locale: "en" | "zh-CN") {
       await expect(row).toHaveCount(1);
       await row.click();
       await expect(page.getByRole("dialog")).toContainText(model);
+      await expect(page.getByRole("dialog").getByRole("note")).toContainText(t("logsUX.captureStorageFailed"));
       await stableGoto(page, "/model-monitor");
       await page.getByLabel(t("monitor.model"), { exact: true }).selectOption(model);
       await expect(page.getByRole("rowheader", { name: model, exact: true })).toHaveCount(1);
@@ -134,6 +139,7 @@ export function registerUsageSpoolScenario(locale: "en" | "zh-CN") {
     } finally {
       if (injected)
         expect((await page.request.post(control + "/usage-spool/recover", { data: { model } })).status()).toBe(200);
+      expect((await page.request.put(GATEWAY + "/account/log-capture", { headers, data: { enabled: false } })).status()).toBe(200);
       if (guardID)
         expect((await page.request.delete(GATEWAY + "/guardrails/" + guardID, { headers })).status()).toBe(200);
       if (modelID)

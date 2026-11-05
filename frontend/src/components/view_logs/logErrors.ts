@@ -7,8 +7,8 @@ export function isRequestFailure(log: Pick<LogEntry, "status" | "metadata" | "er
   ) || Number(log.metadata?.http_status) >= 400 || Boolean(log.error?.trim());
 }
 
-/** 返回完整诊断正文：优先独立 error，其次完整响应，最后旧版错误元数据；JSON 可读格式化，纯文本原样保留，空捕获返回空字符串。 */
-export function fullErrorDetails(log: Pick<LogEntry, "error" | "response" | "metadata">): string {
+/** 返回接口确定的最终错误：error 已包含可用的完整错误或摘要；仅在缺失时回退响应和旧元数据。异步任务保存的初始响应不能覆盖后续失败；不修改原日志。 */
+export function fullErrorDetails(log: Pick<LogEntry, "error" | "response" | "metadata" | "body_capture_status">): string {
   if (log.error?.trim()) return log.error;
   const response = log.response;
   if (typeof response === "string" && response.trim()) return response;

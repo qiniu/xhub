@@ -95,6 +95,8 @@ func (s *Server) GinRoutes() gin.RoutesInfo { return s.engine.Routes() }
 func (s *Server) Handler() http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		start := time.Now()
+		// 外层错误落日志发生在执行器释放之后；请求内副本保留开始时的记录选择，随 HTTP 调用自动回收。
+		r = r.WithContext(context.WithValue(r.Context(), captureSnapshotKey{}, &captureSnapshot{}))
 		var raw []byte
 		var body map[string]any
 		lw := &statusRecorder{ResponseWriter: w, code: http.StatusOK}

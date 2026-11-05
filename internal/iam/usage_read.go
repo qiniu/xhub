@@ -2,6 +2,7 @@ package iam
 
 import (
 	"context"
+	"errors"
 	"strconv"
 	"strings"
 	"sync"
@@ -301,6 +302,26 @@ func (db *DB) GetRequestLog(ctx context.Context, requestID string) (*RequestLog,
 	}
 	if !ok {
 		return nil, ErrNotFound
+	}
+	if row.BodyCaptureStatus == "saved" {
+		captureID := row.BodyCaptureID
+		if captureID == "" {
+			captureID = requestID
+		}
+		capture, captureErr := db.GetLogCapture(ctx, captureID, time.Now())
+		if errors.Is(captureErr, ErrNotFound) {
+			expires, parseErr := time.Parse(time.RFC3339Nano, row.BodyCaptureExpiresAt)
+			if parseErr == nil && !expires.After(time.Now()) {
+				row.BodyCaptureStatus = "expired"
+			} else {
+				row.BodyCaptureStatus = "storage_failed"
+			}
+		} else if captureErr != nil {
+			return nil, captureErr
+		} else {
+			row.ProxyRequest, row.ResponseBody = capture.Request, capture.Response
+			row.RequestBody = requestMessages(capture.Request)
+		}
 	}
 	return &row, nil
 }

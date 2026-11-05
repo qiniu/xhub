@@ -3,16 +3,16 @@ package requestlog
 import (
 	"encoding/json"
 	"net/http"
+	"net/url"
 	"regexp"
 	"sort"
 	"strings"
 )
 
-// Encode builds the three documents the log drawer reads: messages, response, and proxy_server_request. Authorization and API key headers are replaced so the stored log does not keep a credential.
-// 参数 r（*http.Request）：入站 HTTP 请求，用来读路径、头和正文；reqBody（[]byte）：输入JSON要读的原始字节；respBody（[]byte）：输入JSON要读的原始字节。
-// 返回 messages（string）：打码后的请求 JSON，日志抽屉的请求面板读它；response（string）：打码后的响应 JSON；proxy（string）：打码后发给上游的请求 JSON。三段都去掉了 Authorization 和 API 密钥。
-// 调用：仅在 spend.go 内使用
-// 测试：prompt_log_test.go
+// Encode 为日志详情生成请求消息、响应和代理请求文档，并掩盖请求头及地址中的常见认证信息。
+// 参数 r 为入站请求，reqBody 和 respBody 分别是原始请求与响应字节；返回供日志详情读取的三份 JSON。
+// 正文不进行全面脱敏，可能包含敏感内容；调用方必须先确定存储策略和日志访问权限。
+// 调用：日志正文存储路径；测试：encode_test.go 和 prompt_response_test.go。
 func Encode(r *http.Request, reqBody, respBody []byte) (messages, response, proxy string) {
 	reqDoc := jsonDocument(reqBody)
 	respDoc := jsonDocument(respBody)
@@ -35,7 +35,7 @@ func Encode(r *http.Request, reqBody, respBody []byte) (messages, response, prox
 	method, path := "", ""
 	if r != nil {
 		method = r.Method
-		path = r.URL.RequestURI()
+		path = redactRequestURI(r)
 		for k, vals := range r.Header {
 			headers[k] = strings.Join(vals, ", ")
 		}
@@ -270,7 +270,11 @@ func redactHeaders(h map[string]string) {
 // 调用：仅在 spend.go 内使用
 // 测试：无直接单测
 func sensitiveHeader(name string) bool {
-	switch strings.ToLower(name) {
+	name = strings.ToLower(name)
+	if strings.Contains(name, "token") || strings.Contains(name, "secret") || strings.Contains(name, "password") || strings.Contains(name, "api-key") || strings.Contains(name, "apikey") || strings.Contains(name, "authorization") {
+		return true
+	}
+	switch name {
 	case "authorization", "proxy-authorization", "cookie", "set-cookie", "x-api-key", "api-key", "x-litellm-api-key", "x-goog-api-key":
 		return true
 	default:
@@ -278,7 +282,36 @@ func sensitiveHeader(name string) bool {
 	}
 }
 
-var promptSecret = regexp.MustCompile(`sk-[A-Za-z0-9_\-]+`)
+// redactRequestURI 复制请求路径和查询参数，将常见凭据参数的值替换；r 为原始 HTTP 请求。
+// 返回脱敏后的请求 URI；非法查询不保存查询串，不修改实际请求，也不声称识别所有敏感文本。
+func redactRequestURI(r *http.Request) string {
+	if r == nil || r.URL == nil {
+		return ""
+	}
+	u := *r.URL
+	query, err := url.ParseQuery(u.RawQuery)
+	if err != nil {
+		u.RawQuery = ""
+		u.ForceQuery = false
+		return u.RequestURI()
+	}
+	for key, values := range query {
+		lower := strings.ToLower(strings.ReplaceAll(key, "_", "-"))
+		if strings.Contains(lower, "token") || strings.Contains(lower, "secret") || strings.Contains(lower, "password") || strings.Contains(lower, "api-key") || strings.Contains(lower, "apikey") || strings.Contains(lower, "authorization") {
+			query[key] = []string{"***"}
+			continue
+		}
+		for i, value := range values {
+			values[i] = redactSecretText(value)
+		}
+	}
+	u.RawQuery = query.Encode()
+	u.ForceQuery = false
+	return u.RequestURI()
+}
+
+// 短密钥要求单词边界以保留 task-1；较长密钥即使紧贴其他字符也需要掩盖。
+var promptSecret = regexp.MustCompile(`(?:\bsk-[A-Za-z0-9_\-]+|sk-[A-Za-z0-9_\-]{16,})`)
 
 // 把文本里的密钥样式替换成星号。
 // 参数 s（string）：即将写入日志的一行，可能含 bearer、sk- 或上游 URL。

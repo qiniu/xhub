@@ -181,6 +181,7 @@ func queuedUsageRecord(row live.SpendLog) iam.UsageRecord {
 		spend = row.Spend
 	}
 	return iam.UsageRecord{
+		BodyCaptureStatus: row.BodyCaptureStatus, BodyCaptureExpiresAt: row.BodyCaptureExpiresAt, BodyCaptureID: row.BodyCaptureID,
 		BudgetReservationID: row.BudgetReservationID,
 		InboundEndpoint:     row.InboundEndpoint, OutboundEndpoint: row.OutboundEndpoint,
 		APIBase: row.APIBase, Supplier: row.Supplier, UpstreamModel: row.UpstreamModel, Streamed: row.Streamed,

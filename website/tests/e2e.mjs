@@ -357,9 +357,13 @@ try {
     for (const [lang, label, title] of [["zh", "接口领域", "API 参考"], ["en", "API domain", "API reference"]]) {
       await page.goto(base + `reference/${lang}/index.html`);
       await expect(page.getByRole("heading", {name: title, exact: true})).toBeVisible();
-      for (const [domain, count] of [["suppliers",5],["users",11],["keys",14],["models",9],["usage",10]]) {
+      for (const [domain, count] of [["suppliers",5],["users",13],["keys",14],["models",9],["usage",10]]) {
         await page.getByLabel(label, {exact: true}).selectOption(domain);
         await expect(page.locator(".swagger-ui .opblock")).toHaveCount(count);
+        if (domain === "users") {
+          await expect(page.getByRole("button", {name: /^GET \/account\/log-capture /})).toBeVisible();
+          await expect(page.getByRole("button", {name: /^PUT \/account\/log-capture /})).toBeVisible();
+        }
         assert.equal(await page.getByRole("button", {name: "Try it out", exact: true}).count(), 0);
         await expect(page.getByRole("link", {name: lang === "zh" ? "下载原始 OpenAPI" : "Download original OpenAPI", exact:true})).toHaveAttribute("href", `../specs/${domain}.json`);
       }
@@ -370,11 +374,11 @@ try {
       await page.getByLabel(label, {exact:true}).selectOption("users");
       await page.getByRole("link", {name: lang === "zh" ? "English" : "简体中文", exact:true}).click();
       assert.ok(page.url().includes("domain=users"));
-      await expect(page.locator(".swagger-ui .opblock")).toHaveCount(11);
+      await expect(page.locator(".swagger-ui .opblock")).toHaveCount(13);
     }
     await page.goto(base + "docs/development/en/user-api.generated.html");
     await page.waitForURL("**/reference/en/index.html?domain=users");
-    await expect(page.locator(".swagger-ui .opblock")).toHaveCount(11);
+    await expect(page.locator(".swagger-ui .opblock")).toHaveCount(13);
     // 真实跳转验证旧操作书签展开正确操作；未知或损坏片段回到领域，不能误导到另一个操作。
     for (const lang of ["en", "zh"]) {
       await page.goto(base + `docs/development/${lang === "zh" ? "zh-CN" : "en"}/user-api.generated.html#post-usernew`);
@@ -384,7 +388,7 @@ try {
     for (const hash of ["#not-an-operation", "#%ZZ"]) {
       await page.goto(base + "docs/development/en/user-api.generated.html" + hash);
       await page.waitForURL("**/reference/en/index.html?domain=users");
-      await expect(page.locator(".swagger-ui .opblock")).toHaveCount(11);
+      await expect(page.locator(".swagger-ui .opblock")).toHaveCount(13);
     }
     await page.route("**/reference/specs/users.json", route => route.abort("failed"));
     try {
@@ -393,7 +397,7 @@ try {
       await expect(page.locator(".swagger-ui .opblock")).toHaveCount(0);
     } finally { await page.unroute("**/reference/specs/users.json"); }
     await page.reload();
-    await expect(page.locator(".swagger-ui .opblock")).toHaveCount(11);
+    await expect(page.locator(".swagger-ui .opblock")).toHaveCount(13);
     const index = await (await page.request.get(base + "search-index.json")).json();
     assert.ok(!index.some(item => item.url.includes("api.generated.html")), "搜索不能再次混入旧字段表");
     await page.screenshot({path: reportDirectory + "/swagger-reference.png", fullPage: true});

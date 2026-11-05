@@ -61,6 +61,7 @@ func Serve(h dpcontract.Adapted, w http.ResponseWriter, r *http.Request, op stri
 		util.Debug("process path=%s step=auth ok=false", r.URL.Path)
 		return
 	}
+	beginLogCapture(r.Context(), h, callID, p)
 	util.Debug("process path=%s step=auth ok=true kind=%s", r.URL.Path, p.Kind)
 	raw, err := io.ReadAll(r.Body)
 	if err != nil {

@@ -6,12 +6,28 @@ package usage
 import (
 	"encoding/json"
 	"fmt"
+	"time"
 
 	rawjson "encoding/json"
 )
 
 const (
 	BearerAuthScopes = "bearerAuth.Scopes"
+)
+
+// Defines values for LogRecordBodyCaptureStatus.
+const (
+	LogRecordBodyCaptureStatusCapacity            LogRecordBodyCaptureStatus = "capacity"
+	LogRecordBodyCaptureStatusDisabled            LogRecordBodyCaptureStatus = "disabled"
+	LogRecordBodyCaptureStatusEarlyFailure        LogRecordBodyCaptureStatus = "early_failure"
+	LogRecordBodyCaptureStatusEmpty               LogRecordBodyCaptureStatus = "empty"
+	LogRecordBodyCaptureStatusExpired             LogRecordBodyCaptureStatus = "expired"
+	LogRecordBodyCaptureStatusPartial             LogRecordBodyCaptureStatus = "partial"
+	LogRecordBodyCaptureStatusSaved               LogRecordBodyCaptureStatus = "saved"
+	LogRecordBodyCaptureStatusSettingsUnavailable LogRecordBodyCaptureStatus = "settings_unavailable"
+	LogRecordBodyCaptureStatusStorageFailed       LogRecordBodyCaptureStatus = "storage_failed"
+	LogRecordBodyCaptureStatusTooLarge            LogRecordBodyCaptureStatus = "too_large"
+	LogRecordBodyCaptureStatusUnsupported         LogRecordBodyCaptureStatus = "unsupported"
 )
 
 // Defines values for ListSessionLogsParamsCacheHitFilter.
@@ -39,9 +55,9 @@ const (
 
 // Defines values for ListLogsParamsCacheHitFilter.
 const (
-	Empty ListLogsParamsCacheHitFilter = ""
-	Hit   ListLogsParamsCacheHitFilter = "hit"
-	Miss  ListLogsParamsCacheHitFilter = "miss"
+	ListLogsParamsCacheHitFilterEmpty ListLogsParamsCacheHitFilter = ""
+	ListLogsParamsCacheHitFilterHit   ListLogsParamsCacheHitFilter = "hit"
+	ListLogsParamsCacheHitFilterMiss  ListLogsParamsCacheHitFilter = "miss"
 )
 
 // DailyUsage defines model for DailyUsage.
@@ -168,20 +184,26 @@ type LogPage struct {
 
 // LogRecord defines model for LogRecord.
 type LogRecord struct {
-	ApiBase              string   `json:"api_base"`
-	ApiKey               string   `json:"api_key"`
-	CacheHit             string   `json:"cache_hit"`
-	CacheKey             string   `json:"cache_key"`
-	CacheReadInputTokens *float32 `json:"cache_read_input_tokens,omitempty"`
-	CallType             string   `json:"call_type"`
-	CompletionStartTime  *string  `json:"completionStartTime,omitempty"`
-	CompletionTokens     float32  `json:"completion_tokens"`
-	CredentialName       string   `json:"credential_name"`
-	CustomLlmProvider    string   `json:"custom_llm_provider"`
-	EndTime              string   `json:"endTime"`
-	Error                *string  `json:"error,omitempty"`
-	InboundEndpoint      string   `json:"inbound_endpoint"`
-	Label                string   `json:"label"`
+	ApiBase string `json:"api_base"`
+	ApiKey  string `json:"api_key"`
+
+	// BodyCaptureExpiresAt 采集时固定的正文到期时刻 / Body expiry fixed at capture time
+	BodyCaptureExpiresAt *time.Time `json:"body_capture_expires_at,omitempty"`
+
+	// BodyCaptureStatus 正文记录状态；历史日志可能缺少 / Body capture status; may be absent on older logs
+	BodyCaptureStatus    *LogRecordBodyCaptureStatus `json:"body_capture_status,omitempty"`
+	CacheHit             string                      `json:"cache_hit"`
+	CacheKey             string                      `json:"cache_key"`
+	CacheReadInputTokens *float32                    `json:"cache_read_input_tokens,omitempty"`
+	CallType             string                      `json:"call_type"`
+	CompletionStartTime  *string                     `json:"completionStartTime,omitempty"`
+	CompletionTokens     float32                     `json:"completion_tokens"`
+	CredentialName       string                      `json:"credential_name"`
+	CustomLlmProvider    string                      `json:"custom_llm_provider"`
+	EndTime              string                      `json:"endTime"`
+	Error                *string                     `json:"error,omitempty"`
+	InboundEndpoint      string                      `json:"inbound_endpoint"`
+	Label                string                      `json:"label"`
 
 	// Messages 保留任意JSON类型、未知字段与null / Preserve arbitrary JSON values, unknown fields and null
 	Messages         rawjson.RawMessage `json:"messages"`
@@ -219,6 +241,9 @@ type LogRecord struct {
 	User                 string                        `json:"user"`
 	AdditionalProperties map[string]rawjson.RawMessage `json:"-"`
 }
+
+// LogRecordBodyCaptureStatus 正文记录状态；历史日志可能缺少 / Body capture status; may be absent on older logs
+type LogRecordBodyCaptureStatus string
 
 // UsageBreakdown defines model for UsageBreakdown.
 type UsageBreakdown struct {
@@ -576,6 +601,22 @@ func (a *LogRecord) UnmarshalJSON(b []byte) error {
 		delete(object, "api_key")
 	}
 
+	if raw, found := object["body_capture_expires_at"]; found {
+		err = json.Unmarshal(raw, &a.BodyCaptureExpiresAt)
+		if err != nil {
+			return fmt.Errorf("error reading 'body_capture_expires_at': %w", err)
+		}
+		delete(object, "body_capture_expires_at")
+	}
+
+	if raw, found := object["body_capture_status"]; found {
+		err = json.Unmarshal(raw, &a.BodyCaptureStatus)
+		if err != nil {
+			return fmt.Errorf("error reading 'body_capture_status': %w", err)
+		}
+		delete(object, "body_capture_status")
+	}
+
 	if raw, found := object["cache_hit"]; found {
 		err = json.Unmarshal(raw, &a.CacheHit)
 		if err != nil {
@@ -931,6 +972,20 @@ func (a LogRecord) MarshalJSON() ([]byte, error) {
 	object["api_key"], err = json.Marshal(a.ApiKey)
 	if err != nil {
 		return nil, fmt.Errorf("error marshaling 'api_key': %w", err)
+	}
+
+	if a.BodyCaptureExpiresAt != nil {
+		object["body_capture_expires_at"], err = json.Marshal(a.BodyCaptureExpiresAt)
+		if err != nil {
+			return nil, fmt.Errorf("error marshaling 'body_capture_expires_at': %w", err)
+		}
+	}
+
+	if a.BodyCaptureStatus != nil {
+		object["body_capture_status"], err = json.Marshal(a.BodyCaptureStatus)
+		if err != nil {
+			return nil, fmt.Errorf("error marshaling 'body_capture_status': %w", err)
+		}
 	}
 
 	object["cache_hit"], err = json.Marshal(a.CacheHit)

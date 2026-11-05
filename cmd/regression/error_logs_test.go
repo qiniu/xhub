@@ -1,6 +1,8 @@
 package regression
 
 import (
+	"encoding/json"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -10,7 +12,7 @@ import (
 	"github.com/sunqirui1987/xhub/internal/iam"
 )
 
-// TestErrorLogsAreSeparateAndComplete 验证真实 HTTP 请求失败后独立筛选和完整落库。
+// TestErrorLogsAreSeparateAndComplete 验证真实 HTTP 请求失败后独立筛选和有界错误摘要。
 // 参数 t 为测试上下文；前置关闭提示词保存并使用本地失败上游和真实数据库；
 // 验证长 JSON、纯文本、提前拒绝、成功及任务状态归类、费用和错误详情；服务与私有 schema 自动清理。
 func TestErrorLogsAreSeparateAndComplete(t *testing.T) {
@@ -45,8 +47,9 @@ func TestErrorLogsAreSeparateAndComplete(t *testing.T) {
 			if detail["api_base"] != up.URL || detail["credential_name"] != "error-log-supplier" {
 				t.Fatalf("上游失败日志丢失连接快照: %v", detail)
 			}
-			if detail["error"] != raw || !strings.Contains(string(mustJSON(detail["response"])), "terminal cause") {
-				t.Fatalf("提示词保存关闭时丢失上游完整错误: %s", truncate(string(mustJSON(detail)), 300))
+			summary := fmt.Sprint(detail["error"])
+			if detail["body_capture_status"] != "disabled" || len(summary) > 16<<10 || !strings.Contains(summary, "diagnostic begin") || !strings.Contains(summary, "terminal cause") || summary == raw || string(mustJSON(detail["response"])) != "{}" {
+				t.Fatalf("关闭正文时错误摘要不符合预期: %s", truncate(string(mustJSON(detail)), 300))
 			}
 			if strings.Contains(string(mustJSON(detail["messages"])), "private prompt") || firstFloat(detail, "spend") != 0 {
 				t.Fatal("失败请求保存了私有提示词或产生费用")
@@ -59,8 +62,9 @@ func TestErrorLogsAreSeparateAndComplete(t *testing.T) {
 			if rejectedDetail["api_base"] != "" || rejectedDetail["credential_name"] != "" {
 				t.Fatalf("路由前拒绝不得虚构上游: %v", rejectedDetail)
 			}
-			if rejectedDetail["error"] != rejected.text() {
-				t.Fatal("提前拒绝未保存客户端完整错误")
+			var gotError any
+			if err := json.Unmarshal([]byte(fmt.Sprint(rejectedDetail["error"])), &gotError); err != nil || string(mustJSON(gotError)) != string(mustJSON(rejected.json())) {
+				t.Fatal("提前拒绝的错误摘要与客户端错误语义不一致")
 			}
 
 			// 写入非失败任务和兼容失败状态，证明过滤在分页之前执行，并保留执行中的任务。

@@ -25,7 +25,6 @@ import (
 	"github.com/sunqirui1987/xhub/internal/authz"
 	"github.com/sunqirui1987/xhub/internal/catalog"
 	"github.com/sunqirui1987/xhub/internal/gateway/billing"
-	"github.com/sunqirui1987/xhub/internal/gateway/prefs"
 	"github.com/sunqirui1987/xhub/internal/gateway/requestlog"
 	"github.com/sunqirui1987/xhub/internal/iam"
 	"github.com/sunqirui1987/xhub/internal/live"
@@ -261,13 +260,24 @@ func (s *Server) recordSpend(w http.ResponseWriter, p *auth.Principal, callID, a
 		row.APIBase = dep.LogAPIBase()
 	}
 	if status >= 400 {
-		// 失败正文是排障证据，不能受提示词保存开关影响。请求正文仍按原开关处理。
-		row.Error = requestlog.FailureJSON(note.Upstream, ex.rawResponse)
-		row.Response = ex.rawResponse
+		// 关闭正文时仍保留有界错误摘要；完整响应由个人或全局正文策略控制。
+		row.Error = requestlog.FailureSummary(requestlog.FailureJSON(note.Upstream, ex.rawResponse))
 	}
 	if note.SettlementID != "" {
 		row.RequestID = note.SettlementID
 	}
+	if note.TaskRequestID != "" {
+		row.RequestID, row.Status = note.TaskRequestID, note.TaskStatus
+	}
+	// 正文在独立存储中按实际用户选择保存，账单队列只携带状态，不携带正文，避免过期后重放恢复。
+	// 异步任务的查询复用初始日志，先保留初始请求的正文关联；不能用后续轮询覆盖原请求。
+	if note.TaskRequestID == "" || note.TaskInitial {
+		row.BodyCaptureStatus, row.BodyCaptureExpiresAt = s.captureExchange(p, callID, ex, start, note.Streamed, row.Status == "error" || row.Status == "failed" || row.Status == "failure" || status >= 400)
+		if row.BodyCaptureStatus == "saved" {
+			row.BodyCaptureID = callID
+		}
+	}
+	row.Messages, row.Response, row.ProxyRequest = "", "", ""
 	if p != nil && p.Key != nil {
 		row.KeyHash = p.Key.TokenHash
 		row.KeyAlias = p.Key.Name
@@ -282,10 +292,9 @@ func (s *Server) recordSpend(w http.ResponseWriter, p *auth.Principal, callID, a
 		// 原请求的归属是更新授权边界，费用仅在数据库锁内首次成功结算时累加。
 		row.RequestID, row.Status = note.TaskRequestID, note.TaskStatus
 		// 任务失败可能由 HTTP 200 的查询响应表达，不能只按 HTTP 状态判断。
-		// 原始正文独立于提示词开关保存，供详情 error 和 response 回溯供应商结果。
+		// 失败任务保留有界错误摘要；原始正文只由已授权的正文策略保存。
 		if row.Status == "failed" {
-			row.Error = ex.rawResponse
-			row.Response = ex.rawResponse
+			row.Error = requestlog.FailureSummary(ex.rawResponse)
 		}
 		rec := usageFromSpend(row, spend, ex.messages, row.Response, ex.proxy, start, end)
 		if s.IAM != nil {
@@ -365,10 +374,8 @@ func (s *Server) persistSpend(row live.SpendLog, spend float64, ex promptExchang
 	if s.IAM == nil {
 		return
 	}
-	// The event, its stored bodies, the daily roll-up and all five billing scopes
-	// commit together and deduplicate by request_id.
-	// 失败正文已经由 recordSpend 放入 row.Response，不能再用受提示词开关控制的
-	// ex.response 覆盖，否则直写数据库和 Redis 队列会保存不同的排障信息。
+	// 新调用的正文已独立保存；以下参数保留旧调用和测试夹具的兼容处理，
+	// usageFromSpend 会在存在新记录状态时清空这些字段，避免正文进入账单快照。
 	response := ex.response
 	if row.Status == "error" || row.Status == "failed" || row.Status == "failure" || row.HTTPStatus >= 400 {
 		response = row.Response
@@ -407,7 +414,13 @@ func sessionLogBinding(ownerType, teamID, orgID string, memberships []iam.Member
 // 调用：persistSpend。
 // 测试：无直接单测
 func usageFromSpend(row live.SpendLog, spend float64, messages, response, proxy string, start, end time.Time) iam.UsageRecord {
+	// 新正文已独立落库；保留旧无状态记录的原始行为以兼容已有待结算快照。
+	if row.BodyCaptureStatus != "" {
+		messages, proxy = "", ""
+		response = ""
+	}
 	return iam.UsageRecord{
+		BodyCaptureStatus: row.BodyCaptureStatus, BodyCaptureExpiresAt: row.BodyCaptureExpiresAt, BodyCaptureID: row.BodyCaptureID,
 		BudgetReservationID: row.BudgetReservationID,
 		InboundEndpoint:     row.InboundEndpoint, OutboundEndpoint: row.OutboundEndpoint,
 		APIBase: row.APIBase, Supplier: row.Supplier, UpstreamModel: row.UpstreamModel, Streamed: row.Streamed,
@@ -438,8 +451,11 @@ func deref(s *string) string {
 	return *s
 }
 
-// promptExchange is the request and response saved on one spend log. Empty strings mean prompt storage was off.
+// promptExchange 暂存单次调用的输入和失败诊断，recordSpend 消费后立即移除；是否落正文随后按身份判断。
 type promptExchange struct {
+	// 原始请求仅暂存在本次调用内，用于身份确定后选择是否保存；takeExchange 立即清理。
+	request     *http.Request
+	requestBody []byte
 	// 只保存请求明确指定的推理强度，不受提示词保存开关控制。
 	reasoningEffort string
 	// 入站路径独立于正文保存开关。
@@ -448,45 +464,52 @@ type promptExchange struct {
 	messages string
 	response string
 	proxy    string
-	// rawResponse 暂存上游原始响应；仅失败请求会持久化，因此不受提示词开关控制。
+	// rawResponse 暂存上游原始响应；按正文策略选择保存，失败时另提取有界诊断摘要。
 	rawResponse string
 }
 
-// promptsEnabled reports whether new spend logs should keep the request and response. The YAML flag wins when it is set. A database override can turn the same key on later.
-// 参数：无。
-// 返回 bool（bool）：新的花费日志要保存请求和响应正文时返回真。YAML 已设置时以 YAML 为准。
-// 调用：仅在 spend.go 内使用
-// 测试：无直接单测
-func (s *Server) promptsEnabled() bool {
+// promptsEnabled 使用有界查询读取全局正文开关；ctx 为调用上下文，返回是否开启及配置读取错误。
+// YAML 强制开启沿用原优先级，否则使用数据库覆盖或 YAML 原值；故障不能被误报为管理员关闭。
+// 日志设置页、请求策略快照和早期错误回退共用；不写入配置，不使用可能过时的 ORM 缓存。
+func (s *Server) promptsEnabled(ctx context.Context) (bool, error) {
 	if s == nil || s.Cfg == nil {
-		return false
+		return false, nil
 	}
 	if s.Cfg.GeneralSettings.StorePromptsInSpendLogs {
-		return true
+		return true, nil
 	}
 	if s.Store == nil {
-		return false
+		return false, nil
 	}
-	switch v := prefs.MergedGeneral(s)["store_prompts_in_spend_logs"].(type) {
+	ctx, cancel := context.WithTimeout(ctx, time.Second)
+	defer cancel()
+	v, found, err := s.Store.FreshConfigValueContext(ctx, "general_settings", "store_prompts_in_spend_logs")
+	if err != nil {
+		return false, err
+	}
+	if !found {
+		v = s.Cfg.GeneralRaw["store_prompts_in_spend_logs"]
+	}
+	switch value := v.(type) {
 	case bool:
-		return v
+		return value, nil
 	case string:
-		return strings.EqualFold(v, "true")
+		return strings.EqualFold(value, "true"), nil
 	default:
-		return false
+		return false, nil
 	}
 }
 
 // rememberExchange 暂存本次调用的路径、备注、明确推理强度和正文，供 recordSpend 关联日志。
 // 参数 callID 为日志关联标识，r 为入站请求，reqBody 和 respBody 分别为原始请求和响应字节。
-// 返回：无。请求与成功响应受提示词开关控制；失败候选响应始终暂存到 RecordSpend 判定状态。
+// 返回：无。原始数据仅留在本次调用的内存，是否记录由 recordSpend 根据用户及全局设置决定。
 // 调用：gateway/wire.go
 // 边界：非法编码或过长备注忽略；路径、备注和有长度限制的推理强度不受正文保存开关影响，不修改请求内容。
 func (s *Server) rememberExchange(callID string, r *http.Request, reqBody, respBody []byte) {
 	if s == nil || callID == "" {
 		return
 	}
-	ex := promptExchange{rawResponse: string(respBody)}
+	ex := promptExchange{request: r, requestBody: reqBody, rawResponse: string(respBody)}
 	if r != nil && r.URL != nil {
 		ex.inbound = r.URL.EscapedPath()
 		// 备注由客户端声明，只作排查线索；限制长度并解码中文，不从请求正文提取秘密。
@@ -498,9 +521,6 @@ func (s *Server) rememberExchange(callID string, r *http.Request, reqBody, respB
 	}
 	// 只提取协议元数据；即使不保留正文，也能排查本次请求的强度设置。
 	ex.reasoningEffort = requestlog.ReasoningEffort(ex.inbound, reqBody)
-	if s.promptsEnabled() {
-		ex.messages, ex.response, ex.proxy = requestlog.Encode(r, reqBody, respBody)
-	}
 	s.mu.Lock()
 	if s.exchanges == nil {
 		s.exchanges = map[string]promptExchange{}

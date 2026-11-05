@@ -64,8 +64,8 @@ export interface LogDetailContentProps {
 
 /**
  * 在单请求或会话抽屉中展示日志详情；接收日志、加载状态和可选鉴权凭据，
- * 返回请求、响应、费用和护栏视图。失败请求始终展示完整诊断正文，
- * 真实响应优先于旧版错误摘要；加载详情时不显示缺失捕获提示。
+ * 返回请求、响应、费用和护栏视图。失败请求有正文时展示完整响应，否则显示保留的摘要；
+ * 加载详情时不显示缺失捕获提示。
  * 上游响应默认折叠，用户通过标题按钮展开；切换请求时重置折叠状态，复制始终保留完整诊断。
  * 推理强度只展示明确快照，缺省为未知；金额格式化不修改计费或用户内容。
  */
@@ -86,7 +86,7 @@ export function LogDetailContent({ logEntry, isLoadingDetails = false, isDetails
   const hasMessages = checkHasMessages(logEntry.messages);
   const hasResponse = checkHasResponse(logEntry.response);
   // Don't show "missing data" warning while details are still loading
-  const missingData = !hasMessages && !hasResponse && !hasError && !isLoadingDetails && !isDetailsError;
+  const missingData = !hasMessages && !hasResponse && !isLoadingDetails && !isDetailsError;
 
   // Guardrail data
   const guardrailInfo = metadata?.guardrail_information;
@@ -199,7 +199,7 @@ export function LogDetailContent({ logEntry, isLoadingDetails = false, isDetails
       {/* Configuration Info Message */}
       {missingData && (
         <div className="mb-6">
-          <ConfigInfoMessage show={missingData} />
+          <ConfigInfoMessage show={missingData} status={logEntry.body_capture_status} />
         </div>
       )}
 

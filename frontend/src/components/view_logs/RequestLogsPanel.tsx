@@ -24,6 +24,7 @@ import { useLogDetailRouting } from "./logDetailRouting";
 import { LogDetailsDrawer } from "./LogDetailsDrawer";
 import { LogsTableToolbar } from "./LogsTableToolbar";
 import { RequestLogsTable } from "./RequestLogsTable";
+import { PersonalLogCapture } from "./PersonalLogCapture";
 
 const PAGE_SIZE = DEFAULT_PAGE_SIZE_OPTIONS[0];
 const matchesLogId = (log: LogEntry, logId: string) => log.request_id === logId || log.litellm_call_id === logId;
@@ -234,6 +235,8 @@ export default function RequestLogsPanel({ accessToken, token, userRole, userID,
       <div className="flex items-center justify-between mb-4">
         <h1 className="text-xl font-semibold">{errorsOnly ? t("Error Logs") : t("pages.logs.title")}</h1>
       </div>
+
+      {!errorsOnly && <PersonalLogCapture accessToken={accessToken} />}
 
       {logsQuery.isError && <p role="alert" className="mb-3 text-destructive">{t("logsUX.loadFailed")}</p>}
       {detailError && <p role="alert" className="mb-3 text-destructive">{t("logsUX.detailFailed")}</p>}

@@ -1519,6 +1519,28 @@ Return candidates from logs visible to the caller; model and supplier also requi
     },
     "session_total_tokens": {
       "type": "number"
+    },
+    "body_capture_status": {
+      "type": "string",
+      "description": "Body capture status; may be absent on older logs",
+      "enum": [
+        "disabled",
+        "saved",
+        "expired",
+        "empty",
+        "early_failure",
+        "too_large",
+        "capacity",
+        "partial",
+        "unsupported",
+        "storage_failed",
+        "settings_unavailable"
+      ]
+    },
+    "body_capture_expires_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Body expiry fixed at capture time"
     }
   },
   "required": [

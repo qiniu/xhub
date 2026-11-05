@@ -219,6 +219,7 @@ func (s *Server) ReleaseCall(callID string) {
 	defer s.mu.Unlock()
 	delete(s.callNotes, callID)
 	delete(s.exchanges, callID)
+	delete(s.capturePolicies, callID)
 	delete(s.guardrailNotes, callID)
 }
 

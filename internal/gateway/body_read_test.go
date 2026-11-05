@@ -7,6 +7,7 @@ import (
 	"io"
 	"net/http"
 	"net/http/httptest"
+	"reflect"
 	"strings"
 	"testing"
 
@@ -48,7 +49,7 @@ func TestBodyReadFailureStatus(t *testing.T) {
 }
 
 // TestBodyReadFailureLogOmitsPartialBody 验证读取失败时只保存诊断，完整但未读完的 JSON 也不能当作有效请求。
-// 前置隔离 PostgreSQL；覆盖正文保存开关、零字节、超限、超时、取消和截断，检查原错误响应、身份无猜测及日志体积。
+// 前置隔离 PostgreSQL；覆盖正文保存开关、零字节、超限、超时、取消和截断，检查错误摘要、身份无猜测及日志体积。
 // 参数 t 为测试上下文；返回无；testGatewayStores 自动关闭连接并清理私有 schema。
 func TestBodyReadFailureLogOmitsPartialBody(t *testing.T) {
 	cfg, st, db := testGatewayStores(t)
@@ -93,8 +94,15 @@ func TestBodyReadFailureLogOmitsPartialBody(t *testing.T) {
 				if err := json.Unmarshal([]byte(stored.UpstreamResponse), &diagnostic); err != nil || !diagnostic.Failure.Omitted || diagnostic.Failure.Bytes != int64(len(tc.body)) {
 					t.Fatalf("省略正文后诊断丢失: diagnostic=%+v err=%v", diagnostic, err)
 				}
-				if stored.ResponseBody != w.Body.String() || stored.Error == "" {
-					t.Fatal("省略入站正文误删了网关错误响应")
+				if stored.ResponseBody != "" || stored.Error == "" {
+					t.Fatal("失败摘要未保存或账单表重复存储了响应")
+				}
+				if save {
+					loaded, loadErr := db.GetRequestLog(context.Background(), stored.RequestID)
+					var actual, expected any
+					if loadErr != nil || json.Unmarshal([]byte(loaded.ResponseBody), &actual) != nil || json.Unmarshal(w.Body.Bytes(), &expected) != nil || !reflect.DeepEqual(actual, expected) {
+						t.Fatalf("已启用时无法还原错误响应: %v", loadErr)
+					}
 				}
 			})
 		}

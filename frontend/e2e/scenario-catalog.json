@@ -3532,5 +3532,26 @@
     "title": "model view hot update zh-CN",
     "kind": "implemented",
     "environment": "default offline"
+  },
+  {
+    "id": "REG-personal-log-capture-zh-CN",
+    "file": "e2e/scenarios/regression/personal-log-capture-zh-CN.test.ts",
+    "title": "personal request body recording zh-CN",
+    "kind": "implemented",
+    "environment": "default offline"
+  },
+  {
+    "id": "REG-personal-log-capture-en",
+    "file": "e2e/scenarios/regression/personal-log-capture-en.test.ts",
+    "title": "personal request body recording en",
+    "kind": "implemented",
+    "environment": "default offline"
+  },
+  {
+    "id": "REG-personal-log-capture-user",
+    "file": "e2e/scenarios/regression/personal-log-capture-user.test.ts",
+    "title": "personal body recording for an ordinary user",
+    "kind": "implemented",
+    "environment": "default offline"
   }
 ]

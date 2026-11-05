@@ -17,6 +17,8 @@
 | `POST /user/delete` | 删除用户，不允许删除自己 | 200, 400, 401, 403, 404, 409, 500, 503 |
 | `POST /user/set_password` | 按现有权限重置密码并撤销旧会话；不返回密码，不撤销API Key | 200, 400, 401, 403, 404, 409, 500, 503 |
 | `POST /user/{user_id}/password` | 按现有权限重置密码并撤销旧会话；不返回密码，不撤销API Key | 200, 400, 401, 403, 404, 409, 500, 503 |
+| `GET /account/log-capture` | 读取个人正文记录设置 | 200, 400, 401, 403, 500, 503 |
+| `PUT /account/log-capture` | 修改当前账号的正文记录选择 | 200, 400, 401, 403, 500, 503 |
 
 ### GET /user/list
 
@@ -318,6 +320,38 @@
     "application/json": {
       "schema": {
         "$ref": "#/components/schemas/SetPassword"
+      }
+    }
+  }
+}
+```
+
+
+### GET /account/log-capture
+
+读取个人正文记录设置
+
+
+### PUT /account/log-capture
+
+修改当前账号的正文记录选择
+
+```json
+{
+  "required": true,
+  "content": {
+    "application/json": {
+      "schema": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "enabled"
+        ],
+        "properties": {
+          "enabled": {
+            "type": "boolean"
+          }
+        }
       }
     }
   }
@@ -1420,5 +1454,53 @@
     "password_updated"
   ],
   "additionalProperties": false
+}
+```
+
+### PersonalLogCaptureSettings
+
+```json
+{
+  "type": "object",
+  "required": [
+    "enabled",
+    "global_enabled",
+    "effective_enabled",
+    "retention_days",
+    "global_retention_days",
+    "used_bytes",
+    "limit_bytes"
+  ],
+  "properties": {
+    "enabled": {
+      "type": "boolean"
+    },
+    "global_enabled": {
+      "type": "boolean"
+    },
+    "effective_enabled": {
+      "type": "boolean"
+    },
+    "retention_days": {
+      "type": "integer",
+      "format": "int64",
+      "minimum": 0
+    },
+    "global_retention_days": {
+      "type": "integer",
+      "format": "int64",
+      "minimum": 0
+    },
+    "used_bytes": {
+      "type": "integer",
+      "format": "int64",
+      "minimum": 0
+    },
+    "limit_bytes": {
+      "type": "integer",
+      "format": "int64",
+      "minimum": 0
+    }
+  }
 }
 ```

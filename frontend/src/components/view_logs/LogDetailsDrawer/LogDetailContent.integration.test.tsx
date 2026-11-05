@@ -76,14 +76,16 @@ describe("LogDetailContent", () => {
     expect(await navigator.clipboard.readText()).toBe(JSON.stringify(response, null, 2));
   });
 
-  /** 前置无正文捕获的新失败日志或旧版纯文本响应；验证错误诊断仍完整可读，自动卸载清理。 */
+  /** 前置无正文捕获的新失败日志或旧版纯文本响应；验证错误诊断可读且缺少正文时提示，自动卸载清理。 */
   it.each([
     { error: "dial tcp: connection refused\nlast diagnostic", response: {} },
     { response: "proxy returned HTML\nlast diagnostic" },
   ])("shows plain text diagnostics with %j", (overrides) => {
     render(<LogDetailContent logEntry={createLogEntry({ status: "error", metadata: {}, messages: [], ...overrides })} />);
     expect(screen.getByRole("region", { name: "Full Error Details" })).toHaveTextContent("last diagnostic");
-    expect(screen.queryByText("This log has no request or response body available. The reason was not recorded; other recorded details remain available.")).not.toBeInTheDocument();
+    const note = screen.queryByText("This log has no request or response body available. The reason was not recorded; other recorded details remain available.");
+    if (typeof overrides.response === "string") expect(note).not.toBeInTheDocument();
+    else expect(note).toBeInTheDocument();
   });
   it("should render the component successfully", () => {
     render(<LogDetailContent logEntry={createLogEntry()} />);

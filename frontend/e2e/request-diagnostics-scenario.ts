@@ -62,11 +62,11 @@ export function registerRequestDiagnostics(locale: "zh-CN" | "en") {
       await expect(diagnosis).toContainText(translate(locale, "logDiagnostics.bodyOmitted"));
       await expect(diagnosis).toContainText(translate(locale, "logDiagnostics.noUpstreamError"));
       await page.keyboard.press("Escape");
-      await page.getByRole("button", { name: translate(locale, "Last 24 Hours"), exact: true }).click();
+      await page.getByRole("button", { name: translate(locale, "logsUX.last24Hours"), exact: true }).click();
       await page.getByRole("button", { name: translate(locale, "Custom Range"), exact: true }).click();
       // 先通过界面选择历史窗口，后台必须返回零行；不 mock 网络或伪造日志时间。
-      const start = page.getByLabel(translate(locale, "logDiagnostics.startTime"));
-      const end = page.getByLabel(translate(locale, "logDiagnostics.endTime"));
+      const start = page.getByLabel(translate(locale, "logsUX.start"));
+      const end = page.getByLabel(translate(locale, "logsUX.end"));
       await start.fill("2020-01-01T00:00");
       const filtered = page.waitForResponse((r) => r.url().includes("/spend/logs/ui?") && r.url().includes("end_date=2020"));
       await end.fill("2020-01-02T00:00");
@@ -78,7 +78,7 @@ export function registerRequestDiagnostics(locale: "zh-CN" | "en") {
       await expect(row).toBeVisible();
       const target = locale === "en" ? "zh-CN" : "en";
       await page.getByRole("button", { name: target === "en" ? "English" : translate("en", "language.zhCN"), exact: true }).click();
-      await expect(page.getByLabel(translate(target, "logDiagnostics.startTime"))).toBeVisible();
+      await expect(page.getByLabel(translate(target, "logsUX.start"))).toBeVisible();
       await row.click();
       await expect(page.getByRole("region", { name: translate(target, "logDiagnostics.title") })).toContainText("unexpected EOF");
       await page.keyboard.press("Escape");

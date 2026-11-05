@@ -20,4 +20,15 @@ describe("request error diagnostics", () => {
     expect(fullErrorDetails({ response: {}, metadata: { error_information: { error_message: "legacy" } } })).toContain("legacy");
     expect(fullErrorDetails({ response: {}, error: " " })).toBe("");
   });
+  /** 前置已保存正文、最终错误及缺失错误；验证以接口确定的错误为准，空值仍兼容旧响应；纯函数无需清理。 */
+  it("prefers authoritative errors over captured initial or partial responses", () => {
+    const full = { error: { message: "x".repeat(5000), details: { trace: "full-tail-marker" } } };
+    expect(fullErrorDetails({ body_capture_status: "saved", error: JSON.stringify(full), response: full })).toContain("full-tail-marker");
+    expect(fullErrorDetails({ body_capture_status: "saved", error: "final failure", response: { status: "queued" } })).toBe("final failure");
+    expect(fullErrorDetails({ body_capture_status: "saved", error: "final failure", response: '{"status":"queued"}' })).toBe("final failure");
+    expect(fullErrorDetails({ body_capture_status: "saved", error: "cancellation summary", response: "data: partial response" })).toBe("cancellation summary");
+    expect(fullErrorDetails({ body_capture_status: "saved", error: " ", response: full })).toContain("full-tail-marker");
+    expect(fullErrorDetails({ body_capture_status: "saved", error: "short summary", response: {} })).toBe("short summary");
+    expect(fullErrorDetails({ body_capture_status: "disabled", error: "short summary", response: {} })).toBe("short summary");
+  });
 });
