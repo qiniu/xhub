@@ -424,6 +424,8 @@ return tostring(total)
 // SpendLog 是网关发送到 Redis 队列的单次用量载荷，消费者转换为 iam.UsageRecord 写 PostgreSQL。
 // RequestID 用于去重结算，SessionID 用于授权范围内归组，字段记录调用时事实而非刷库时配置。
 type SpendLog struct {
+	// DeliverySnapshot 仅用于数据库中断后的已确认同步响应，保存按原正文策略冻结的用量快照。
+	DeliverySnapshot string `json:"delivery_snapshot,omitempty"`
 	// 已验证完整用量的预算尝试 ID，随队列保留至 PostgreSQL 同事务结算。
 	BudgetReservationID string `json:"budget_reservation_id,omitempty"`
 	// 客户端明确指定的推理强度快照；独立于提示词保存，空值表示未指定或历史未记录，不推断厂商默认值。
@@ -523,6 +525,21 @@ type SpendLog struct {
 // 首个 payload 生效，确认后重放也不重复扣费；去重身份不设置 TTL，依赖部署的 Redis 持久化。
 // 调用：gateway/spend.go；不会等待磁盘 fsync 或副本 quorum。测试：redis_test.go 覆盖边界和失败原子性。
 func (c *Client) EnqueueSpend(row SpendLog) error {
+	return c.enqueueSpend(row, false)
+}
+
+// EnqueueConfirmedDelivery 原子登记已确认响应及热费用；row 必须包含冻结快照。
+// 返回错误时不声称已持久化；相同 ID 已存在时明确拒绝，避免把不同队列内容当成已保存。
+func (c *Client) EnqueueConfirmedDelivery(row SpendLog) error {
+	if row.DeliverySnapshot == "" {
+		return fmt.Errorf("delivery snapshot is required")
+	}
+	return c.enqueueSpend(row, true)
+}
+
+// enqueueSpend 共享 Redis 原子入队；strict 禁止已存在的请求 ID，返回验证或 Redis 错误。
+// 两个公开方法调用；正常旧队列保留原幂等语义，费用及多级预算引用在同一 Lua 操作中登记。
+func (c *Client) enqueueSpend(row SpendLog, strict bool) error {
 	if c == nil || c.rdb == nil {
 		return fmt.Errorf("enqueue spend: Redis client is unavailable")
 	}
@@ -542,7 +559,11 @@ func (c *Client) EnqueueSpend(row SpendLog) error {
 	if err == nil {
 		startedMicros = started.UnixMicro()
 	}
-	args := []any{raw, 0.0, row.RequestID, startedMicros, row.OrgID, row.KeyID, row.APIKey}
+	mode := "normal"
+	if strict {
+		mode = "strict"
+	}
+	args := []any{raw, 0.0, row.RequestID, startedMicros, row.OrgID, row.KeyID, row.APIKey, mode}
 	if row.SpendValid {
 		args[1] = row.Spend
 	}
@@ -560,6 +581,7 @@ func (c *Client) EnqueueSpend(row SpendLog) error {
 
 var enqueueSpendScript = redis.NewScript(keyQueueSnapshotLua + `
 if redis.call('HEXISTS', KEYS[2], ARGV[3]) == 1 then
+  if ARGV[8] == 'strict' then return redis.error_reply('delivery request already recorded') end
   return 0
 end
 local delta = tonumber(ARGV[2])
@@ -583,7 +605,7 @@ if keyType ~= 'none' and keyType ~= 'set' then return redis.error_reply('invalid
 local orgIndex = 'xhub:spend:org-pending:' .. ARGV[5]
 local orgType = redis.call('TYPE', orgIndex).ok
 if orgType ~= 'none' and orgType ~= 'zset' then return redis.error_reply('invalid organization pending index') end
-for i = 8, #ARGV do
+for i = 9, #ARGV do
   if delta ~= 0 then
     local raw = redis.call('GET', 'xhub:spend:' .. ARGV[i])
     local current = raw and tonumber(raw) or 0
@@ -595,7 +617,7 @@ for i = 8, #ARGV do
 end
 -- 旧 flusher 可能留下索引；空队列可证明旧成员均已确认，安全开始新的覆盖集合。
 if wasEmpty then redis.call('DEL', 'xhub:spend:key-indexed') end
-for i = 8, #ARGV do
+for i = 9, #ARGV do
   if delta ~= 0 then
     redis.call('INCRBYFLOAT', 'xhub:spend:' .. ARGV[i], delta)
   end
@@ -634,6 +656,40 @@ func (c *Client) PeekLogs(n int) (rows []SpendLog, raw []string) {
 	}
 	return out, vals
 }
+
+// SpendQueueEmpty 严格检查 Redis 花费队列是否为空；返回空状态及连接、类型或读取错误。
+// 恢复未知响应前调用；损坏队列或 Redis 不可用不能被当作没有待结算的成功请求。
+func (c *Client) SpendQueueEmpty(ctx context.Context) (bool, error) {
+	if c == nil || c.rdb == nil {
+		return false, fmt.Errorf("spend queue unavailable")
+	}
+	n, err := c.rdb.LLen(ctx, "xhub:spendlog").Result()
+	if err != nil {
+		return false, err
+	}
+	return n == 0, nil
+}
+
+// RotateSpendHead 将指定队头移至队尾，让后续可结算请求继续处理；ctx 控制 Redis，head 为已读取的原始快照。
+// 仅归属冲突等确定性错误调用；不删除账单、不释放热费用或去重标识；队头已变化或仅有一条时返回 false。
+func (c *Client) RotateSpendHead(ctx context.Context, head string) (bool, error) {
+	if c == nil || c.rdb == nil || head == "" {
+		return false, fmt.Errorf("rotate spend: missing queue or head")
+	}
+	n, err := rotateSpendHeadScript.Run(ctx, c.rdb, []string{"xhub:spendlog"}, head).Int()
+	return n == 1, err
+}
+
+// 原子核对原队头并轮转；保留费用与索引，只更新可信队列快照，避免并发刷写误操作。
+var rotateSpendHeadScript = redis.NewScript(keyQueueSnapshotLua + `
+local head = redis.call('LINDEX', KEYS[1], 0)
+if not head or head ~= ARGV[1] or redis.call('LLEN', KEYS[1]) < 2 then return 0 end
+local trusted = keyIndexTrusted()
+redis.call('LPOP', KEYS[1])
+redis.call('RPUSH', KEYS[1], head)
+if trusted then redis.call('SET', 'xhub:spend:key-queue-state', keyQueueSnapshot()) else redis.call('DEL', 'xhub:spend:key-queue-state') end
+return 1
+`)
 
 // AckFlushed 在数据库事务成功后，原子释放各主体热花费并确认已写入的队列前缀。
 // 参数 deltas 为主体花费标识到本批金额的映射，n 为记录数，head 为 PeekLogs 返回的首条原文。

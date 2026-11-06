@@ -14,6 +14,8 @@ package gateway
 import (
 	"context"
 	"encoding/json"
+	"errors"
+	"fmt"
 	"net/http"
 	"net/url"
 	"strconv"
@@ -129,7 +131,8 @@ func (s *Server) quoteSpend(callID, alias, depID string, usage map[string]any, s
 	return spendQuote{billed: billed, charge: charge, total: total, input: input, output: output, priced: priced, softActive: softActive, tokenOnly: tokenOnly}
 }
 
-// recordSpend 计算费用响应头并记录用量；配置磁盘队列时先同步落盘/PG，否则沿用Redis排队或直接PG。
+// recordSpend 计算费用响应头并记录用量；同步对话先冻结最终快照，交付确认后再持久化并结算。
+// 非同步路径按原磁盘、Redis 或 PG 路径持久化；交付标记无法保存时由 Handler 返回 503。
 // 异步轮询消费临时元数据后更新原请求，只有创建增加请求计数，首次结算增加费用。
 // 本地计价失败时仅将安全原因码加入原始费用快照，不补价或改变预算和费用结果。
 // 参数 w（http.ResponseWriter）：调用方的 HTTP 响应，状态和正文写在这里；p（*auth.Principal）：已经鉴权的调用方，含用户、团队、密钥哈希和别名；callID（string）：这一次调用的 id，用来把请求、响应和用量记在同一行；alias（string）：对外模型名；op（string）：操作名，例如 chat；usage（map[string]any）：用量对象。字段可能是 prompt_tokens，也可能是 input_tokens；start（time.Time）：时间范围的起点。零值表示不限制开始；cacheHit（bool）：为真时走缓存命中这一支。为假时保持原来的路径；status（int）：HTTP 状态码；depID（string）：部署 id。空串表示当前没有钉住的部署。
@@ -139,6 +142,10 @@ func (s *Server) quoteSpend(callID, alias, depID string, usage map[string]any, s
 func (s *Server) recordSpend(w http.ResponseWriter, p *auth.Principal, callID, alias, op string, usage map[string]any, start time.Time, cacheHit bool, status int, depID string) {
 	// 完整快照由本路径负责，即使存储失败也不能由外层生成内容不同的替代账单。
 	markUsageRecorded(w)
+	if pending := deliveryBuffer(w); pending != nil && pending.preparedID == callID && pending.principal != nil {
+		// 重试时凭证的团队等可能更新；结算应使用提交前已持久化的归属快照。
+		p = pending.principal
+	}
 	if usage == nil {
 		usage = map[string]any{}
 	}
@@ -230,7 +237,12 @@ func (s *Server) recordSpend(w http.ResponseWriter, p *auth.Principal, callID, a
 	}
 	guardrail := s.takeGuardrail(callID)
 	if !cacheHit && tokens > 0 && !note.SkipRouteUsage {
-		s.noteUsage(depID, tokens)
+		if pending := deliveryBuffer(w); pending != nil && status >= 200 && status < 300 && !note.Streamed && note.TaskRequestID == "" {
+			// 对话写出失败不计入成功路由用量；最终写入成功后由入口提交。
+			pending.routeDeployment, pending.routeTokens = depID, tokens
+		} else {
+			s.noteUsage(depID, tokens)
+		}
 	}
 	keyID := ""
 	if p != nil {
@@ -306,6 +318,48 @@ func (s *Server) recordSpend(w http.ResponseWriter, p *auth.Principal, callID, a
 			if err := s.IAM.RecordTaskUsage(context.Background(), rec, note.TaskInitial, note.TaskSettlement); err != nil {
 				util.Error("task usage persistence failed request=%s err=%v", row.RequestID, err)
 			}
+		}
+		return
+	}
+	if pending := deliveryBuffer(w); pending != nil && (pending.preparedID == callID || !note.Streamed && status >= 200 && status < 300) {
+		// 执行器即将释放请求级事实，先冻结费用与日志快照；未确认写出时仅登记零费用恢复记录。
+		record := usageFromSpend(row, spend, ex.messages, row.Response, ex.proxy, start, end)
+		if s.usageSpoolEnabled {
+			record.DeliveryPending, record.DeliverySpoolOnly = true, true
+		}
+		if pending.preparedID != callID {
+			ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+			if s.IAM == nil {
+				pending.deliveryErr = fmt.Errorf("delivery storage unavailable")
+			} else {
+				pending.deliveryErr = s.IAM.PrepareDelivery(ctx, record, time.Now().Add(24*time.Hour))
+			}
+			cancel()
+			if pending.deliveryErr == nil && s.usageSpoolEnabled {
+				marker, markerErr := iam.UnconfirmedDelivery(record)
+				marker.DeliveryUnconfirmed = true
+				if markerErr == nil && s.usageSpool != nil {
+					markerErr = s.usageSpool.BeginDelivery(marker)
+				} else if markerErr == nil {
+					markerErr = fmt.Errorf("delivery spool unavailable")
+				}
+				pending.deliveryErr = markerErr
+			}
+		}
+		if pending.deliveryErr != nil && !errors.Is(pending.deliveryErr, iam.ErrConflict) && s.usageSpoolEnabled && s.usageSpool != nil {
+			// 数据库不可用时，独立磁盘先保留零费用未确认状态；进程退出后只能按未知结果恢复。
+			record.DeliveryPending, record.DeliverySpoolOnly, record.DeliveryUnconfirmed = true, true, true
+			marker, markerErr := iam.UnconfirmedDelivery(record)
+			if markerErr == nil {
+				markerErr = s.usageSpool.BeginDelivery(marker)
+			}
+			if markerErr == nil {
+				record.DeliveryUnconfirmed = false
+				pending.deliveryErr = nil
+			}
+		}
+		if pending.deliveryErr == nil {
+			pending.delivery = &record
 		}
 		return
 	}

@@ -39,6 +39,11 @@ var archiveSchemaSQL string
 //go:embed usage_pending_schema.sql
 var usagePendingSchemaSQL string
 
+// usageDeliverySchemaSQL 保存尚未确认响应送达的零费用恢复记录。
+//
+//go:embed usage_delivery_schema.sql
+var usageDeliverySchemaSQL string
+
 // idempotencyFenceSchemaSQL 仅保存幂等标识摘要，禁止持久化请求和响应正文。
 //
 //go:embed idempotency_schema.sql
@@ -112,6 +117,9 @@ func (db *DB) Migrate(ctx context.Context) error {
 		return err
 	}
 	if _, err := db.Engine.Context(ctx).Exec(usagePendingSchemaSQL); err != nil {
+		return err
+	}
+	if _, err := db.Engine.Context(ctx).Exec(usageDeliverySchemaSQL); err != nil {
 		return err
 	}
 	if _, err := db.Engine.Context(ctx).Exec(idempotencyFenceSchemaSQL); err != nil {

@@ -45,8 +45,20 @@ settings), syncs the file, atomically renames it, and syncs the directory before
 synchronously committing PostgreSQL. It removes the snapshot only after database
 confirmation. A complete PG outage without Redis can therefore recover after a
 restart. Recovery settles usage; it never repeats the upstream call. Existing PG
-`usage_pending` and old Redis queues still drain; new spool-enabled calls do not
-also enqueue Redis hot charges.
+`usage_pending` and Redis queues still drain. When the disk does not retain a
+confirmed synchronous result, it may be queued in Redis with its hot charge until settlement.
+
+Synchronous Chat, Responses and Messages calls write a body-free
+`usage_delivery_pending` marker before contacting the provider. Actual charges
+are confirmed only after the response is written and flushed. A write failure or
+an unknown outcome after process exit is recorded as failed with zero cost.
+Non-disk-owned markers expire after 24 hours, but recovery waits for local pending
+records and the shared Redis queue to drain. Disk-owned markers can only be
+recovered by the instance holding the original volume. Backlogs and conflicts can
+delay recovery and do not establish that a user canceled the request.
+A deterministic ownership conflict in a confirmed Redis record retains its raw
+evidence and hot charge and moves to the queue tail so other records can settle.
+It still requires manual reconciliation by request ID; do not delete evidence.
 
 This adds disk sync and database commit latency per call. Throughput depends on
 the disk and database. Use a persistent volume, not the container writable layer or
@@ -71,6 +83,8 @@ storage returns `503 billing_storage_unavailable` with
 search soft-budget calls with `503 billing_storage_pending` rather than relying on
 stale balances. Existing hard-budget holds remain. Until recovery, usage pages
 contain settled charges only, not all incurred charges.
+The `503 billing_storage_unavailable` path for failure to save a synchronous
+delivery marker does not guarantee that this header is present.
 
 Records include a version and SHA-256 checksum. Corrupt, unsupported-version or
 conflicting snapshots are preserved in `quarantine/`, never silently deleted.

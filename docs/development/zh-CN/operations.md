@@ -36,7 +36,14 @@ Compose 为每个网关挂载 `xhub-usage-spool:/var/lib/xhub/usage-spool`，并
 `UsageRecord`（含预占 ID、冻结费率和原有日志设置允许保存的正文），执行文件
 `fsync`、原子改名和目录 `fsync`，然后同步提交 PostgreSQL。只有数据库确认成功
 才删除文件。PG 完全断连、无 Redis 时，重启仍可恢复；恢复只结算账单，不重试上游。
-原有 `usage_pending` 和旧 Redis 队列继续恢复，新请求启用磁盘队列后不再重复入 Redis。
+原有 `usage_pending` 和 Redis 队列继续恢复；磁盘未保存终态时，已确认的同步响应可能转入 Redis，并保留相应热费用直到结算。
+
+同步 Chat、Responses 和 Messages 请求在调用上游前会写入不含正文的 `usage_delivery_pending` 标记；
+完整写出并刷新后才确认实际账单。写入失败或进程退出后结果无法确认时，按失败、零费用记录。
+无磁盘独占标记到期 24 小时后，需等待本机待处理记录及共享 Redis 队列清空才能恢复；
+磁盘独占标记只能由持有原卷的实例恢复。持续积压或冲突可能推迟未知结果恢复，不能仅据此判定用户主动取消。
+Redis 中已确认终态若发生确定性归属冲突，网关保留原始记录及热费用并轮转到队尾，允许后续正常账单处理；
+冲突不会自动消除，需根据请求 ID 核对账单和归属并人工处理，不能直接删除队列证据。
 
 这是同步持久化路径：每次调用增加磁盘同步和数据库提交延迟，以减少最终账单仅留在
 内存中的窗口。吞吐量取决于持久盘与数据库；不要把该目录放在容器可写层、临时目录或
@@ -56,6 +63,7 @@ Compose 为每个网关挂载 `xhub-usage-spool:/var/lib/xhub/usage-spool`，并
 新调用返回 `503 billing_storage_unavailable`，响应头
 `X-XHub-Usage-Persistence: unavailable`。已有未落库费用时搜索软预算调用返回
 `503 billing_storage_pending`，防止用旧余额继续放行；硬额度原有预占继续保留。
+同步响应的交付标记无法持久化时也会返回 `503 billing_storage_unavailable`，该路径不保证附带上述响应头。
 恢复成功前用量页只包含已入账部分，不能把显示值当作全部已产生费用。
 
 文件含版本和 SHA-256 内容校验，损坏/版本不符/同调用不同快照进入 `quarantine/`，

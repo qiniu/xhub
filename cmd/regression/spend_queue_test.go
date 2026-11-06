@@ -63,8 +63,11 @@ func TestSpendQueueFailureRecovery(t *testing.T) {
 				t.Fatal("网关未连接专用 Redis，回归不能降级为空跑")
 			}
 			before := h.moneyOf(t, c)
-			r := h.ok(http.MethodPost, "/v1/chat/completions", c.key, chatRequest(model, "Verify reliable accounting recovery"))
-			cost := parseFloatOrZero(r.header("x-litellm-response-cost"))
+			// 流式请求结束后仍走 Redis 队列；同步交付改为先确认并落库，不能再假设它一定排队。
+			body := chatRequest(model, "Verify reliable accounting recovery")
+			body["stream"] = true
+			r := h.ok(http.MethodPost, "/v1/chat/completions", c.key, body)
+			cost := expectedCost()
 			rows, raw := h.gw.Live.PeekLogs(10)
 			if cost <= 0 || len(rows) != 1 || len(raw) != 1 || rows[0].RequestID != r.header("x-litellm-call-id") {
 				t.Fatalf("HTTP 调用未生成唯一可计费队列记录: cost=%v rows=%+v", cost, rows)
@@ -162,10 +165,13 @@ func TestUsageSessionSourceUpgradeRecovery(t *testing.T) {
 	if _, err := h.db.Engine.Exec("ALTER TABLE usage_events DROP COLUMN session_source"); err != nil {
 		t.Fatal(err)
 	}
-	r := h.ok(http.MethodPost, "/v1/chat/completions", c.key, chatRequest(model, "Verify upgrade recovery"))
-	cost := parseFloatOrZero(r.header("x-litellm-response-cost"))
+	// 使用流式请求覆盖仍会经过 Redis 的旧库升级恢复链路，不通过删除队列断言绕过测试。
+	body := chatRequest(model, "Verify upgrade recovery")
+	body["stream"] = true
+	r := h.ok(http.MethodPost, "/v1/chat/completions", c.key, body)
+	cost := expectedCost()
 	rows, raw := h.gw.Live.PeekLogs(10)
-	if cost <= 0 || len(rows) != 1 || len(raw) != 1 {
+	if cost <= 0 || len(rows) != 1 || len(raw) != 1 || rows[0].RequestID != r.header("x-litellm-call-id") {
 		t.Fatalf("推理成功后未保留待结算账单: cost=%v rows=%+v", cost, rows)
 	}
 	row := rows[0]

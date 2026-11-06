@@ -1,12 +1,25 @@
 package util
 
-import "net/http"
+import (
+	"errors"
+	"net/http"
+)
 
 // FlushResponse 刷新 HTTP 响应并尽量返回底层错误，供流式转发检测客户端断连。
 // w 是响应写入器；返回刷新错误，不支持刷新时返回 nil。已知的 Gin 包装先落实响应头再解包，
 // 因为其 Flush 丢弃底层错误；其他具有 Flush 的包装优先保留自身行为，避免绕过压缩等中间层。
 // 调用时可能将已缓冲的正文发送给客户端；限制解包深度避免异常包装循环。
 func FlushResponse(w http.ResponseWriter) error {
+	err := FlushResponseStrict(w)
+	if errors.Is(err, http.ErrNotSupported) {
+		return nil
+	}
+	return err
+}
+
+// FlushResponseStrict 刷新响应并在不支持时返回 http.ErrNotSupported，供同步交付确认使用。
+// 参数 w 为响应写入器；返回底层错误，可能发送已缓冲的响应，不推断客户端是否处理。
+func FlushResponseStrict(w http.ResponseWriter) error {
 	for depth := 0; w != nil && depth < 64; depth++ {
 		if f, ok := w.(interface{ FlushError() error }); ok {
 			return f.FlushError()
@@ -29,7 +42,7 @@ func FlushResponse(w http.ResponseWriter) error {
 			w = wrapper.Unwrap()
 			continue
 		}
-		return nil
+		return http.ErrNotSupported
 	}
-	return nil
+	return http.ErrNotSupported
 }

@@ -16,6 +16,7 @@ type dialogueWriteProbe struct {
 	header http.Header
 	short  bool
 	writes int
+	err    error
 }
 
 // Header 返回单请求响应头，供网关设置调用 ID。
@@ -29,6 +30,9 @@ func (w *dialogueWriteProbe) Write(p []byte) (int, error) {
 	w.writes++
 	if w.short {
 		return len(p) - 1, nil
+	}
+	if w.err != nil {
+		return 0, w.err
 	}
 	return 0, errors.New("synthetic client write failure")
 }

@@ -241,6 +241,18 @@ func TestBrowserEnterpriseFixture(t *testing.T) {
 		fault := usageFault
 		usageFaultMu.Unlock()
 		path := strings.TrimPrefix(r.URL.Path, "/gw")
+		if r.Method == http.MethodPost && (path == "/v1/chat/completions" || path == "/bypass/openai/v1/chat/completions") && (r.Header.Get("X-E2E-Client-Write") == "fail" || r.Header.Get("X-E2E-Client-Write") == "flush-fail") {
+			// 仅测试二进制和私有 E2E schema 具备该故障注入；数据面及鉴权仍走真实网关。
+			schema, err := s.IAM.Engine.QueryString("SELECT current_schema() AS schema")
+			if err == nil && len(schema) == 1 && strings.HasPrefix(schema[0]["schema"], "e2e_") {
+				if r.Header.Get("X-E2E-Client-Write") == "flush-fail" {
+					gatewayHandler.ServeHTTP(browserFlushFailure{ResponseWriter: w}, r)
+					return
+				}
+				gatewayHandler.ServeHTTP(browserWriteFailure{ResponseWriter: w}, r)
+				return
+			}
+		}
 		failed := strings.Contains(path, "/daily/activity") && ((fault == "aggregated" && strings.HasSuffix(path, "/aggregated")) || (fault == "page2" && (strings.HasSuffix(path, "/aggregated") || r.URL.Query().Get("page") == "2")) || (fault == "gateway" && path == "/gateway/daily/activity"))
 		if failed {
 			util.WriteError(w, 503, "unavailable", "isolated usage failure")
@@ -294,7 +306,7 @@ func TestBrowserEnterpriseFixture(t *testing.T) {
 	defer closeSpoolControl()
 	control := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
-		if browserBillingPendingControl(w, r, s) || spoolControl(w, r) {
+		if browserBillingPendingControl(w, r, s) || spoolControl(w, r) || browserQueueConflictControl(w, r, s) {
 			return
 		}
 		switch r.URL.Path {

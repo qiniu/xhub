@@ -43,6 +43,9 @@ func TestFlushResponsePropagation(t *testing.T) {
 		}
 	}
 	if err := FlushResponse(nil); err != nil {
-		t.Fatalf("空写入器不应失败: %v", err)
+		t.Fatalf("流式兼容路径应容忍空写入器: %v", err)
+	}
+	if err := FlushResponseStrict(nil); !errors.Is(err, http.ErrNotSupported) {
+		t.Fatalf("同步确认不能把不支持刷新当作成功: %v", err)
 	}
 }

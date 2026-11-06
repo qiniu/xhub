@@ -6,6 +6,8 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"testing"
+
+	"github.com/sunqirui1987/xhub/internal/iam"
 )
 
 // TestCodexAgentConversation 验证 Codex 客户端通过个人密钥进行三轮增量会话。
@@ -102,11 +104,11 @@ func verifyCodexAgentConversation(t *testing.T) {
 		if index > 0 {
 			wantSource = "parent"
 		}
-		// 刷写前确认当前事件确实进入队列，防止 Redis 连接失败后直写降级掩盖转换缺陷。
+		// 同步响应确认后直接持久化；仍核对 Redis 确实连接，且账单在刷写前已正确入库。
 		if h.gw.Live != nil {
-			rows, _ := h.gw.Live.PeekLogs(10)
-			if len(rows) != 1 || rows[0].RequestID != callID || rows[0].SessionSource != wantSource {
-				t.Fatalf("Codex 第%d轮未入队或会话来源错误：预期=%s 队列=%+v", index+1, wantSource, rows)
+			event, err := h.db.GetUsageEvent(t.Context(), iam.UsageQuery{}, callID)
+			if err != nil || event.SessionSource != wantSource {
+				t.Fatalf("Codex 第%d轮同步账单未持久化或会话来源错误：预期=%s 事件=%+v 错误=%v", index+1, wantSource, event, err)
 			}
 		}
 		h.flushSpend()

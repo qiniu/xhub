@@ -26,6 +26,7 @@ import (
 	"time"
 
 	"github.com/gin-gonic/gin"
+	"github.com/sunqirui1987/xhub/internal/auth"
 	"github.com/sunqirui1987/xhub/internal/authz"
 	"github.com/sunqirui1987/xhub/internal/catalog"
 	dpcontract "github.com/sunqirui1987/xhub/internal/dataplane/contract"
@@ -88,7 +89,8 @@ func setCORS(w http.ResponseWriter, r *http.Request) {
 func (s *Server) GinRoutes() gin.RoutesInfo { return s.engine.Routes() }
 
 // Handler 返回统一 HTTP 入口，供服务器和测试挂载；读取失败仅保留有界诊断，不保存不完整正文。
-// Bypass 处理后直接返回，其余请求经 Gin 流式输出或缓冲供幂等重放；不改变鉴权、预算或正常请求正文保存规则。
+// 流式请求直接输出；同步对话和幂等请求经缓冲后写出，交付标记无法保存时返回 503。
+// 实际刷新结果用于确认同步账单；不改变鉴权、预算或正常请求正文保存规则。
 // 参数：无。
 // 调用：gateway/server.go
 // 测试：access_log_test.go、activity_http_test.go、builtin_providers_test.go
@@ -111,6 +113,17 @@ func (s *Server) Handler() http.Handler {
 			}
 			if lw.code >= 400 {
 				s.recordEarlyError(lw, r, raw, body, start)
+				if lw.delivery != nil && lw.delivery.delivery != nil {
+					s.finishSyncDelivery(r.Context(), *lw.delivery.delivery, lw.writeErr)
+					lw.delivery.delivery = nil
+				}
+				if s.IAM != nil {
+					ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+					if err := s.IAM.DiscardRecordedDelivery(ctx, lw.Header().Get("x-litellm-call-id")); err != nil {
+						util.Error("delivery marker cleanup failed: %v", err)
+					}
+					cancel()
+				}
 				s.ReleaseCall(lw.Header().Get("x-litellm-call-id"))
 				note := lw.note
 				if note == "" {
@@ -190,7 +203,8 @@ func (s *Server) Handler() http.Handler {
 		if lease != nil {
 			defer lease.abort()
 		}
-		if lease == nil && s.serveBypass(lw, r) {
+		guardDelivery := syncDialogueGuard(r, stream)
+		if lease == nil && !guardDelivery && s.serveBypass(lw, r) {
 			return
 		}
 		if stream || strings.EqualFold(r.Header.Get("Upgrade"), "websocket") {
@@ -199,7 +213,8 @@ func (s *Server) Handler() http.Handler {
 			return
 		}
 		util.Debug("process %s %s step=dispatch mode=buffered", r.Method, r.URL.Path)
-		hw := &holdWriter{ResponseWriter: w, code: 200}
+		hw := &holdWriter{ResponseWriter: w, code: 200, guardDelivery: guardDelivery}
+		lw.delivery = hw
 		if !s.serveBypass(hw, r) {
 			s.engine.ServeHTTP(hw, r)
 		}
@@ -214,6 +229,17 @@ func (s *Server) Handler() http.Handler {
 				}
 			}
 		}
+		if hw.deliveryErr != nil {
+			// 没有可靠恢复标记时不能发送成功响应，也不能把内存账单当作已持久化。
+			w.Header().Del("x-litellm-response-cost")
+			w.Header().Del("x-litellm-response-cost-original")
+			w.Header().Del("x-litellm-response-cost-input")
+			w.Header().Del("x-litellm-response-cost-output")
+			w.Header().Del("x-litellm-key-spend")
+			lw.usageRecorded = false
+			util.WriteTypedError(w, r.URL.Path, http.StatusServiceUnavailable, "billing_storage_unavailable", "response delivery tracking is unavailable")
+			return
+		}
 		code := hw.code
 		if !hw.hdr {
 			code = 200
@@ -222,8 +248,23 @@ func (s *Server) Handler() http.Handler {
 			lw.note = errorNote(hw.buf.Bytes())
 		}
 		w.WriteHeader(code)
-		_, _ = w.Write(hw.buf.Bytes())
-		if lease != nil && code < 500 {
+		n, writeErr := w.Write(hw.buf.Bytes())
+		if writeErr == nil && n != hw.buf.Len() {
+			writeErr = io.ErrShortWrite
+		}
+		if hw.delivery != nil {
+			// 小响应可能还在 net/http 缓冲区；先尝试真正刷新，才能观察可见的连接写入错误。
+			if writeErr == nil {
+				writeErr = http.NewResponseController(w).Flush()
+			}
+			s.finishSyncDelivery(r.Context(), *hw.delivery, writeErr)
+			hw.delivery = nil
+			if writeErr == nil && hw.routeTokens > 0 {
+				s.noteUsage(hw.routeDeployment, hw.routeTokens)
+			}
+		}
+		// 写失败已记零费用；不可缓存成功正文供同键免费重放。保留持久标识，避免重复调用上游。
+		if lease != nil && code < 500 && writeErr == nil {
 			rec := idemRec{Code: code, CT: w.Header().Get("Content-Type"), Body: append([]byte(nil), hw.buf.Bytes()...)}
 			rec.Hdr = map[string]string{}
 			for _, k := range []string{"x-litellm-call-id", "x-litellm-version", "x-litellm-model-name", "x-litellm-model-id"} {
@@ -471,6 +512,8 @@ type statusRecorder struct {
 	note string
 	// usageRecorded 只抑制外层错误兜底，不影响执行链对真实尝试的结算。
 	usageRecorded bool
+	delivery      *holdWriter // 同步对话的待确认账单缓冲，供错误收尾访问。
+	writeErr      error       // 实际响应写入错误，用于错误路径记录交付失败。
 	// body 只收集失败响应，供统一早期错误日志保存客户端实际收到的完整正文。
 	body bytes.Buffer
 }
@@ -501,7 +544,14 @@ func (s *statusRecorder) Write(p []byte) (int, error) {
 	if s.code >= 400 {
 		_, _ = s.body.Write(p)
 	}
-	return s.ResponseWriter.Write(p)
+	n, err := s.ResponseWriter.Write(p)
+	if err == nil && n != len(p) {
+		err = io.ErrShortWrite
+	}
+	if err != nil {
+		s.writeErr = err
+	}
+	return n, err
 }
 
 // markUsageRecorded 沿标准 Unwrap 链标记当前HTTP请求已进入结算，供Handler的错误兜底使用。
@@ -555,10 +605,21 @@ func (s *Server) recordEarlyError(lw *statusRecorder, r *http.Request, raw []byt
 	identityCtx, cancel := context.WithTimeout(context.WithoutCancel(r.Context()), 2*time.Second)
 	defer cancel()
 	p, _ := s.resolve(r.WithContext(identityCtx))
+	if lw.delivery != nil && lw.delivery.principal != nil {
+		p = lw.delivery.principal
+	}
+	if lw.delivery != nil && lw.delivery.preparedID == callID && !lw.delivery.preparedAt.IsZero() {
+		// 早期错误的外层计时可能早于执行器标记；磁盘快照必须复用标记时间才能严格重放。
+		start = lw.delivery.preparedAt
+	}
 	// 使用实际响应正文，而不是重新构造错误包络，确保日志与调用方看到的字节一致。
 	s.AnnotateCall(callID, dpcontract.CallNote{Upstream: lw.failureDiagnostics})
 	s.rememberExchange(callID, r, raw, lw.body.Bytes())
-	s.recordSpend(lw, p, callID, alias, "request", nil, start, false, lw.code, "")
+	var writer http.ResponseWriter = lw
+	if lw.delivery != nil {
+		writer = lw.delivery
+	}
+	s.recordSpend(writer, p, callID, alias, "request", nil, start, false, lw.code, "")
 }
 
 // Flush 在底层支持刷新时，把已经缓冲的字节推给调用方。
@@ -568,10 +629,10 @@ func (s *Server) recordEarlyError(lw *statusRecorder, r *http.Request, raw []byt
 // 返回：无。底层实现了 http.Flusher 时才会真正刷新。
 func (s *statusRecorder) Flush() { _ = s.FlushError() }
 
-// FlushError 将底层刷新错误传给流式执行器，避免最后一帧断连被误判为成功。
-// 无参数；返回底层刷新结果。不支持刷新时保留旧行为；调用方不能据此判断断连发起方。
+// FlushError 刷新底层响应并报告错误，供同步交付确认和流式转发使用。
+// 不支持刷新时返回 http.ErrNotSupported，避免同步请求把未确认的正文当作已交付。
 func (s *statusRecorder) FlushError() error {
-	return util.FlushResponse(s.ResponseWriter)
+	return util.FlushResponseStrict(s.ResponseWriter)
 }
 
 // Hijack 把连接从 HTTP 服务里交出去，给需要升级的协议使用。
@@ -596,9 +657,53 @@ func (s *statusRecorder) Unwrap() http.ResponseWriter { return s.ResponseWriter 
 
 type holdWriter struct {
 	http.ResponseWriter
-	code int
-	buf  bytes.Buffer
-	hdr  bool
+	code            int
+	buf             bytes.Buffer
+	hdr             bool
+	guardDelivery   bool             // 同步对话需要等客户端写出后再确认账单。
+	delivery        *iam.UsageRecord // 执行器冻结的最终账单，等待响应写入。
+	deliveryErr     error            // 交付标记或快照无法保存，不能返回成功正文。
+	preparedID      string           // 已持久化交付标记的调用 ID。
+	preparedAt      time.Time        // 首次出站时写入标记的冻结时间。
+	principal       *auth.Principal  // 首次出站时冻结的计费归属。
+	routeDeployment string
+	routeTokens     int
+}
+
+// syncDialogueGuard 判断请求是否需要等待完整写出后结算；r 为当前请求，stream 为已解析的流式标志。
+// 流式与 WebSocket 不进入正文缓冲，其余同步对话路径沿用 syncDialogueRoute。
+func syncDialogueGuard(r *http.Request, stream bool) bool {
+	return r != nil && !stream && !strings.EqualFold(r.Header.Get("Upgrade"), "websocket") && syncDialogueRoute(r.Method, r.URL.Path)
+}
+
+// syncDialogueRoute 识别需要等待客户端完整写出的同步对话入口；参数为 HTTP 方法和路径。
+// 返回是否适用，供 Handler 选择缓冲/结算方式；流式、异步任务及非对话接口保持既有行为。
+func syncDialogueRoute(method, path string) bool {
+	if method != http.MethodPost {
+		return false
+	}
+	switch path {
+	case "/chat/completions", "/v1/chat/completions", "/responses", "/v1/responses", "/messages", "/v1/messages", "/bypass/openai/v1/chat/completions", "/bypass/openai/v1/responses", "/bypass/anthropic/v1/messages":
+		return true
+	default:
+		return false
+	}
+}
+
+// deliveryBuffer 沿响应包装链查找当前请求的同步结算缓冲；参数为执行器 writer。
+// 找不到适用缓冲时返回 nil，不修改状态；供 recordSpend 构建完整快照后延迟结算。
+func deliveryBuffer(w http.ResponseWriter) *holdWriter {
+	for depth := 0; w != nil && depth < 32; depth++ {
+		if h, ok := w.(*holdWriter); ok && h.guardDelivery {
+			return h
+		}
+		wrapped, ok := w.(interface{ Unwrap() http.ResponseWriter })
+		if !ok {
+			return nil
+		}
+		w = wrapped.Unwrap()
+	}
+	return nil
 }
 
 // WriteHeader 先把状态码留在缓冲里，让中间件还能补响应头。Finish 才真正写出。
