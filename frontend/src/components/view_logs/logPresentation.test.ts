@@ -15,6 +15,10 @@ describe("日志展示摘要", () => {
   ])("classifies %s neutrally", (http_status, key) => {
     expect(logOutcomeKey({ metadata: { http_status } })).toBe(`logsUX.${key}`);
   });
+  /** 前置客户端写入失败且状态为 502；展示写入事实而不是误归因上游，纯函数无需清理。 */
+  it("prefers the observed client write failure over the status", () => {
+    expect(logOutcomeKey({ metadata: { http_status: 502, upstream_response: { failure: { kind: "client_write_error" } } } })).toBe("logsUX.clientWriteFailed");
+  });
   /** 前置普通/错误列表；默认仅错误列表展示摘要，低频技术列可通过列菜单恢复，纯函数无需清理。 */
   it("uses different default columns for errors and usage", () => {
     expect(logColumnVisibility(true)).toMatchObject({
