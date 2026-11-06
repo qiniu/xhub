@@ -1,4 +1,8 @@
 import { expect, test } from "@playwright/test";
+import { spawn, type ChildProcess } from "node:child_process";
+import { createServer } from "node:net";
+import { closeSync, openSync } from "node:fs";
+import { join } from "node:path";
 import { translate } from "../src/i18n/translate";
 import { GATEWAY, UPSTREAM, loginAdmin, sessionBearer, stableGoto } from "./helpers";
 
@@ -14,6 +18,8 @@ export function registerLogCostReasoningScenario(locale: "en" | "zh-CN") {
     const tr = (key: string) => translate(locale, key);
     const model = "monitor-tps-log-details-" + locale + "-" + Date.now();
     let modelID = "", keyID = "", key = "";
+    let secondGateway: ChildProcess | undefined;
+    let secondGatewayError: Error | undefined;
     const extraModelIDs: string[] = [];
     const observations: Record<string, unknown>[] = [];
     try {
@@ -156,8 +162,66 @@ export function registerLogCostReasoningScenario(locale: "en" | "zh-CN") {
         await page.keyboard.press("Escape");
         await expect(dialog).not.toBeVisible();
       }
+      // 用同一隔离数据库启动另一个真实网关，验证实例变化时不能重放正文或重复请求上游。
+      const probe = createServer();
+      await new Promise<void>((resolve, reject) => { probe.once("error", reject); probe.listen(0, "127.0.0.1", resolve); });
+      const address = probe.address();
+      if (!address || typeof address === "string") throw new Error("Failed to allocate isolated gateway port");
+      const secondOrigin = `http://127.0.0.1:${address.port}`;
+      await new Promise<void>((resolve, reject) => probe.close((error) => error ? reject(error) : resolve()));
+      const runDir = process.env.E2E_RUN_DIR;
+      if (!runDir) throw new Error("E2E_RUN_DIR is required for isolated gateway");
+      const secondLog = openSync(join(runDir, "idempotency-second-gateway.log"), "a");
+      try {
+        secondGateway = spawn(join(runDir, "xhub"), ["-config", join(runDir, "c.yaml"), "-addr", `127.0.0.1:${address.port}`], {
+          env: { ...process.env, XHUB_PRICE_FEED_URL: UPSTREAM + "/v1/market/models", XHUB_PUBLIC_ORIGIN: secondOrigin, XHUB_USAGE_SPOOL_DIR: "" },
+          stdio: ["ignore", secondLog, secondLog],
+        });
+        secondGateway.once("error", (error) => { secondGatewayError = error; });
+      } finally {
+        closeSync(secondLog);
+      }
+      await expect.poll(async () => {
+        if (secondGatewayError) throw new Error(`Second gateway failed to start: ${secondGatewayError.message}`);
+        if (secondGateway?.exitCode !== null) throw new Error(`Second gateway exited: ${secondGateway?.exitCode}`);
+        try { return (await page.request.get(secondOrigin + "/health/readiness")).status(); } catch { return 0; }
+      }).toBe(200);
+      const idemHeaders = { Authorization: "Bearer " + key, "Idempotency-Key": `${model}-instance-test` };
+      const idemBody = { model, stream: false, messages: [{ role: "user", content: "Verify retry across gateway instances." }] };
+      const original = await page.request.post(secondOrigin + "/v1/chat/completions", { headers: idemHeaders, data: idemBody });
+      expect(original.status(), await original.text()).toBe(200);
+      const originalID = original.headers()["x-litellm-call-id"];
+      // Messages 的跨实例拒绝也应使用客户端可识别的 Anthropic 错误格式。
+      const messagesHeaders = { Authorization: "Bearer " + key, "Idempotency-Key": `${model}-messages-instance-test` };
+      const messagesBody = { model, stream: false, max_tokens: 32, messages: [{ role: "user", content: "Verify message retry across instances." }] };
+      const originalMessages = await page.request.post(secondOrigin + "/v1/messages", { headers: messagesHeaders, data: messagesBody });
+      expect(originalMessages.status(), await originalMessages.text()).toBe(200);
+      // 结束处理原请求的进程，确认另一实例仅依靠数据库中的摘要识别重试。
+      secondGateway.kill("SIGTERM");
+      await new Promise<void>((resolve) => secondGateway!.once("exit", () => resolve()));
+      secondGateway = undefined;
+      const retry = await page.request.post(GATEWAY + "/v1/chat/completions", { headers: idemHeaders, data: idemBody });
+      expect(retry.status(), await retry.text()).toBe(409);
+      expect(await retry.text()).toContain("idempotency_result_unavailable");
+      expect(await retry.text()).not.toContain("e2e-ok");
+      const retryMessages = await page.request.post(GATEWAY + "/v1/messages", { headers: messagesHeaders, data: messagesBody });
+      expect(retryMessages.status(), await retryMessages.text()).toBe(409);
+      expect(await retryMessages.json()).toMatchObject({ type: "error", error: { type: "idempotency_result_unavailable" } });
+      const retryMessagesID = retryMessages.headers()["x-litellm-call-id"];
+      await expect.poll(async () => (await page.request.get(GATEWAY + "/spend/logs/ui/" + retryMessagesID, { headers })).status()).toBe(200);
+      const retryMessagesLog = await (await page.request.get(GATEWAY + "/spend/logs/ui/" + retryMessagesID, { headers })).json();
+      expect(retryMessagesLog.status).toBe("error");
+      expect(retryMessagesLog.spend).toBe(0);
+      await expect.poll(async () => (await page.request.get(GATEWAY + "/spend/logs/ui/" + originalID, { headers })).status()).toBe(200);
+      await stableGoto(page, "/logs");
+      await page.getByPlaceholder(tr("Search logs by ID…"), { exact: true }).fill(originalID);
+      await expect(page.getByRole("row").filter({ hasText: originalID })).toBeVisible();
       await info.attach("log-cost-reasoning-contract", { body: JSON.stringify(observations, null, 2), contentType: "application/json" });
     } finally {
+      if (secondGateway && !secondGatewayError && secondGateway.pid && secondGateway.exitCode === null && secondGateway.signalCode === null) {
+        secondGateway.kill("SIGTERM");
+        await new Promise<void>((resolve) => secondGateway!.once("exit", () => resolve()));
+      }
       if (keyID) expect((await page.request.post(GATEWAY + "/key/delete", { headers, data: { keys: [keyID] } })).status()).toBe(200);
       for (const id of extraModelIDs) expect((await page.request.post(GATEWAY + "/model/delete", { headers, data: { id } })).status()).toBe(200);
       if (modelID) expect((await page.request.post(GATEWAY + "/model/delete", { headers, data: { id: modelID } })).status()).toBe(200);

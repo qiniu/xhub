@@ -13,7 +13,7 @@ go test ./internal/dataplane/... ./internal/live -count=1
 | Path | Guarantee / limit |
 | --- | --- |
 | Complete response cache | Non-streaming results; process-local LRU, no shared invalidation/TTL guarantee |
-| Idempotency-Key | Authenticated non-streaming coordination/replay; process-local |
+| Idempotency-Key | Authenticated non-streaming responses replay within the same process; PostgreSQL stores a digest for 24 hours and returns `409 idempotency_result_unavailable` across instances or restarts without retaining response bodies. Database failure or claim timeout returns `503 idempotency_unavailable`. |
 | Stream | No successful cache/stickiness update after failure; cannot restart after output |
 | Native tasks | Query using creation identity and registered task path |
 | Task settlement | Successful measured result, deduplicated PostgreSQL event |

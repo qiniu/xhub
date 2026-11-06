@@ -197,7 +197,8 @@ The [pricing reference](development/en/pricing.md) explains rate units, snapshot
 | SDK receives HTML | Gateway URL should normally use port `4000`, not console port `3000` |
 | Stream stops midway | Inspect the call log; decide whether the application can safely make a new request |
 | Unexpected zero cost | Response cache, failed call, missing rate, or missing upstream usage; compare provider billing |
-| Idempotency `409` | The same idempotency key was reused with changed raw request body or query |
+| Idempotency `409` | `idempotency_conflict` means the key was reused with a different body or query; `idempotency_result_unavailable` means the original result cannot be replayed. Use a new key for a new request only after considering that the original may have reached the provider. |
+| Idempotency `503 idempotency_unavailable` | Database access or claim timed out; the gateway refuses the upstream call. If the claim outcome is uncertain, the same key may temporarily be unavailable. |
 | Cannot remove the last team administrator | Assign a replacement first |
 | Changing the configured admin password has no effect | Configuration seeds a new account only; change/reset the existing account's password in the console |
 

@@ -95,6 +95,8 @@ type idemRec struct {
 	CT          string
 	Body        []byte
 	Hdr         map[string]string
+	// Synthetic 表示本次请求生成的拒绝响应，需要单独记零费用错误日志。
+	Synthetic bool
 }
 
 const defaultIdempotencyTTL = 24 * time.Hour
@@ -197,6 +199,8 @@ func (s *Server) serveListener(ln net.Listener) error {
 		go func() { defer flush.Done(); s.flushLoop(ctx) }()
 		flush.Add(1)
 		go func() { defer flush.Done(); s.samlRefreshLoop(ctx) }()
+		flush.Add(1)
+		go func() { defer flush.Done(); s.idempotencyCleanupLoop(ctx) }()
 	}
 	go s.archiveLoop(ctx)
 	return (&http.Server{Handler: s.Handler()}).Serve(ln)

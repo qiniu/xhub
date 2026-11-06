@@ -168,7 +168,7 @@ func TestIdempotentErrorDoesNotCreateAnotherSnapshot(t *testing.T) {
 	out := httptest.NewRecorder()
 	r := &statusRecorder{ResponseWriter: out, code: 200}
 	hit := &idemRec{Code: 400, Body: []byte(`{"error":"original"}`), Hdr: map[string]string{"x-litellm-call-id": "original-id"}}
-	s.writeIdempotentResponse(r, r, hit)
+	s.writeIdempotentResponse(r, r, hit, "/v1/chat/completions")
 	s.recordEarlyError(r, httptest.NewRequest("POST", "/v1/chat/completions", nil), nil, nil, time.Now())
 	if !r.usageRecorded || out.Code != 400 || out.Body.String() != string(hit.Body) || len(s.exchanges) != 0 {
 		t.Fatal("错误重放修改原响应或重复记录")

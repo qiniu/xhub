@@ -39,6 +39,11 @@ var archiveSchemaSQL string
 //go:embed usage_pending_schema.sql
 var usagePendingSchemaSQL string
 
+// idempotencyFenceSchemaSQL 仅保存幂等标识摘要，禁止持久化请求和响应正文。
+//
+//go:embed idempotency_schema.sql
+var idempotencyFenceSchemaSQL string
+
 // budgetReconciliationSchemaSQL 追加保存人工对账终态与原始证据，供重放防重复核验。
 //
 //go:embed budget_reconciliation_schema.sql
@@ -107,6 +112,9 @@ func (db *DB) Migrate(ctx context.Context) error {
 		return err
 	}
 	if _, err := db.Engine.Context(ctx).Exec(usagePendingSchemaSQL); err != nil {
+		return err
+	}
+	if _, err := db.Engine.Context(ctx).Exec(idempotencyFenceSchemaSQL); err != nil {
 		return err
 	}
 	if _, err := db.Engine.Context(ctx).Exec(budgetReconciliationSchemaSQL); err != nil {
