@@ -301,7 +301,7 @@ func TestBrowserEnterpriseFixture(t *testing.T) {
 	defer closeSpoolControl()
 	control := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
-		if browserBillingPendingControl(w, r, s) || spoolControl(w, r) {
+		if browserBillingPendingControl(w, r, s) || spoolControl(w, r) || browserQueueConflictControl(w, r, s) {
 			return
 		}
 		switch r.URL.Path {
