@@ -151,6 +151,9 @@ for (const locale of ["zh-CN", "en"] as const)
             ).toBe(true);
             expectSoftVisionBudget(reply.headers());
             await expect(page.getByText("green-pixel", { exact: true }).last()).toBeVisible();
+            // 文本可见时 SSE 尾部的用量和结束事件仍可能在传输；等响应收完且页面恢复可发送后，再清空对话。
+            expect(await reply.finished(), name + " " + path + " response transfer").toBeNull();
+            await expect(page.getByRole("button", { name: t("Send message"), exact: true })).toBeVisible();
             calls.push(reply.headers()["x-litellm-call-id"]);
           }
         // Messages 通过同源浏览器代理到真实后台，必须转换成上游能消费的图片，不能只允许一个白名单字段。
