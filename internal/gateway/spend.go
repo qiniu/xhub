@@ -140,6 +140,10 @@ func (s *Server) quoteSpend(callID, alias, depID string, usage map[string]any, s
 func (s *Server) recordSpend(w http.ResponseWriter, p *auth.Principal, callID, alias, op string, usage map[string]any, start time.Time, cacheHit bool, status int, depID string) {
 	// 完整快照由本路径负责，即使存储失败也不能由外层生成内容不同的替代账单。
 	markUsageRecorded(w)
+	if pending := deliveryBuffer(w); pending != nil && pending.preparedID == callID && pending.principal != nil {
+		// 重试时凭证的团队等可能更新；结算应使用提交前已持久化的归属快照。
+		p = pending.principal
+	}
 	if usage == nil {
 		usage = map[string]any{}
 	}
@@ -315,7 +319,7 @@ func (s *Server) recordSpend(w http.ResponseWriter, p *auth.Principal, callID, a
 		}
 		return
 	}
-	if pending := deliveryBuffer(w); pending != nil && !note.Streamed && (status >= 200 && status < 300 || pending.preparedID == callID) {
+	if pending := deliveryBuffer(w); pending != nil && (pending.preparedID == callID || !note.Streamed && status >= 200 && status < 300) {
 		// 执行器即将释放请求级事实，先冻结费用与日志快照；未确认写出时仅登记零费用恢复记录。
 		record := usageFromSpend(row, spend, ex.messages, row.Response, ex.proxy, start, end)
 		if s.usageSpoolEnabled {

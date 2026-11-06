@@ -65,7 +65,7 @@ func (s *Server) finishSyncDelivery(ctx context.Context, record iam.UsageRecord,
 		}
 		return
 	}
-	if err := s.IAM.FlushPendingUsage(persistCtx, 500); err != nil {
+	if err := s.IAM.FlushPendingUsageRequest(persistCtx, record.RequestID); err != nil {
 		util.Error("delivery settlement pending request=%s: %v", record.RequestID, err)
 		return
 	}

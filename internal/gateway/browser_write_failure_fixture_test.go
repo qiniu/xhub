@@ -10,6 +10,12 @@ import (
 // browserWriteFailure 只用于隔离浏览器测试，转发响应头但模拟客户端正文写入失败。
 type browserWriteFailure struct{ http.ResponseWriter }
 
+// browserFlushFailure 在隔离浏览器测试中只模拟连接刷新失败，不更改请求或响应正文。
+type browserFlushFailure struct{ http.ResponseWriter }
+
+// FlushError 返回可控连接错误，供浏览器端验证小响应刷新失败后的零费用日志。
+func (w browserFlushFailure) FlushError() error { return io.ErrClosedPipe }
+
 // Write 模拟连接在写正文时断开；参数为未持久化的响应字节，返回零字节和标准连接错误。
 // 浏览器夹具包裹真实 HTTP 输出调用，不读取、复制或记录响应内容。
 func (w browserWriteFailure) Write(_ []byte) (int, error) { return 0, io.ErrClosedPipe }

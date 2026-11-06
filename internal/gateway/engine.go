@@ -252,13 +252,18 @@ func (s *Server) Handler() http.Handler {
 			writeErr = io.ErrShortWrite
 		}
 		if hw.delivery != nil {
+			// 小响应可能还在 net/http 缓冲区；先尝试真正刷新，才能观察可见的连接写入错误。
+			if writeErr == nil {
+				writeErr = http.NewResponseController(w).Flush()
+			}
 			s.finishSyncDelivery(r.Context(), *hw.delivery, writeErr)
 			hw.delivery = nil
 			if writeErr == nil && hw.routeTokens > 0 {
 				s.noteUsage(hw.routeDeployment, hw.routeTokens)
 			}
 		}
-		if lease != nil && code < 500 {
+		// 写失败已记零费用；不可缓存成功正文供同键免费重放。保留持久标识，避免重复调用上游。
+		if lease != nil && code < 500 && writeErr == nil {
 			rec := idemRec{Code: code, CT: w.Header().Get("Content-Type"), Body: append([]byte(nil), hw.buf.Bytes()...)}
 			rec.Hdr = map[string]string{}
 			for _, k := range []string{"x-litellm-call-id", "x-litellm-version", "x-litellm-model-name", "x-litellm-model-id"} {
@@ -603,9 +608,13 @@ func (s *Server) recordEarlyError(lw *statusRecorder, r *http.Request, raw []byt
 // 测试：无直接单测
 // 返回：无。底层实现了 http.Flusher 时才会真正刷新。
 func (s *statusRecorder) Flush() {
-	if f, ok := s.ResponseWriter.(http.Flusher); ok {
-		f.Flush()
-	}
+	_ = s.FlushError()
+}
+
+// FlushError 将缓冲响应刷新到底层连接并返回可观察的写入错误；同步交付确认和流式输出调用。
+// 无参数；底层不支持刷新时返回 http.ErrNotSupported，不能把未确认的正文当成已交付。
+func (s *statusRecorder) FlushError() error {
+	return http.NewResponseController(s.ResponseWriter).Flush()
 }
 
 // Hijack 把连接从 HTTP 服务里交出去，给需要升级的协议使用。

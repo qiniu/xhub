@@ -280,3 +280,64 @@ func TestDeliverySpoolOwnedMarker(t *testing.T) {
 		t.Fatalf("磁盘终态未正确结算: %+v %v", event, err)
 	}
 }
+
+// TestConfirmedDeliveryIgnoresUnrelatedPendingFailure 验证其他损坏账单不能阻止本请求确认并结算。
+// 使用独立 PostgreSQL 注入无效待处理快照；检查本请求只结算一次且故障快照保留，测试库自动清理。
+func TestConfirmedDeliveryIgnoresUnrelatedPendingFailure(t *testing.T) {
+	db := testDB(t)
+	if _, err := db.Engine.Exec(`INSERT INTO usage_pending(request_id,payload) VALUES ('unrelated-bad', '{}'::jsonb)`); err != nil {
+		t.Fatal(err)
+	}
+	rec := usageRecord("confirmed-isolated", "", 0.25)
+	if err := db.PrepareDelivery(t.Context(), rec, time.Now().Add(time.Hour)); err != nil {
+		t.Fatal(err)
+	}
+	if err := db.SettleConfirmedDelivery(t.Context(), rec); err != nil {
+		t.Fatalf("无关待结算错误不应阻止已确认账单: %v", err)
+	}
+	if countEvents(t, db, rec.RequestID) != 1 {
+		t.Fatal("已确认账单未唯一结算")
+	}
+	if n, err := db.Engine.Table("usage_pending").Where("request_id = ?", "unrelated-bad").Count(); err != nil || n != 1 {
+		t.Fatalf("无关故障快照应保留以供排查: n=%d err=%v", n, err)
+	}
+}
+
+// TestConfirmedDeliveryUsesPreparedTimestamp 验证交付标记冻结的发生时间在确认和故障重放时保持一致。
+// 使用隔离 PostgreSQL 准备不同开始时间的快照并重复结算，验证唯一账单和费用；测试库自动清理。
+func TestConfirmedDeliveryUsesPreparedTimestamp(t *testing.T) {
+	db := testDB(t)
+	initial := usageRecord("prepared-timestamp", "", 0.25)
+	initial.TS = time.Now().UTC().Truncate(time.Second)
+	if err := db.PrepareDelivery(t.Context(), initial, time.Now().Add(time.Hour)); err != nil {
+		t.Fatal(err)
+	}
+	record := initial
+	record.TS = initial.TS.Add(-time.Second)
+	if err := db.SettleConfirmedDelivery(t.Context(), record); err != nil {
+		t.Fatalf("确认时应沿用标记的时间: %v", err)
+	}
+	event, err := db.GetUsageEvent(t.Context(), UsageQuery{}, initial.RequestID)
+	if err != nil || !event.TS.Equal(initial.TS) || event.Cost != initial.Cost {
+		t.Fatalf("账单时间或金额与标记不一致: event=%+v err=%v", event, err)
+	}
+}
+
+// TestFlushPendingUsageRequestRejectsMissing 验证定向结算不能把不存在的账单误认为已成功。
+// 使用独立 PostgreSQL，覆盖空标识、缺失记录及已提交账单；测试库由夹具清理。
+func TestFlushPendingUsageRequestRejectsMissing(t *testing.T) {
+	db := testDB(t)
+	if err := db.FlushPendingUsageRequest(t.Context(), ""); err == nil {
+		t.Fatal("空请求标识应被拒绝")
+	}
+	if err := db.FlushPendingUsageRequest(t.Context(), "missing-request"); err == nil {
+		t.Fatal("无待结算快照和账单时不能报告成功")
+	}
+	record := usageRecord("already-committed", "", 0.25)
+	if err := db.RecordUsageExact(t.Context(), []UsageRecord{record}); err != nil {
+		t.Fatal(err)
+	}
+	if err := db.FlushPendingUsageRequest(t.Context(), record.RequestID); err != nil {
+		t.Fatalf("已提交的账单应可安全确认: %v", err)
+	}
+}

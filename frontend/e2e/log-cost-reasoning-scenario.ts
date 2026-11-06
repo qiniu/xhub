@@ -90,7 +90,7 @@ export function registerLogCostReasoningScenario(locale: "en" | "zh-CN") {
       }
       // 测试二进制在真实 HTTP 写边界注入连接错误，浏览器随后核对日志和零费用。
       const writeFailure = await page.request.post(GATEWAY + "/v1/chat/completions", {
-        headers: { Authorization: "Bearer " + key, "X-E2E-Client-Write": "fail" },
+        headers: { Authorization: "Bearer " + key, "X-E2E-Client-Write": "fail", "Idempotency-Key": model + "-write-failure" },
         data: { model, stream: false, messages: [{ role: "user", content: "Verify client write failure." }] },
       });
       expect(await writeFailure.text()).not.toContain("e2e-ok");
@@ -101,9 +101,50 @@ export function registerLogCostReasoningScenario(locale: "en" | "zh-CN") {
       expect(failureDetail.status).toBe("error");
       expect(failureDetail.spend).toBe(0);
       expect(failureDetail.metadata.upstream_response.failure.kind).toBe("client_write_error");
+      // 已失败并记零费用的交付不能通过幂等重放泄露完整的成功正文。
+      const failedReplay = await page.request.post(GATEWAY + "/v1/chat/completions", {
+        headers: { Authorization: "Bearer " + key, "Idempotency-Key": model + "-write-failure" },
+        data: { model, stream: false, messages: [{ role: "user", content: "Verify client write failure." }] },
+      });
+      expect(failedReplay.status()).toBe(409);
+      expect(await failedReplay.text()).not.toContain("e2e-ok");
       await stableGoto(page, "/logs?log_id=" + encodeURIComponent(writeFailureID));
       const failureDialog = page.getByRole("dialog");
       await expect(failureDialog.getByText(tr("logDiagnostics.clientWriteError"))).toBeVisible();
+      await page.keyboard.press("Escape");
+      // 小响应在服务端缓冲成功后刷新失败，仍应在真实日志界面显示失败且费用为零。
+      const flushFailure = await page.request.post(GATEWAY + "/v1/chat/completions", {
+        headers: { Authorization: "Bearer " + key, "X-E2E-Client-Write": "flush-fail" },
+        data: { model, stream: false, messages: [{ role: "user", content: "Verify client flush failure." }] },
+      });
+      const flushFailureID = flushFailure.headers()["x-litellm-call-id"];
+      await expect.poll(async () => (await page.request.get(GATEWAY + "/spend/logs/ui/" + flushFailureID, { headers })).status()).toBe(200);
+      const flushDetail = await (await page.request.get(GATEWAY + "/spend/logs/ui/" + flushFailureID, { headers })).json();
+      expect(flushDetail.status).toBe("error");
+      expect(flushDetail.spend).toBe(0);
+      await stableGoto(page, "/logs?log_id=" + encodeURIComponent(flushFailureID));
+      await expect(page.getByRole("dialog").getByText(tr("logDiagnostics.clientWriteError"))).toBeVisible();
+      await page.keyboard.press("Escape");
+      // 透传模型名包含空格时，页面必须展示实际成功账单，不能丢失费用。
+      const bypassModel = model + "-bypass-trim";
+      const bypassCreated = await page.request.post(GATEWAY + "/model/new", { headers, data: {
+        model_name: bypassModel,
+        litellm_params: { model: bypassModel, custom_llm_provider: "openai", api_base: UPSTREAM, api_key: "sk-fake", input_cost_per_token: 0.0000003, output_cost_per_token: 0.000008641 },
+        model_info: { transport: "bypass_openai_chat", endpoint_types: ["bypass:openai-chat"], pricing_source: "manual" },
+      } });
+      expect(bypassCreated.status(), await bypassCreated.text()).toBe(200);
+      extraModelIDs.push((await bypassCreated.json()).model_info.id);
+      const bypassResponse = await page.request.post(GATEWAY + "/bypass/openai/v1/chat/completions", {
+        headers: { Authorization: "Bearer " + key }, data: { model: bypassModel + " ", stream: false, messages: [{ role: "user", content: "Verify bypass billing." }] },
+      });
+      expect(bypassResponse.status(), await bypassResponse.text()).toBe(200);
+      const bypassID = bypassResponse.headers()["x-litellm-call-id"];
+      await expect.poll(async () => (await page.request.get(GATEWAY + "/spend/logs/ui/" + bypassID, { headers })).status()).toBe(200);
+      const bypassDetail = await (await page.request.get(GATEWAY + "/spend/logs/ui/" + bypassID, { headers })).json();
+      expect(bypassDetail.status).toBe("success");
+      expect(bypassDetail.spend).toBeCloseTo(0.00308641, 12);
+      await stableGoto(page, "/logs?log_id=" + encodeURIComponent(bypassID));
+      await expect(page.getByRole("dialog").getByText("$0.00308641", { exact: true }).first()).toBeVisible();
       await page.keyboard.press("Escape");
       // 创建带分时费率的真实部署，通过网关产生账单，再核对存储快照与页面标签。
       const windowModel = model + "-window";

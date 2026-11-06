@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+	"strings"
 	"time"
 
 	"github.com/sunqirui1987/xhub/internal/auth"
@@ -88,7 +89,8 @@ func (s *Server) PrepareBudgetAttempt(w http.ResponseWriter, r *http.Request, p 
 	}
 	if pending := deliveryBuffer(w); pending != nil && pending.preparedID == "" {
 		// 在实际调用上游前持久化零费用标记，避免供应商处理期间网关退出后没有恢复证据。
-		record := iam.UsageRecord{RequestID: callID, TS: start, KeyID: p.KeyID, UserID: p.UserID, OwnerType: p.OwnerType, Model: w.Header().Get("x-litellm-model-name")}
+		// 执行器用裁剪后的别名路由和记账，标记必须使用同一模型名才能确认账单。
+		record := iam.UsageRecord{RequestID: callID, TS: start, KeyID: p.KeyID, UserID: p.UserID, OwnerType: p.OwnerType, Model: strings.TrimSpace(w.Header().Get("x-litellm-model-name"))}
 		if p.Key != nil {
 			record.TeamID, record.OrganizationID, record.ProjectID = p.BillingTeamID, p.BillingOrgID, deref(p.Key.ProjectID)
 			if p.Key.UserID != nil {

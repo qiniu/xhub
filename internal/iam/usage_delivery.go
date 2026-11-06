@@ -90,7 +90,13 @@ func stageDelivery(s *xorm.Session, record UsageRecord) error {
 // 参数 ctx 为数据库上下文，record 为最终快照；返回错误时不删除恢复标记，也不产生部分账单。
 // 记录必须属于原请求的相同密钥和账单归属；结果已被恢复或同 ID 内容冲突时拒绝重复结算。
 func (db *DB) ConfirmDelivery(ctx context.Context, record UsageRecord) error {
-	if err := validatePendingUsage(record); err != nil {
+	return db.confirmDelivery(ctx, &record)
+}
+
+// confirmDelivery 将最终快照转入待结算队列并回填标记中冻结的时间；参数 record 会被更新。
+// 供确认和恢复路径使用，事务失败保留原标记，不对外泄露请求或响应正文。
+func (db *DB) confirmDelivery(ctx context.Context, record *UsageRecord) error {
+	if err := validatePendingUsage(*record); err != nil {
 		return err
 	}
 	if record.Cost > 0 && (record.Status != "success" || record.HTTPStatus >= 400) {
@@ -118,7 +124,7 @@ func (db *DB) ConfirmDelivery(ctx context.Context, record UsageRecord) error {
 	}
 	// 首次准备时固定发生时间，故障恢复不会把账单移到其他时间范围。
 	record.TS = initial.TS
-	if err := stageDelivery(s, record); err != nil {
+	if err := stageDelivery(s, *record); err != nil {
 		return err
 	}
 	if _, err := s.Exec(`DELETE FROM usage_delivery_pending WHERE request_id = ?`, record.RequestID); err != nil {
@@ -131,7 +137,7 @@ func (db *DB) ConfirmDelivery(ctx context.Context, record UsageRecord) error {
 // 先原子转换待确认标记；仅独立磁盘在断库时保存的快照可在没有标记时创建账单，其他情况必须已存在持久账单。
 // 全量快照由严格指纹核对，冲突保留队列并返回错误，不能伪造确认或重复计费。
 func (db *DB) SettleConfirmedDelivery(ctx context.Context, record UsageRecord) error {
-	if err := db.ConfirmDelivery(ctx, record); err != nil {
+	if err := db.confirmDelivery(ctx, &record); err != nil {
 		if !errors.Is(err, ErrDeliveryMarkerGone) {
 			return err
 		}
@@ -150,7 +156,7 @@ func (db *DB) SettleConfirmedDelivery(ctx context.Context, record UsageRecord) e
 	if err := db.RecordUsageExact(ctx, []UsageRecord{record}); err != nil {
 		return err
 	}
-	return db.FlushPendingUsage(ctx, 500)
+	return db.FlushPendingUsageRequest(ctx, record.RequestID)
 }
 
 // RecoverExpiredDeliveries 将过期且尚未确认的记录原子转为零费用失败，返回已转移数量和错误。

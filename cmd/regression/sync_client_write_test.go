@@ -62,15 +62,15 @@ func TestSyncClientWriteFailure(t *testing.T) {
 					t.Fatalf("客户端写失败后不应重放上游: %d", calls.Load())
 				}
 				if tc.idempotent {
-					// 已成功生成不能再次付费调用；同一幂等键重放已获得的结果。
+					// 原响应写入失败并记零费用后，同一幂等键不能免费重放成功正文，也不能再次调用上游。
 					retry := httptest.NewRequest("POST", tc.path, strings.NewReader(`{"model":"sync-write","messages":[{"role":"user","content":"Hello"}],"stream":false}`))
 					retry.Header.Set("Authorization", "Bearer "+owner.key)
 					retry.Header.Set("Content-Type", "application/json")
 					retry.Header.Set("Idempotency-Key", "sync-client-write-fixture")
 					replay := httptest.NewRecorder()
 					h.gw.Handler().ServeHTTP(replay, retry)
-					if replay.Code != 200 || calls.Load() != 1 {
-						t.Fatalf("写失败后同幂等键重复外发: status=%d calls=%d", replay.Code, calls.Load())
+					if replay.Code != 409 || strings.Contains(replay.Body.String(), "Hello") || calls.Load() != 1 {
+						t.Fatalf("写失败后不应重放成功正文或重复外发: status=%d calls=%d body=%q", replay.Code, calls.Load(), replay.Body.String())
 					}
 				}
 				id := w.header.Get("x-litellm-call-id")

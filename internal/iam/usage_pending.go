@@ -79,6 +79,30 @@ func (db *DB) settlePendingUsage(ctx context.Context, saved pendingUsage) error 
 	return err
 }
 
+// FlushPendingUsageRequest 仅结算指定请求的持久快照；ctx 控制数据库操作，requestID 为非空调用标识。
+// 同步交付确认后调用；未找到快照时核对已提交账单，不扫描或删除其他请求的待结算证据。
+func (db *DB) FlushPendingUsageRequest(ctx context.Context, requestID string) error {
+	if requestID == "" {
+		return fmt.Errorf("pending usage request ID is required")
+	}
+	var saved pendingUsage
+	found, err := db.Engine.Context(ctx).Table("usage_pending").Where("request_id = ?", requestID).Get(&saved)
+	if err != nil {
+		return err
+	}
+	if !found {
+		committed, err := db.Engine.Context(ctx).Table("usage_events").Where("request_id = ?", requestID).Exist()
+		if err != nil {
+			return err
+		}
+		if !committed {
+			return fmt.Errorf("pending usage and committed event are missing")
+		}
+		return nil
+	}
+	return db.settlePendingUsage(ctx, saved)
+}
+
 // FlushPendingUsage 重放最多 limit 条待结算账单；参数 ctx 控制操作，limit 必须为正，返回各失败的合并错误。
 // 后台 Flush 即使没有 Redis 也调用；单条损坏或约束失败不阻止同批其他记录，失败原文保留供修复。
 // 不调用上游、不重算价格；多实例重复读取依靠 RecordUsage 的 request_id 幂等性，确认失败可再次重放。

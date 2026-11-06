@@ -241,10 +241,14 @@ func TestBrowserEnterpriseFixture(t *testing.T) {
 		fault := usageFault
 		usageFaultMu.Unlock()
 		path := strings.TrimPrefix(r.URL.Path, "/gw")
-		if r.Method == http.MethodPost && (path == "/v1/chat/completions" || path == "/bypass/openai/v1/chat/completions") && r.Header.Get("X-E2E-Client-Write") == "fail" {
+		if r.Method == http.MethodPost && (path == "/v1/chat/completions" || path == "/bypass/openai/v1/chat/completions") && (r.Header.Get("X-E2E-Client-Write") == "fail" || r.Header.Get("X-E2E-Client-Write") == "flush-fail") {
 			// 仅测试二进制和私有 E2E schema 具备该故障注入；数据面及鉴权仍走真实网关。
 			schema, err := s.IAM.Engine.QueryString("SELECT current_schema() AS schema")
 			if err == nil && len(schema) == 1 && strings.HasPrefix(schema[0]["schema"], "e2e_") {
+				if r.Header.Get("X-E2E-Client-Write") == "flush-fail" {
+					gatewayHandler.ServeHTTP(browserFlushFailure{ResponseWriter: w}, r)
+					return
+				}
 				gatewayHandler.ServeHTTP(browserWriteFailure{ResponseWriter: w}, r)
 				return
 			}
