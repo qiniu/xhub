@@ -37,7 +37,8 @@ export function registerModelMonitorTPSScenario(locale: "en" | "zh-CN") {
         expect(await response.text()).toContain("e2e-ok");
         calls.push(response.headers()["x-litellm-call-id"]);
       }
-      await expect.poll(async () => (await page.request.get(GATEWAY + "/spend/logs/ui/" + calls[1], { headers })).status(), { timeout: 80_000 }).toBe(200);
+      // 同步账单可能先于 Redis 中的流式账单落库；两条都必须真实可查后再比较指标。
+      await expect.poll(async () => Promise.all(calls.map(async id => (await page.request.get(GATEWAY + "/spend/logs/ui/" + id, { headers })).status())), { timeout: 80_000 }).toEqual([200, 200]);
       const streamed = await (await page.request.get(GATEWAY + "/spend/logs/ui/" + calls[0], { headers })).json();
       const sync = await (await page.request.get(GATEWAY + "/spend/logs/ui/" + calls[1], { headers })).json();
       expect(streamed).toMatchObject({ streamed: true, prompt_tokens: 10000, completion_tokens: 10 });
