@@ -12,6 +12,7 @@ import (
 	"time"
 
 	dpdiagnostics "github.com/sunqirui1987/xhub/internal/dataplane/diagnostics"
+	dpstream "github.com/sunqirui1987/xhub/internal/dataplane/stream"
 	llmdialogue "github.com/sunqirui1987/xhub/internal/llm/dialogue"
 	providercontract "github.com/sunqirui1987/xhub/internal/provider/contract"
 	providermeasurement "github.com/sunqirui1987/xhub/internal/provider/measurement"
@@ -42,7 +43,7 @@ type ForwardResponse struct {
 
 // ForwardOfficial 只向登记的供应商地址发送一次原生请求，并保留协议响应及实测事实。
 // 参数 upstreamClient 为共享 HTTP 客户端；r 提供请求 context；method/address/key 为登记操作与服务端凭据；body/in 为载荷与入站头；transport 为显式注册传输；w 可为 nil 以禁用即时流式写出。
-// 返回 ForwardResponse 与网络、读取、写出、超限或缺少成功终态错误；原生创建和查询调用。
+// 返回 ForwardResponse 与网络、读取、写出、超限或缺少成功终态错误；写出错误及短写含 ErrClientWrite，原生创建和查询调用。
 // 过滤客户端鉴权与逐跳头后设置登记的供应商认证，复制 client 禁止重定向；若 context 有截止时间则由它独占超时控制。
 // 安装原始诊断后读取；2xx SSE 且有 w 时逐行保留换行转发并 Flush，事件/行上限 8 MiB，必须观测正常终态。
 // 完整 Responses completed 或明确输出上限终态可立即结束；其他协议保留既有读取规则。
@@ -123,7 +124,7 @@ func ForwardOfficial(upstreamClient *http.Client, r *http.Request, method, addre
 			if result.FirstByteAt.IsZero() && bytes.HasPrefix(line, []byte("data:")) {
 				result.FirstByteAt = time.Now()
 			}
-			if _, err = w.Write(line); err != nil {
+			if _, err = dpstream.WriteClient(w, line); err != nil {
 				return result, err
 			}
 			if f, ok := w.(http.Flusher); ok {
