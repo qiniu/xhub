@@ -240,6 +240,11 @@ export function registerLogCostReasoningScenario(locale: "en" | "zh-CN") {
       const original = await page.request.post(secondOrigin + "/v1/chat/completions", { headers: idemHeaders, data: idemBody });
       expect(original.status(), await original.text()).toBe(200);
       const originalID = original.headers()["x-litellm-call-id"];
+      // Messages 的跨实例拒绝也应使用客户端可识别的 Anthropic 错误格式。
+      const messagesHeaders = { Authorization: "Bearer " + key, "Idempotency-Key": `${model}-messages-instance-test` };
+      const messagesBody = { model, stream: false, max_tokens: 32, messages: [{ role: "user", content: "Verify message retry across instances." }] };
+      const originalMessages = await page.request.post(secondOrigin + "/v1/messages", { headers: messagesHeaders, data: messagesBody });
+      expect(originalMessages.status(), await originalMessages.text()).toBe(200);
       // 结束处理原请求的进程，确认另一实例仅依靠数据库中的摘要识别重试。
       secondGateway.kill("SIGTERM");
       await new Promise<void>((resolve) => secondGateway!.once("exit", () => resolve()));
@@ -248,6 +253,14 @@ export function registerLogCostReasoningScenario(locale: "en" | "zh-CN") {
       expect(retry.status(), await retry.text()).toBe(409);
       expect(await retry.text()).toContain("idempotency_result_unavailable");
       expect(await retry.text()).not.toContain("e2e-ok");
+      const retryMessages = await page.request.post(GATEWAY + "/v1/messages", { headers: messagesHeaders, data: messagesBody });
+      expect(retryMessages.status(), await retryMessages.text()).toBe(409);
+      expect(await retryMessages.json()).toMatchObject({ type: "error", error: { type: "idempotency_result_unavailable" } });
+      const retryMessagesID = retryMessages.headers()["x-litellm-call-id"];
+      await expect.poll(async () => (await page.request.get(GATEWAY + "/spend/logs/ui/" + retryMessagesID, { headers })).status()).toBe(200);
+      const retryMessagesLog = await (await page.request.get(GATEWAY + "/spend/logs/ui/" + retryMessagesID, { headers })).json();
+      expect(retryMessagesLog.status).toBe("error");
+      expect(retryMessagesLog.spend).toBe(0);
       await expect.poll(async () => (await page.request.get(GATEWAY + "/spend/logs/ui/" + originalID, { headers })).status()).toBe(200);
       await stableGoto(page, "/logs");
       await page.getByPlaceholder(tr("Search logs by ID…"), { exact: true }).fill(originalID);

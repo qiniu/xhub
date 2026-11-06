@@ -1,10 +1,12 @@
 package regression
 
 import (
+	"encoding/json"
 	"net/http"
 	"net/http/httptest"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/sunqirui1987/xhub/internal/gateway"
 )
@@ -60,6 +62,58 @@ func TestIdempotencyFenceAcrossInstances(t *testing.T) {
 	fresh.Handler().ServeHTTP(newResult, newRequest)
 	if newResult.Code != 200 || len(h.upstreamCalls()) != 2 {
 		t.Fatalf("新幂等键被错误阻止: status=%d calls=%d", newResult.Code, len(h.upstreamCalls()))
+	}
+}
+
+// TestIdempotencyStorageFailureUsesAnthropicEnvelope 验证幂等存储故障遵循 Messages 协议的错误格式。
+// 使用隔离 PostgreSQL 和真实网关，注入数据库约束并核对失败响应、零上游调用；清理由隔离 schema 完成。
+func TestIdempotencyStorageFailureUsesAnthropicEnvelope(t *testing.T) {
+	t.Setenv("XHUB_USAGE_SPOOL_DIR", "")
+	t.Setenv("XHUB_REGRESSION_REDIS_URL", "")
+	h := newHarness(t, chatDeployment("fence-anthropic"))
+	scope := h.openScope(t, h.adminSession(), "fence-anthropic")
+	if _, err := h.db.Engine.Exec(`ALTER TABLE inference_idempotency_fences ADD CONSTRAINT reject_anthropic_fence CHECK (false)`); err != nil {
+		t.Fatal(err)
+	}
+	r := httptest.NewRequest("POST", "/v1/messages", strings.NewReader(`{"model":"fence-anthropic","messages":[{"role":"user","content":"Hello"}],"max_tokens":16}`))
+	r.Header.Set("Authorization", "Bearer "+scope.key)
+	r.Header.Set("Content-Type", "application/json")
+	r.Header.Set("Idempotency-Key", "anthropic-fault")
+	w := httptest.NewRecorder()
+	h.gw.Handler().ServeHTTP(w, r)
+	var body map[string]any
+	if err := json.Unmarshal(w.Body.Bytes(), &body); err != nil {
+		t.Fatalf("错误响应不是 JSON: %v", err)
+	}
+	errorBody, _ := body["error"].(map[string]any)
+	if w.Code != 503 || body["type"] != "error" || errorBody["type"] != "idempotency_unavailable" || len(h.upstreamCalls()) != 0 {
+		t.Fatalf("存储失败未按 Messages 协议返回或调用了上游: status=%d body=%v calls=%d", w.Code, body, len(h.upstreamCalls()))
+	}
+}
+
+// TestIdempotencySlowStorageFailsClosed 验证幂等持久化卡顿时及时拒绝，不能调用上游。
+// 使用隔离 PostgreSQL 的触发器模拟慢写，验证真实 HTTP 状态、时延和调用次数；schema 自动清理。
+func TestIdempotencySlowStorageFailsClosed(t *testing.T) {
+	t.Setenv("XHUB_USAGE_SPOOL_DIR", "")
+	t.Setenv("XHUB_REGRESSION_REDIS_URL", "")
+	h := newHarness(t, chatDeployment("fence-slow"))
+	scope := h.openScope(t, h.adminSession(), "fence-slow")
+	_, err := h.db.Engine.Exec(`CREATE FUNCTION test_slow_fence() RETURNS trigger LANGUAGE plpgsql AS $$ BEGIN PERFORM pg_sleep(5); RETURN NEW; END $$`)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := h.db.Engine.Exec(`CREATE TRIGGER slow_fence BEFORE INSERT ON inference_idempotency_fences FOR EACH ROW EXECUTE FUNCTION test_slow_fence()`); err != nil {
+		t.Fatal(err)
+	}
+	r := httptest.NewRequest("POST", "/chat/completions", strings.NewReader(`{"model":"fence-slow","messages":[{"role":"user","content":"Hello"}]}`))
+	r.Header.Set("Authorization", "Bearer "+scope.key)
+	r.Header.Set("Content-Type", "application/json")
+	r.Header.Set("Idempotency-Key", "slow-storage")
+	w := httptest.NewRecorder()
+	start := time.Now()
+	h.gw.Handler().ServeHTTP(w, r)
+	if elapsed := time.Since(start); w.Code != 503 || elapsed > 4*time.Second || len(h.upstreamCalls()) != 0 {
+		t.Fatalf("慢存储应及时拒绝且不能调用上游: status=%d elapsed=%s calls=%d", w.Code, elapsed, len(h.upstreamCalls()))
 	}
 }
 

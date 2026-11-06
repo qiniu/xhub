@@ -195,7 +195,7 @@ func (s *Server) Handler() http.Handler {
 			}
 			if hit != nil {
 				util.Debug("process %s %s step=idempotency hit=true", r.Method, r.URL.Path)
-				s.writeIdempotentResponse(w, lw, hit)
+				s.writeIdempotentResponse(w, lw, hit, r.URL.Path)
 				return
 			}
 		}
@@ -283,11 +283,10 @@ type idempotencyLease struct {
 	done   bool
 }
 
-// beginIdempotency authenticates the caller and either owns, replays, or rejects an idempotent operation.
-// 参数 r（*http.Request）：带当前凭证、方法、路径和查询串的请求；key（string）：调用方提供的幂等键；body（[]byte）：用于请求指纹的原始正文。
-// 返回 lease（*idempotencyLease）：首次请求的执行所有权；replay（*idemRec）：已完成响应或等待取消响应；conflict（bool）：同键请求指纹不一致。
-// 调用：Handler 在非流式请求进入 bypass 或 Gin 前调用。
-// 测试：TestIdempotencyScopesHashesAndExpires、TestIdempotencyConcurrentRequestWaitsForOwner 和 TestIdempotencyReplaysWithoutASecondCharge。
+// beginIdempotency 对已鉴权的非流式请求取得执行权或返回已有结果。
+// r 包含身份和路径，key 是调用方幂等键，body 用于计算摘要；返回执行权、缓存或合成错误以及载荷冲突标记。
+// Handler 调用；首次请求同步写入 PostgreSQL，最多等待两秒。数据库异常返回 503，跨实例结果无法重放返回 409。
+// 只持久化摘要；提交结果不明时保留数据库占位，避免下一次误将同一请求重新发往上游。
 func (s *Server) beginIdempotency(r *http.Request, key string, body []byte) (*idempotencyLease, *idemRec, bool) {
 	p, err := s.resolve(r)
 	if err != nil || p == nil {
@@ -334,7 +333,10 @@ func (s *Server) beginIdempotency(r *http.Request, key string, body []byte) (*id
 				lease.abort()
 				return nil, &idemRec{Synthetic: true, Code: http.StatusServiceUnavailable, CT: "application/json", Body: []byte(`{"error":{"message":"idempotency protection unavailable","type":"idempotency_unavailable"}}`)}, false
 			}
-			claim, err := s.IAM.ClaimInferenceFence(r.Context(), stringHex(keyHash[:]), stringHex(hash[:]), now, now.Add(ttl))
+			// 数据库慢或故障时及时失败关闭；若提交状态未知，保留标识以避免重复调用上游。
+			claimCtx, cancel := context.WithTimeout(r.Context(), 2*time.Second)
+			claim, err := s.IAM.ClaimInferenceFence(claimCtx, stringHex(keyHash[:]), stringHex(hash[:]), now, now.Add(ttl))
+			cancel()
 			if err != nil {
 				lease.abort()
 				return nil, &idemRec{Synthetic: true, Code: http.StatusServiceUnavailable, CT: "application/json", Body: []byte(`{"error":{"message":"idempotency protection unavailable","type":"idempotency_unavailable"}}`)}, false
@@ -401,11 +403,11 @@ func (l *idempotencyLease) complete(response *idemRec) {
 	l.done = true
 }
 
-// abort releases an unfinished idempotency claim so a later request can retry it.
+// abort 释放当前进程中未完成的幂等占位，并唤醒等待者。
 // 参数：无；使用接收者保存的服务器、缓存键和占位记录。
 // 返回：无；仍由本 lease 持有时删除占位并唤醒等待者。
 // 调用：Handler 延迟调用；complete 已提交时该调用为空操作。
-// 测试：TestIdempotencyScopesHashesAndExpires 覆盖释放后的重新占有。
+// 数据库中的摘要继续保留至过期；此前可能已调用上游，不能仅因本进程失败就允许重复执行。
 func (l *idempotencyLease) abort() {
 	if l == nil || l.done {
 		return
@@ -442,14 +444,27 @@ func cloneStringMap(in map[string]string) map[string]string {
 }
 
 // writeIdempotentResponse writes a cached status, selected headers, and body to the client.
-// 参数 w（http.ResponseWriter）：客户端响应；lw（*statusRecorder）：访问日志状态记录器；hit（*idemRec）：缓存响应快照。
+// 参数 w 为客户端响应、lw 为访问日志状态、hit 为缓存或合成快照，path 用于选择协议错误包络。
 // 返回：无；响应已写入 w，错误响应同时更新 lw 的错误摘要。
 // 调用：Handler 在 beginIdempotency 返回缓存命中时调用。
 // 测试：TestIdempotencyReplaysWithoutASecondCharge 通过完整入口重放覆盖。
-func (s *Server) writeIdempotentResponse(w http.ResponseWriter, lw *statusRecorder, hit *idemRec) {
+func (s *Server) writeIdempotentResponse(w http.ResponseWriter, lw *statusRecorder, hit *idemRec, path string) {
 	// 同进程重放沿用原账单；跨实例拒绝是本次新请求，应记录零费用错误。
 	if !hit.Synthetic {
 		lw.usageRecorded = true
+	} else {
+		// 拒绝不是上游响应，按调用方协议生成错误包络，供 Messages/Gemini 客户端识别。
+		var envelope struct {
+			Error struct {
+				Type    string `json:"type"`
+				Message string `json:"message"`
+			} `json:"error"`
+		}
+		if json.Unmarshal(hit.Body, &envelope) == nil && envelope.Error.Type != "" {
+			lw.note = strings.TrimSpace(envelope.Error.Type + " " + envelope.Error.Message)
+			util.WriteTypedError(w, path, hit.Code, envelope.Error.Type, envelope.Error.Message)
+			return
+		}
 	}
 	for k, v := range hit.Hdr {
 		w.Header().Set(k, v)

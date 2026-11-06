@@ -121,7 +121,7 @@ func TestIdempotencyCrossInstanceAndStorageFailure(t *testing.T) {
 	}
 	w := httptest.NewRecorder()
 	lw := &statusRecorder{ResponseWriter: w}
-	other.writeIdempotentResponse(lw, lw, hit)
+	other.writeIdempotentResponse(lw, lw, hit, "/v1/chat/completions")
 	if w.Code != 409 || lw.usageRecorded || !strings.Contains(lw.note, "idempotency_result_unavailable") {
 		t.Fatal("跨实例拒绝应保留错误日志路径")
 	}
