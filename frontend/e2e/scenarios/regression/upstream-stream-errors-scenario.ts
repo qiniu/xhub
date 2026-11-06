@@ -8,12 +8,13 @@ import {GATEWAY,loginAdmin,sessionBearer,stableGoto} from "../../helpers";
 export function registerUpstreamStreamErrors(locale: "en" | "zh-CN") {
 test("upstream stream error details "+locale,async({page})=>{
  test.setTimeout(120000);
- let partial=false,fail=true,truncated=false,truncated4xx=false,calls=0;
+ let partial=false,fail=true,truncated=false,truncated4xx=false,truncated4xxEmpty=false,calls=0;
  const marker="Vendor capacity exhausted: 保留原文";
  // 本地HTTP供应商夹具：接收真实请求，返回协议流或长度不足的完整 JSON，验证流错误及非流式读取错误；资源在finally回收。
  const upstream=createServer((req,res)=>{
   calls++;
   req.resume();
+  if(truncated4xxEmpty){res.writeHead(400,{"Content-Type":"application/json","Content-Length":"100","Connection":"close"});res.end();return;}
   if(truncated4xx){const full=JSON.stringify({error:{code:"context_length_exceeded",message:"Input is too long"}});res.writeHead(400,{"Content-Type":"application/json","Content-Length":String(Buffer.byteLength(full)+100),"Connection":"close"});res.end(full);return;}
   if(truncated){const full=JSON.stringify({id:"r-trunc",object:"chat.completion",choices:[{index:0,message:{role:"assistant",content:"ok"},finish_reason:"stop"}]});res.writeHead(200,{"Content-Type":"application/json","Content-Length":String(Buffer.byteLength(full)+100),"Connection":"close"});res.end(full);return;}
   res.writeHead(200,{"Content-Type":"text/event-stream","X-Request-Id":"req-upstream-header"});
@@ -82,6 +83,18 @@ test("upstream stream error details "+locale,async({page})=>{
   const errorLog=await (await page.request.get(GATEWAY+"/spend/logs/ui/"+errorID,{headers})).json();
   expect(errorLog.status).toBe("error");expect(errorLog.metadata.upstream_response.read_error).toContain("unexpected EOF");
   await stableGoto(page,"/logs?log_id="+errorID);
+  await expect(page.getByRole("dialog").getByRole("alert")).toContainText("400");
+  await page.keyboard.press("Escape");
+  // 空正文截断的流式 4xx 不可重试；日志保留读取错误并记零费用。
+  truncated4xx=false;truncated4xxEmpty=true;
+  const beforeEmpty=calls;
+  const emptyError=await page.request.post(GATEWAY+"/chat/completions",{headers,data:{model,messages:[{role:"user",content:"Test an empty provider error."}],stream:true}});
+  expect(emptyError.status()).toBe(400);expect(calls-beforeEmpty).toBe(1);
+  const emptyID=emptyError.headers()["x-litellm-call-id"];
+  await expect.poll(async()=> (await page.request.get(GATEWAY+"/spend/logs/ui/"+emptyID,{headers})).status()).toBe(200);
+  const emptyLog=await (await page.request.get(GATEWAY+"/spend/logs/ui/"+emptyID,{headers})).json();
+  expect(emptyLog.status).toBe("error");expect(emptyLog.spend).toBe(0);expect(emptyLog.metadata.upstream_response.read_error).toContain("unexpected EOF");
+  await stableGoto(page,"/logs?log_id="+emptyID);
   await expect(page.getByRole("dialog").getByRole("alert")).toContainText("400");
  }finally{
   if(modelID)expect((await page.request.post(GATEWAY+"/model/delete",{headers,data:{id:modelID}})).status()).toBe(200);
