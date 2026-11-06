@@ -529,10 +529,12 @@ func (s *Server) recordEarlyError(lw *statusRecorder, r *http.Request, raw []byt
 // 调用：net/http 在流式响应需要刷新时。
 // 测试：无直接单测
 // 返回：无。底层实现了 http.Flusher 时才会真正刷新。
-func (s *statusRecorder) Flush() {
-	if f, ok := s.ResponseWriter.(http.Flusher); ok {
-		f.Flush()
-	}
+func (s *statusRecorder) Flush() { _ = s.FlushError() }
+
+// FlushError 将底层刷新错误传给流式执行器，避免最后一帧断连被误判为成功。
+// 无参数；返回底层刷新结果。不支持刷新时保留旧行为；调用方不能据此判断断连发起方。
+func (s *statusRecorder) FlushError() error {
+	return util.FlushResponse(s.ResponseWriter)
 }
 
 // Hijack 把连接从 HTTP 服务里交出去，给需要升级的协议使用。
