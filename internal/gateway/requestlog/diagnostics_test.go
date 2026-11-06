@@ -50,3 +50,22 @@ func TestCancellationFailureJSON(t *testing.T) {
 		}
 	}
 }
+
+// TestClientWriteFailureJSON 验证客户端写失败单独记录，不把部分模型输出冒充错误或编造上游原因。
+// 内存构造有无上游错误两种状态；只验证结构和原文保护，没有外部资源需要清理。
+func TestClientWriteFailureJSON(t *testing.T) {
+	for _, observed := range []bool{false, true} {
+		d := &dpdiagnostics.UpstreamDiagnostics{StatusCode: 200, Failure: &dpdiagnostics.Failure{Kind: "client_write_error", Phase: "client_write"}}
+		if observed {
+			d.Error = map[string]any{"error": map[string]any{"code": "vendor_overloaded"}}
+		}
+		raw := FailureJSON(d, "data: partial generated content")
+		var got map[string]any
+		if json.Unmarshal([]byte(raw), &got) != nil || got["diagnostics"] == nil || (got["upstream_error"] != nil) != observed || strings.Contains(raw, "partial generated content") {
+			t.Fatalf("客户端写失败证据错误: %s", raw)
+		}
+		if errObj, ok := got["error"].(map[string]any); !ok || errObj["type"] != "client_write_error" {
+			t.Fatalf("客户端写失败类型丢失: %s", raw)
+		}
+	}
+}

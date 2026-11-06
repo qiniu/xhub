@@ -273,6 +273,7 @@ export function LogDetailContent({ logEntry, isLoadingDetails = false, isDetails
         <section aria-label={t("logDiagnostics.title")} className="mb-6 rounded-lg border p-4">
           <h3 className="font-semibold">{t("logDiagnostics.title")}</h3>
           {metadata.upstream_response.failure?.cancellation_source === "unknown" && <p>{t("logDiagnostics.cancelUnknown")}</p>}
+          {metadata.upstream_response.failure?.kind === "client_write_error" && <p>{t("logDiagnostics.clientWriteError")}</p>}
           {metadata.upstream_response.failure?.request_body_omitted && <p>{t("logDiagnostics.bodyOmitted")}</p>}
           <pre className="max-h-64 overflow-auto whitespace-pre-wrap break-all text-xs">{JSON.stringify(metadata.upstream_response.failure ?? metadata.upstream_response.routing ?? metadata.upstream_response.rate_limit, null, 2)}</pre>
           <h4>{t("logDiagnostics.upstreamError")}</h4>

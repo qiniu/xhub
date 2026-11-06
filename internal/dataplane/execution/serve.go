@@ -570,11 +570,21 @@ func Serve(h dpcontract.Adapted, w http.ResponseWriter, r *http.Request, op stri
 					if attempt.err != nil {
 						lastErr = attempt.err
 						diagnostic.Failure = dpdiagnostics.ObserveFailure(r.Context(), "response_transfer", attempt.err, time.Since(start))
-						if stopCanceled(attempt.body, attempt.usage, did, attempt.ttft) {
+						// 写失败会同时触发请求上下文取消；已观察到写入错误时保留更具体的诊断事实。
+						if !errors.Is(attempt.err, dpstream.ErrClientWrite) && stopCanceled(attempt.body, attempt.usage, did, attempt.ttft) {
 							return
 						}
-						h.NoteFailure(did, routeCfg)
-						util.Error("upstream stream path=%s provider=%s model=%s base_host=%s err=%s", r.URL.Path, supplier, realModel, dpdiagnostics.BaseHost(apiBase), dpdiagnostics.SafeErr(attempt.err))
+						if errors.Is(attempt.err, dpstream.ErrClientWrite) {
+							// 写客户端失败不证明供应商异常，也不证明用户主动取消；保留可观测阶段并避免污染供应商冷却。
+							diagnostic.Failure.Phase = "client_write"
+							diagnostic.Failure.Kind = "client_write_error"
+							// net.OpError 可能包含客户端和网关地址；日志仅保留安全的失败类别。
+							diagnostic.Failure.TransportError = "client response write failed"
+							util.Error("client response write path=%s model=%s", r.URL.Path, realModel)
+						} else {
+							h.NoteFailure(did, routeCfg)
+							util.Error("upstream stream path=%s provider=%s model=%s base_host=%s err=%s", r.URL.Path, supplier, realModel, dpdiagnostics.BaseHost(apiBase), dpdiagnostics.SafeErr(attempt.err))
+						}
 						if attempt.mustStopAfterFailure(preparationFailed, dialogue.NativeResponses) {
 							// 已开始输出、历史准备失败或原生响应不可安全重放时，不重试或换模型；记录已有用量与失败事实后结束。
 							h.RememberExchange(callID, r, raw, attempt.body)
