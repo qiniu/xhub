@@ -63,3 +63,33 @@ func TestPipeStreamReportsClientWriteFailure(t *testing.T) {
 		})
 	}
 }
+
+// flushFailureWriter 模拟写入缓冲成功、刷新时底层连接失败；不访问外部网络。
+type flushFailureWriter struct {
+	header http.Header
+	err    error
+}
+
+// Header 返回测试响应头，供 PipeStream 设置协议类型。
+func (w *flushFailureWriter) Header() http.Header { return w.header }
+
+// WriteHeader 接收状态码，模拟响应已经开始。
+func (w *flushFailureWriter) WriteHeader(int) {}
+
+// Write 假装数据已写入缓冲区，供刷新失败路径测试。
+func (w *flushFailureWriter) Write(p []byte) (int, error) { return len(p), nil }
+
+// FlushError 返回连接错误，模拟真实 HTTP 缓冲区在刷新时才发现断连。
+func (w *flushFailureWriter) FlushError() error { return w.err }
+
+// TestPipeStreamReportsFlushFailure 验证最后一帧写缓冲成功但刷新失败不能记为成功。
+// 先使用内存上游和可返回错误的刷新器，验证用量仍记录、错误归类且响应关闭，无外部数据需清理。
+func TestPipeStreamReportsFlushFailure(t *testing.T) {
+	broken := errors.New("flush failed")
+	body := &closeProbe{Reader: strings.NewReader("data: {\"usage\":{\"prompt_tokens\":8,\"completion_tokens\":2}}\n\n")}
+	w := &flushFailureWriter{header: make(http.Header), err: broken}
+	started, usage, _, _, err := PipeStream(w, &http.Response{StatusCode: 200, Body: body}, time.Now())
+	if !started || !errors.Is(err, ErrClientWrite) || !errors.Is(err, broken) || !body.closed || usage["prompt_tokens"] != float64(8) {
+		t.Fatalf("刷新失败或上游用量未正确记录: started=%v usage=%v err=%v closed=%v", started, usage, err, body.closed)
+	}
+}

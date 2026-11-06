@@ -20,8 +20,10 @@ export function logErrorSummary(log: Pick<LogEntry, "error" | "response" | "meta
   return text.length > 240 ? `${text.slice(0, 240)}…` : text;
 }
 
-/** 根据记录中的 HTTP 状态生成中性摘要键；参数为日志，返回翻译键，不把取消或状态码推断为责任方。供列表与详情共用，无副作用。 */
+/** 优先根据已记录的写入失败事实，其次根据 HTTP 状态生成中性摘要键；参数为日志，返回翻译键，不把取消或状态码推断为责任方。供列表与详情共用，无副作用。 */
 export function logOutcomeKey(log: Pick<LogEntry, "metadata">): string {
+  // 客户端写入失败不等于上游服务错误，状态码不能覆盖更具体的已观测事实。
+  if (log.metadata?.upstream_response?.failure?.kind === "client_write_error") return "logsUX.clientWriteFailed";
   const status = Number(log.metadata?.http_status);
   if (status === 499) return "logsUX.interrupted";
   if (status === 429) return "logsUX.limited";
