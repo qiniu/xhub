@@ -5,6 +5,7 @@ package runtime
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"sync"
 	"time"
 
@@ -115,7 +116,8 @@ func FlushLoop(ctx context.Context, h Runtime, interval time.Duration) {
 // Flush 将至多 500 条队列用量先持久化，再确认删除并调整热预算计数。
 // 参数 h 提供 Redis 与身份数据库；返回值无，FlushLoop 或网关显式刷写方法调用。
 // 数据库为 nil 时跳过；先恢复可选本机磁盘快照，再恢复数据库待结算，没有 Redis 也可恢复此前失败调用。
-// Redis 队列为空时不再处理；PeekLogs 只窥视，数据库写入失败记录日志且保留整批队列。
+// Redis 队列为空时不再处理；PeekLogs 只窥视，暂时性数据库失败保留整批队列。
+// 确定性归属冲突保留快照及热费用，轮转到队尾并允许前面的有效前缀结算，避免阻断其他账单。
 // PeekLogs 遇到损坏记录只返回此前的有效前缀；损坏记录位于队头时返回空批次，保留原条目等待修复。
 // 成功后用有效前缀的原始条数及首元素 head 确认，防止并发刷写误删已变化的队头。
 // hotDeltas 扣回已经持久化的临时预算增量；数据库幂等性处理重试，确认失败可能导致下次再次写同一批。
@@ -178,7 +180,7 @@ func Flush(h Runtime) {
 	head := raw[0]
 	// logs 与 raw 是同一有效前缀的两种表示；只确认这段前缀，不越过损坏记录删除后续数据。
 	records := make([]iam.UsageRecord, 0, len(logs))
-	for _, row := range logs {
+	for i, row := range logs {
 		if row.DeliverySnapshot != "" {
 			var confirmed iam.UsageRecord
 			if err := json.Unmarshal([]byte(row.DeliverySnapshot), &confirmed); err != nil || confirmed.RequestID != row.RequestID || confirmed.Cost != row.Spend || confirmed.KeyID != row.KeyID || confirmed.UserID != row.UserID || confirmed.TeamID != row.TeamID || confirmed.OrganizationID != row.OrgID || confirmed.ProjectID != row.ProjectID || confirmed.KeyHash != row.APIKey {
@@ -189,7 +191,20 @@ func Flush(h Runtime) {
 			if err := db.SettleConfirmedDelivery(context.Background(), confirmed); err != nil {
 				util.Error("confirmed delivery flush failed request=%s: %v", row.RequestID, err)
 				allowRecovery = false
-				return
+				if !errors.Is(err, iam.ErrConflict) {
+					return
+				}
+				if i == 0 {
+					// 冲突证据及其热费用仍保留在队列，轮转只让后续正常账单有机会结算。
+					if _, rotateErr := redis.RotateSpendHead(context.Background(), head); rotateErr != nil {
+						util.Error("confirmed delivery queue rotation failed request=%s: %v", row.RequestID, rotateErr)
+					}
+					return
+				}
+				// 先确认冲突之前已成功处理的前缀，下次循环再处理冲突队头。
+				logs, raw = logs[:i], raw[:i]
+				n = i
+				break
 			}
 			if local, ok := h.(interface {
 				AcknowledgeDeliverySpool(context.Context, iam.UsageRecord) error

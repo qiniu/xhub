@@ -670,6 +670,27 @@ func (c *Client) SpendQueueEmpty(ctx context.Context) (bool, error) {
 	return n == 0, nil
 }
 
+// RotateSpendHead 将指定队头移至队尾，让后续可结算请求继续处理；ctx 控制 Redis，head 为已读取的原始快照。
+// 仅归属冲突等确定性错误调用；不删除账单、不释放热费用或去重标识；队头已变化或仅有一条时返回 false。
+func (c *Client) RotateSpendHead(ctx context.Context, head string) (bool, error) {
+	if c == nil || c.rdb == nil || head == "" {
+		return false, fmt.Errorf("rotate spend: missing queue or head")
+	}
+	n, err := rotateSpendHeadScript.Run(ctx, c.rdb, []string{"xhub:spendlog"}, head).Int()
+	return n == 1, err
+}
+
+// 原子核对原队头并轮转；保留费用与索引，只更新可信队列快照，避免并发刷写误操作。
+var rotateSpendHeadScript = redis.NewScript(keyQueueSnapshotLua + `
+local head = redis.call('LINDEX', KEYS[1], 0)
+if not head or head ~= ARGV[1] or redis.call('LLEN', KEYS[1]) < 2 then return 0 end
+local trusted = keyIndexTrusted()
+redis.call('LPOP', KEYS[1])
+redis.call('RPUSH', KEYS[1], head)
+if trusted then redis.call('SET', 'xhub:spend:key-queue-state', keyQueueSnapshot()) else redis.call('DEL', 'xhub:spend:key-queue-state') end
+return 1
+`)
+
 // AckFlushed 在数据库事务成功后，原子释放各主体热花费并确认已写入的队列前缀。
 // 参数 deltas 为主体花费标识到本批金额的映射，n 为记录数，head 为 PeekLogs 返回的首条原文。
 // 返回 error：非法金额或 Redis 失败时非 nil；空客户端、空批次和队头已经改变时无副作用。

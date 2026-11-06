@@ -9,6 +9,8 @@ import (
 	"strings"
 	"sync/atomic"
 	"testing"
+
+	"github.com/sunqirui1987/xhub/internal/iam"
 )
 
 // TestSyncBypassDeliveryModelWhitespace 验证透传模型名首尾空格不会使成功账单与预先登记的归属冲突。
@@ -64,6 +66,30 @@ func TestSyncFlushFailureCostsZero(t *testing.T) {
 	key, err := h.db.GetKey(t.Context(), owner.keyID)
 	if err != nil || key.Spend != 0 {
 		t.Fatalf("刷新失败不应扣费: err=%v", err)
+	}
+}
+
+// TestSyncUpstreamErrorAndWriteFailurePreserveDiagnostics 验证上游错误与客户端写入错误同时发生时均保留。
+// 使用独立 PostgreSQL、本机上游 400 和注入式写失败，核对状态、错误正文和零费用；夹具自动清理。
+func TestSyncUpstreamErrorAndWriteFailurePreserveDiagnostics(t *testing.T) {
+	t.Setenv("XHUB_USAGE_SPOOL_DIR", "")
+	t.Setenv("XHUB_REGRESSION_REDIS_URL", "")
+	h := newHarness(t, chatDeployment("sync-upstream-error"))
+	owner := h.openScope(t, h.adminSession(), "sync-upstream-error")
+	h.scriptStatus("sync-upstream-error", http.StatusBadRequest)
+	r := httptest.NewRequest("POST", "/v1/chat/completions", strings.NewReader(`{"model":"sync-upstream-error","messages":[{"role":"user","content":"Hello"}]}`))
+	r.Header.Set("Authorization", "Bearer "+owner.key)
+	r.Header.Set("Content-Type", "application/json")
+	w := &dialogueWriteProbe{header: make(http.Header)}
+	h.gw.Handler().ServeHTTP(w, r)
+	id := w.Header().Get("x-litellm-call-id")
+	event, err := h.db.GetUsageEvent(t.Context(), iam.UsageQuery{}, id)
+	if err != nil || event.Status != "error" || event.HTTPStatus != 400 || event.Cost != 0 {
+		t.Fatalf("应保留上游错误状态且记零费用: event=%+v err=%v", event, err)
+	}
+	row, err := h.db.GetRequestLog(t.Context(), id)
+	if err != nil || row.Error == "" || !strings.Contains(row.UpstreamResponse, "client_write_error") {
+		t.Fatalf("应同时保留上游错误和客户端写失败诊断: row=%+v err=%v", row, err)
 	}
 }
 

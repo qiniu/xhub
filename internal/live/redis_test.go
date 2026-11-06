@@ -13,6 +13,68 @@ import (
 	"github.com/redis/go-redis/v9"
 )
 
+// TestRotateSpendHeadPreservesAccounting 验证无法结算的队头可移到队尾且不丢失账单或释放待结算额度。
+// 使用独立 Redis，检查队头不匹配、排序和各主体热费用；夹具在测试结束时关闭并清理。
+func TestRotateSpendHeadPreservesAccounting(t *testing.T) {
+	c := testRedis(t)
+	if _, err := c.RotateSpendHead(t.Context(), ""); err == nil {
+		t.Fatal("空队头不能轮转")
+	}
+	if err := c.EnqueueSpend(SpendLog{RequestID: "alone", Spend: 0, SpendValid: true}); err != nil {
+		t.Fatal(err)
+	}
+	_, single := c.PeekLogs(1)
+	if moved, err := c.RotateSpendHead(t.Context(), single[0]); err != nil || moved {
+		t.Fatalf("单条记录无需轮转: moved=%v err=%v", moved, err)
+	}
+	if err := c.AckFlushed(nil, 1, single[0]); err != nil {
+		t.Fatal(err)
+	}
+	for _, id := range []string{"blocked", "healthy"} {
+		if err := c.EnqueueSpend(SpendLog{RequestID: id, KeyID: "key-id", APIKey: "hash", UserID: "user", Spend: 1, SpendValid: true, Start: time.Now().UTC().Format(time.RFC3339Nano)}); err != nil {
+			t.Fatal(err)
+		}
+	}
+	_, raw := c.PeekLogs(2)
+	if moved, err := c.RotateSpendHead(t.Context(), "wrong-head"); err != nil || moved {
+		t.Fatalf("队头已变化时不能轮转: moved=%v err=%v", moved, err)
+	}
+	if moved, err := c.RotateSpendHead(t.Context(), raw[0]); err != nil || !moved {
+		t.Fatalf("冲突记录应轮转: moved=%v err=%v", moved, err)
+	}
+	rows, _ := c.PeekLogs(2)
+	if len(rows) != 2 || rows[0].RequestID != "healthy" || rows[1].RequestID != "blocked" || c.HotSpend("user/user") != 2 {
+		t.Fatalf("轮转丢失账单或释放额度: rows=%+v hot=%v", rows, c.HotSpend("user/user"))
+	}
+	if got, err := c.HotKeySpend("key-id"); err != nil || got != 2 {
+		t.Fatalf("轮转不能影响密钥待结算额度: got=%v err=%v", got, err)
+	}
+	_, raw = c.PeekLogs(2)
+	var wg sync.WaitGroup
+	var movedCount int
+	var mu sync.Mutex
+	for range 8 {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			moved, err := c.RotateSpendHead(t.Context(), raw[0])
+			if err != nil {
+				t.Error(err)
+			}
+			if moved {
+				mu.Lock()
+				movedCount++
+				mu.Unlock()
+			}
+		}()
+	}
+	wg.Wait()
+	rows, _ = c.PeekLogs(2)
+	if movedCount != 1 || len(rows) != 2 || rows[0].RequestID != "blocked" || c.HotSpend("user/user") != 2 {
+		t.Fatalf("并发轮转应只执行一次且保留账单: moved=%d rows=%+v", movedCount, rows)
+	}
+}
+
 // TestOrganizationPendingPeriod 前置独立 Redis，验证边界时间、迟到旧费用、去重、确认与升级遗留队列。
 // 参数 t 为测试上下文，无返回值；非法时间保守按当前计入，损坏索引不得部分写入；testRedis 负责清理进程。
 func TestOrganizationPendingPeriod(t *testing.T) {

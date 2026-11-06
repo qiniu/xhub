@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"math"
 	"net"
 	"os/exec"
 	"testing"
@@ -132,6 +133,45 @@ func TestFlushConfirmedDelivery(t *testing.T) {
 	}
 	if empty, err := redis.SpendQueueEmpty(t.Context()); err != nil || !empty || redis.HotSpend("user/"+user.ID) != 0 {
 		t.Fatal("结算后队列或热费用未清理")
+	}
+	// 一条归属冲突的已确认终态不能永久阻断其他用户的正常账单；原始证据必须保留。
+	conflictMarker := rec
+	conflictMarker.RequestID = "runtime-conflicting-owner"
+	if err := db.PrepareDelivery(t.Context(), conflictMarker, time.Now().Add(time.Hour)); err != nil {
+		t.Fatal(err)
+	}
+	conflictSnapshot := conflictMarker
+	conflictSnapshot.Model = "different-model"
+	conflictRaw, err := json.Marshal(conflictSnapshot)
+	if err != nil {
+		t.Fatal(err)
+	}
+	leadingRow := live.SpendLog{RequestID: "runtime-before-conflict", UserID: user.ID, OwnerType: iam.OwnerPersonal, Model: "test", CallType: "chat", Status: "success", HTTPStatus: 200, Spend: 0.1, SpendValid: true, Start: rec.TS.Format(time.RFC3339Nano)}
+	if err := redis.EnqueueSpend(leadingRow); err != nil {
+		t.Fatal(err)
+	}
+	conflictRow := live.SpendLog{RequestID: conflictMarker.RequestID, UserID: user.ID, Spend: 0.25, SpendValid: true, Start: rec.TS.Format(time.RFC3339Nano), DeliverySnapshot: string(conflictRaw)}
+	if err := redis.EnqueueConfirmedDelivery(conflictRow); err != nil {
+		t.Fatal(err)
+	}
+	validRow := live.SpendLog{RequestID: "runtime-after-conflict", UserID: user.ID, OwnerType: iam.OwnerPersonal, Model: "test", CallType: "chat", Status: "success", HTTPStatus: 200, Spend: 0.1, SpendValid: true, Start: rec.TS.Format(time.RFC3339Nano)}
+	if err := redis.EnqueueSpend(validRow); err != nil {
+		t.Fatal(err)
+	}
+	for range 3 {
+		Flush(&deliveryRuntime{db: db, redis: redis})
+	}
+	if _, err := db.GetUsageEvent(t.Context(), iam.UsageQuery{}, leadingRow.RequestID); err != nil {
+		t.Fatalf("冲突之前的正常账单也应结算: %v", err)
+	}
+	if _, err := db.GetUsageEvent(t.Context(), iam.UsageQuery{}, validRow.RequestID); err != nil {
+		t.Fatalf("冲突账单不能永久阻塞之后的正常账单: %v", err)
+	}
+	if rows, _ := redis.PeekLogs(10); len(rows) != 1 || rows[0].RequestID != conflictMarker.RequestID || math.Abs(redis.HotSpend("user/"+user.ID)-0.25) > 1e-9 {
+		t.Fatalf("冲突记录及待结算额度必须保留: rows=%+v hot=%v", rows, redis.HotSpend("user/"+user.ID))
+	}
+	if n, err := db.Engine.Table("usage_delivery_pending").Where("request_id = ?", conflictMarker.RequestID).Count(); err != nil || n != 1 {
+		t.Fatalf("冲突原始标记必须保留: n=%d err=%v", n, err)
 	}
 	bad := rec
 	bad.RequestID = "runtime-corrupt"

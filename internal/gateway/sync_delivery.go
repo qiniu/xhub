@@ -18,16 +18,21 @@ import (
 // 确认和转入待结算队列是数据库事务；数据库失败保留待确认记录，后续恢复不能将未知结果作为成功收费。
 func (s *Server) finishSyncDelivery(ctx context.Context, record iam.UsageRecord, writeErr error) {
 	if writeErr != nil {
+		alreadyFailed := record.Status != "success" || record.HTTPStatus >= 400
 		var diag dpdiagnostics.UpstreamDiagnostics
 		_ = json.Unmarshal([]byte(record.UpstreamResponse), &diag)
 		failure := dpdiagnostics.ObserveFailure(ctx, "client_write", writeErr, time.Since(record.TS))
 		failure.Kind = "client_write_error"
 		failure.CancellationSource = "unknown"
 		diag.Failure = failure
-		record.Status, record.HTTPStatus, record.Cost = "error", 0, 0
+		// 原本已失败的上游状态和错误正文仍是排障证据；写客户端失败作为独立诊断补充。
+		if !alreadyFailed {
+			record.Status, record.HTTPStatus = "error", 0
+			record.Error = requestlog.FailureJSON(&diag, "")
+		}
+		record.Cost = 0
 		record.PriceSnapshot = ""
 		record.UpstreamResponse = requestlog.DiagnosticJSON(&diag, diag.BillingUsage)
-		record.Error = requestlog.FailureJSON(&diag, "")
 	}
 	// 已确认的终态先保存在独立磁盘队列；数据库故障时可由原实例恢复，不能提前恢复成未知账单。
 	record.DeliveryPending = s.usageSpoolEnabled
