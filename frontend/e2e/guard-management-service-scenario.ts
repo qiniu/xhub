@@ -55,6 +55,8 @@ export function registerGuardManagementService(locale: Locale) {
     expect((await redacted.json()).choices[0].message.content).toBe("Rendered: Keep Original 用户输入 and [hidden].");
     expect(fixture.requests).toHaveLength(1);
     expect(fixture.requests[0].body.messages).toEqual([{ role: "user", content: "Keep Original 用户输入 and [hidden]." }]);
+    // 页面导航会取消尚未读取的响应体；先完成已观察响应的真实契约检查，再触发刷新。
+    await watched.assertOk();
     // 刷新后从服务器重读并编辑，验证不是只改浏览器临时状态。
     await page.reload();
     await page.getByRole("tab", { name: tr("pages.guardrails.title"), exact: true }).click();
