@@ -121,6 +121,7 @@ func (s *Server) PrepareBudgetAttempt(w http.ResponseWriter, r *http.Request, p 
 			return nil, false
 		}
 		pending.preparedID = callID
+		pending.preparedAt = start
 		// 失败兜底使用已鉴权归属快照；后续预算变化不能抹去原团队/组织归属。
 		principal := *p
 		if p.Key != nil {

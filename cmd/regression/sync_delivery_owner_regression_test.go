@@ -5,11 +5,13 @@ import (
 	"fmt"
 	"net/http"
 	"net/http/httptest"
+	"os"
 	"path/filepath"
 	"strings"
 	"sync/atomic"
 	"testing"
 
+	"github.com/sunqirui1987/xhub/internal/gateway"
 	"github.com/sunqirui1987/xhub/internal/iam"
 )
 
@@ -37,6 +39,70 @@ func TestSyncBypassDeliveryModelWhitespace(t *testing.T) {
 	log := logDetail(t, h, admin, id)
 	if log["status"] != "success" {
 		t.Fatalf("成功调用应有对应的成功账单: status=%v", log["status"])
+	}
+}
+
+// TestSyncEarlyFailureSpoolReplayKeepsTimestamp 验证回退前预算拒绝时，磁盘账单重复恢复不会因时间不同发生冲突。
+// 前置隔离 PostgreSQL、本机上游和临时磁盘队列；模拟提交失败及确认后崩溃，核对零费用和唯一账单，夹具清理资源。
+func TestSyncEarlyFailureSpoolReplayKeepsTimestamp(t *testing.T) {
+	dir := filepath.Join(t.TempDir(), "spool")
+	t.Setenv("XHUB_USAGE_SPOOL_DIR", dir)
+	t.Setenv("XHUB_REGRESSION_REDIS_URL", "")
+	h := newHarness(t)
+	t.Cleanup(func() { _ = h.gw.CloseUsageSpool() })
+	admin := h.adminSession()
+	owner := h.openScope(t, admin, "early-replay")
+	const model = "early-replay"
+	h.addDBModel(t, admin, model, "early-fail-a", "early-replay-a", map[string]any{"input_cost_per_token": testInputRate / 2})
+	h.addDBModel(t, admin, model, "early-fail-b", "early-replay-b", nil)
+	template := routeTemplate(t, h, admin, "early-replay", routeTemplateBody([]any{map[string]any{"model": model, "strategy": "cost-based-routing"}}, 1, 60, 0, 0))
+	h.ok(http.MethodPost, "/key/update", admin, map[string]any{"key": owner.key, "route_template_id": template})
+	h.scriptStatus("early-fail-a", http.StatusInternalServerError)
+	h.onUpstream("early-fail-a", func() {
+		spent := h.moneyOf(t, owner).project
+		h.setProjectBudget(t, admin, owner.projectID, spent)
+		if _, err := h.db.Engine.Exec(`ALTER TABLE usage_pending ADD CONSTRAINT reject_early_replay CHECK (false)`); err != nil {
+			t.Error(err)
+		}
+	})
+	response := h.do(http.MethodPost, "/v1/chat/completions", owner.key, chatRequest(model, "Verify retry accounting."))
+	if response.status != http.StatusForbidden {
+		t.Fatalf("应在第二次调用前被预算检查拒绝: %s", response.describe())
+	}
+	files, err := filepath.Glob(filepath.Join(dir, "*.json"))
+	if err != nil || len(files) != 1 {
+		t.Fatalf("待恢复账单应保留在磁盘: files=%v err=%v", files, err)
+	}
+	snapshot, err := os.ReadFile(files[0])
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := h.db.Engine.Exec(`ALTER TABLE usage_pending DROP CONSTRAINT reject_early_replay`); err != nil {
+		t.Fatal(err)
+	}
+	h.gw.FlushSpend()
+	if err := h.gw.CloseUsageSpool(); err != nil {
+		t.Fatal(err)
+	}
+	// 复现账单已提交但删除磁盘快照前进程退出。
+	if err := os.WriteFile(files[0], snapshot, 0600); err != nil {
+		t.Fatal(err)
+	}
+	fresh := gateway.New(h.gw.Cfg, h.store, h.db)
+	t.Cleanup(func() { _ = fresh.CloseUsageSpool() })
+	if err := fresh.FlushLocalUsage(t.Context()); err != nil {
+		t.Fatalf("相同账单重复恢复不能发生时间冲突: %v", err)
+	}
+	if files, err := filepath.Glob(filepath.Join(dir, "*.json")); err != nil || len(files) != 0 {
+		t.Fatalf("相同账单重放后磁盘快照应清理: files=%v err=%v", files, err)
+	}
+	id := response.header("x-litellm-call-id")
+	event, err := h.db.GetUsageEvent(t.Context(), iam.UsageQuery{}, id)
+	if err != nil || event.Status != "error" || event.Cost != 0 {
+		t.Fatalf("预算拒绝账单应为失败零费用: event=%+v err=%v", event, err)
+	}
+	if count, err := h.db.Engine.Table("usage_events").Where("request_id = ?", id).Count(); err != nil || count != 1 {
+		t.Fatalf("重复恢复应只保留一条账单: count=%d err=%v", count, err)
 	}
 }
 

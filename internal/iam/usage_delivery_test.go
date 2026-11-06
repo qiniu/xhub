@@ -317,6 +317,11 @@ func TestConfirmedDeliveryUsesPreparedTimestamp(t *testing.T) {
 	if err := db.SettleConfirmedDelivery(t.Context(), record); err != nil {
 		t.Fatalf("确认时应沿用标记的时间: %v", err)
 	}
+	// 重放必须携带已冻结的标记时间，否则严格快照比较应拒绝不同账单。
+	record.TS = initial.TS
+	if err := db.SettleConfirmedDelivery(t.Context(), record); err != nil {
+		t.Fatalf("已冻结的同一终态应可安全重放: %v", err)
+	}
 	event, err := db.GetUsageEvent(t.Context(), UsageQuery{}, initial.RequestID)
 	if err != nil || !event.TS.Equal(initial.TS) || event.Cost != initial.Cost {
 		t.Fatalf("账单时间或金额与标记不一致: event=%+v err=%v", event, err)

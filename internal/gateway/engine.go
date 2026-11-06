@@ -608,6 +608,10 @@ func (s *Server) recordEarlyError(lw *statusRecorder, r *http.Request, raw []byt
 	if lw.delivery != nil && lw.delivery.principal != nil {
 		p = lw.delivery.principal
 	}
+	if lw.delivery != nil && lw.delivery.preparedID == callID && !lw.delivery.preparedAt.IsZero() {
+		// 早期错误的外层计时可能早于执行器标记；磁盘快照必须复用标记时间才能严格重放。
+		start = lw.delivery.preparedAt
+	}
 	// 使用实际响应正文，而不是重新构造错误包络，确保日志与调用方看到的字节一致。
 	s.AnnotateCall(callID, dpcontract.CallNote{Upstream: lw.failureDiagnostics})
 	s.rememberExchange(callID, r, raw, lw.body.Bytes())
@@ -662,6 +666,7 @@ type holdWriter struct {
 	delivery        *iam.UsageRecord // 执行器冻结的最终账单，等待响应写入。
 	deliveryErr     error            // 交付标记或快照无法保存，不能返回成功正文。
 	preparedID      string           // 已持久化交付标记的调用 ID。
+	preparedAt      time.Time        // 首次出站时写入标记的冻结时间。
 	principal       *auth.Principal  // 首次出站时冻结的计费归属。
 	routeDeployment string
 	routeTokens     int
