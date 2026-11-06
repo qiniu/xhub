@@ -37,6 +37,16 @@ func WriteClient(w io.Writer, p []byte) (int, error) {
 	return n, nil
 }
 
+// FlushClient 刷新客户端流并将底层错误分类为写入失败，供原生与协议转换流使用。
+// 参数 w 为当前响应写入器；返回刷新错误，不支持刷新时保持原有兼容行为。
+// 不进行重试或推断中断发起方，已缓冲正文可能被发送到连接。
+func FlushClient(w http.ResponseWriter) error {
+	if err := util.FlushResponse(w); err != nil {
+		return fmt.Errorf("%w: %w", ErrClientWrite, err)
+	}
+	return nil
+}
+
 // noteCaptureTruncated 在流式日志捕获达到上限时记录诊断提示。
 // 参数 kept 为已保存字节数；返回值无，PipeStream 追加捕获后调用，未到上限时不输出。
 // 提示正文估算可能偏低，但真实用量解析仍消费完整流；只写进程日志，不截断上游传输。

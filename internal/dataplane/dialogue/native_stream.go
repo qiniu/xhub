@@ -59,8 +59,8 @@ func pipeNativeDialogue(w http.ResponseWriter, resp *http.Response, start time.T
 				ttft = time.Since(start)
 			}
 		}
-		if f, ok := w.(http.Flusher); ok && err == nil {
-			f.Flush()
+		if err == nil {
+			err = dpstream.FlushClient(w)
 		}
 		return err
 	}
