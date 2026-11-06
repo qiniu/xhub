@@ -61,7 +61,7 @@ func (s *Server) decBusy(id string) {
 }
 
 // setChatHeaders sets response headers such as the model name, spend, and latency.
-// 参数 w（http.ResponseWriter）：调用方的 HTTP 响应，状态和正文写在这里；p（*auth.Principal）：已经鉴权的调用方，含用户、团队、密钥哈希和别名；alias（string）：对外模型名；apiBase（string）：上游根地址，末尾斜杠会被去掉再拼路径。
+// 参数 w（http.ResponseWriter）：用于写入费用响应头的调用方响应写入器；p（*auth.Principal）：已经鉴权的调用方，含用户、团队、密钥哈希和别名；alias（string）：对外模型名；apiBase（string）：上游根地址，末尾斜杠会被去掉再拼路径。
 // 返回：无。状态码和正文写进调用方的响应。
 // 调用：gateway/engine.go、gateway/wire.go
 // 测试：无直接单测
@@ -110,7 +110,7 @@ func (s *Server) quoteSpend(callID, alias, depID string, usage map[string]any, s
 	}
 	total, input, output, priced, charge := billing.CallCost(s, alias, depID, billed, start)
 	softActive := false
-	// 已提交尝试必须使用出站时冻结的费率，避免管理端热更新改变在途账单。
+	// 已准入的尝试使用出站时冻结的费率，即使不完整也不能退回实时价造成错误计费。
 	if frozen, active, valid, reason := s.softBudgetCharge(callID, usage); active {
 		softActive = true
 		charge, priced = frozen, valid
@@ -125,6 +125,7 @@ func (s *Server) quoteSpend(callID, alias, depID string, usage map[string]any, s
 		charge = catalog.Charge{}
 	}
 	if status >= 400 {
+		// 失败响应可能没有 usage，不能因此误报模型价格不完整。
 		billed.PricingBlocked = ""
 	}
 	return spendQuote{billed: billed, charge: charge, total: total, input: input, output: output, priced: priced, softActive: softActive, tokenOnly: tokenOnly}
@@ -136,7 +137,7 @@ func (s *Server) quoteSpend(callID, alias, depID string, usage map[string]any, s
 // 本地计价失败时仅将安全原因码加入原始费用快照，不补价或改变预算和费用结果。
 // 参数 w（http.ResponseWriter）：调用方的 HTTP 响应，状态和正文写在这里；p（*auth.Principal）：已经鉴权的调用方，含用户、团队、密钥哈希和别名；callID（string）：这一次调用的 id，用来把请求、响应和用量记在同一行；alias（string）：对外模型名；op（string）：操作名，例如 chat；usage（map[string]any）：用量对象。字段可能是 prompt_tokens，也可能是 input_tokens；start（time.Time）：时间范围的起点。零值表示不限制开始；cacheHit（bool）：为真时走缓存命中这一支。为假时保持原来的路径；status（int）：HTTP 状态码；depID（string）：部署 id。空串表示当前没有钉住的部署。
 // 返回：无；写费用响应头并保存或排队用量，不直接写 HTTP 状态或正文。
-// 调用：gateway/wire.go、同步和流式结算路径。
+// 调用：gateway/wire.go、recordEarlyError、writeCacheHit 和 writeChatJSON。
 // 测试：spend_quote_test.go、official_settlement_test.go。
 func (s *Server) recordSpend(w http.ResponseWriter, p *auth.Principal, callID, alias, op string, usage map[string]any, start time.Time, cacheHit bool, status int, depID string) {
 	// 完整快照由本路径负责，即使存储失败也不能由外层生成内容不同的替代账单。

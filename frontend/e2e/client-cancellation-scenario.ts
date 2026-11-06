@@ -169,6 +169,7 @@ export function registerClientScenario(locale: Locale) {
       const beforeBridgeStopped = stopped;
       const bridgeCall = await page.evaluate(async ({token, model}) => {
         const controller = new AbortController();
+        // eslint-disable-next-line no-restricted-syntax
         const response = await fetch("/gw/responses", {method:"POST",headers:{Authorization:token,"Content-Type":"application/json"},body:JSON.stringify({model,input:"Test cancellation through conversion.",stream:true}),signal:controller.signal});
         const reader = response.body!.getReader();
         await reader.read();
@@ -192,6 +193,7 @@ export function registerClientScenario(locale: Locale) {
       const beforeBypassStopped = stopped;
       const bypassCall = await page.evaluate(async ({token, model}) => {
         const controller = new AbortController();
+        // eslint-disable-next-line no-restricted-syntax
         const response = await fetch("/gw/bypass/openai/v1/chat/completions", {method:"POST",headers:{Authorization:token,"Content-Type":"application/json"},body:JSON.stringify({model,messages:[{role:"user",content:"Test bypass cancellation."}],stream:true}),signal:controller.signal});
         const reader = response.body!.getReader();
         await reader.read();
@@ -205,8 +207,8 @@ export function registerClientScenario(locale: Locale) {
         const detail = await page.request.get(GATEWAY + "/spend/logs/ui/" + bypassCall.id, {headers});
         if (!detail.ok()) return null;
         const row = await detail.json();
-        return {status:row.status,spend:Number(row.spend)};
-      }).toEqual({status:"error",spend:0});
+        return {status:row.status,spend:Number(row.spend),kind:row.metadata.upstream_response.failure?.kind,source:row.metadata.upstream_response.failure?.cancellation_source};
+      }).toEqual({status:"error",spend:0,kind:"request_canceled",source:"unknown"});
       await stableGoto(page, "/logs?log_id=" + bypassCall.id);
       await expect(page.getByRole("dialog").getByRole("alert")).toBeVisible();
 
