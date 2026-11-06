@@ -246,6 +246,11 @@ func TestBrowserEnterpriseFixture(t *testing.T) {
 			util.WriteError(w, 503, "unavailable", "isolated usage failure")
 			return
 		}
+		// 仅隔离夹具、指定测试头和 completion 路由可注入刷新失败；生产网关不包含此代码。
+		if path == "/completions" && r.Header.Get("X-Xhub-E2E-Flush-Failure") == "1" {
+			gatewayHandler.ServeHTTP(&browserFlushFailureWriter{ResponseWriter: w}, r)
+			return
+		}
 		gatewayHandler.ServeHTTP(w, r)
 	})
 	ui, _ := url.Parse("http://127.0.0.1:" + os.Getenv("E2E_UI_PORT"))

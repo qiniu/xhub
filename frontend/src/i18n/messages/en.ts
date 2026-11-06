@@ -77,6 +77,7 @@ export const en = {
     limited: "Rate limit response",
     bodyRejected: "Request body rejected",
     denied: "Authentication or access denied",
+    clientWriteFailed: "Client response write failed",
     serviceFailed: "Service error",
     requestFailed: "Request failed",
     causeUnknown: "The status alone does not identify the cause. Check the recorded diagnostics below.",

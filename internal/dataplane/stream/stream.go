@@ -86,7 +86,6 @@ func responseDocumentID(raw []byte) string {
 func PipeStream(w http.ResponseWriter, resp *http.Response, start time.Time) (bool, map[string]any, time.Duration, []byte, error) {
 	defer resp.Body.Close()
 	buf := make([]byte, 4096)
-	flusher, _ := w.(http.Flusher)
 	wrote := false
 	var ttft time.Duration
 	var captured []byte
@@ -103,6 +102,17 @@ func PipeStream(w http.ResponseWriter, resp *http.Response, start time.Time) (bo
 				w.WriteHeader(resp.StatusCode)
 				wrote = true
 			}
+			// 尽早转发已读数据，避免大块事件先解析而拖慢用户看到首字。
+			written, writeErr := w.Write(buf[:n])
+			if writeErr == nil && written != n {
+				writeErr = io.ErrShortWrite
+			}
+			if writeErr == nil {
+				// 沿包装链查找可返回错误的刷新器，避免中间层吞掉连接错误。
+				if flushErr := util.FlushResponse(w); flushErr != nil {
+					writeErr = flushErr
+				}
+			}
 			if len(captured) < 2<<20 {
 				take := n
 				if len(captured)+take > 2<<20 {
@@ -114,17 +124,10 @@ func PipeStream(w http.ResponseWriter, resp *http.Response, start time.Time) (bo
 			parser.write(buf[:n], false)
 			// 解析器始终消费完整读取片段；上面的 2 MiB 限制只作用于
 			// 日志留档，不能让末尾出现的供应商实测用量被忽略。
-			written, writeErr := w.Write(buf[:n])
-			if writeErr == nil && written != n {
-				writeErr = io.ErrShortWrite
-			}
 			if writeErr != nil {
 				// 上游已经读到的用量仍保留为诊断事实；写失败不代表用户主动停止，也不能继续重放。
 				parser.write(nil, true)
 				return wrote, parser.usage, ttft, captured, fmt.Errorf("%w: %w", ErrClientWrite, writeErr)
-			}
-			if flusher != nil {
-				flusher.Flush()
 			}
 		}
 		if err != nil {
