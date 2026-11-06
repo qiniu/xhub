@@ -2,6 +2,7 @@ package execution
 
 import (
 	"context"
+	"fmt"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -147,6 +148,58 @@ func TestNativeClientCancellationClassification(t *testing.T) {
 			}
 			if attempts != count || h.status != status || h.bills != 1 || len(h.failures) != failures {
 				t.Fatalf("native classification attempts=%d status=%d bills=%d failures=%d", attempts, h.status, h.bills, len(h.failures))
+			}
+		})
+	}
+}
+
+// TestUpstream4xxPrereadClientCancellation 验证读取 4xx 正文时连接取消应记为未知来源中断而不是上游 400。
+// 使用内存传输和请求上下文，覆盖流式/非流式及空/部分正文；断言零重试、零冷却、单次失败记录，无外部数据需清理。
+func TestUpstream4xxPrereadClientCancellation(t *testing.T) {
+	for _, stream := range []bool{false, true} {
+		for _, partial := range []bool{false, true} {
+			t.Run(fmt.Sprintf("stream=%t/partial=%t", stream, partial), func(t *testing.T) {
+				ctx, cancel := context.WithCancel(t.Context())
+				defer cancel()
+				attempts := 0
+				client := &http.Client{Transport: auditRoundTripper(func(*http.Request) (*http.Response, error) {
+					attempts++
+					data := ""
+					if partial {
+						data = `{"error":`
+					}
+					return &http.Response{StatusCode: http.StatusBadRequest, Header: make(http.Header), Body: io.NopCloser(&cancellationBody{data: data, cancel: cancel, err: context.Canceled})}, nil
+				})}
+				cfg := chatConfig(config.ModelEntry{ModelName: "cancel-4xx", LiteLLMParams: map[string]any{"model": "cancel-4xx", "api_base": "https://example.invalid/v1", "api_key": "test"}})
+				settings := router.BuiltinSettings()
+				settings.Settings["retry_policy"] = map[string]any{"max_attempts": 3, "timeout_seconds": 60, "failure_threshold": 3}
+				h := &cancellationHost{streamAuditHost: &streamAuditHost{logHost: newLogHost(cfg, client), settings: settings}}
+				Serve(h, httptest.NewRecorder(), chatRequest(t, "cancel-4xx", stream).WithContext(ctx), "chat")
+				if attempts != 1 || h.status != 499 || h.failures != 0 || h.bills != 1 {
+					t.Fatalf("4xx 预读取消分类错误: attempts=%d status=%d failures=%d bills=%d", attempts, h.status, h.failures, h.bills)
+				}
+			})
+		}
+	}
+}
+
+// TestUpstream4xxEmptyTruncationNeverRetries 验证 4xx 头已收到但正文截断时不应把空流当成可重试的空成功。
+// 使用内存传输模拟意外 EOF 和可重试配置，覆盖流式与非流式；断言一次上游调用和零冷却，无外部资源需清理。
+func TestUpstream4xxEmptyTruncationNeverRetries(t *testing.T) {
+	for _, stream := range []bool{true} {
+		t.Run(fmt.Sprintf("stream=%t", stream), func(t *testing.T) {
+			attempts := 0
+			client := &http.Client{Transport: auditRoundTripper(func(*http.Request) (*http.Response, error) {
+				attempts++
+				return &http.Response{StatusCode: http.StatusBadRequest, Header: make(http.Header), Body: io.NopCloser(&cancellationBody{err: io.ErrUnexpectedEOF})}, nil
+			})}
+			cfg := chatConfig(config.ModelEntry{ModelName: "truncated-4xx", LiteLLMParams: map[string]any{"model": "truncated-4xx", "api_base": "https://example.invalid/v1", "api_key": "test"}})
+			settings := router.BuiltinSettings()
+			settings.Settings["retry_policy"] = map[string]any{"max_attempts": 3, "timeout_seconds": 60, "failure_threshold": 3}
+			h := &cancellationHost{streamAuditHost: &streamAuditHost{logHost: newLogHost(cfg, client), settings: settings}}
+			Serve(h, httptest.NewRecorder(), chatRequest(t, "truncated-4xx", stream), "chat")
+			if attempts != 1 || h.status != 400 || h.failures != 0 || h.bills != 1 {
+				t.Fatalf("截断 4xx 不应重试或换模型: attempts=%d status=%d failures=%d bills=%d", attempts, h.status, h.failures, h.bills)
 			}
 		})
 	}
