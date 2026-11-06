@@ -2,6 +2,7 @@ package regression
 
 import (
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -48,6 +49,15 @@ func TestIdempotencyFenceAcrossInstances(t *testing.T) {
 	after := h.moneyOf(t, scope)
 	if replay.Code != 409 || !strings.Contains(replay.Body.String(), "idempotency_result_unavailable") || strings.Contains(replay.Body.String(), "regression-ok") || len(h.upstreamCalls()) != 1 || after.key != before.key {
 		t.Fatalf("新实例同一幂等键重复调用或扣费: status=%d calls=%d key_before=%v key_after=%v", replay.Code, len(h.upstreamCalls()), before.key, after.key)
+	}
+	// 幂等拒绝也必须产生本次独立的零费用失败日志，不能只检查余额未变化。
+	if id := replay.Header().Get("x-litellm-call-id"); id == "" {
+		t.Fatal("跨实例拒绝缺少调用 ID")
+	} else {
+		entry := logDetail(t, h, admin, id)
+		if entry["status"] != "error" || parseFloatOrZero(fmt.Sprint(entry["spend"])) != 0 || fmt.Sprint(entry["metadata"].(map[string]any)["http_status"]) != "409" {
+			t.Fatalf("跨实例拒绝日志或费用错误: %v", entry)
+		}
 	}
 	conflicting := request()
 	conflicting.Body = http.NoBody
@@ -143,5 +153,13 @@ func TestIdempotencyFenceStorageFailure(t *testing.T) {
 	after := h.moneyOf(t, scope)
 	if result.Code != 503 || !strings.Contains(result.Body.String(), "idempotency_unavailable") || len(h.upstreamCalls()) != 0 || before.key != after.key {
 		t.Fatalf("存储失败未安全拒绝: status=%d calls=%d key_before=%v key_after=%v", result.Code, len(h.upstreamCalls()), before.key, after.key)
+	}
+	if id := result.Header().Get("x-litellm-call-id"); id == "" {
+		t.Fatal("存储故障拒绝缺少调用 ID")
+	} else {
+		entry := logDetail(t, h, admin, id)
+		if entry["status"] != "error" || parseFloatOrZero(fmt.Sprint(entry["spend"])) != 0 || fmt.Sprint(entry["metadata"].(map[string]any)["http_status"]) != "503" {
+			t.Fatalf("存储故障拒绝日志或费用错误: %v", entry)
+		}
 	}
 }
