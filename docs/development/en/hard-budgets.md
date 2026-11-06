@@ -91,7 +91,7 @@ If usage is complete but the billing transaction fails, an independent `usage_pe
 
 ## Upgrade and configuration changes
 
-1. Stop new affected calls, wait for in-flight attempts, and reconcile/drain old Redis billing entries and PostgreSQL `usage_pending`. Flushing Redis does not settle bills.
+1. Stop new affected calls, wait for in-flight attempts, and reconcile/drain Redis billing entries, PostgreSQL `usage_pending` and `usage_delivery_pending`, and every instance's disk spool. Clearing Redis or deleting unconfirmed markers does not settle bills.
 2. Upgrade every gateway node to the reservation implementation. Mixed deployment with old writers cannot provide this guarantee.
 3. Verify model bounds, output-cap support, and complete rates before enabling limits. Changing an unlimited scope to a limited one also requires draining in-flight calls; earlier unlimited attempts cannot acquire a cost bound retroactively.
 4. Test a dedicated limited key for default caps, concurrent rejection, measured settlement, and key details before restoring traffic.

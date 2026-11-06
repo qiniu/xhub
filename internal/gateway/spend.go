@@ -130,7 +130,8 @@ func (s *Server) quoteSpend(callID, alias, depID string, usage map[string]any, s
 	return spendQuote{billed: billed, charge: charge, total: total, input: input, output: output, priced: priced, softActive: softActive, tokenOnly: tokenOnly}
 }
 
-// recordSpend 计算费用响应头并记录用量；配置磁盘队列时先同步落盘/PG，否则沿用Redis排队或直接PG。
+// recordSpend 计算费用响应头并记录用量；同步对话先冻结最终快照，交付确认后再持久化并结算。
+// 非同步路径按原磁盘、Redis 或 PG 路径持久化；交付标记无法保存时由 Handler 返回 503。
 // 异步轮询消费临时元数据后更新原请求，只有创建增加请求计数，首次结算增加费用。
 // 本地计价失败时仅将安全原因码加入原始费用快照，不补价或改变预算和费用结果。
 // 参数 w（http.ResponseWriter）：调用方的 HTTP 响应，状态和正文写在这里；p（*auth.Principal）：已经鉴权的调用方，含用户、团队、密钥哈希和别名；callID（string）：这一次调用的 id，用来把请求、响应和用量记在同一行；alias（string）：对外模型名；op（string）：操作名，例如 chat；usage（map[string]any）：用量对象。字段可能是 prompt_tokens，也可能是 input_tokens；start（time.Time）：时间范围的起点。零值表示不限制开始；cacheHit（bool）：为真时走缓存命中这一支。为假时保持原来的路径；status（int）：HTTP 状态码；depID（string）：部署 id。空串表示当前没有钉住的部署。

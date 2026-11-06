@@ -89,7 +89,8 @@ func setCORS(w http.ResponseWriter, r *http.Request) {
 func (s *Server) GinRoutes() gin.RoutesInfo { return s.engine.Routes() }
 
 // Handler 返回统一 HTTP 入口，供服务器和测试挂载；读取失败仅保留有界诊断，不保存不完整正文。
-// Bypass 处理后直接返回，其余请求经 Gin 流式输出或缓冲供幂等重放；不改变鉴权、预算或正常请求正文保存规则。
+// 流式请求直接输出；同步对话和幂等请求经缓冲后写出，交付标记无法保存时返回 503。
+// 实际刷新结果用于确认同步账单；不改变鉴权、预算或正常请求正文保存规则。
 // 参数：无。
 // 调用：gateway/server.go
 // 测试：access_log_test.go、activity_http_test.go、builtin_providers_test.go
@@ -511,8 +512,8 @@ type statusRecorder struct {
 	note string
 	// usageRecorded 只抑制外层错误兜底，不影响执行链对真实尝试的结算。
 	usageRecorded bool
-	delivery      *holdWriter
-	writeErr      error
+	delivery      *holdWriter // 同步对话的待确认账单缓冲，供错误收尾访问。
+	writeErr      error       // 实际响应写入错误，用于错误路径记录交付失败。
 	// body 只收集失败响应，供统一早期错误日志保存客户端实际收到的完整正文。
 	body bytes.Buffer
 }
@@ -657,11 +658,11 @@ type holdWriter struct {
 	code            int
 	buf             bytes.Buffer
 	hdr             bool
-	guardDelivery   bool
-	delivery        *iam.UsageRecord
-	deliveryErr     error
-	preparedID      string
-	principal       *auth.Principal
+	guardDelivery   bool             // 同步对话需要等客户端写出后再确认账单。
+	delivery        *iam.UsageRecord // 执行器冻结的最终账单，等待响应写入。
+	deliveryErr     error            // 交付标记或快照无法保存，不能返回成功正文。
+	preparedID      string           // 已持久化交付标记的调用 ID。
+	principal       *auth.Principal  // 首次出站时冻结的计费归属。
 	routeDeployment string
 	routeTokens     int
 }
