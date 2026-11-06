@@ -460,3 +460,61 @@ func TestSpoolLimitsPermissionsAndConflict(t *testing.T) {
 	}
 	os.Chmod(clean.config.Dir, 0700)
 }
+
+// TestDeliveryMarkerRejectsInvalidAndCorruptTransitions 验证无效终态或损坏标记不会被静默覆盖、清除或重复结算。
+// 使用独占临时磁盘队列，依次模拟非法状态、重复在途和文件损坏；修复后严格确认并清理，临时目录自动删除。
+func TestDeliveryMarkerRejectsInvalidAndCorruptTransitions(t *testing.T) {
+	s := openSpool(t, Config{})
+	final := spoolRecord("transition-check")
+	final.Status, final.HTTPStatus, final.DeliveryPending, final.DeliverySpoolOnly = "success", 200, true, true
+	marker, err := iam.UnconfirmedDelivery(final)
+	if err != nil {
+		t.Fatal(err)
+	}
+	marker.DeliveryUnconfirmed = true
+	if err := s.CompleteDelivery(final); !errors.Is(err, ErrUnavailable) {
+		t.Fatalf("缺少在途标记不能确认: %v", err)
+	}
+	invalid := marker
+	invalid.RequestBody = "private"
+	if err := s.BeginDelivery(invalid); err == nil {
+		t.Fatal("未确认标记不能包含请求正文")
+	}
+	if err := s.BeginDelivery(marker); err != nil {
+		t.Fatal(err)
+	}
+	if err := s.BeginDelivery(marker); !errors.Is(err, ErrConflict) {
+		t.Fatalf("重复在途标记必须冲突: %v", err)
+	}
+	invalid = final
+	invalid.DeliveryUnconfirmed = true
+	if err := s.CompleteDelivery(invalid); err == nil {
+		t.Fatal("未确认结果不能作为最终账单")
+	}
+	name := filepath.Join(s.config.Dir, basename(marker.RequestID))
+	raw, err := os.ReadFile(name)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(name, []byte("corrupt"), 0600); err != nil {
+		t.Fatal(err)
+	}
+	if err := s.CompleteDelivery(final); err == nil {
+		t.Fatal("损坏的标记不能被终态覆盖")
+	}
+	if err := s.DiscardUnconfirmedDelivery(final); err == nil {
+		t.Fatal("损坏的标记不能被确认删除")
+	}
+	if err := os.WriteFile(name, raw, 0600); err != nil {
+		t.Fatal(err)
+	}
+	if err := s.CompleteDelivery(final); err != nil {
+		t.Fatalf("修复标记后应能确认: %v", err)
+	}
+	if err := s.DiscardUnconfirmedDelivery(final); err != nil {
+		t.Fatalf("正确终态应能清理: %v", err)
+	}
+	if status, err := s.Status(); err != nil || status.Pending != 0 {
+		t.Fatalf("确认后仍有残留: status=%+v err=%v", status, err)
+	}
+}

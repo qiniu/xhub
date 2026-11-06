@@ -346,3 +346,49 @@ func TestFlushPendingUsageRequestRejectsMissing(t *testing.T) {
 		t.Fatalf("已提交的账单应可安全确认: %v", err)
 	}
 }
+
+// TestDeliveryRecoveryRejectsCorruptSnapshotAtomically 验证坏的待确认快照不能让同批其他账单部分恢复。
+// 前置隔离 PostgreSQL，按时间排序插入正常和损坏标记；检查事务回滚、修复后唯一零费用结算，测试库自动清理。
+func TestDeliveryRecoveryRejectsCorruptSnapshotAtomically(t *testing.T) {
+	db := testDB(t)
+	now := time.Now().UTC()
+	if _, err := db.RecoverExpiredDeliveries(t.Context(), now, 0); err == nil {
+		t.Fatal("无效批次大小不能视为恢复成功")
+	}
+	good := usageRecord("recovery-atomic-a", "", 0.25)
+	bad := usageRecord("recovery-atomic-b", "", 0.5)
+	for _, record := range []UsageRecord{good, bad} {
+		if err := db.PrepareDelivery(t.Context(), record, now.Add(time.Minute)); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if _, err := db.Engine.Exec(`UPDATE usage_delivery_pending SET payload=jsonb_set(payload, '{Cost}', '1'::jsonb) WHERE request_id=?`, bad.RequestID); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := db.RecoverExpiredDeliveries(t.Context(), now.Add(2*time.Minute), 10); err == nil {
+		t.Fatal("损坏的快照不能当作零费用恢复")
+	}
+	for _, record := range []UsageRecord{good, bad} {
+		if n, err := db.Engine.Table("usage_delivery_pending").Where("request_id = ?", record.RequestID).Count(); err != nil || n != 1 {
+			t.Fatalf("失败批次必须保留全部标记: id=%s n=%d err=%v", record.RequestID, n, err)
+		}
+		if n, err := db.Engine.Table("usage_pending").Where("request_id = ?", record.RequestID).Count(); err != nil || n != 0 {
+			t.Fatalf("失败批次不能部分转移: id=%s n=%d err=%v", record.RequestID, n, err)
+		}
+	}
+	if _, err := db.Engine.Exec(`UPDATE usage_delivery_pending SET payload=jsonb_set(payload, '{Cost}', '0'::jsonb) WHERE request_id=?`, bad.RequestID); err != nil {
+		t.Fatal(err)
+	}
+	if n, err := db.RecoverExpiredDeliveries(t.Context(), now.Add(2*time.Minute), 10); err != nil || n != 2 {
+		t.Fatalf("修复后应恢复全部标记: n=%d err=%v", n, err)
+	}
+	if err := db.FlushPendingUsage(t.Context(), 10); err != nil {
+		t.Fatal(err)
+	}
+	for _, record := range []UsageRecord{good, bad} {
+		event, err := db.GetUsageEvent(t.Context(), UsageQuery{}, record.RequestID)
+		if err != nil || event.Status != "error" || event.Cost != 0 || countEvents(t, db, record.RequestID) != 1 {
+			t.Fatalf("恢复结果不唯一或不为零费用: event=%+v err=%v", event, err)
+		}
+	}
+}
