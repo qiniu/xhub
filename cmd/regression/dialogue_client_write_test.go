@@ -1,6 +1,7 @@
 package regression
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"net/http"
@@ -93,6 +94,44 @@ func TestDialogueClientWriteFailure(t *testing.T) {
 			recovered := h.do("POST", "/chat/completions", owner.key, map[string]any{"model": "dialogue-write", "messages": []any{map[string]any{"role": "user", "content": "Recover."}}, "stream": true})
 			if recovered.status != 200 || calls.Load() != 2 {
 				t.Fatalf("客户端写失败导致健康上游不可用: calls=%d %s", calls.Load(), recovered.describe())
+			}
+		})
+	}
+}
+
+// TestDialogueFlushFailureCanceledContext 验证普通 Chat 与 Responses 转换流的刷新失败不会误记成功或扣费。
+// 使用隔离 PostgreSQL、Redis 和本地上游，注入刷新错误与上下文同时取消；验证诊断与费用，夹具清理资源。
+func TestDialogueFlushFailureCanceledContext(t *testing.T) {
+	for _, tc := range []struct{ name, path, body string }{
+		{"chat", "/chat/completions", `{"model":"dialogue-flush","messages":[{"role":"user","content":"Hello"}],"stream":true}`},
+		{"responses", "/responses", `{"model":"dialogue-flush","input":"Hello","stream":true}`},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			isolatedSpendRedis(t)
+			up := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				w.Header().Set("Content-Type", "text/event-stream")
+				fmt.Fprint(w, "data: {\"id\":\"chat-1\",\"choices\":[{\"index\":0,\"delta\":{\"content\":\"Hello\"},\"finish_reason\":null}]}\n\ndata: {\"id\":\"chat-1\",\"choices\":[{\"index\":0,\"delta\":{},\"finish_reason\":\"stop\"}],\"usage\":{\"prompt_tokens\":8,\"completion_tokens\":2}}\n\ndata: [DONE]\n\n")
+			}))
+			t.Cleanup(up.Close)
+			dep := chatDeployment("dialogue-flush")
+			dep.LiteLLMParams["api_base"] = up.URL + "/v1"
+			dep.ModelInfo["transport"] = "bypass_openai_chat"
+			dep.ModelInfo["endpoint_types"] = []string{"chat", "responses"}
+			h := newHarness(t, dep)
+			admin := h.adminSession()
+			owner := h.openScope(t, admin, "dialogue-flush")
+			req := httptest.NewRequest("POST", tc.path, strings.NewReader(tc.body))
+			ctx, cancel := context.WithCancel(req.Context())
+			defer cancel()
+			req = req.WithContext(ctx)
+			req.Header.Set("Authorization", "Bearer "+owner.key)
+			req.Header.Set("Content-Type", "application/json")
+			w := &flushRejectedClientWriter{header: make(http.Header), cancel: cancel}
+			h.gw.Handler().ServeHTTP(w, req)
+			log := logDetail(t, h, admin, w.header.Get("x-litellm-call-id"))
+			failure := log["metadata"].(map[string]any)["upstream_response"].(map[string]any)["failure"].(map[string]any)
+			if log["status"] != "error" || parseFloatOrZero(fmt.Sprint(log["spend"])) != 0 || failure["kind"] != "client_write_error" {
+				t.Fatalf("对话流刷新失败诊断或费用错误: log=%v failure=%v", log, failure)
 			}
 		})
 	}

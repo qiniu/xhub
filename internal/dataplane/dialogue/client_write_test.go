@@ -88,3 +88,37 @@ func TestRefusalCompletionWriteFailure(t *testing.T) {
 		t.Fatalf("拒绝完成帧短写未报告或继续输出: err=%v failed=%v writes=%d", err, w.failed, w.writes)
 	}
 }
+
+// dialogueFlushProbe 模拟正文写入缓冲成功、刷新时失败；只用于内存测试。
+type dialogueFlushProbe struct {
+	header http.Header
+	err    error
+	writes int
+}
+
+// Header 返回当前测试独占的响应头。
+func (w *dialogueFlushProbe) Header() http.Header { return w.header }
+
+// WriteHeader 接收状态码，不触及网络。
+func (w *dialogueFlushProbe) WriteHeader(int) {}
+
+// Write 模拟底层缓冲接收正文，返回完整写入长度。
+func (w *dialogueFlushProbe) Write(p []byte) (int, error) { w.writes++; return len(p), nil }
+
+// FlushError 报告刷新失败，模拟客户端连接已断开。
+func (w *dialogueFlushProbe) FlushError() error { return w.err }
+
+// TestDialogueFlushFailure 验证同协议和转换协议的刷新失败不会被伪装成成功。
+// 使用内存 SSE 和失败刷新器，断言错误分类及停止输出，无外部资源需清理。
+func TestDialogueFlushFailure(t *testing.T) {
+	const raw = "data: {\"id\":\"chat-1\",\"choices\":[{\"index\":0,\"delta\":{\"content\":\"Hello\"},\"finish_reason\":null}]}\n\ndata: {\"id\":\"chat-1\",\"choices\":[{\"index\":0,\"delta\":{},\"finish_reason\":\"stop\"}]}\n\ndata: [DONE]\n\n"
+	for _, caller := range []string{"openai-chat", "openai-responses"} {
+		t.Run(caller, func(t *testing.T) {
+			w := &dialogueFlushProbe{header: make(http.Header), err: errors.New("flush failed")}
+			_, _, _, _, err := PipeDialogue(w, &http.Response{Body: io.NopCloser(strings.NewReader(raw))}, time.Now(), "public", "openai-chat", caller)
+			if !errors.Is(err, dpstream.ErrClientWrite) || w.writes != 1 {
+				t.Fatalf("刷新失败未分类或继续输出: err=%v writes=%d", err, w.writes)
+			}
+		})
+	}
+}
