@@ -121,7 +121,7 @@ export function registerClientScenario(locale: Locale) {
           .toEqual({ status: "error", spend: 0 });
       }
       await stableGoto(page, "/logs");
-      await expect(page.getByRole("main")).toContainText(name);
+      // 直接按已确认的失败请求查找；成功请求在独立 Redis 中可能尚未刷入，不作为进入错误页的前置条件。
       await page.getByRole("tab", {name:tr("Error Logs"),exact:true}).click();
       // 页签过渡时两个面板可能同时可见；限定目标页签，保持严格唯一匹配，不依赖动画时长。
       const errorPanel = page.getByRole("tabpanel", {name:tr("Error Logs"),exact:true});
@@ -186,6 +186,26 @@ export function registerClientScenario(locale: Locale) {
       }).toEqual({status:"error",spend:0});
       await stableGoto(page, "/logs?log_id=" + bridgeCall.id);
       await expect(page.getByRole("dialog").getByRole("alert")).toBeVisible();
+
+      await page.keyboard.press("Escape");
+
+      // 通过只存在于隔离测试网关的写入器注入刷新失败，验证真实日志页面与零费用。
+      const flushCall = await page.evaluate(async ({token, model}) => {
+        // eslint-disable-next-line no-restricted-syntax
+        const response = await fetch("/gw/completions", {method:"POST",headers:{Authorization:token,"Content-Type":"application/json","X-Xhub-E2E-Flush-Failure":"1"},body:JSON.stringify({model,prompt:"Test flush failure.",stream:true})});
+        await response.text();
+        return response.headers.get("x-litellm-call-id");
+      }, {token:headers.Authorization,model:completionName});
+      expect(flushCall).toBeTruthy();
+      await expect.poll(async () => {
+        const detail = await page.request.get(GATEWAY + "/spend/logs/ui/" + flushCall, {headers});
+        if (!detail.ok()) return null;
+        const row = await detail.json();
+        return {status:row.status,spend:Number(row.spend),kind:row.metadata.upstream_response.failure?.kind};
+      }).toEqual({status:"error",spend:0,kind:"client_write_error"});
+      await stableGoto(page, "/logs?log_id=" + flushCall);
+      await expect(page.getByRole("dialog")).toContainText(tr("logsUX.clientWriteFailed"));
+      await expect(page.getByRole("region",{name:tr("logDiagnostics.title")})).toContainText(tr("logDiagnostics.clientWriteError"));
     } finally {
       if (key)
         expect((await page.request.post(GATEWAY + "/key/delete", { headers, data: { keys: [key] } })).status()).toBe(
