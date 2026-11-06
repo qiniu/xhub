@@ -64,7 +64,7 @@ export function registerClientScenario(locale: Locale) {
             input_cost_per_token: 0.000002,
             output_cost_per_token: 0.000008,
           },
-          model_info: { transport: "bypass_openai_chat", endpoint_types: ["chat"], pricing_source: "manual" },
+          model_info: { transport: "bypass_openai_chat", endpoint_types: ["chat", "responses"], pricing_source: "manual" },
         },
       });
       expect(created.status(), await created.text()).toBe(200);
@@ -163,6 +163,31 @@ export function registerClientScenario(locale: Locale) {
       }).toEqual({status:"error",spend:0});
       await stableGoto(page, "/logs?log_id=" + rawCall.id);
       await expect(page.getByRole("dialog").getByRole("alert")).toBeVisible();
+      await page.keyboard.press("Escape");
+
+      // Responses 经 Chat 上游转换；真实浏览器读取首帧后中断，确认中断传播及零费用日志。
+      const beforeBridgeStopped = stopped;
+      const bridgeCall = await page.evaluate(async ({token, model}) => {
+        const controller = new AbortController();
+        const response = await fetch("/gw/responses", {method:"POST",headers:{Authorization:token,"Content-Type":"application/json"},body:JSON.stringify({model,input:"Test cancellation through conversion.",stream:true}),signal:controller.signal});
+        const reader = response.body!.getReader();
+        await reader.read();
+        const id = response.headers.get("x-litellm-call-id");
+        controller.abort();
+        return {id,status:response.status};
+      }, {token:headers.Authorization,model:name});
+      expect(bridgeCall.status).toBe(200);expect(bridgeCall.id).toBeTruthy();
+      await expect.poll(() => stopped).toBe(beforeBridgeStopped + 1);
+      await expect.poll(async () => {
+        const detail = await page.request.get(GATEWAY + "/spend/logs/ui/" + bridgeCall.id, {headers});
+        if (!detail.ok()) return null;
+        const row = await detail.json();
+        return {status:row.status,spend:Number(row.spend)};
+      }).toEqual({status:"error",spend:0});
+      await stableGoto(page, "/logs?log_id=" + bridgeCall.id);
+      await expect(page.getByRole("dialog").getByRole("alert")).toBeVisible();
+
+      await page.keyboard.press("Escape");
 
       // 通过只存在于隔离测试网关的写入器注入刷新失败，验证真实日志页面与零费用。
       const flushCall = await page.evaluate(async ({token, model}) => {
@@ -181,6 +206,26 @@ export function registerClientScenario(locale: Locale) {
       await stableGoto(page, "/logs?log_id=" + flushCall);
       await expect(page.getByRole("dialog")).toContainText(tr("logsUX.clientWriteFailed"));
       await expect(page.getByRole("region",{name:tr("logDiagnostics.title")})).toContainText(tr("logDiagnostics.clientWriteError"));
+      // 同协议 Chat 和 Responses 转换路径也需在实际网页到网关流程中识别刷新失败。
+      for (const path of ["/chat/completions", "/responses"]) {
+        await page.keyboard.press("Escape");
+        const dialogueCall = await page.evaluate(async ({token, model, path}) => {
+          const body = path === "/responses" ? {model,input:"Test flush failure.",stream:true} : {model,messages:[{role:"user",content:"Test flush failure."}],stream:true};
+          // eslint-disable-next-line no-restricted-syntax
+          const response = await fetch("/gw"+path, {method:"POST",headers:{Authorization:token,"Content-Type":"application/json","X-Xhub-E2E-Flush-Failure":"1"},body:JSON.stringify(body)});
+          await response.text();
+          return response.headers.get("x-litellm-call-id");
+        }, {token:headers.Authorization,model:name,path});
+        expect(dialogueCall).toBeTruthy();
+        await expect.poll(async () => {
+          const detail = await page.request.get(GATEWAY + "/spend/logs/ui/" + dialogueCall, {headers});
+          if (!detail.ok()) return null;
+          const row = await detail.json();
+          return {status:row.status,spend:Number(row.spend),kind:row.metadata.upstream_response.failure?.kind};
+        }).toEqual({status:"error",spend:0,kind:"client_write_error"});
+        await stableGoto(page, "/logs?log_id=" + dialogueCall);
+        await expect(page.getByRole("dialog")).toContainText(tr("logsUX.clientWriteFailed"));
+      }
     } finally {
       if (key)
         expect((await page.request.post(GATEWAY + "/key/delete", { headers, data: { keys: [key] } })).status()).toBe(

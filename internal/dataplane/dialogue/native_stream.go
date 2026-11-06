@@ -3,13 +3,14 @@ package dialogue
 import (
 	"bytes"
 	"encoding/json"
+	"errors"
 	"fmt"
-	"io"
 	"net/http"
 	"strings"
 	"time"
 
 	"github.com/openai/openai-go/v3/packages/ssestream"
+	dpstream "github.com/sunqirui1987/xhub/internal/dataplane/stream"
 	llmdialogue "github.com/sunqirui1987/xhub/internal/llm/dialogue"
 	"github.com/sunqirui1987/xhub/internal/util"
 )
@@ -51,18 +52,15 @@ func pipeNativeDialogue(w http.ResponseWriter, resp *http.Response, start time.T
 			n := min(len(raw), (2<<20)-capture.Len())
 			capture.Write(raw[:n])
 		}
-		n, err := w.Write(raw)
+		n, err := dpstream.WriteClient(w, raw)
 		if n > 0 {
 			wrote = true
 			if ttft == 0 {
 				ttft = time.Since(start)
 			}
 		}
-		if err == nil && n != len(raw) {
-			err = io.ErrShortWrite
-		}
-		if f, ok := w.(http.Flusher); ok && err == nil {
-			f.Flush()
+		if err == nil {
+			err = dpstream.FlushClient(w)
 		}
 		return err
 	}
@@ -160,7 +158,7 @@ func pipeNativeDialogue(w http.ResponseWriter, resp *http.Response, start time.T
 	if err == nil && !completed {
 		err = fmt.Errorf("upstream stream ended without completion")
 	}
-	if err != nil && wrote {
+	if err != nil && wrote && !errors.Is(err, dpstream.ErrClientWrite) {
 		event, payload := streamFailureEvent(err, protocol, state.id)
 		raw, _ := json.Marshal(payload)
 		_ = write(event, raw)

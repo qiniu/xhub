@@ -6,8 +6,8 @@ package dialogue
 import (
 	"bytes"
 	"encoding/json"
+	"errors"
 	"fmt"
-	"io"
 	"net/http"
 	"sort"
 	"strings"
@@ -15,6 +15,7 @@ import (
 
 	"github.com/openai/openai-go/v3/packages/ssestream"
 	dpdiagnostics "github.com/sunqirui1987/xhub/internal/dataplane/diagnostics"
+	dpstream "github.com/sunqirui1987/xhub/internal/dataplane/stream"
 	llmdialogue "github.com/sunqirui1987/xhub/internal/llm/dialogue"
 	"github.com/sunqirui1987/xhub/internal/util"
 )
@@ -147,12 +148,12 @@ func (s *dialogueStream) emit(event string, data any) error {
 	fmt.Fprintf(&b, "data: %s\n\n", raw)
 	chunk := []byte(b.String())
 	s.capture.Write(chunk)
-	n, err := s.writer.Write(chunk)
+	n, err := dpstream.WriteClient(s.writer, chunk)
 	if n > 0 {
 		s.wrote = true
 	}
-	if f, ok := s.writer.(http.Flusher); ok {
-		f.Flush()
+	if err == nil {
+		err = dpstream.FlushClient(s.writer)
 	}
 	return err
 }
@@ -463,9 +464,9 @@ func (s *dialogueStream) finish() error {
 			return err
 		}
 		s.capture.WriteString("data: [DONE]\n\n")
-		_, err := io.WriteString(s.writer, "data: [DONE]\n\n")
-		if f, ok := s.writer.(http.Flusher); ok {
-			f.Flush()
+		_, err := dpstream.WriteClient(s.writer, []byte("data: [DONE]\n\n"))
+		if err == nil {
+			err = dpstream.FlushClient(s.writer)
 		}
 		return err
 	case "openai-responses":
@@ -992,7 +993,7 @@ func PipeDialogueWithPreparation(w http.ResponseWriter, resp *http.Response, sta
 	if err == nil {
 		err = s.finish()
 	}
-	if err != nil && s.wrote { // 已输出后发送明确失败事件，不能生成完成事件或改用另一个部署。
+	if err != nil && s.wrote && !errors.Is(err, dpstream.ErrClientWrite) { // 已输出后的上游失败尝试发送失败事件；客户端写失败不能继续写。
 		event, payload := streamFailureEvent(err, caller, s.id)
 		_ = s.emit(event, payload)
 	}

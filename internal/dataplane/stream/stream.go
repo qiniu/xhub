@@ -23,6 +23,30 @@ const captureLimit = 2 << 20
 // ErrClientWrite 标识响应写向客户端时的失败；调用方不得据此推断是谁中断连接。
 var ErrClientWrite = errors.New("client response write failed")
 
+// WriteClient 将一段响应正文写给客户端，保留实际写出字节数并分类写入错误或短写。
+// 参数 w 为当前请求的响应写入器，p 为待发送字节；返回实际写入长度及带 ErrClientWrite 的错误。
+// 流式原生及协议转换路径调用；本函数不刷新、不重试、不推断连接由哪一方中断。
+func WriteClient(w io.Writer, p []byte) (int, error) {
+	n, err := w.Write(p)
+	if err == nil && n != len(p) {
+		err = io.ErrShortWrite
+	}
+	if err != nil {
+		return n, fmt.Errorf("%w: %w", ErrClientWrite, err)
+	}
+	return n, nil
+}
+
+// FlushClient 刷新客户端流并将底层错误分类为写入失败，供原生与协议转换流使用。
+// 参数 w 为当前响应写入器；返回刷新错误，不支持刷新时保持原有兼容行为。
+// 不进行重试或推断中断发起方，已缓冲正文可能被发送到连接。
+func FlushClient(w http.ResponseWriter) error {
+	if err := util.FlushResponse(w); err != nil {
+		return fmt.Errorf("%w: %w", ErrClientWrite, err)
+	}
+	return nil
+}
+
 // noteCaptureTruncated 在流式日志捕获达到上限时记录诊断提示。
 // 参数 kept 为已保存字节数；返回值无，PipeStream 追加捕获后调用，未到上限时不输出。
 // 提示正文估算可能偏低，但真实用量解析仍消费完整流；只写进程日志，不截断上游传输。
@@ -103,14 +127,11 @@ func PipeStream(w http.ResponseWriter, resp *http.Response, start time.Time) (bo
 				wrote = true
 			}
 			// 尽早转发已读数据，避免大块事件先解析而拖慢用户看到首字。
-			written, writeErr := w.Write(buf[:n])
-			if writeErr == nil && written != n {
-				writeErr = io.ErrShortWrite
-			}
+			_, writeErr := WriteClient(w, buf[:n])
 			if writeErr == nil {
 				// 沿包装链查找可返回错误的刷新器，避免中间层吞掉连接错误。
 				if flushErr := util.FlushResponse(w); flushErr != nil {
-					writeErr = flushErr
+					writeErr = fmt.Errorf("%w: %w", ErrClientWrite, flushErr)
 				}
 			}
 			if len(captured) < 2<<20 {
@@ -127,7 +148,7 @@ func PipeStream(w http.ResponseWriter, resp *http.Response, start time.Time) (bo
 			if writeErr != nil {
 				// 上游已经读到的用量仍保留为诊断事实；写失败不代表用户主动停止，也不能继续重放。
 				parser.write(nil, true)
-				return wrote, parser.usage, ttft, captured, fmt.Errorf("%w: %w", ErrClientWrite, writeErr)
+				return wrote, parser.usage, ttft, captured, writeErr
 			}
 		}
 		if err != nil {
