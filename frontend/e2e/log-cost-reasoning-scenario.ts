@@ -54,6 +54,12 @@ export function registerLogCostReasoningScenario(locale: "en" | "zh-CN") {
         const detail = await (await page.request.get(GATEWAY + "/spend/logs/ui/" + callID, { headers })).json();
         expect(detail).toMatchObject({ reasoning_effort: effort, prompt_tokens: 10000, completion_tokens: 10 });
         expect(detail.spend).toBeCloseTo(0.00308641, 12);
+        // 同步调用的费用响应头与日志应一致；流式响应在最终用量产生前已发送头，不作该断言。
+        if (!stream) {
+          const cost = response.headers()["x-litellm-response-cost"];
+          expect(cost).toBeTruthy();
+          expect(Number(cost)).toBeCloseTo(detail.spend, 12);
+        }
         expect(detail.metadata.cost_breakdown.total_cost).toBeCloseTo(detail.spend, 12);
         // 普通固定费率不能仅因请求发生在高峰时间而被标记为分时价。
         expect(detail.metadata.cost_breakdown.pricing_window).toBeUndefined();
