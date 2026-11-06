@@ -48,6 +48,8 @@ func TestDialogueClientWriteFailure(t *testing.T) {
 		{"bridge-short", "/responses", `{"model":"dialogue-write","input":"Hello","stream":true}`, true},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
+			// 冷却状态只保存在 Redis；必须连接独立实例才能验证健康检查。
+			isolatedSpendRedis(t)
 			var calls atomic.Int32
 			up := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 				calls.Add(1)
@@ -69,8 +71,8 @@ func TestDialogueClientWriteFailure(t *testing.T) {
 			req.Header.Set("Content-Type", "application/json")
 			w := &dialogueWriteProbe{header: make(http.Header), short: tc.short}
 			h.gw.Handler().ServeHTTP(w, req)
-			if calls.Load() != 1 {
-				t.Fatalf("客户端写入失败不应重放上游: calls=%d", calls.Load())
+			if calls.Load() != 1 || w.writes != 1 {
+				t.Fatalf("客户端写入失败不应重放上游或再次写出错误: calls=%d writes=%d", calls.Load(), w.writes)
 			}
 			id := w.header.Get("x-litellm-call-id")
 			if id == "" {
