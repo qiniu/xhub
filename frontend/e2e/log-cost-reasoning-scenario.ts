@@ -103,6 +103,9 @@ export function registerLogCostReasoningScenario(locale: "en" | "zh-CN") {
       expect(failureDetail.status).toBe("error");
       expect(failureDetail.spend).toBe(0);
       expect(failureDetail.metadata.upstream_response.failure.kind).toBe("client_write_error");
+      // 虚拟网络错误含两端地址，日志接口及界面均不能暴露连接地址。
+      expect(JSON.stringify(failureDetail)).not.toContain("10.20.30.40");
+      expect(JSON.stringify(failureDetail)).not.toContain("198.51.100.123");
       // 已失败并记零费用的交付不能通过幂等重放泄露完整的成功正文。
       const failedReplay = await page.request.post(GATEWAY + "/v1/chat/completions", {
         headers: { Authorization: "Bearer " + key, "Idempotency-Key": model + "-write-failure" },
@@ -113,6 +116,8 @@ export function registerLogCostReasoningScenario(locale: "en" | "zh-CN") {
       await stableGoto(page, "/logs?log_id=" + encodeURIComponent(writeFailureID));
       const failureDialog = page.getByRole("dialog");
       await expect(failureDialog.getByText(tr("logDiagnostics.clientWriteError"))).toBeVisible();
+      await expect(failureDialog).not.toContainText("10.20.30.40");
+      await expect(failureDialog).not.toContainText("198.51.100.123");
       await page.keyboard.press("Escape");
       // 小响应在服务端缓冲成功后刷新失败，仍应在真实日志界面显示失败且费用为零。
       const flushFailure = await page.request.post(GATEWAY + "/v1/chat/completions", {

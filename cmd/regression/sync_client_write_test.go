@@ -1,7 +1,9 @@
 package regression
 
 import (
+	"errors"
 	"fmt"
+	"net"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -379,5 +381,29 @@ func TestSyncConfirmedSpoolRecoveryAcrossInstances(t *testing.T) {
 	after := h.moneyOf(t, owner)
 	if !after.grewBy(before, expectedCost()) {
 		t.Fatalf("其他实例提前恢复导致成功账单丢失: id=%s before=%+v after=%+v", id, before, after)
+	}
+}
+
+// TestSyncClientWriteNetworkErrorPrivacy 验证真实网关写入错误日志不会泄露 TCP 连接双方地址。
+// 使用隔离 PostgreSQL 和本地上游，注入带虚拟地址的写失败，检查错误分类与零费用；夹具清理所有资源。
+func TestSyncClientWriteNetworkErrorPrivacy(t *testing.T) {
+	t.Setenv("XHUB_USAGE_SPOOL_DIR", "")
+	t.Setenv("XHUB_REGRESSION_REDIS_URL", "")
+	h := newHarness(t, chatDeployment("sync-network-privacy"))
+	admin := h.adminSession()
+	owner := h.openScope(t, admin, "sync-network-privacy")
+	req := httptest.NewRequest("POST", "/v1/chat/completions", strings.NewReader(`{"model":"sync-network-privacy","messages":[{"role":"user","content":"Hello"}],"stream":false}`))
+	req.Header.Set("Authorization", "Bearer "+owner.key)
+	req.Header.Set("Content-Type", "application/json")
+	failure := &net.OpError{Op: "write", Net: "tcp", Source: &net.TCPAddr{IP: net.ParseIP("10.20.30.40"), Port: 1234}, Addr: &net.TCPAddr{IP: net.ParseIP("198.51.100.123"), Port: 5678}, Err: errors.New("broken pipe")}
+	w := &dialogueWriteProbe{header: make(http.Header), err: failure}
+	h.gw.Handler().ServeHTTP(w, req)
+	log := logDetail(t, h, admin, w.header.Get("x-litellm-call-id"))
+	if log["status"] != "error" || parseFloatOrZero(fmt.Sprint(log["spend"])) != 0 {
+		t.Fatalf("失败响应不应收费: %v", log)
+	}
+	detail := fmt.Sprint(log["metadata"], log["error"])
+	if strings.Contains(detail, "10.20.30.40") || strings.Contains(detail, "198.51.100.123") || !strings.Contains(detail, "client_write_error") {
+		t.Fatalf("写失败诊断泄露地址或分类缺失: %s", detail)
 	}
 }

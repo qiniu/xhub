@@ -23,6 +23,8 @@ func (s *Server) finishSyncDelivery(ctx context.Context, record iam.UsageRecord,
 		_ = json.Unmarshal([]byte(record.UpstreamResponse), &diag)
 		failure := dpdiagnostics.ObserveFailure(ctx, "client_write", writeErr, time.Since(record.TS))
 		failure.Kind = "client_write_error"
+		// TCP 写错误可能包含用户和网关地址；记录安全的失败类别而非原始连接信息。
+		failure.TransportError = "client response write failed"
 		failure.CancellationSource = "unknown"
 		diag.Failure = failure
 		// 原本已失败的上游状态和错误正文仍是排障证据；写客户端失败作为独立诊断补充。

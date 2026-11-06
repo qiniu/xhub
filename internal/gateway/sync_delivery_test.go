@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"net"
 	"net/http"
 	"net/http/httptest"
 	"path/filepath"
@@ -144,5 +145,34 @@ func TestDeliveryBuffer(t *testing.T) {
 	h.guardDelivery = false
 	if deliveryBuffer(w) != nil {
 		t.Fatal("未启用的缓冲不应接管账单")
+	}
+}
+
+// TestSyncDeliveryWriteFailureHidesNetworkAddresses 验证客户端写入故障的日志不会泄露连接两端地址。
+// 使用隔离 PostgreSQL 和带地址的模拟 TCP 错误；核对失败零费用和诊断信息，测试库自动清理。
+func TestSyncDeliveryWriteFailureHidesNetworkAddresses(t *testing.T) {
+	db := testIdentityStore(t)
+	s := &Server{IAM: db}
+	record := iam.UsageRecord{RequestID: "finish-network-privacy", TS: time.Now().UTC(), Model: "test", CallType: "chat", Status: "success", HTTPStatus: 200, Cost: 0.25}
+	if err := db.PrepareDelivery(t.Context(), record, time.Now().Add(time.Minute)); err != nil {
+		t.Fatal(err)
+	}
+	writeErr := &net.OpError{Op: "write", Net: "tcp", Source: &net.TCPAddr{IP: net.ParseIP("10.20.30.40"), Port: 1234}, Addr: &net.TCPAddr{IP: net.ParseIP("198.51.100.123"), Port: 5678}, Err: errors.New("broken pipe")}
+	s.finishSyncDelivery(context.Background(), record, writeErr)
+	event, err := db.GetUsageEvent(t.Context(), iam.UsageQuery{}, record.RequestID)
+	if err != nil || event.Status != "error" || event.Cost != 0 {
+		t.Fatalf("写失败不能扣费: event=%+v err=%v", event, err)
+	}
+	log, err := db.GetRequestLog(t.Context(), record.RequestID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, value := range []string{log.UpstreamResponse, log.Error} {
+		if strings.Contains(value, "10.20.30.40") || strings.Contains(value, "198.51.100.123") {
+			t.Fatalf("错误诊断不应包含 IP 地址: %s", value)
+		}
+		if !strings.Contains(value, "client_write_error") {
+			t.Fatalf("缺少写入失败分类: %s", value)
+		}
 	}
 }
