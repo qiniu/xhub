@@ -514,15 +514,33 @@ func Serve(h dpcontract.Adapted, w http.ResponseWriter, r *http.Request, op stri
 
 				// 专用 4xx 在分类后切换模型；普通 4xx 保留原状态与正文。
 				if resp.StatusCode >= 400 {
-					errorBody, readErr := io.ReadAll(resp.Body)
-					resp.Body.Close()
-					resp.Body = io.NopCloser(bytes.NewReader(errorBody))
-					errorKind := dprouting.FallbackKind(resp.StatusCode, errorBody)
-					if readErr == nil && errorKind != "" && !fallbacks.Disabled && len(baseRouteCfg.ModelFallbacks[fallbacks.Current].Targets(errorKind)) > 0 {
+					// 回退判断基于原始预读事实：传输截断时不能仅凭错误片段切换模型。
+					errorAttempt := readBufferedAttempt(resp)
+					// 正文预读时请求上下文可能结束；不能把不完整响应当作完整上游 4xx，也不能重试。
+					if errorAttempt.readErr != nil && r.Context().Err() != nil {
+						cancelAttempt()
+						h.DecBusy(did)
+						lastErr = errorAttempt.readErr
+						if stopCanceled(errorAttempt.body, nil, did, 0) {
+							return
+						}
+					}
+					if errorAttempt.readErr != nil && stream && len(errorAttempt.body) == 0 {
+						// 已收到上游错误状态，空截断正文不是空成功流；保持状态、零费用和不重试。
+						cancelAttempt()
+						h.DecBusy(did)
+						h.RememberExchange(callID, r, raw, nil)
+						h.RecordSpend(w, p, callID, alias, op, nil, start, false, resp.StatusCode, did)
+						util.WriteTypedError(w, r.URL.Path, resp.StatusCode, "upstream_error", "upstream error response body was interrupted")
+						return
+					}
+					resp.Body = io.NopCloser(bytes.NewReader(errorAttempt.body))
+					errorKind := dprouting.FallbackKind(errorAttempt.status, errorAttempt.body)
+					if errorAttempt.readErr == nil && errorKind != "" && !fallbacks.Disabled && len(baseRouteCfg.ModelFallbacks[fallbacks.Current].Targets(errorKind)) > 0 {
 						cancelAttempt()
 						h.DecBusy(did)
 						lastStatus = resp.StatusCode
-						lastResponse = errorBody
+						lastResponse = errorAttempt.body
 						lastErr = errUpstreamStatus
 						kind = errorKind
 						goto nextFallbackModel

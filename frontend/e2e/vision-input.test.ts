@@ -31,6 +31,16 @@ function expectSoftVisionBudget(headers: Record<string, string>) {
  expect(headers["x-xhub-budget-reservation-id"]).toBeUndefined();
 }
 
+/** 图片协议回归按调用标识读取真实账单，等待后台结算并核对状态、费用和用量；只读，测试 schema 由运行器回收。 */
+async function expectVisionBill(page: Page, headers: Record<string, string>, id: string) {
+  await expect.poll(async () => {
+    const reply = await page.request.get(GATEWAY + "/spend/logs/ui/" + id, { headers });
+    if (!reply.ok()) return null;
+    const bill = await reply.json();
+    return { status: bill.status, spend: Number(bill.spend), input: bill.prompt_tokens, output: bill.completion_tokens };
+  }, { message: "Vision bill " + id }).toEqual({ status: "success", spend: 0.000012, input: 8, output: 2 });
+}
+
 for (const locale of ["zh-CN", "en"] as const)
   for (const stream of [false, true]) {
     /** 前置真实浏览器/Go 后台/PostgreSQL 和校验图片字节/cap的本地上游；中英文创建选择有限额Key、上传预览、三协议JSON/SSE、账单和零占用。
@@ -151,8 +161,12 @@ for (const locale of ["zh-CN", "en"] as const)
             ).toBe(true);
             expectSoftVisionBudget(reply.headers());
             await expect(page.getByText("green-pixel", { exact: true }).last()).toBeVisible();
+            // 文本可见时 SSE 尾部的用量和结束事件仍可能在传输；等响应收完且页面恢复可发送后，再清空对话。
+            await expect(page.getByRole("button", { name: t("Send message"), exact: true })).toBeVisible();
+            await expectVisionBill(page, headers, reply.headers()["x-litellm-call-id"]);
             calls.push(reply.headers()["x-litellm-call-id"]);
           }
+        const playgroundCallCount = calls.length;
         // Messages 通过同源浏览器代理到真实后台，必须转换成上游能消费的图片，不能只允许一个白名单字段。
         for (const name of names) {
           const result = await browserPost(page, key.key, "/gw/v1/messages", {
@@ -228,20 +242,7 @@ for (const locale of ["zh-CN", "en"] as const)
         // 独立图片价格不再阻断请求；当前仅按实测 token 计费，也必须纳入账单核对。
         calls.push(separateImageRate.callID);
 
-        for (const id of calls)
-          await expect
-            .poll(async () => {
-              const reply = await page.request.get(GATEWAY + "/spend/logs/ui/" + id, { headers });
-              if (!reply.ok()) return null;
-              const bill = await reply.json();
-              return {
-                status: bill.status,
-                spend: Number(bill.spend),
-                input: bill.prompt_tokens,
-                output: bill.completion_tokens,
-              };
-            })
-            .toEqual({ status: "success", spend: 0.000012, input: 8, output: 2 });
+        for (const id of calls.slice(playgroundCallCount)) await expectVisionBill(page, headers, id);
         await expect
           .poll(async () => {
             const info = (await (await page.request.get(GATEWAY + "/key/info?key=" + keyID, { headers })).json()).info;
