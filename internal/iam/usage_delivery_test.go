@@ -379,6 +379,19 @@ func TestDeliveryRecoveryRejectsCorruptSnapshotAtomically(t *testing.T) {
 	if _, err := db.Engine.Exec(`UPDATE usage_delivery_pending SET payload=jsonb_set(payload, '{Cost}', '0'::jsonb) WHERE request_id=?`, bad.RequestID); err != nil {
 		t.Fatal(err)
 	}
+	// 持久化新终态失败时同样必须回滚并保留标记，不能把账单视为已恢复。
+	if _, err := db.Engine.Exec(`ALTER TABLE usage_pending ADD CONSTRAINT reject_atomic_recovery CHECK (false)`); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := db.RecoverExpiredDeliveries(t.Context(), now.Add(2*time.Minute), 10); err == nil {
+		t.Fatal("待结算写入失败不能报告恢复成功")
+	}
+	if n, err := db.Engine.Table("usage_delivery_pending").Count(); err != nil || n != 2 {
+		t.Fatalf("写入失败必须保留全部标记: n=%d err=%v", n, err)
+	}
+	if _, err := db.Engine.Exec(`ALTER TABLE usage_pending DROP CONSTRAINT reject_atomic_recovery`); err != nil {
+		t.Fatal(err)
+	}
 	if n, err := db.RecoverExpiredDeliveries(t.Context(), now.Add(2*time.Minute), 10); err != nil || n != 2 {
 		t.Fatalf("修复后应恢复全部标记: n=%d err=%v", n, err)
 	}
