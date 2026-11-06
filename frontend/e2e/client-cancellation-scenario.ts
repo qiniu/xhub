@@ -229,6 +229,26 @@ export function registerClientScenario(locale: Locale) {
       await stableGoto(page, "/logs?log_id=" + flushCall);
       await expect(page.getByRole("dialog")).toContainText(tr("logsUX.clientWriteFailed"));
       await expect(page.getByRole("region",{name:tr("logDiagnostics.title")})).toContainText(tr("logDiagnostics.clientWriteError"));
+      // 同协议 Chat 和 Responses 转换路径也需在实际网页到网关流程中识别刷新失败。
+      for (const path of ["/chat/completions", "/responses"]) {
+        await page.keyboard.press("Escape");
+        const dialogueCall = await page.evaluate(async ({token, model, path}) => {
+          const body = path === "/responses" ? {model,input:"Test flush failure.",stream:true} : {model,messages:[{role:"user",content:"Test flush failure."}],stream:true};
+          // eslint-disable-next-line no-restricted-syntax
+          const response = await fetch("/gw"+path, {method:"POST",headers:{Authorization:token,"Content-Type":"application/json","X-Xhub-E2E-Flush-Failure":"1"},body:JSON.stringify(body)});
+          await response.text();
+          return response.headers.get("x-litellm-call-id");
+        }, {token:headers.Authorization,model:name,path});
+        expect(dialogueCall).toBeTruthy();
+        await expect.poll(async () => {
+          const detail = await page.request.get(GATEWAY + "/spend/logs/ui/" + dialogueCall, {headers});
+          if (!detail.ok()) return null;
+          const row = await detail.json();
+          return {status:row.status,spend:Number(row.spend),kind:row.metadata.upstream_response.failure?.kind};
+        }).toEqual({status:"error",spend:0,kind:"client_write_error"});
+        await stableGoto(page, "/logs?log_id=" + dialogueCall);
+        await expect(page.getByRole("dialog")).toContainText(tr("logsUX.clientWriteFailed"));
+      }
     } finally {
       if (key)
         expect((await page.request.post(GATEWAY + "/key/delete", { headers, data: { keys: [key] } })).status()).toBe(
