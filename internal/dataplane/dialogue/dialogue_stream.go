@@ -152,8 +152,8 @@ func (s *dialogueStream) emit(event string, data any) error {
 	if n > 0 {
 		s.wrote = true
 	}
-	if f, ok := s.writer.(http.Flusher); ok && err == nil {
-		f.Flush()
+	if err == nil {
+		err = dpstream.FlushClient(s.writer)
 	}
 	return err
 }
@@ -465,8 +465,8 @@ func (s *dialogueStream) finish() error {
 		}
 		s.capture.WriteString("data: [DONE]\n\n")
 		_, err := dpstream.WriteClient(s.writer, []byte("data: [DONE]\n\n"))
-		if f, ok := s.writer.(http.Flusher); ok && err == nil {
-			f.Flush()
+		if err == nil {
+			err = dpstream.FlushClient(s.writer)
 		}
 		return err
 	case "openai-responses":
