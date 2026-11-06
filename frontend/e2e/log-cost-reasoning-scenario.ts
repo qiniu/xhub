@@ -1,6 +1,7 @@
 import { expect, test } from "@playwright/test";
 import { spawn, type ChildProcess } from "node:child_process";
 import { createServer } from "node:net";
+import { closeSync, openSync } from "node:fs";
 import { join } from "node:path";
 import { translate } from "../src/i18n/translate";
 import { GATEWAY, UPSTREAM, loginAdmin, sessionBearer, stableGoto } from "./helpers";
@@ -18,6 +19,7 @@ export function registerLogCostReasoningScenario(locale: "en" | "zh-CN") {
     const model = "monitor-tps-log-details-" + locale + "-" + Date.now();
     let modelID = "", keyID = "", key = "";
     let secondGateway: ChildProcess | undefined;
+    let secondGatewayError: Error | undefined;
     const extraModelIDs: string[] = [];
     const observations: Record<string, unknown>[] = [];
     try {
@@ -169,11 +171,18 @@ export function registerLogCostReasoningScenario(locale: "en" | "zh-CN") {
       await new Promise<void>((resolve, reject) => probe.close((error) => error ? reject(error) : resolve()));
       const runDir = process.env.E2E_RUN_DIR;
       if (!runDir) throw new Error("E2E_RUN_DIR is required for isolated gateway");
-      secondGateway = spawn(join(runDir, "xhub"), ["-config", join(runDir, "c.yaml"), "-addr", `127.0.0.1:${address.port}`], {
-        env: { ...process.env, XHUB_PRICE_FEED_URL: UPSTREAM + "/v1/market/models", XHUB_PUBLIC_ORIGIN: secondOrigin, XHUB_USAGE_SPOOL_DIR: "" },
-        stdio: "ignore",
-      });
+      const secondLog = openSync(join(runDir, "idempotency-second-gateway.log"), "a");
+      try {
+        secondGateway = spawn(join(runDir, "xhub"), ["-config", join(runDir, "c.yaml"), "-addr", `127.0.0.1:${address.port}`], {
+          env: { ...process.env, XHUB_PRICE_FEED_URL: UPSTREAM + "/v1/market/models", XHUB_PUBLIC_ORIGIN: secondOrigin, XHUB_USAGE_SPOOL_DIR: "" },
+          stdio: ["ignore", secondLog, secondLog],
+        });
+        secondGateway.once("error", (error) => { secondGatewayError = error; });
+      } finally {
+        closeSync(secondLog);
+      }
       await expect.poll(async () => {
+        if (secondGatewayError) throw new Error(`Second gateway failed to start: ${secondGatewayError.message}`);
         if (secondGateway?.exitCode !== null) throw new Error(`Second gateway exited: ${secondGateway?.exitCode}`);
         try { return (await page.request.get(secondOrigin + "/health/readiness")).status(); } catch { return 0; }
       }).toBe(200);
@@ -209,7 +218,7 @@ export function registerLogCostReasoningScenario(locale: "en" | "zh-CN") {
       await expect(page.getByRole("row").filter({ hasText: originalID })).toBeVisible();
       await info.attach("log-cost-reasoning-contract", { body: JSON.stringify(observations, null, 2), contentType: "application/json" });
     } finally {
-      if (secondGateway && secondGateway.exitCode === null && secondGateway.signalCode === null) {
+      if (secondGateway && !secondGatewayError && secondGateway.pid && secondGateway.exitCode === null && secondGateway.signalCode === null) {
         secondGateway.kill("SIGTERM");
         await new Promise<void>((resolve) => secondGateway!.once("exit", () => resolve()));
       }
