@@ -11,7 +11,7 @@ go test ./internal/dataplane/... ./internal/live -count=1
 | 路径 | 保证与边界 |
 | --- | --- |
 | 完整响应缓存 | 非流式，进程内 LRU；无 TTL、跨实例失效保证 |
-| Idempotency-Key | 鉴权后非流式协调与重放；进程内，重启可能重执行 |
+| Idempotency-Key | 鉴权后非流式请求在当前进程内重放；PostgreSQL 保存摘要 24 小时，跨实例或重启后返回 `409 idempotency_result_unavailable`，不保存响应正文；数据库不可用或登记超时返回 `503 idempotency_unavailable` |
 | 流式响应 | 失败不更新成功缓存/粘性；输出后不能重新开始 |
 | 原生任务 | 使用创建身份及登记路径查询 |
 | 任务结算 | 成功结果的实测用量，PostgreSQL 去重 |
